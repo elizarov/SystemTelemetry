@@ -11,11 +11,8 @@ public:
     CardChromeWidget() = default;
     explicit CardChromeWidget(const LayoutCardConfig& card);
 
-    WidgetClass Class() const override;
-    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetHost& renderer) const override;
-    bool IsHoverable() const override;
     void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) override;
     void Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
     void BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const override;

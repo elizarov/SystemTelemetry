@@ -5,8 +5,8 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 
 ## Top-Level Packages
 
-- [config](architecture/config.md) - persisted configuration model, INI parsing and writing, schema metadata, theme and color resolution, and config-facing contracts.
-- [dashboard](architecture/dashboard.md) - shell UI, controller orchestration, tray integration, menus, auto-start, service registration, and user-facing command flow.
+- [config](architecture/config.md) - persisted configuration model, INI parsing and writing, schema metadata, theme and color resolution, config color text formatting, and config-facing contracts.
+- [dashboard](architecture/dashboard.md) - shell UI, controller orchestration, tray integration, menus and menu labels, auto-start, service registration, and user-facing command flow.
 - [dashboard_renderer](architecture/dashboard_renderer.md) - dashboard scene traversal, layout resolution, widget host services, drawing-mode state, and active-region collection.
 - [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app-icon export, and native crash reports.
 - [display](architecture/display.md) - monitor enumeration, display targeting, placement, scale, and wallpaper/configure-display helpers.
@@ -17,13 +17,13 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 - [main](architecture/main.md) - process entry point, command-line startup mode selection, elevation handoff, service host entry, and runtime config loading.
 - [renderer](architecture/renderer.md) - D2D-free renderer interface, render-space DTOs, style resources, Direct2D/DirectWrite/WIC backend, text measurement, and bitmap export support.
 - [telemetry](architecture/telemetry.md) - telemetry runtime, snapshot contracts, metric catalog, provider bridges, FPS service protocol, fake runtime, and retained histories.
-- [util](architecture/util.md) - domain-neutral file path, command-line, string, enum, UTF-8, resource, localization, numeric, trace, and callback helpers.
+- [util](architecture/util.md) - domain-neutral file path, command-line, string, enum, UTF-8, resource, localization, numeric formatting, Win32 error formatting, trace, and callback helpers.
 - [vendor](architecture/vendor.md) - narrow vendored source kept outside project layering rules where package-managed dependencies are not practical.
 - [widget](architecture/widget.md) - widget contracts, widget factories, widget-local drawing/layout behavior, edit-artifact registration, and app-icon/card-chrome geometry.
 
 Other top-level areas:
 
-- `resources/` contains the resource script, embedded config and localization files, dialog templates, manifest, and fallback executable icon.
+- `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, generated asset, and source dependency graph helper scripts.
 - `.agents/skills/` contains reusable agent or automation skills.
@@ -35,8 +35,9 @@ Other top-level areas:
 - Dependencies flow downward. Higher layers may include lower-layer contracts, but lower layers do not include or call higher layers.
 - The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `layout_edit`, `layout_edit_dialog`, and `main`.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Config-language DTOs live in `config`, runtime telemetry DTOs live in `telemetry`, and domain-neutral helpers live in `util`.
+- Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
 - Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
-- `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, and the renderer-only Direct2D boundary before reporting success.
+- `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, source-policy bans, and the renderer-only Direct2D boundary before reporting success.
 
 ## Package Dependency Rules
 
@@ -63,10 +64,10 @@ Other top-level areas:
 
 ## Resources And Build Graph
 
-- `resources/CaseDash.rc` owns dialogs, icons, embedded config, and the embedded localization catalog.
+- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded config/localization text atlas resource.
 - `resources/resource.h` owns resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
-- CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers, target-specific version resource scripts, and the application manifest.
+- CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.
 - The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
 - `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the Windows runner.
 - `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.

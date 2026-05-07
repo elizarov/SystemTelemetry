@@ -4,7 +4,6 @@
 
 #include <optional>
 #include <string>
-#include <vector>
 
 #include "config/config.h"
 #include "util/scale.h"
@@ -25,7 +24,6 @@ struct TargetMonitorInfo {
 };
 
 struct DisplayMenuOption {
-    UINT commandId = 0;
     std::string displayName;
     std::string configMonitorName;
     RECT rect{};
@@ -43,6 +41,6 @@ SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
 std::string SimplifyDeviceName(const std::string& deviceName);
 bool IsUsefulFriendlyName(const std::string& name);
-std::vector<DisplayMenuOption> EnumerateDisplayMenuOptions(const AppConfig& config);
+size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity);
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName);
 MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredScale = 0.0);

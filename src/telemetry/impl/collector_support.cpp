@@ -7,8 +7,11 @@
 
 #include "telemetry/impl/system_info_support.h"
 #include "util/strings.h"
+#include "util/utf8.h"
 
 namespace {
+
+constexpr wchar_t kPdhLibraryName[] = L"pdh.dll";  // GetModuleHandleW requires a UTF-16 module name.
 
 std::string DetectCpuNameFromCpuid() {
     int maxExtendedLeaf[4]{};
@@ -58,13 +61,14 @@ std::string PdhStatusCodeString(PDH_STATUS status) {
 
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
 
-PDH_STATUS AddCounterCompat(PDH_HQUERY query, const wchar_t* path, PDH_HCOUNTER* counter) {
+PDH_STATUS AddCounterCompat(PDH_HQUERY query, std::string_view path, PDH_HCOUNTER* counter) {
+    const std::wstring widePath = WideFromUtf8(path);
     static PdhAddEnglishCounterWFn addEnglish = reinterpret_cast<PdhAddEnglishCounterWFn>(
-        GetProcAddress(GetModuleHandleW(L"pdh.dll"), "PdhAddEnglishCounterW"));
+        GetProcAddress(GetModuleHandleW(kPdhLibraryName), "PdhAddEnglishCounterW"));
     if (addEnglish != nullptr) {
-        return addEnglish(query, path, 0, counter);
+        return addEnglish(query, widePath.c_str(), 0, counter);
     }
-    return PdhAddCounterW(query, path, 0, counter);
+    return PdhAddCounterW(query, widePath.c_str(), 0, counter);
 }
 
 std::string DetectCpuName() {
@@ -74,7 +78,7 @@ std::string DetectCpuName() {
     }
 
     const auto registryName = ReadRegistryString(
-        HKEY_LOCAL_MACHINE, L"HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", L"ProcessorNameString");
+        HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0", "ProcessorNameString");
     if (registryName.has_value()) {
         return CollapseAsciiWhitespace(Trim(*registryName));
     }

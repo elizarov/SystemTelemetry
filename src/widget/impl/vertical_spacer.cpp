@@ -1,24 +1,18 @@
 #include "widget/impl/vertical_spacer.h"
 
+#include <optional>
+#include <string_view>
+
 #include "widget/widget_host.h"
 
-WidgetClass VerticalSpacerWidget::Class() const {
-    return WidgetClass::VerticalSpacer;
+namespace {
+
+std::unique_ptr<Widget> CreateReferencedWidget(std::string_view name) {
+    const auto widgetClass = name.empty() ? std::nullopt : EnumFromString<WidgetClass>(name);
+    return widgetClass.has_value() ? CreateWidget(*widgetClass) : nullptr;
 }
 
-std::unique_ptr<Widget> VerticalSpacerWidget::Clone() const {
-    auto widget = std::make_unique<VerticalSpacerWidget>();
-    widget->referencedWidgetName_ = referencedWidgetName_;
-    if (!referencedWidgetName_.empty()) {
-        widget->referencedWidget_ = CreateWidget(referencedWidgetName_);
-        if (widget->referencedWidget_ != nullptr) {
-            LayoutNodeConfig node;
-            node.name = referencedWidgetName_;
-            widget->referencedWidget_->Initialize(node);
-        }
-    }
-    return widget;
-}
+}  // namespace
 
 void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
     referencedWidgetName_ = node.parameter;
@@ -27,7 +21,7 @@ void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
         return;
     }
 
-    referencedWidget_ = CreateWidget(referencedWidgetName_);
+    referencedWidget_ = CreateReferencedWidget(referencedWidgetName_);
     if (referencedWidget_ == nullptr) {
         return;
     }
@@ -39,12 +33,4 @@ void VerticalSpacerWidget::Initialize(const LayoutNodeConfig& node) {
 
 int VerticalSpacerWidget::PreferredHeight(const WidgetHost& renderer) const {
     return referencedWidget_ != nullptr ? referencedWidget_->PreferredHeight(renderer) : 0;
-}
-
-bool VerticalSpacerWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
-}
-
-bool VerticalSpacerWidget::IsHoverable() const {
-    return false;
 }

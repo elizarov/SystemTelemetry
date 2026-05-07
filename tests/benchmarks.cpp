@@ -29,6 +29,7 @@
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
     X(EditLayout, "edit-layout")                                                                                       \
@@ -244,10 +245,12 @@ std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& render
         if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
             return false;
         }
-        const auto& guide = std::get<LayoutEditGuide>(region.payload);
-        return guide.editCardId.empty() && guide.nodePath.size() <= 1 && guide.childExtents.size() >= 2;
+        const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
+        return guide != nullptr && guide->editCardId.empty() && guide->nodePath.size() <= 1 &&
+               guide->childExtents.size() >= 2;
     });
-    return it != regions.end() ? std::optional<LayoutEditGuide>(std::get<LayoutEditGuide>(it->payload)) : std::nullopt;
+    const auto* guide = it != regions.end() ? LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(*it) : nullptr;
+    return guide != nullptr ? std::optional<LayoutEditGuide>(*guide) : std::nullopt;
 }
 
 std::vector<std::vector<int>> BuildWeightSequence(const std::vector<int>& seedWeights, size_t iterations) {
@@ -327,9 +330,11 @@ public:
     }
 
     bool Initialize() {
+        const std::wstring staticClass = WideFromUtf8("STATIC");
+        const std::wstring windowTitle = WideFromUtf8("CaseDashBenchmarkHost");
         hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
-            L"STATIC",
-            L"CaseDashBenchmarkHost",
+            staticClass.c_str(),
+            windowTitle.c_str(),
             WS_POPUP,
             0,
             0,
@@ -428,6 +433,13 @@ public:
     }
 
 private:
+    bool FinishLayoutEditConfigMutation() {
+        // Keep this aligned with the real layout-edit mutation tail; drag cost includes config dirty tracking.
+        renderer_.SetConfig(config_);
+        dirty_ = true;
+        return true;
+    }
+
     const AppConfig& LayoutEditConfig() const override {
         return config_;
     }
@@ -468,8 +480,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ApplyGuideWeights(config_, target, weights);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -480,8 +491,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ::ApplyMetricListOrder(config_, widget, metricRefs);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -491,8 +501,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ::ApplyContainerChildOrder(config_, key, fromIndex, toIndex);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -512,8 +521,7 @@ private:
         const auto start = Clock::now();
         const bool applied = ApplyLayoutEditParameterValue(config_, parameter, value);
         if (applied) {
-            renderer_.SetConfig(config_);
-            dirty_ = true;
+            FinishLayoutEditConfigMutation();
         }
         RecordLayoutEditTracePhase(TracePhase::Apply, Clock::now() - start);
         return applied;
@@ -523,7 +531,7 @@ private:
         dirty_ = true;
     }
 
-    void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override {
+    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override {
         phaseTotals_ = {};
         traceSession_.Begin(trace_, kind, detail);
     }
@@ -533,7 +541,7 @@ private:
         RecordPhase(static_cast<BenchPhase>(PhaseIndex(phase)), elapsed);
     }
 
-    void EndLayoutEditTraceSession(const std::string& reason) override {
+    void EndLayoutEditTraceSession(const char* reason) override {
         traceSession_.End(trace_, reason);
     }
 
@@ -752,6 +760,7 @@ BenchResult RunDragBenchmark(BenchmarkHost& host,
     const auto start = Clock::now();
     for (const auto& weights : weightSequence) {
         controller.HandleMouseMove(DragPointForWeights(guide, initialWeights, weights));
+        // Mirrors the app's drag WM_MOUSEMOVE path, which forces a redraw instead of waiting for queued WM_PAINT.
         host.FlushPaintIfDirty();
     }
     const Duration total = Clock::now() - start;

@@ -1,10 +1,9 @@
 #include "telemetry/metrics.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
-#include <span>
 #include <string_view>
 #include <utility>
 
@@ -12,116 +11,94 @@
 
 namespace {
 
-constexpr std::string_view kBoardTemperaturePrefix = "board.temp.";
-constexpr std::string_view kBoardFanPrefix = "board.fan.";
-constexpr std::string_view kPermissionRequiredText = "!admin";
+constexpr char kBoardTemperaturePrefix[] = "board.temp.";
+constexpr char kBoardFanPrefix[] = "board.fan.";
+constexpr char kPermissionRequiredText[] = "!admin";
 
-enum class MetricPayloadKind : unsigned int {
-    Text = 1u,
-    Value = 2u,
-    Throughput = 4u,
+enum class MetricPayloadKind {
+    Text,
+    Value,
+    Throughput,
 };
 
-enum class ThroughputGraphGroup {
+enum class ThroughputGraphGroup : std::uint8_t {
     None,
     Network,
     Storage,
 };
 
-using TextResolverFn = std::string (*)(const SystemSnapshot&, std::string_view);
-using MetricResolverFn = MetricValue (*)(
-    const SystemSnapshot&, const MetricDefinitionConfig&, const std::string&, std::string_view);
-using ThroughputValueResolverFn = double (*)(const SystemSnapshot&);
-using ThroughputGuideStepResolverFn = double (*)(double);
-using MetricPayloadMask = unsigned int;
+enum class MetricBindingKind : std::uint8_t {
+    CpuName,
+    GpuName,
+    Nothing,
+    CpuLoad,
+    CpuClock,
+    CpuMemory,
+    GpuLoad,
+    GpuTemperature,
+    GpuClock,
+    GpuFan,
+    GpuFps,
+    GpuMemory,
+    NetworkUpload,
+    NetworkDownload,
+    StorageRead,
+    StorageWrite,
+    DriveActivityRead,
+    DriveActivityWrite,
+    DriveUsage,
+    DriveFree,
+    BoardTemperature,
+    BoardFan,
+};
 
-constexpr MetricPayloadMask PayloadMask(MetricPayloadKind kind) {
-    return static_cast<MetricPayloadMask>(kind);
-}
-
-constexpr MetricPayloadMask kNoPayload = 0;
-constexpr MetricPayloadMask kTextPayload = PayloadMask(MetricPayloadKind::Text);
-constexpr MetricPayloadMask kValuePayload = PayloadMask(MetricPayloadKind::Value);
-constexpr MetricPayloadMask kThroughputPayload = PayloadMask(MetricPayloadKind::Throughput);
+enum MetricBindingFlags : std::uint8_t {
+    kPrefixMatchFlag = 1u << 0,
+    kHasMetricStyleFlag = 1u << 1,
+    kGenerallyAvailableFlag = 1u << 2,
+    kStaticTextFlag = 1u << 3,
+    kTextPayloadFlag = 1u << 4,
+    kValuePayloadFlag = 1u << 5,
+    kThroughputPayloadFlag = 1u << 6,
+};
 
 struct MetricBinding {
-    std::string_view key;
-    bool prefixMatch = false;
-    std::optional<MetricDisplayStyle> metricStyle;
-    MetricPayloadMask payloadMask = kNoPayload;
-    bool generallyAvailable = true;
-    bool staticText = false;
-    TextResolverFn resolveText = nullptr;
-    MetricResolverFn resolveMetric = nullptr;
-    ThroughputValueResolverFn resolveThroughputValue = nullptr;
+    const char* key = "";
+    MetricDisplayStyle metricStyle = MetricDisplayStyle::Scalar;
+    MetricBindingKind kind = MetricBindingKind::Nothing;
     ThroughputGraphGroup throughputGroup = ThroughputGraphGroup::None;
-    ThroughputGuideStepResolverFn resolveGuideStep = nullptr;
-
-    static constexpr MetricBinding ExactStaticText(std::string_view key, TextResolverFn resolveText) {
-        MetricBinding binding{};
-        binding.key = key;
-        binding.payloadMask = kTextPayload;
-        binding.staticText = true;
-        binding.resolveText = resolveText;
-        return binding;
-    }
-
-    static constexpr MetricBinding ExactValue(
-        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
-        MetricBinding binding{};
-        binding.key = key;
-        binding.metricStyle = style;
-        binding.payloadMask = kValuePayload;
-        binding.resolveMetric = resolveMetric;
-        return binding;
-    }
-
-    static constexpr MetricBinding ExactThroughput(std::string_view key,
-        ThroughputValueResolverFn resolveThroughputValue,
-        ThroughputGraphGroup throughputGroup,
-        ThroughputGuideStepResolverFn resolveGuideStep) {
-        MetricBinding binding{};
-        binding.key = key;
-        binding.metricStyle = MetricDisplayStyle::Throughput;
-        binding.payloadMask = kThroughputPayload;
-        binding.resolveThroughputValue = resolveThroughputValue;
-        binding.throughputGroup = throughputGroup;
-        binding.resolveGuideStep = resolveGuideStep;
-        return binding;
-    }
-
-    static constexpr MetricBinding ExactDisplayOnly(std::string_view key, MetricDisplayStyle style) {
-        MetricBinding binding{};
-        binding.key = key;
-        binding.metricStyle = style;
-        return binding;
-    }
-
-    static constexpr MetricBinding ExactSpecialDisplayOnly(std::string_view key, MetricDisplayStyle style) {
-        MetricBinding binding = ExactDisplayOnly(key, style);
-        binding.generallyAvailable = false;
-        return binding;
-    }
-
-    static constexpr MetricBinding PrefixValue(
-        std::string_view key, MetricDisplayStyle style, MetricResolverFn resolveMetric) {
-        MetricBinding binding{};
-        binding.key = key;
-        binding.prefixMatch = true;
-        binding.metricStyle = style;
-        binding.payloadMask = kValuePayload;
-        binding.resolveMetric = resolveMetric;
-        return binding;
-    }
+    std::uint8_t flags = kGenerallyAvailableFlag;
 };
+
+static_assert(sizeof(MetricBinding) == 16);
 
 struct MetricBindingMatch {
     const MetricBinding* binding = nullptr;
     std::string_view logicalName;
 };
 
+constexpr std::uint8_t operator|(MetricBindingFlags lhs, MetricBindingFlags rhs) {
+    return static_cast<std::uint8_t>(static_cast<std::uint8_t>(lhs) | static_cast<std::uint8_t>(rhs));
+}
+
+constexpr std::uint8_t operator|(std::uint8_t lhs, MetricBindingFlags rhs) {
+    return static_cast<std::uint8_t>(lhs | static_cast<std::uint8_t>(rhs));
+}
+
+bool BindingHasFlag(const MetricBinding& binding, MetricBindingFlags flag) {
+    return (binding.flags & static_cast<std::uint8_t>(flag)) != 0;
+}
+
 bool BindingSupportsPayload(const MetricBinding& binding, MetricPayloadKind kind) {
-    return (binding.payloadMask & PayloadMask(kind)) != 0;
+    switch (kind) {
+        case MetricPayloadKind::Text:
+            return BindingHasFlag(binding, kTextPayloadFlag);
+        case MetricPayloadKind::Value:
+            return BindingHasFlag(binding, kValuePayloadFlag);
+        case MetricPayloadKind::Throughput:
+            return BindingHasFlag(binding, kThroughputPayloadFlag);
+    }
+    return false;
 }
 
 std::string FormatScalarValue(std::optional<double> value, std::string_view unit, int precision) {
@@ -132,7 +109,7 @@ std::string FormatScalarValue(std::optional<double> value, std::string_view unit
     if (unit.empty()) {
         sprintf_s(buffer, "%.*f", precision, *value);
     } else {
-        sprintf_s(buffer, "%.*f %s", precision, *value, std::string(unit).c_str());
+        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
     }
     return buffer;
 }
@@ -147,7 +124,7 @@ std::string FormatPercentValue(std::optional<double> value, std::string_view uni
     } else if (unit == "%") {
         sprintf_s(buffer, "%.*f%%", precision, *value);
     } else {
-        sprintf_s(buffer, "%.*f %s", precision, *value, std::string(unit).c_str());
+        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
     }
     return buffer;
 }
@@ -160,7 +137,7 @@ std::string FormatMemoryValue(double usedGb, double totalGb, std::string_view un
     if (unit.empty()) {
         sprintf_s(buffer, "%.1f / %.0f", usedGb, totalGb);
     } else {
-        sprintf_s(buffer, "%.1f / %.0f %s", usedGb, totalGb, std::string(unit).c_str());
+        sprintf_s(buffer, "%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(unit.size()), unit.data());
     }
     return buffer;
 }
@@ -173,7 +150,11 @@ std::string FormatThroughputValue(double valueMbps, std::string_view unit) {
     if (unit.empty()) {
         sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
     } else {
-        sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f %s" : "%.1f %s", valueMbps, std::string(unit).c_str());
+        sprintf_s(buffer,
+            valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s",
+            valueMbps,
+            static_cast<int>(unit.size()),
+            unit.data());
     }
     return buffer;
 }
@@ -196,12 +177,12 @@ std::string FormatSizeAutoValue(double valueGb, std::string_view units) {
         if (largeUnit.empty()) {
             sprintf_s(buffer, "%.1f", valueGb / 1024.0);
         } else {
-            sprintf_s(buffer, "%.1f %s", valueGb / 1024.0, std::string(largeUnit).c_str());
+            sprintf_s(buffer, "%.1f %.*s", valueGb / 1024.0, static_cast<int>(largeUnit.size()), largeUnit.data());
         }
     } else if (smallUnit.empty()) {
         sprintf_s(buffer, "%.0f", valueGb);
     } else {
-        sprintf_s(buffer, "%.0f %s", valueGb, std::string(smallUnit).c_str());
+        sprintf_s(buffer, "%.0f %.*s", valueGb, static_cast<int>(smallUnit.size()), smallUnit.data());
     }
     return buffer;
 }
@@ -227,9 +208,10 @@ double ResolveDisplayedThroughputValue(double fallbackValue, const std::vector<d
     return FiniteNonNegativeOr(fallbackValue);
 }
 
-double GetThroughputGraphMax(const std::vector<const std::vector<double>*>& histories) {
+double GetThroughputGraphMax(const std::vector<double>* const* histories, size_t historyCount) {
     double maxSmoothedValue = 10.0;
-    for (const auto* history : histories) {
+    for (size_t i = 0; i < historyCount; ++i) {
+        const auto* history = histories[i];
         if (history == nullptr) {
             continue;
         }
@@ -267,11 +249,22 @@ int ResolveScalarPrecision(const std::string& metricRef) {
 }
 
 const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
-    const auto indexIt = snapshot.retainedHistoryIndexByRef.find(seriesRef);
-    if (indexIt == snapshot.retainedHistoryIndexByRef.end() || indexIt->second >= snapshot.retainedHistories.size()) {
-        return nullptr;
+    RetainedHistoryKey key = RetainedHistoryKey::Count;
+    if (TryRetainedHistoryKey(seriesRef, key)) {
+        const uint16_t encodedIndex = snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)];
+        if (encodedIndex != 0) {
+            const size_t index = encodedIndex - 1u;
+            if (index < snapshot.retainedHistories.size() && snapshot.retainedHistories[index].seriesRef == seriesRef) {
+                return &snapshot.retainedHistories[index].samples;
+            }
+        }
     }
-    return &snapshot.retainedHistories[indexIt->second].samples;
+    for (const auto& history : snapshot.retainedHistories) {
+        if (history.seriesRef == seriesRef) {
+            return &history.samples;
+        }
+    }
+    return nullptr;
 }
 
 double ResolvePeakRatio(const SystemSnapshot& snapshot,
@@ -385,90 +378,39 @@ MetricValue ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
     return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
 }
 
-std::string ResolveCpuNameText(const SystemSnapshot& snapshot, std::string_view) {
-    return snapshot.cpu.name;
-}
-
-std::string ResolveGpuNameText(const SystemSnapshot& snapshot, std::string_view) {
-    return snapshot.gpu.name;
-}
-
-MetricValue ResolveCpuLoadMetric(const SystemSnapshot& snapshot,
+MetricValue ResolvePercentMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
-    std::string_view) {
-    const double percent = ClampFinite(snapshot.cpu.loadPercent, 0.0, 100.0);
+    double rawPercent) {
+    const double percent = ClampFinite(rawPercent, 0.0, 100.0);
     const double ratio = ResolveMetricRatio(definition, percent, 100.0);
     return BuildResolvedMetric(
         snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, percent), ratio, 100.0);
 }
 
-MetricValue ResolveCpuClockMetric(const SystemSnapshot& snapshot,
+MetricValue ResolveOptionalScalarMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
-    std::string_view) {
-    const double value = FiniteNonNegativeOr(snapshot.cpu.clock.value.value_or(0.0));
+    std::optional<double> metricValue) {
+    const double value = FiniteNonNegativeOr(metricValue.value_or(0.0));
     const double ratio = ResolveMetricRatio(definition, value);
     return BuildResolvedMetric(
-        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.cpu.clock.value), ratio);
+        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, metricValue), ratio);
 }
 
-MetricValue ResolveCpuMemoryMetric(const SystemSnapshot& snapshot,
+MetricValue ResolveMemoryMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
-    std::string_view) {
-    const double total = FiniteNonNegativeOr(snapshot.cpu.memory.totalGb);
-    const double used = FiniteNonNegativeOr(snapshot.cpu.memory.usedGb);
+    const MemoryMetric& memory) {
+    const double total = FiniteNonNegativeOr(memory.totalGb);
+    const double used = FiniteNonNegativeOr(memory.usedGb);
     const double ratio = ResolveMetricRatio(definition, used, total);
     return BuildResolvedMetric(snapshot,
         definition,
         metricRef,
-        FormatMetricValueText(definition, metricRef, snapshot.cpu.memory.usedGb, snapshot.cpu.memory.totalGb),
+        FormatMetricValueText(definition, metricRef, memory.usedGb, memory.totalGb),
         ratio,
         total);
-}
-
-MetricValue ResolveGpuLoadMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view) {
-    const double percent = ClampFinite(snapshot.gpu.loadPercent, 0.0, 100.0);
-    const double ratio = ResolveMetricRatio(definition, percent, 100.0);
-    return BuildResolvedMetric(
-        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, percent), ratio, 100.0);
-}
-
-MetricValue ResolveGpuTemperatureMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view) {
-    const double value = FiniteNonNegativeOr(snapshot.gpu.temperature.value.value_or(0.0));
-    const double ratio = ResolveMetricRatio(definition, value);
-    return BuildResolvedMetric(snapshot,
-        definition,
-        metricRef,
-        FormatMetricValueText(definition, metricRef, snapshot.gpu.temperature.value),
-        ratio);
-}
-
-MetricValue ResolveGpuClockMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view) {
-    const double value = FiniteNonNegativeOr(snapshot.gpu.clock.value.value_or(0.0));
-    const double ratio = ResolveMetricRatio(definition, value);
-    return BuildResolvedMetric(
-        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.clock.value), ratio);
-}
-
-MetricValue ResolveGpuFanMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view) {
-    const double value = FiniteNonNegativeOr(snapshot.gpu.fan.value.value_or(0.0));
-    const double ratio = ResolveMetricRatio(definition, value);
-    return BuildResolvedMetric(
-        snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, snapshot.gpu.fan.value), ratio);
 }
 
 MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
@@ -504,134 +446,209 @@ MetricValue ResolveGpuFpsMetric(const SystemSnapshot& snapshot,
         permissionRequired);
 }
 
-MetricValue ResolveGpuMemoryMetric(const SystemSnapshot& snapshot,
+MetricValue ResolveMetricByKind(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
-    std::string_view) {
-    const double total = FiniteNonNegativeOr(snapshot.gpu.vram.totalGb);
-    const double used = FiniteNonNegativeOr(snapshot.gpu.vram.usedGb);
-    const double ratio = ResolveMetricRatio(definition, used, total);
-    return BuildResolvedMetric(snapshot,
-        definition,
-        metricRef,
-        FormatMetricValueText(definition, metricRef, snapshot.gpu.vram.usedGb, snapshot.gpu.vram.totalGb),
-        ratio,
-        total);
-}
-
-MetricValue ResolveBoardTemperatureMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
+    MetricBindingKind kind,
     std::string_view logicalName) {
-    return ResolveBoardMetric(snapshot.boardTemperatures, snapshot, definition, metricRef, logicalName);
+    switch (kind) {
+        case MetricBindingKind::Nothing:
+            return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
+        case MetricBindingKind::CpuLoad:
+            return ResolvePercentMetric(snapshot, definition, metricRef, snapshot.cpu.loadPercent);
+        case MetricBindingKind::CpuClock:
+            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.cpu.clock.value);
+        case MetricBindingKind::CpuMemory:
+            return ResolveMemoryMetric(snapshot, definition, metricRef, snapshot.cpu.memory);
+        case MetricBindingKind::GpuLoad:
+            return ResolvePercentMetric(snapshot, definition, metricRef, snapshot.gpu.loadPercent);
+        case MetricBindingKind::GpuTemperature:
+            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.temperature.value);
+        case MetricBindingKind::GpuClock:
+            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.clock.value);
+        case MetricBindingKind::GpuFan:
+            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.fan.value);
+        case MetricBindingKind::GpuFps:
+            return ResolveGpuFpsMetric(snapshot, definition, metricRef, logicalName);
+        case MetricBindingKind::GpuMemory:
+            return ResolveMemoryMetric(snapshot, definition, metricRef, snapshot.gpu.vram);
+        case MetricBindingKind::BoardTemperature:
+            return ResolveBoardMetric(snapshot.boardTemperatures, snapshot, definition, metricRef, logicalName);
+        case MetricBindingKind::BoardFan:
+            return ResolveBoardMetric(snapshot.boardFans, snapshot, definition, metricRef, logicalName);
+        default:
+            return {};
+    }
 }
 
-MetricValue ResolveBoardFanMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view logicalName) {
-    return ResolveBoardMetric(snapshot.boardFans, snapshot, definition, metricRef, logicalName);
-}
-
-MetricValue ResolveNothingMetric(const SystemSnapshot& snapshot,
-    const MetricDefinitionConfig& definition,
-    const std::string& metricRef,
-    std::string_view) {
-    return BuildResolvedMetric(snapshot, definition, metricRef, "N/A", 0.0);
-}
-
-double ResolveNetworkUploadValue(const SystemSnapshot& snapshot) {
-    return snapshot.network.uploadMbps;
-}
-
-double ResolveNetworkDownloadValue(const SystemSnapshot& snapshot) {
-    return snapshot.network.downloadMbps;
-}
-
-double ResolveStorageReadValue(const SystemSnapshot& snapshot) {
-    return snapshot.storage.readMbps;
-}
-
-double ResolveStorageWriteValue(const SystemSnapshot& snapshot) {
-    return snapshot.storage.writeMbps;
+std::string ResolveTextByKind(const SystemSnapshot& snapshot, MetricBindingKind kind) {
+    switch (kind) {
+        case MetricBindingKind::CpuName:
+            return snapshot.cpu.name;
+        case MetricBindingKind::GpuName:
+            return snapshot.gpu.name;
+        default:
+            return {};
+    }
 }
 
 const MetricBinding kExactBindings[] = {
-    MetricBinding::ExactStaticText("cpu.name", &ResolveCpuNameText),
-    MetricBinding::ExactStaticText("gpu.name", &ResolveGpuNameText),
-    MetricBinding::ExactValue("nothing", MetricDisplayStyle::Scalar, &ResolveNothingMetric),
-    MetricBinding::ExactValue("cpu.load", MetricDisplayStyle::Percent, &ResolveCpuLoadMetric),
-    MetricBinding::ExactValue("cpu.clock", MetricDisplayStyle::Scalar, &ResolveCpuClockMetric),
-    MetricBinding::ExactValue("cpu.ram", MetricDisplayStyle::Memory, &ResolveCpuMemoryMetric),
-    MetricBinding::ExactValue("gpu.load", MetricDisplayStyle::Percent, &ResolveGpuLoadMetric),
-    MetricBinding::ExactValue("gpu.temp", MetricDisplayStyle::Scalar, &ResolveGpuTemperatureMetric),
-    MetricBinding::ExactValue("gpu.clock", MetricDisplayStyle::Scalar, &ResolveGpuClockMetric),
-    MetricBinding::ExactValue("gpu.fan", MetricDisplayStyle::Scalar, &ResolveGpuFanMetric),
-    MetricBinding::ExactValue("gpu.fps", MetricDisplayStyle::Scalar, &ResolveGpuFpsMetric),
-    MetricBinding::ExactValue("gpu.vram", MetricDisplayStyle::Memory, &ResolveGpuMemoryMetric),
-    MetricBinding::ExactThroughput(
-        "network.upload", &ResolveNetworkUploadValue, ThroughputGraphGroup::Network, &GetThroughputGuideStep),
-    MetricBinding::ExactThroughput(
-        "network.download", &ResolveNetworkDownloadValue, ThroughputGraphGroup::Network, &GetThroughputGuideStep),
-    MetricBinding::ExactThroughput(
-        "storage.read", &ResolveStorageReadValue, ThroughputGraphGroup::Storage, &GetThroughputGuideStep),
-    MetricBinding::ExactThroughput(
-        "storage.write", &ResolveStorageWriteValue, ThroughputGraphGroup::Storage, &GetThroughputGuideStep),
-    MetricBinding::ExactSpecialDisplayOnly("drive.activity.read", MetricDisplayStyle::LabelOnly),
-    MetricBinding::ExactSpecialDisplayOnly("drive.activity.write", MetricDisplayStyle::LabelOnly),
-    MetricBinding::ExactSpecialDisplayOnly("drive.usage", MetricDisplayStyle::Percent),
-    MetricBinding::ExactSpecialDisplayOnly("drive.free", MetricDisplayStyle::SizeAuto),
+    {"cpu.name",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::CpuName,
+        ThroughputGraphGroup::None,
+        kTextPayloadFlag | kStaticTextFlag},
+    {"gpu.name",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::GpuName,
+        ThroughputGraphGroup::None,
+        kTextPayloadFlag | kStaticTextFlag},
+    {"nothing",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::Nothing,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"cpu.load",
+        MetricDisplayStyle::Percent,
+        MetricBindingKind::CpuLoad,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"cpu.clock",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::CpuClock,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"cpu.ram",
+        MetricDisplayStyle::Memory,
+        MetricBindingKind::CpuMemory,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.load",
+        MetricDisplayStyle::Percent,
+        MetricBindingKind::GpuLoad,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.temp",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::GpuTemperature,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.clock",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::GpuClock,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.fan",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::GpuFan,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.fps",
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::GpuFps,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"gpu.vram",
+        MetricDisplayStyle::Memory,
+        MetricBindingKind::GpuMemory,
+        ThroughputGraphGroup::None,
+        kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"network.upload",
+        MetricDisplayStyle::Throughput,
+        MetricBindingKind::NetworkUpload,
+        ThroughputGraphGroup::Network,
+        kThroughputPayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"network.download",
+        MetricDisplayStyle::Throughput,
+        MetricBindingKind::NetworkDownload,
+        ThroughputGraphGroup::Network,
+        kThroughputPayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"storage.read",
+        MetricDisplayStyle::Throughput,
+        MetricBindingKind::StorageRead,
+        ThroughputGraphGroup::Storage,
+        kThroughputPayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"storage.write",
+        MetricDisplayStyle::Throughput,
+        MetricBindingKind::StorageWrite,
+        ThroughputGraphGroup::Storage,
+        kThroughputPayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {"drive.activity.read",
+        MetricDisplayStyle::LabelOnly,
+        MetricBindingKind::DriveActivityRead,
+        ThroughputGraphGroup::None,
+        kHasMetricStyleFlag},
+    {"drive.activity.write",
+        MetricDisplayStyle::LabelOnly,
+        MetricBindingKind::DriveActivityWrite,
+        ThroughputGraphGroup::None,
+        kHasMetricStyleFlag},
+    {"drive.usage",
+        MetricDisplayStyle::Percent,
+        MetricBindingKind::DriveUsage,
+        ThroughputGraphGroup::None,
+        kHasMetricStyleFlag},
+    {"drive.free",
+        MetricDisplayStyle::SizeAuto,
+        MetricBindingKind::DriveFree,
+        ThroughputGraphGroup::None,
+        kHasMetricStyleFlag},
 };
 
 const MetricBinding kPrefixBindings[] = {
-    MetricBinding::PrefixValue(kBoardTemperaturePrefix, MetricDisplayStyle::Scalar, &ResolveBoardTemperatureMetric),
-    MetricBinding::PrefixValue(kBoardFanPrefix, MetricDisplayStyle::Scalar, &ResolveBoardFanMetric),
+    {kBoardTemperaturePrefix,
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::BoardTemperature,
+        ThroughputGraphGroup::None,
+        kPrefixMatchFlag | kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
+    {kBoardFanPrefix,
+        MetricDisplayStyle::Scalar,
+        MetricBindingKind::BoardFan,
+        ThroughputGraphGroup::None,
+        kPrefixMatchFlag | kValuePayloadFlag | kHasMetricStyleFlag | kGenerallyAvailableFlag},
 };
 
-const std::unordered_map<std::string_view, const MetricBinding*>& ExactMetricBindingIndex() {
-    static const auto index = [] {
-        std::unordered_map<std::string_view, const MetricBinding*> bindings;
-        bindings.reserve(std::size(kExactBindings));
-        for (const auto& binding : kExactBindings) {
-            bindings.emplace(binding.key, &binding);
-        }
-        return bindings;
-    }();
-    return index;
-}
-
 MetricBindingMatch FindMetricBinding(std::string_view metricRef) {
-    const auto exactIt = ExactMetricBindingIndex().find(metricRef);
-    if (exactIt != ExactMetricBindingIndex().end()) {
-        return MetricBindingMatch{exactIt->second, {}};
+    for (const auto& binding : kExactBindings) {
+        if (std::string_view(binding.key) == metricRef) {
+            return MetricBindingMatch{&binding, {}};
+        }
     }
     for (const auto& binding : kPrefixBindings) {
-        if (metricRef.rfind(binding.key, 0) == 0) {
-            return MetricBindingMatch{&binding, metricRef.substr(binding.key.size())};
+        const std::string_view key(binding.key);
+        if (metricRef.rfind(key, 0) == 0) {
+            return MetricBindingMatch{&binding, metricRef.substr(key.size())};
         }
     }
     return {};
 }
 
-std::optional<MetricValue> ResolveMetricValue(
-    const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics, const std::string& metricRef) {
+bool ResolveMetricValue(const SystemSnapshot& snapshot,
+    const MetricsSectionConfig& metrics,
+    const std::string& metricRef,
+    MetricValue& value) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    if (match.binding == nullptr || !BindingSupportsPayload(*match.binding, MetricPayloadKind::Value) ||
-        match.binding->resolveMetric == nullptr) {
-        return std::nullopt;
+    if (match.binding == nullptr || !BindingSupportsPayload(*match.binding, MetricPayloadKind::Value)) {
+        return false;
     }
 
     const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(metrics, metricRef);
     if (definition == nullptr) {
-        return std::nullopt;
+        return false;
     }
-    return match.binding->resolveMetric(snapshot, *definition, metricRef, match.logicalName);
+    value = ResolveMetricByKind(snapshot, *definition, metricRef, match.binding->kind, match.logicalName);
+    return true;
 }
 
 const std::vector<double>* FindThroughputHistory(
     const MetricSource::ThroughputSharedState& state, std::string_view metricRef) {
-    const auto it = state.historyByMetricRef.find(std::string(metricRef));
-    return it != state.historyByMetricRef.end() ? &it->second : nullptr;
+    for (size_t i = 0; i < state.historyCount; ++i) {
+        const auto& entry = state.histories[i];
+        if (entry.metricRef != nullptr && std::string_view(entry.metricRef) == metricRef) {
+            return &entry.samples;
+        }
+    }
+    return nullptr;
 }
 
 double ResolveThroughputGraphMax(const MetricSource::ThroughputSharedState& state, const MetricBinding& binding) {
@@ -646,25 +663,47 @@ double ResolveThroughputGraphMax(const MetricSource::ThroughputSharedState& stat
     return 10.0;
 }
 
+double ResolveThroughputValue(const SystemSnapshot& snapshot, MetricBindingKind kind) {
+    switch (kind) {
+        case MetricBindingKind::NetworkUpload:
+            return snapshot.network.uploadMbps;
+        case MetricBindingKind::NetworkDownload:
+            return snapshot.network.downloadMbps;
+        case MetricBindingKind::StorageRead:
+            return snapshot.storage.readMbps;
+        case MetricBindingKind::StorageWrite:
+            return snapshot.storage.writeMbps;
+        default:
+            return 0.0;
+    }
+}
+
 void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSource::ThroughputSharedState& state) {
-    std::vector<const std::vector<double>*> networkHistories;
-    std::vector<const std::vector<double>*> storageHistories;
+    const std::vector<double>* networkHistories[2] = {};
+    const std::vector<double>* storageHistories[2] = {};
+    size_t networkHistoryCount = 0;
+    size_t storageHistoryCount = 0;
+    state.historyCount = 0;
     for (const auto& binding : kExactBindings) {
         if (!BindingSupportsPayload(binding, MetricPayloadKind::Throughput)) {
             continue;
         }
-        auto [it, inserted] = state.historyByMetricRef.emplace(std::string(binding.key),
-            SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key))));
-        (void)inserted;
-        const auto* history = &it->second;
-        if (binding.throughputGroup == ThroughputGraphGroup::Network) {
-            networkHistories.push_back(history);
-        } else if (binding.throughputGroup == ThroughputGraphGroup::Storage) {
-            storageHistories.push_back(history);
+        if (state.historyCount >= std::size(state.histories)) {
+            break;
+        }
+        auto& entry = state.histories[state.historyCount++];
+        entry.metricRef = binding.key;
+        entry.samples = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key)));
+        if (binding.throughputGroup == ThroughputGraphGroup::Network &&
+            networkHistoryCount < std::size(networkHistories)) {
+            networkHistories[networkHistoryCount++] = &entry.samples;
+        } else if (binding.throughputGroup == ThroughputGraphGroup::Storage &&
+                   storageHistoryCount < std::size(storageHistories)) {
+            storageHistories[storageHistoryCount++] = &entry.samples;
         }
     }
-    state.networkMaxGraph = GetThroughputGraphMax(networkHistories);
-    state.storageMaxGraph = GetThroughputGraphMax(storageHistories);
+    state.networkMaxGraph = GetThroughputGraphMax(networkHistories, networkHistoryCount);
+    state.storageMaxGraph = GetThroughputGraphMax(storageHistories, storageHistoryCount);
     state.timeMarkerOffsetSamples = GetTimeMarkerOffsetSamples(snapshot.now);
 }
 
@@ -679,7 +718,7 @@ std::string NumberText(int value) {
 }
 
 std::string MonthName(int month) {
-    static constexpr std::array<std::string_view, 12> kNames{
+    static constexpr const char* kNames[]{
         "January",
         "February",
         "March",
@@ -697,35 +736,113 @@ std::string MonthName(int month) {
 }
 
 std::string MonthShortName(int month) {
-    static constexpr std::array<std::string_view, 12> kNames{
+    static constexpr const char* kNames[]{
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     return month >= 1 && month <= 12 ? std::string(kNames[static_cast<size_t>(month - 1)]) : std::string{};
 }
 
 std::string WeekdayName(int dayOfWeek) {
-    static constexpr std::array<std::string_view, 7> kNames{
-        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    static constexpr const char* kNames[]{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
 }
 
 std::string WeekdayShortName(int dayOfWeek) {
-    static constexpr std::array<std::string_view, 7> kNames{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static constexpr const char* kNames[]{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
 }
 
-struct FormatToken {
-    std::string_view token;
-    std::string (*resolve)(const SYSTEMTIME&);
+enum class FormatTokenKind : std::uint8_t {
+    Hour24TwoDigit,
+    Hour24,
+    Hour12TwoDigit,
+    Hour12,
+    MinuteTwoDigit,
+    Minute,
+    SecondTwoDigit,
+    Second,
+    UpperMeridiem,
+    LowerMeridiem,
+    YearFull,
+    YearShort,
+    MonthName,
+    MonthShortName,
+    MonthTwoDigit,
+    Month,
+    DayTwoDigit,
+    Day,
+    WeekdayName,
+    WeekdayShortName,
 };
 
-std::string FormatWithTokens(const SYSTEMTIME& time, std::string_view format, std::span<const FormatToken> tokens) {
+struct FormatToken {
+    const char* text = "";
+    std::uint8_t length = 0;
+    FormatTokenKind kind = FormatTokenKind::Hour24TwoDigit;
+};
+
+static_assert(sizeof(FormatToken) == 16);
+
+std::string ResolveFormatToken(const SYSTEMTIME& time, FormatTokenKind kind) {
+    switch (kind) {
+        case FormatTokenKind::Hour24TwoDigit:
+            return TwoDigit(time.wHour);
+        case FormatTokenKind::Hour24:
+            return NumberText(time.wHour);
+        case FormatTokenKind::Hour12TwoDigit: {
+            const int hour = time.wHour % 12;
+            return TwoDigit(hour == 0 ? 12 : hour);
+        }
+        case FormatTokenKind::Hour12: {
+            const int hour = time.wHour % 12;
+            return NumberText(hour == 0 ? 12 : hour);
+        }
+        case FormatTokenKind::MinuteTwoDigit:
+            return TwoDigit(time.wMinute);
+        case FormatTokenKind::Minute:
+            return NumberText(time.wMinute);
+        case FormatTokenKind::SecondTwoDigit:
+            return TwoDigit(time.wSecond);
+        case FormatTokenKind::Second:
+            return NumberText(time.wSecond);
+        case FormatTokenKind::UpperMeridiem:
+            return time.wHour < 12 ? std::string("AM") : std::string("PM");
+        case FormatTokenKind::LowerMeridiem:
+            return time.wHour < 12 ? std::string("am") : std::string("pm");
+        case FormatTokenKind::YearFull:
+            return NumberText(time.wYear);
+        case FormatTokenKind::YearShort:
+            return TwoDigit(time.wYear % 100);
+        case FormatTokenKind::MonthName:
+            return MonthName(time.wMonth);
+        case FormatTokenKind::MonthShortName:
+            return MonthShortName(time.wMonth);
+        case FormatTokenKind::MonthTwoDigit:
+            return TwoDigit(time.wMonth);
+        case FormatTokenKind::Month:
+            return NumberText(time.wMonth);
+        case FormatTokenKind::DayTwoDigit:
+            return TwoDigit(time.wDay);
+        case FormatTokenKind::Day:
+            return NumberText(time.wDay);
+        case FormatTokenKind::WeekdayName:
+            return WeekdayName(time.wDayOfWeek);
+        case FormatTokenKind::WeekdayShortName:
+            return WeekdayShortName(time.wDayOfWeek);
+    }
+    return {};
+}
+
+std::string FormatWithTokens(
+    const SYSTEMTIME& time, std::string_view format, const FormatToken* tokens, size_t tokenCount) {
     std::string output;
     for (size_t index = 0; index < format.size();) {
         bool matched = false;
-        for (const auto& token : tokens) {
-            if (format.substr(index, token.token.size()) == token.token) {
-                output += token.resolve(time);
-                index += token.token.size();
+        for (size_t tokenIndex = 0; tokenIndex < tokenCount; ++tokenIndex) {
+            const FormatToken& token = tokens[tokenIndex];
+            if (format.size() - index >= token.length &&
+                format.compare(index, token.length, token.text, token.length) == 0) {
+                output += ResolveFormatToken(time, token.kind);
+                index += token.length;
                 matched = true;
                 break;
             }
@@ -741,54 +858,48 @@ std::string FormatWithTokens(const SYSTEMTIME& time, std::string_view format, st
 }  // namespace
 
 std::string FormatClockTime(const SYSTEMTIME& time, std::string_view format) {
-    static constexpr std::array<FormatToken, 10> kTokens{{
-        {"HH", [](const SYSTEMTIME& value) { return TwoDigit(value.wHour); }},
-        {"H", [](const SYSTEMTIME& value) { return NumberText(value.wHour); }},
-        {"hh",
-            [](const SYSTEMTIME& value) {
-                const int hour = value.wHour % 12;
-                return TwoDigit(hour == 0 ? 12 : hour);
-            }},
-        {"h",
-            [](const SYSTEMTIME& value) {
-                const int hour = value.wHour % 12;
-                return NumberText(hour == 0 ? 12 : hour);
-            }},
-        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMinute); }},
-        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMinute); }},
-        {"SS", [](const SYSTEMTIME& value) { return TwoDigit(value.wSecond); }},
-        {"S", [](const SYSTEMTIME& value) { return NumberText(value.wSecond); }},
-        {"AM", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("AM") : std::string("PM"); }},
-        {"am", [](const SYSTEMTIME& value) { return value.wHour < 12 ? std::string("am") : std::string("pm"); }},
-    }};
-    return FormatWithTokens(time, format, kTokens);
+    static constexpr FormatToken kTokens[]{
+        {"HH", 2, FormatTokenKind::Hour24TwoDigit},
+        {"H", 1, FormatTokenKind::Hour24},
+        {"hh", 2, FormatTokenKind::Hour12TwoDigit},
+        {"h", 1, FormatTokenKind::Hour12},
+        {"MM", 2, FormatTokenKind::MinuteTwoDigit},
+        {"M", 1, FormatTokenKind::Minute},
+        {"SS", 2, FormatTokenKind::SecondTwoDigit},
+        {"S", 1, FormatTokenKind::Second},
+        {"AM", 2, FormatTokenKind::UpperMeridiem},
+        {"am", 2, FormatTokenKind::LowerMeridiem},
+    };
+    return FormatWithTokens(time, format, kTokens, sizeof(kTokens) / sizeof(kTokens[0]));
 }
 
 std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format) {
-    static constexpr std::array<FormatToken, 10> kTokens{{
-        {"YYYY", [](const SYSTEMTIME& value) { return NumberText(value.wYear); }},
-        {"YY", [](const SYSTEMTIME& value) { return TwoDigit(value.wYear % 100); }},
-        {"MMMM", [](const SYSTEMTIME& value) { return MonthName(value.wMonth); }},
-        {"MMM", [](const SYSTEMTIME& value) { return MonthShortName(value.wMonth); }},
-        {"MM", [](const SYSTEMTIME& value) { return TwoDigit(value.wMonth); }},
-        {"M", [](const SYSTEMTIME& value) { return NumberText(value.wMonth); }},
-        {"DD", [](const SYSTEMTIME& value) { return TwoDigit(value.wDay); }},
-        {"D", [](const SYSTEMTIME& value) { return NumberText(value.wDay); }},
-        {"dddd", [](const SYSTEMTIME& value) { return WeekdayName(value.wDayOfWeek); }},
-        {"ddd", [](const SYSTEMTIME& value) { return WeekdayShortName(value.wDayOfWeek); }},
-    }};
-    return FormatWithTokens(time, format, kTokens);
+    static constexpr FormatToken kTokens[]{
+        {"YYYY", 4, FormatTokenKind::YearFull},
+        {"YY", 2, FormatTokenKind::YearShort},
+        {"MMMM", 4, FormatTokenKind::MonthName},
+        {"MMM", 3, FormatTokenKind::MonthShortName},
+        {"MM", 2, FormatTokenKind::MonthTwoDigit},
+        {"M", 1, FormatTokenKind::Month},
+        {"DD", 2, FormatTokenKind::DayTwoDigit},
+        {"D", 1, FormatTokenKind::Day},
+        {"dddd", 4, FormatTokenKind::WeekdayName},
+        {"ddd", 3, FormatTokenKind::WeekdayShortName},
+    };
+    return FormatWithTokens(time, format, kTokens, sizeof(kTokens) / sizeof(kTokens[0]));
 }
 
 bool IsStaticTextMetric(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    return match.binding != nullptr && match.binding->staticText &&
+    return match.binding != nullptr && BindingHasFlag(*match.binding, kStaticTextFlag) &&
            BindingSupportsPayload(*match.binding, MetricPayloadKind::Text);
 }
 
 std::optional<MetricDisplayStyle> FindMetricDisplayStyle(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    return match.binding != nullptr ? match.binding->metricStyle : std::nullopt;
+    return match.binding != nullptr && BindingHasFlag(*match.binding, kHasMetricStyleFlag)
+               ? std::optional<MetricDisplayStyle>(match.binding->metricStyle)
+               : std::nullopt;
 }
 
 ConfigMetricCatalog TelemetryMetricCatalog() {
@@ -797,7 +908,7 @@ ConfigMetricCatalog TelemetryMetricCatalog() {
 
 bool IsGenerallyAvailableMetric(std::string_view metricRef) {
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    return match.binding != nullptr && match.binding->generallyAvailable;
+    return match.binding != nullptr && BindingHasFlag(*match.binding, kGenerallyAvailableFlag);
 }
 
 std::string ResolveMetricSampleValueText(const MetricsSectionConfig& metrics, const std::string& metricRef) {
@@ -818,147 +929,164 @@ MetricSource::MetricSource(const SystemSnapshot& snapshot, const MetricsSectionC
     : snapshot_(snapshot), metrics_(metrics) {}
 
 const std::string& MetricSource::ResolveText(const std::string& metricRef) const {
-    const auto cached = textCache_.find(metricRef);
-    if (cached != textCache_.end()) {
-        return cached->second;
+    if (textCached_ && textCacheKey_ == metricRef) {
+        return textCache_;
     }
 
     std::string resolved = "N/A";
     const MetricBindingMatch match = FindMetricBinding(metricRef);
-    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Text) &&
-        match.binding->resolveText != nullptr) {
-        resolved = match.binding->resolveText(snapshot_, match.logicalName);
+    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Text)) {
+        resolved = ResolveTextByKind(snapshot_, match.binding->kind);
     }
-    return textCache_.emplace(metricRef, std::move(resolved)).first->second;
+    textCacheKey_ = metricRef;
+    textCache_ = std::move(resolved);
+    textCached_ = true;
+    return textCache_;
+}
+
+const MetricSource::MetricCacheEntry& MetricSource::CacheMetric(const std::string& metricRef) const {
+    for (size_t i = 0; i < metricCacheCount_; ++i) {
+        if (metricCache_[i].key == metricRef) {
+            return metricCache_[i];
+        }
+    }
+
+    const size_t slot = metricCacheCount_ < std::size(metricCache_) ? metricCacheCount_++ : std::size(metricCache_) - 1;
+    auto& entry = metricCache_[slot];
+    MetricValue metric;
+    entry.resolved = ResolveMetricValue(snapshot_, metrics_, metricRef, metric);
+    entry.key = metricRef;
+    entry.metric = std::move(metric);
+    return entry;
+}
+
+const MetricValue* MetricSource::FindMetric(const std::string& metricRef) const {
+    const MetricCacheEntry& entry = CacheMetric(metricRef);
+    return entry.resolved ? &entry.metric : nullptr;
 }
 
 const MetricValue& MetricSource::ResolveMetric(const std::string& metricRef) const {
-    const auto cached = metricCache_.find(metricRef);
-    if (cached != metricCache_.end()) {
-        return cached->second;
-    }
-
-    MetricValue metric;
-    if (auto resolved = ResolveMetricValue(snapshot_, metrics_, metricRef); resolved.has_value()) {
-        metric = std::move(*resolved);
-    }
-    return metricCache_.emplace(metricRef, std::move(metric)).first->second;
-}
-
-const std::vector<MetricValue>& MetricSource::ResolveMetricList(const std::vector<std::string>& metricRefs) const {
-    std::string key;
-    for (const auto& metricRef : metricRefs) {
-        key += metricRef;
-        key += '\n';
-    }
-
-    const auto cached = metricListCache_.find(key);
-    if (cached != metricListCache_.end()) {
-        return cached->second;
-    }
-
-    std::vector<MetricValue> rows;
-    rows.reserve(metricRefs.size());
-    for (const auto& metricRef : metricRefs) {
-        if (auto row = ResolveMetricValue(snapshot_, metrics_, metricRef); row.has_value()) {
-            rows.push_back(*row);
-        }
-    }
-    return metricListCache_.emplace(key, std::move(rows)).first->second;
+    return CacheMetric(metricRef).metric;
 }
 
 const ThroughputMetric& MetricSource::ResolveThroughput(const std::string& metricRef) const {
-    const auto cached = throughputCache_.find(metricRef);
-    if (cached != throughputCache_.end()) {
-        return cached->second.metric;
+    if (throughputCached_ && throughputCacheKey_ == metricRef) {
+        return throughputCache_;
     }
 
-    if (!throughputSharedState_.has_value()) {
-        throughputSharedState_ = ThroughputSharedState{};
-        InitializeThroughputSharedState(snapshot_, *throughputSharedState_);
+    if (!throughputSharedStateReady_) {
+        InitializeThroughputSharedState(snapshot_, throughputSharedState_);
+        throughputSharedStateReady_ = true;
     }
 
     const MetricBindingMatch match = FindMetricBinding(metricRef);
     const MetricDefinitionConfig* definition = FindMetricDefinition(metrics_, metricRef);
     ThroughputMetric metric;
-    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Throughput) &&
-        match.binding->resolveThroughputValue != nullptr) {
-        const auto* history = FindThroughputHistory(*throughputSharedState_, metricRef);
+    if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Throughput)) {
+        const auto* history = FindThroughputHistory(throughputSharedState_, metricRef);
         const std::vector<double> emptyHistory;
         const std::vector<double>& resolvedHistory = history != nullptr ? *history : emptyHistory;
         metric.valueMbps =
-            ResolveDisplayedThroughputValue(match.binding->resolveThroughputValue(snapshot_), resolvedHistory);
+            ResolveDisplayedThroughputValue(ResolveThroughputValue(snapshot_, match.binding->kind), resolvedHistory);
         metric.history = resolvedHistory;
-        metric.maxGraph = ResolveThroughputGraphMax(*throughputSharedState_, *match.binding);
-        metric.guideStepMbps =
-            match.binding->resolveGuideStep != nullptr ? match.binding->resolveGuideStep(metric.maxGraph) : 5.0;
+        metric.maxGraph = ResolveThroughputGraphMax(throughputSharedState_, *match.binding);
+        metric.guideStepMbps = GetThroughputGuideStep(metric.maxGraph);
     }
-    metric.timeMarkerOffsetSamples = throughputSharedState_->timeMarkerOffsetSamples;
+    metric.timeMarkerOffsetSamples = throughputSharedState_.timeMarkerOffsetSamples;
     metric.timeMarkerIntervalSamples = 20.0;
     if (definition != nullptr) {
         metric.label = definition->label;
         metric.valueText = FormatMetricValueText(*definition, metricRef, metric.valueMbps);
     }
-    return throughputCache_.emplace(metricRef, ThroughputCacheEntry{metric}).first->second.metric;
+    throughputCacheKey_ = metricRef;
+    throughputCache_ = std::move(metric);
+    throughputCached_ = true;
+    return throughputCache_;
 }
 
 const std::string& MetricSource::ResolveNetworkFooter() const {
-    if (!networkFooterCache_.has_value()) {
+    if (!networkFooterCached_) {
         if (snapshot_.network.adapterName.empty()) {
             networkFooterCache_ = snapshot_.network.ipAddress;
         } else {
             networkFooterCache_ = snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
         }
+        networkFooterCached_ = true;
     }
-    return *networkFooterCache_;
+    return networkFooterCache_;
 }
 
-const std::vector<DriveRow>& MetricSource::ResolveDriveRows() const {
-    if (!driveRowsCache_.has_value()) {
-        const MetricDefinitionConfig* usageDefinition = FindMetricDefinition(metrics_, "drive.usage");
-        const MetricDefinitionConfig* freeDefinition = FindMetricDefinition(metrics_, "drive.free");
+void MetricSource::InitializeDriveRows() const {
+    driveUsageDefinition_ = FindMetricDefinition(metrics_, "drive.usage");
+    driveFreeDefinition_ = FindMetricDefinition(metrics_, "drive.free");
+    driveRowsTotalReadMbps_ = 0.0;
+    driveRowsTotalWriteMbps_ = 0.0;
+    for (const auto& drive : snapshot_.drives) {
+        driveRowsTotalReadMbps_ += FiniteNonNegativeOr(drive.readMbps);
+        driveRowsTotalWriteMbps_ += FiniteNonNegativeOr(drive.writeMbps);
+    }
+    driveRowsCached_ = true;
+}
 
-        driveRowsCache_ = std::vector<DriveRow>{};
-        driveRowsCache_->reserve(snapshot_.drives.size());
-        double totalReadMbps = 0.0;
-        double totalWriteMbps = 0.0;
-        for (const auto& drive : snapshot_.drives) {
-            totalReadMbps += FiniteNonNegativeOr(drive.readMbps);
-            totalWriteMbps += FiniteNonNegativeOr(drive.writeMbps);
-        }
-        for (const auto& drive : snapshot_.drives) {
-            const double readActivity =
-                totalReadMbps > 0.0 ? ClampFinite(FiniteNonNegativeOr(drive.readMbps) / totalReadMbps, 0.0, 1.0) : 0.0;
-            const double writeActivity =
-                totalWriteMbps > 0.0 ? ClampFinite(FiniteNonNegativeOr(drive.writeMbps) / totalWriteMbps, 0.0, 1.0)
-                                     : 0.0;
-            driveRowsCache_->push_back(DriveRow{drive.label,
-                readActivity,
-                writeActivity,
-                ClampFinite(drive.usedPercent, 0.0, 100.0),
-                usageDefinition != nullptr ? FormatMetricValueText(*usageDefinition, "drive.usage", drive.usedPercent)
-                                           : std::string{},
-                freeDefinition != nullptr ? FormatMetricValueText(*freeDefinition, "drive.free", drive.freeGb)
-                                          : std::string{}});
+const MetricSource::DriveRowCacheEntry& MetricSource::CacheDriveRow(size_t rowIndex) const {
+    for (size_t i = 0; i < driveRowCacheCount_; ++i) {
+        if (driveRowCache_[i].rowIndex == rowIndex) {
+            return driveRowCache_[i];
         }
     }
-    return *driveRowsCache_;
+
+    if (!driveRowsCached_) {
+        InitializeDriveRows();
+    }
+
+    const size_t slot =
+        driveRowCacheCount_ < std::size(driveRowCache_) ? driveRowCacheCount_++ : std::size(driveRowCache_) - 1;
+    auto& entry = driveRowCache_[slot];
+    const auto& drive = snapshot_.drives[rowIndex];
+    const double readActivity =
+        driveRowsTotalReadMbps_ > 0.0
+            ? ClampFinite(FiniteNonNegativeOr(drive.readMbps) / driveRowsTotalReadMbps_, 0.0, 1.0)
+            : 0.0;
+    const double writeActivity =
+        driveRowsTotalWriteMbps_ > 0.0
+            ? ClampFinite(FiniteNonNegativeOr(drive.writeMbps) / driveRowsTotalWriteMbps_, 0.0, 1.0)
+            : 0.0;
+    entry.row = DriveRow{drive.label,
+        readActivity,
+        writeActivity,
+        ClampFinite(drive.usedPercent, 0.0, 100.0),
+        driveUsageDefinition_ != nullptr
+            ? FormatMetricValueText(*driveUsageDefinition_, "drive.usage", drive.usedPercent)
+            : std::string{},
+        driveFreeDefinition_ != nullptr ? FormatMetricValueText(*driveFreeDefinition_, "drive.free", drive.freeGb)
+                                        : std::string{}};
+    entry.rowIndex = rowIndex;
+    return entry;
+}
+
+const DriveRow* MetricSource::FindDriveRow(size_t rowIndex) const {
+    if (rowIndex >= snapshot_.drives.size()) {
+        return nullptr;
+    }
+    return &CacheDriveRow(rowIndex).row;
 }
 
 const std::string& MetricSource::ResolveClockTime(std::string_view format) const {
-    const std::string key(format);
-    const auto cached = clockTimeCache_.find(key);
-    if (cached != clockTimeCache_.end()) {
-        return cached->second;
+    if (clockTimeCached_ && clockTimeCacheKey_ == format) {
+        return clockTimeCache_;
     }
-    return clockTimeCache_.emplace(key, FormatClockTime(snapshot_.now, format)).first->second;
+    clockTimeCacheKey_ = format;
+    clockTimeCache_ = FormatClockTime(snapshot_.now, format);
+    clockTimeCached_ = true;
+    return clockTimeCache_;
 }
 
 const std::string& MetricSource::ResolveClockDate(std::string_view format) const {
-    const std::string key(format);
-    const auto cached = clockDateCache_.find(key);
-    if (cached != clockDateCache_.end()) {
-        return cached->second;
+    if (clockDateCached_ && clockDateCacheKey_ == format) {
+        return clockDateCache_;
     }
-    return clockDateCache_.emplace(key, FormatClockDate(snapshot_.now, format)).first->second;
+    clockDateCacheKey_ = format;
+    clockDateCache_ = FormatClockDate(snapshot_.now, format);
+    clockDateCached_ = true;
+    return clockDateCache_;
 }

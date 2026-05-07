@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string_view>
 
 #include "layout_edit_dialog/impl/state.h"
 
@@ -53,26 +54,16 @@ std::optional<RECT> LayoutEditRightPaneRect(HWND hwnd);
 void RefreshLayoutEditRightPane(HWND hwnd);
 
 void ConfigureDialogFonts(LayoutEditDialogState* state, HWND hwnd);
+void EnsureLayoutEditDialogControls(HWND hwnd);
 void DestroyDialogFonts(LayoutEditDialogState* state);
-void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text);
+void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, std::string_view text);
 void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
 bool IsColorGradientBarControlId(int controlId);
 void DrawColorGradientBar(HWND hwnd, const DRAWITEMSTRUCT& drawItem);
 void DrawThemePreview(LayoutEditDialogState* state, const DRAWITEMSTRUCT& drawItem);
 void SetFontSamplePreview(
     LayoutEditDialogState* state, HWND hwnd, std::optional<LayoutEditParameter> parameter, const UiFontConfig* font);
-void ShowLayoutEditEditors(HWND hwnd,
-    bool showNumeric,
-    bool showFont,
-    bool showColor,
-    bool showWeights,
-    bool showMetric,
-    bool showBinding,
-    bool showMetricListOrder,
-    bool showGlobalFontFamily = false,
-    bool showDateTimeFormat = false,
-    bool showThemeSelector = false,
-    bool showLayoutSelector = false);
+void ShowLayoutEditEditors(HWND hwnd, LayoutEditEditorKind kind, bool showBinding = false);
 void DestroyMetricListOrderEditorControls(LayoutEditDialogState* state);
 void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd, size_t rowCount);
 void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd);

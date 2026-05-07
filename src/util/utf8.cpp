@@ -11,19 +11,6 @@ template <typename CharT> int CheckedSize(size_t size) {
     return size > static_cast<size_t>(INT_MAX) ? -1 : static_cast<int>(size);
 }
 
-bool CanDecodeCodePage(std::string_view text, unsigned int codePage, DWORD flags) {
-    if (text.empty()) {
-        return true;
-    }
-
-    const int length = CheckedSize<char>(text.size());
-    if (length < 0) {
-        return false;
-    }
-
-    return MultiByteToWideChar(codePage, flags, text.data(), length, nullptr, 0) > 0;
-}
-
 std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWORD flags) {
     if (text.empty()) {
         return {};
@@ -39,7 +26,7 @@ std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWOR
         return {};
     }
 
-    std::wstring result(static_cast<size_t>(required), L'\0');
+    std::wstring result(static_cast<size_t>(required), wchar_t{});
     MultiByteToWideChar(codePage, flags, text.data(), length, result.data(), required);
     return result;
 }
@@ -79,21 +66,14 @@ std::string Utf8FromCodePage(std::string_view text, unsigned int codePage) {
         return {};
     }
 
-    std::wstring wide(static_cast<size_t>(wideLength), L'\0');
+    std::wstring wide(static_cast<size_t>(wideLength), wchar_t{});
     MultiByteToWideChar(codePage, 0, text.data(), length, wide.data(), wideLength);
     return Utf8FromWideChars(wide);
 }
 
 }  // namespace
 
-bool IsValidUtf8(std::string_view text) {
-    return CanDecodeCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
-}
-
 std::wstring WideFromUtf8(std::string_view text) {
-    if (!IsValidUtf8(text)) {
-        return {};
-    }
     return WideFromCodePage(text, CP_UTF8, MB_ERR_INVALID_CHARS);
 }
 

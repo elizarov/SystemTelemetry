@@ -1,6 +1,5 @@
 #pragma once
 
-#include <initializer_list>
 #include <optional>
 #include <string>
 #include <variant>
@@ -65,6 +64,14 @@ struct LayoutEditActiveRegion {
     LayoutEditActiveRegionPayload payload = LayoutEditCardRegion{};
 };
 
+template <typename T> const T* LayoutEditActiveRegionPayloadAs(const LayoutEditActiveRegionPayload& payload) {
+    return std::get_if<T>(&payload);
+}
+
+template <typename T> const T* LayoutEditActiveRegionPayloadAs(const LayoutEditActiveRegion& region) {
+    return LayoutEditActiveRegionPayloadAs<T>(region.payload);
+}
+
 struct LayoutEditHoverResolution {
     std::optional<LayoutEditWidgetIdentity> hoveredLayoutCard;
     std::optional<LayoutEditWidgetIdentity> hoveredEditableCard;
@@ -85,7 +92,6 @@ public:
 
     LayoutEditActiveRegions() = default;
     explicit LayoutEditActiveRegions(std::vector<LayoutEditActiveRegion> regions);
-    LayoutEditActiveRegions(std::initializer_list<LayoutEditActiveRegion> regions);
 
     void Reserve(size_t count);
     void Add(LayoutEditActiveRegion region);

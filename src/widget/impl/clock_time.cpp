@@ -3,24 +3,12 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_host.h"
 
-WidgetClass ClockTimeWidget::Class() const {
-    return WidgetClass::ClockTime;
-}
-
-std::unique_ptr<Widget> ClockTimeWidget::Clone() const {
-    return std::make_unique<ClockTimeWidget>(*this);
-}
-
 void ClockTimeWidget::Initialize(const LayoutNodeConfig& node) {
     format_ = node.parameter;
 }
 
 int ClockTimeWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().clockTime;
-}
-
-bool ClockTimeWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
 }
 
 void ClockTimeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {

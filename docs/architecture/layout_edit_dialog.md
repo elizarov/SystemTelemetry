@@ -15,3 +15,7 @@
 
 - `layout_edit_dialog` may depend on `layout_edit_dialog`, `config`, `layout_edit`, `layout_model`, `telemetry`, `util`, and `widget`.
 - It does not depend on dashboard renderer, diagnostics, display, main, renderer implementation, or Direct2D/DirectWrite/WIC headers.
+
+## Implementation Notes
+
+- Config tree item `lParam` values point into `LayoutEditDialogState::visibleTreeModel`; rebuilds keep the old visible model alive until old tree-view items are deleted, then insert items from the new visible model with selection notifications suppressed.

@@ -6,7 +6,7 @@
 
 - `DashboardApp` owns HWND lifetime, message dispatch, tray integration, repaint invalidation, move-mode presentation, and the shell side of layout-edit interaction.
 - `DashboardController` owns active config state, runtime instance lifetime, diagnostics session lifetime, save and reload actions, layout and scale switching, runtime target selection, and layout-edit session state.
-- `DashboardShellUi` owns popup-menu construction, focused command dispatch, custom prompts, and the host bridge for the modeless editor window.
+- `DashboardShellUi` owns popup-menu construction, dashboard menu label formatting, focused command dispatch, custom prompts, and the host bridge for the modeless editor window.
 - Auto-start enablement writes the machine-wide Run entry for per-user dashboard UI startup and installs or starts the `CashDashService` LocalSystem service; disabling auto-start removes both.
 - Configure-display and save flows use package-owned elevated helper routes when the current process cannot write target registry values, service registration, or executable-side files directly.
 

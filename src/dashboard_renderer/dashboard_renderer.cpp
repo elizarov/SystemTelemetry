@@ -6,8 +6,6 @@
 #include <limits>
 #include <memory>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -72,8 +70,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
         InvalidateMetricSourceCache();
-        metricDefinitionCache_.clear();
-        metricSampleValueTextCache_.clear();
+        metricLookupCache_.Clear();
     }
     config_ = config;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
@@ -377,7 +374,7 @@ std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSh
         summary.chromeLayout = card.chromeLayout;
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {
-                summary.widgetClasses.push_back(widget.widget->Class());
+                summary.widgetClasses.push_back(widget.widgetClass);
             }
         }
         summaries.push_back(std::move(summary));
@@ -545,13 +542,13 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
                 appendRegion(card.chromeLayout.titleRect, LayoutEditActiveRegionKind::CardHeader, cardRegion);
             }
             for (const auto& widget : card.widgets) {
-                if (widget.widget == nullptr || !widget.widget->IsHoverable()) {
+                if (widget.widget == nullptr || !IsWidgetHoverable(widget.widgetClass)) {
                     continue;
                 }
                 appendRegion(widget.rect,
                     LayoutEditActiveRegionKind::WidgetHover,
                     LayoutEditWidgetRegion{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                        widget.widget->Class(),
+                        widget.widgetClass,
                         widget.rect,
                         SupportsLayoutSimilarityIndicator(widget)});
             }
@@ -583,10 +580,10 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
             appendRegion(guide.hitRect, LayoutEditActiveRegionKind::WidgetGuide, guide);
         }
 
-        const auto appendAnchorRegions = [&](const std::vector<LayoutEditAnchorRegion>& regions,
+        const auto appendAnchorRegions = [&](const std::vector<LayoutEditAnchorRegion>& anchorRegions,
                                              LayoutEditActiveRegionKind handleKind,
                                              LayoutEditActiveRegionKind targetKind) {
-            for (const auto& region : regions) {
+            for (const auto& region : anchorRegions) {
                 appendRegion(region.anchorHitRect, handleKind, region);
                 appendRegion(region.targetRect, targetKind, region);
             }
@@ -598,9 +595,9 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
             LayoutEditActiveRegionKind::DynamicEditAnchorHandle,
             LayoutEditActiveRegionKind::DynamicEditAnchorTarget);
 
-        const auto appendColorRegions = [&](const std::vector<LayoutEditColorRegion>& regions,
+        const auto appendColorRegions = [&](const std::vector<LayoutEditColorRegion>& colorRegions,
                                             LayoutEditActiveRegionKind kind) {
-            for (const auto& region : regions) {
+            for (const auto& region : colorRegions) {
                 appendRegion(region.targetRect, kind, region);
             }
         };
@@ -783,7 +780,8 @@ LayoutEditHoverResolution DashboardRenderer::ResolveLayoutEditHover(
     std::optional<LayoutEditWidgetIdentity> hoveredWidget;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (widget.widget == nullptr || !widget.widget->IsHoverable() || !widget.rect.Contains(clientPoint)) {
+            if (widget.widget == nullptr || !IsWidgetHoverable(widget.widgetClass) ||
+                !widget.rect.Contains(clientPoint)) {
                 continue;
             }
             hoveredWidget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -836,39 +834,22 @@ bool DashboardRenderer::ApplyLayoutGuideWeightsPreview(
 }
 
 const MetricDefinitionConfig* DashboardRenderer::FindConfiguredMetricDefinition(std::string_view metricRef) const {
-    const std::string key(metricRef);
-    const auto cached = metricDefinitionCache_.find(key);
-    if (cached != metricDefinitionCache_.end()) {
-        return cached->second;
-    }
-    const MetricDefinitionConfig* definition = FindEffectiveMetricDefinition(config_.layout.metrics, metricRef);
-    metricDefinitionCache_.emplace(key, definition);
-    return definition;
+    return metricLookupCache_.FindDefinition(config_.layout.metrics, metricRef);
 }
 
 const std::string& DashboardRenderer::ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const {
-    const std::string key(metricRef);
-    const auto cached = metricSampleValueTextCache_.find(key);
-    if (cached != metricSampleValueTextCache_.end()) {
-        return cached->second;
-    }
-    return metricSampleValueTextCache_.emplace(key, ResolveMetricSampleValueText(config_.layout.metrics, key))
-        .first->second;
+    return metricLookupCache_.ResolveSampleValueText(config_.layout.metrics, metricRef);
 }
 
-std::optional<LayoutEditAnchorRegion> DashboardRenderer::FindEditableAnchorRegion(
-    const LayoutEditAnchorKey& key) const {
-    const auto findIn =
-        [&](const std::vector<LayoutEditAnchorRegion>& regions) -> std::optional<LayoutEditAnchorRegion> {
+const LayoutEditAnchorRegion* DashboardRenderer::FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const {
+    const auto findIn = [&](const std::vector<LayoutEditAnchorRegion>& regions) -> const LayoutEditAnchorRegion* {
         const auto it = std::find_if(regions.begin(), regions.end(), [&](const LayoutEditAnchorRegion& region) {
             return MatchesEditableAnchorKey(region.key, key);
         });
-        if (it == regions.end()) {
-            return std::nullopt;
-        }
-        return *it;
+        return it != regions.end() ? &(*it) : nullptr;
     };
-    if (const auto staticRegion = findIn(layoutResolver_->staticEditableAnchorRegions_); staticRegion.has_value()) {
+    if (const LayoutEditAnchorRegion* staticRegion = findIn(layoutResolver_->staticEditableAnchorRegions_);
+        staticRegion != nullptr) {
         return staticRegion;
     }
     return findIn(layoutResolver_->dynamicEditableAnchorRegions_);
@@ -884,7 +865,8 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPr
 
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
-            if (widget.widget == nullptr || !widget.widget->IsHoverable() || widget.widget->Class() != *widgetClass) {
+            if (widget.widget == nullptr || !IsWidgetHoverable(widget.widgetClass) ||
+                widget.widgetClass != *widgetClass) {
                 continue;
             }
             return LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
@@ -944,8 +926,12 @@ void DashboardRenderer::InvalidateMetricSourceCache() {
     cachedMetricSnapshotRevision_ = 0;
 }
 
+bool DashboardRenderer::ShouldWriteRendererTrace() const {
+    return !interactiveDragTraceActive_;
+}
+
 void DashboardRenderer::WriteTrace(const std::string& text) const {
-    if (interactiveDragTraceActive_ && text.rfind("renderer:", 0) == 0) {
+    if (!ShouldWriteRendererTrace() && text.rfind("renderer:", 0) == 0) {
         return;
     }
     trace_.Write(text);
@@ -971,42 +957,18 @@ bool DashboardRenderer::MatchesWidgetIdentity(
 }
 
 bool DashboardRenderer::SupportsLayoutSimilarityIndicator(const WidgetLayout& widget) const {
-    if (widget.widget == nullptr || widget.widget->IsVerticalSpring()) {
+    if (widget.widget == nullptr || widget.widgetClass == WidgetClass::VerticalSpring) {
         return false;
     }
-    if (UsesFixedPreferredHeightInRows(widget)) {
+    if (WidgetUsesFixedPreferredHeightInRows(widget.widgetClass)) {
         return false;
     }
     return true;
 }
 
 std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWidgets(LayoutGuideAxis axis) const {
-    struct SimilarityRepresentativeKey {
-        std::string cardId;
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-        int edgeStart = 0;
-        int edgeEnd = 0;
-
-        bool operator==(const SimilarityRepresentativeKey& other) const {
-            return cardId == other.cardId && widgetClass == other.widgetClass && extent == other.extent &&
-                   edgeStart == other.edgeStart && edgeEnd == other.edgeEnd;
-        }
-    };
-
-    struct SimilarityRepresentativeKeyHash {
-        size_t operator()(const SimilarityRepresentativeKey& key) const {
-            size_t hash = std::hash<std::string>{}(key.cardId);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(static_cast<int>(key.widgetClass));
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.extent);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeStart);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.edgeEnd);
-            return hash;
-        }
-    };
-
+    // Size: scan the already-small result list; a separate seen-key vector measured larger.
     std::vector<const WidgetLayout*> widgets;
-    std::unordered_set<SimilarityRepresentativeKey, SimilarityRepresentativeKeyHash> seenKeys;
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         for (const auto& widget : card.widgets) {
             if (!SupportsLayoutSimilarityIndicator(widget) || widget.widget == nullptr) {
@@ -1018,18 +980,20 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
                 continue;
             }
 
-            SimilarityRepresentativeKey key;
-            key.cardId = widget.cardId;
-            key.widgetClass = widget.widget->Class();
-            key.extent = extent;
-            if (axis == LayoutGuideAxis::Vertical) {
-                key.edgeStart = widget.rect.left;
-                key.edgeEnd = widget.rect.right;
-            } else {
-                key.edgeStart = widget.rect.top;
-                key.edgeEnd = widget.rect.bottom;
-            }
-            if (!seenKeys.insert(std::move(key)).second) {
+            const WidgetClass widgetClass = widget.widgetClass;
+            const int edgeStart = axis == LayoutGuideAxis::Vertical ? widget.rect.left : widget.rect.top;
+            const int edgeEnd = axis == LayoutGuideAxis::Vertical ? widget.rect.right : widget.rect.bottom;
+            const auto duplicate = [&](const WidgetLayout* candidate) {
+                if (candidate == nullptr || candidate->widget == nullptr || candidate->cardId != widget.cardId ||
+                    candidate->widgetClass != widgetClass || WidgetExtentForAxis(*candidate, axis) != extent) {
+                    return false;
+                }
+                if (axis == LayoutGuideAxis::Vertical) {
+                    return candidate->rect.left == edgeStart && candidate->rect.right == edgeEnd;
+                }
+                return candidate->rect.top == edgeStart && candidate->rect.bottom == edgeEnd;
+            };
+            if (std::find_if(widgets.begin(), widgets.end(), duplicate) != widgets.end()) {
                 continue;
             }
             widgets.push_back(&widget);
@@ -1040,10 +1004,6 @@ std::vector<const WidgetLayout*> DashboardRenderer::CollectSimilarityIndicatorWi
 
 bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
     return node.name == "rows" || node.name == "columns";
-}
-
-bool DashboardRenderer::UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const {
-    return widget.widget != nullptr && widget.widget->UsesFixedPreferredHeightInRows();
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {

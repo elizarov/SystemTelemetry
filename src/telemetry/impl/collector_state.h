@@ -24,7 +24,7 @@
 
 struct DriveCounterState {
     std::string label;
-    std::wstring rootPath;
+    std::string rootPath;
     PDH_HCOUNTER readCounter = nullptr;
     PDH_HCOUNTER writeCounter = nullptr;
 };

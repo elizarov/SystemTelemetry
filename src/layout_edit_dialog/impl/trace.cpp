@@ -1,10 +1,10 @@
 #include "layout_edit_dialog/impl/trace.h"
 
-#include <cstdio>
-
+#include "config/color_format.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit_dialog/impl/util.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/trace.h"
 
 namespace {
 
@@ -38,41 +38,30 @@ const char* ValueFormatTraceName(configschema::ValueFormat format) {
     return "unknown";
 }
 
-}  // namespace
+struct DialogTraceField {
+    const char* label = nullptr;
+    int controlId = 0;
+};
 
-std::string EscapeTraceText(std::string_view text) {
-    std::string escaped;
-    escaped.reserve(text.size());
-    for (const char ch : text) {
-        switch (ch) {
-            case '\\':
-                escaped += "\\\\";
-                break;
-            case '"':
-                escaped += "\\\"";
-                break;
-            case '\r':
-                escaped += "\\r";
-                break;
-            case '\n':
-                escaped += "\\n";
-                break;
-            default:
-                escaped.push_back(ch);
-                break;
-        }
+std::string BuildDialogTraceValues(HWND hwnd, const DialogTraceField* fields, size_t fieldCount) {
+    std::string text;
+    for (size_t i = 0; i < fieldCount; ++i) {
+        text += ' ';
+        text += fields[i].label;
+        text += '=';
+        text += QuoteTraceText(ReadDialogControlTextUtf8(hwnd, fields[i].controlId));
     }
-    return escaped;
+    return text;
 }
 
+}  // namespace
+
 std::string QuoteTraceText(std::string_view text) {
-    return "\"" + EscapeTraceText(text) + "\"";
+    return Trace::QuoteText(text);
 }
 
 std::string FormatTraceColorHex(unsigned int color) {
-    char buffer[16] = {};
-    sprintf_s(buffer, "#%08X", color);
-    return buffer;
+    return FormatRgbaColorText(color);
 }
 
 std::string JoinNodePath(const std::vector<size_t>& path) {
@@ -126,7 +115,8 @@ std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
     text += " label=" + QuoteTraceText(node->label);
     text += " location=" + QuoteTraceText(node->locationText);
     if (node->leaf.has_value()) {
-        text += " " + BuildTraceFocusKeyText(&*node->leaf);
+        text += ' ';
+        text += BuildTraceFocusKeyText(&*node->leaf);
         if (std::holds_alternative<LayoutMetricEditKey>(node->leaf->focusKey)) {
             text += " value_format=\"metric\"";
         } else {
@@ -137,17 +127,19 @@ std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
 }
 
 std::string BuildColorDialogTraceValues(HWND hwnd) {
-    return " hex=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT)) +
-           " red=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT)) +
-           " green=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT)) +
-           " blue=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT)) +
-           " alpha=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT));
+    static constexpr DialogTraceField kFields[] = {{"hex", IDC_LAYOUT_EDIT_COLOR_HEX_EDIT},
+        {"red", IDC_LAYOUT_EDIT_COLOR_RED_EDIT},
+        {"green", IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT},
+        {"blue", IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT},
+        {"alpha", IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT}};
+    return BuildDialogTraceValues(hwnd, kFields, sizeof(kFields) / sizeof(kFields[0]));
 }
 
 std::string BuildMetricDialogTraceValues(HWND hwnd) {
-    return " style=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE)) +
-           " scale=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT)) +
-           " unit=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT)) +
-           " label=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT)) +
-           " binding=" + QuoteTraceText(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT));
+    static constexpr DialogTraceField kFields[] = {{"style", IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE},
+        {"scale", IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT},
+        {"unit", IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT},
+        {"label", IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT},
+        {"binding", IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT}};
+    return BuildDialogTraceValues(hwnd, kFields, sizeof(kFields) / sizeof(kFields[0]));
 }

@@ -6,6 +6,7 @@
 #include <limits>
 #include <vector>
 
+#include "util/numeric_format.h"
 #include "util/strings.h"
 
 namespace {

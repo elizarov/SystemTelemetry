@@ -35,7 +35,6 @@ struct StorageDriveMenuOption {
 struct ScaleMenuOption {
     UINT commandId = 0;
     double scale = 0.0;
-    std::string label;
     bool selected = false;
     bool isDefault = false;
     bool isCustomEntry = false;

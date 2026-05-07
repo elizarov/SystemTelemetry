@@ -5,14 +5,6 @@
 
 namespace {
 
-void RebuildRetainedHistoryIndex(SystemSnapshot& snapshot) {
-    snapshot.retainedHistoryIndexByRef.clear();
-    snapshot.retainedHistoryIndexByRef.reserve(snapshot.retainedHistories.size());
-    for (size_t i = 0; i < snapshot.retainedHistories.size(); ++i) {
-        snapshot.retainedHistoryIndexByRef[snapshot.retainedHistories[i].seriesRef] = i;
-    }
-}
-
 MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
     metrics.definitions.push_back(
@@ -57,7 +49,6 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, st
     series.seriesRef = metricRef;
     series.samples.assign(samples.begin(), samples.end());
     snapshot.retainedHistories.push_back(std::move(series));
-    RebuildRetainedHistoryIndex(snapshot);
 }
 
 }  // namespace
@@ -169,11 +160,15 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     EXPECT_DOUBLE_EQ(fps.ratio, 0.6);
     EXPECT_DOUBLE_EQ(fps.peakRatio, 0.6);
 
-    const std::vector<MetricValue>& metricList = source.ResolveMetricList({"cpu.load", "gpu.vram", "gpu.fps"});
-    ASSERT_EQ(metricList.size(), 3u);
-    EXPECT_EQ(metricList[0].label, "Load");
-    EXPECT_EQ(metricList[1].label, "VRAM");
-    EXPECT_EQ(metricList[2].label, "FPS");
+    const MetricValue* metricListLoad = source.FindMetric("cpu.load");
+    ASSERT_NE(metricListLoad, nullptr);
+    EXPECT_EQ(metricListLoad->label, "Load");
+    const MetricValue* metricListVram = source.FindMetric("gpu.vram");
+    ASSERT_NE(metricListVram, nullptr);
+    EXPECT_EQ(metricListVram->label, "VRAM");
+    const MetricValue* metricListFps = source.FindMetric("gpu.fps");
+    ASSERT_NE(metricListFps, nullptr);
+    EXPECT_EQ(metricListFps->label, "FPS");
 }
 
 TEST(Metrics, ResolvesGpuFpsPermissionIssueAsAdminIndicator) {
@@ -281,10 +276,11 @@ TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     EXPECT_EQ(throughput.label, "Up");
     EXPECT_EQ(throughput.valueText, "74.2 MB/s");
 
-    const std::vector<DriveRow>& rows = source.ResolveDriveRows();
-    ASSERT_EQ(rows.size(), 1u);
-    EXPECT_EQ(rows[0].usedText, "42%");
-    EXPECT_EQ(rows[0].freeText, "1.5 TB");
+    const DriveRow* row = source.FindDriveRow(0);
+    ASSERT_NE(row, nullptr);
+    EXPECT_EQ(row->usedText, "42%");
+    EXPECT_EQ(row->freeText, "1.5 TB");
+    EXPECT_EQ(source.FindDriveRow(1), nullptr);
 }
 
 TEST(Metrics, ScalesThroughputGraphsFromSmoothedHistoryInsteadOfCurrentSamples) {
@@ -365,6 +361,7 @@ TEST(Metrics, KeepsUnknownMetricFallbacksUnchanged) {
     EXPECT_TRUE(metric.valueText.empty());
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.0);
+    EXPECT_EQ(source.FindMetric("unknown.metric"), nullptr);
 
     const ThroughputMetric& throughput = source.ResolveThroughput("unknown.metric");
     EXPECT_TRUE(throughput.label.empty());

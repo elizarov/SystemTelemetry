@@ -2,15 +2,20 @@
 
 #include <windows.h>
 
-FilePath CreateTempFilePath(const wchar_t* prefix) {
+#include <string>
+
+#include "util/utf8.h"
+
+FilePath CreateTempFilePath(std::string_view prefix) {
     wchar_t tempPathBuffer[MAX_PATH];
     const DWORD length = GetTempPathW(ARRAYSIZE(tempPathBuffer), tempPathBuffer);
     if (length == 0 || length >= ARRAYSIZE(tempPathBuffer)) {
         return {};
     }
 
+    const std::wstring widePrefix = WideFromUtf8(prefix);
     wchar_t tempFileBuffer[MAX_PATH];
-    if (GetTempFileNameW(tempPathBuffer, prefix, 0, tempFileBuffer) == 0) {
+    if (GetTempFileNameW(tempPathBuffer, widePrefix.c_str(), 0, tempFileBuffer) == 0) {
         return {};
     }
     return FilePath(tempFileBuffer);

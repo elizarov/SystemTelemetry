@@ -15,6 +15,12 @@
 #include "resource.h"
 #include "util/scale.h"
 
+namespace {
+
+constexpr wchar_t kFilterCueText[] = L"Filter settings";  // EM_SETCUEBANNER sends UTF-16 cue text.
+
+}  // namespace
+
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
 
 LayoutEditDialog::~LayoutEditDialog() {
@@ -147,12 +153,19 @@ void LayoutEditDialog::PositionWindow(HWND hwnd) const {
 }
 
 void LayoutEditDialog::UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) {
-    selectionHighlight_ = highlight;
+    selectionHighlight_.reset();
+    if (highlight.has_value()) {
+        selectionHighlight_.emplace(*highlight);
+    }
     ApplySelectionHighlightVisibility();
 }
 
 void LayoutEditDialog::ApplySelectionHighlightVisibility() {
-    host_.UpdateLayoutEditSelectionHighlight(selectionHighlightVisible_ ? selectionHighlight_ : std::nullopt);
+    if (selectionHighlightVisible_) {
+        host_.UpdateLayoutEditSelectionHighlight(selectionHighlight_);
+    } else {
+        host_.UpdateLayoutEditSelectionHighlight(std::nullopt);
+    }
 }
 
 void LayoutEditDialog::ClearSelectionHighlight() {
@@ -215,7 +228,10 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
     state_->dialog = this;
     state_->originalConfig = host_.BuildLayoutEditOriginalConfig();
     state_->treeModel = BuildLayoutEditTreeModel(host_.CurrentConfig());
-    state_->initialFocus = focusKey;
+    state_->initialFocus.reset();
+    if (focusKey.has_value()) {
+        state_->initialFocus.emplace(*focusKey);
+    }
 
     std::string initialFocusTrace = "session";
     if (focusKey.has_value()) {
@@ -235,7 +251,7 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace = "weight";
         }
     }
-    host_.TraceLayoutEditDialogEvent("layout_edit_dialog:open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
+    host_.TraceLayoutEditDialogEvent("open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
 
     HWND dialog = CreateDialogParamW(host_.LayoutEditDialogInstance(),
         MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
@@ -293,9 +309,8 @@ void LayoutEditDialog::RefreshIcons() {
     host_.ApplyLayoutEditDialogIcons(hwnd_);
 }
 
-bool LayoutEditDialog::SyncSelection(
-    const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront) {
-    if (!target.has_value()) {
+bool LayoutEditDialog::SyncSelection(const LayoutEditController::TooltipTarget* target, bool bringToFront) {
+    if (target == nullptr) {
         return true;
     }
 
@@ -352,10 +367,11 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
     if (message == WM_INITDIALOG) {
         auto* state = reinterpret_cast<LayoutEditDialogState*>(lParam);
         SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
-        SetWindowTextW(hwnd, L"Edit Configuration");
+        SetWindowTextUtf8(hwnd, "Edit Configuration");
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
         state->dialog->UpdateSelectionHighlight(std::nullopt);
         state->dialog->Host().ApplyLayoutEditDialogIcons(hwnd);
+        EnsureLayoutEditDialogControls(hwnd);
         ConfigureColorSliders(hwnd);
         ConfigureColorViewTabs(hwnd, state->colorEditViewMode);
         ConfigureDialogFonts(state, hwnd);
@@ -363,7 +379,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
             TreeView_SetExtendedStyle(tree, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
         }
         SendDlgItemMessageW(
-            hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"Filter settings"));
+            hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(kFilterCueText));
         RebuildLayoutEditTree(state, hwnd, state->initialFocus);
         state->dialog->PositionWindow(hwnd);
         ShowWindow(hwnd, SW_SHOWNORMAL);
@@ -373,7 +389,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
 
     if (message == WM_NCDESTROY) {
         if (auto* state = DialogStateFromWindow(hwnd); state != nullptr) {
-            state->dialog->Host().TraceLayoutEditDialogEvent("layout_edit_dialog:close");
+            state->dialog->Host().TraceLayoutEditDialogEvent("close");
             SetWindowLongPtrW(hwnd, DWLP_USER, 0);
             state->dialog->HandleDestroyed(hwnd);
         }
@@ -386,8 +402,9 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         }
     }
 
-    if (const auto handled = HandleLayoutEditDialogProcMessage(hwnd, message, wParam, lParam); handled.has_value()) {
-        return *handled;
+    INT_PTR result = FALSE;
+    if (HandleLayoutEditDialogProcMessage(hwnd, message, wParam, lParam, result)) {
+        return result;
     }
     return FALSE;
 }

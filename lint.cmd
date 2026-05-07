@@ -19,6 +19,10 @@ echo Running include style checks...
 python tools\check_includes.py
 if errorlevel 1 set "failed=1"
 
+echo Running source policy checks...
+python tools\check_source_policy.py
+if errorlevel 1 set "failed=1"
+
 if /I "%~1"=="tidy" (
     call :run_clang_tidy %~2 %~3
     set "tidy_result=!errorlevel!"

@@ -43,9 +43,14 @@ jobs:
           "CASE_DASH_RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append
           "CASE_DASH_RELEASE_TAG=$actualTag" | Out-File -FilePath $env:GITHUB_ENV -Append
 
+      - name: Read release notes
+        shell: pwsh
+        run: .\tools\release_changelog.ps1 -Mode Extract -Version $env:CASE_DASH_RELEASE_VERSION -OutputPath build\release-notes.md
+
       - name: Restore vcpkg caches
         id: vcpkg-cache-restore
         uses: actions/cache/restore@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
@@ -65,7 +70,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: build.cmd
+        run: build.cmd /benchmarks
 
       - name: Run tests
         shell: cmd
@@ -111,16 +116,17 @@ jobs:
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi" `
             "build\CaseDash-$env:CASE_DASH_RELEASE_VERSION.msi.sha256" `
             --title "CaseDash $env:CASE_DASH_RELEASE_VERSION" `
-            --notes "CaseDash $env:CASE_DASH_RELEASE_VERSION"
+            --notes-file build\release-notes.md
 
       - name: Save vcpkg caches
         if: always()
         uses: actions/cache/save@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
-          key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+          key: vcpkg-windows-2025-vs2026-release-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/release.yml') }}-${{ github.run_id }}
 
   build-pages:
     name: Build Pages
@@ -143,6 +149,7 @@ jobs:
       - name: Restore vcpkg caches
         id: vcpkg-cache-restore
         uses: actions/cache/restore@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
@@ -164,11 +171,12 @@ jobs:
       - name: Save vcpkg caches
         if: always()
         uses: actions/cache/save@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
-          key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+          key: vcpkg-windows-2025-vs2026-release-pages-${{ hashFiles('vcpkg.json', 'build.cmd', 'web-build.cmd', '.github/workflows/release.yml') }}-${{ github.run_id }}
 
   deploy-pages:
     name: Deploy Pages

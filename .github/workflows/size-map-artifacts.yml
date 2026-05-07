@@ -1,0 +1,100 @@
+name: Size Map Artifacts
+
+on:
+  workflow_dispatch:
+
+jobs:
+  size-map-artifacts:
+    name: Size Map Artifacts
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 120
+
+    env:
+      CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Restore vcpkg caches
+        id: vcpkg-cache-restore
+        uses: actions/cache/restore@v5
+        continue-on-error: true
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-size-map-${{ hashFiles('vcpkg.json', 'build.cmd', 'build_maps.cmd', '.github/workflows/size-map-artifacts.yml') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-windows-2025-vs2026-size-map-${{ hashFiles('vcpkg.json', 'build.cmd', 'build_maps.cmd', '.github/workflows/size-map-artifacts.yml') }}-
+            vcpkg-windows-2025-vs2026-
+
+      - name: Build executable and map
+        shell: cmd
+        run: build_maps.cmd
+
+      - name: Write artifact metadata
+        shell: pwsh
+        run: |
+          $metadataPath = "build\size_map_artifact_metadata.txt"
+          $compilerVersion = "unknown"
+          $compilerFile = Get-ChildItem -Path "build\cmake\CMakeFiles" -Filter "CMakeCXXCompiler.cmake" -Recurse -ErrorAction SilentlyContinue |
+            Select-Object -First 1
+          if ($compilerFile) {
+            $compilerLine = Get-Content $compilerFile.FullName |
+              Select-String -Pattern 'CMAKE_CXX_COMPILER_VERSION' |
+              Select-Object -First 1
+            if ($compilerLine -and $compilerLine.Line -match '"([^"]+)"') {
+              $compilerVersion = $matches[1]
+            }
+          }
+
+          $lines = @(
+            "Workflow: $env:GITHUB_WORKFLOW"
+            "Run id: $env:GITHUB_RUN_ID"
+            "Run attempt: $env:GITHUB_RUN_ATTEMPT"
+            "Ref: $env:GITHUB_REF"
+            "Commit: $env:GITHUB_SHA"
+            "Compiler: MSVC $compilerVersion"
+            ""
+          )
+
+          foreach ($path in @("build\CaseDash.exe", "build\CaseDash.map", "build\CaseDash.map.summary.txt")) {
+            $item = Get-Item -LiteralPath $path
+            $hash = Get-FileHash -LiteralPath $path -Algorithm SHA256
+            $lines += "$path size: $($item.Length) bytes"
+            $lines += "$path sha256: $($hash.Hash.ToLowerInvariant())"
+          }
+
+          $lines | Set-Content -LiteralPath $metadataPath
+
+      - name: Upload CaseDash executable
+        uses: actions/upload-artifact@v7
+        with:
+          name: CaseDash-size-map-exe
+          path: |
+            build/CaseDash.exe
+            build/size_map_artifact_metadata.txt
+          if-no-files-found: error
+
+      - name: Upload CaseDash linker map
+        uses: actions/upload-artifact@v7
+        with:
+          name: CaseDash-size-map
+          path: |
+            build/CaseDash.map
+            build/CaseDash.map.summary.txt
+            build/size_map_artifact_metadata.txt
+          if-no-files-found: error
+
+      - name: Save vcpkg caches
+        if: always()
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-size-map-${{ hashFiles('vcpkg.json', 'build.cmd', 'build_maps.cmd', '.github/workflows/size-map-artifacts.yml') }}-${{ github.run_id }}

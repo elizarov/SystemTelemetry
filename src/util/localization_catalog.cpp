@@ -2,7 +2,6 @@
 
 #include <utility>
 
-#include "resource.h"
 #include "util/resource_loader.h"
 #include "util/strings.h"
 
@@ -49,7 +48,7 @@ void InitializeLocalizationCatalog() {
         return;
     }
 
-    g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8ResourceData(IDR_LOCALIZATION_CATALOG));
+    g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8ResourceData(TextResourceId::LocalizationCatalog));
     g_localizationCatalogInitialized = true;
 }
 

@@ -1,15 +1,16 @@
 # Profile Benchmark Log
 
-This document owns benchmark workflow, current baselines, confirmed hotspots, and experiment history.
-See also: [docs/build.md](build.md) for build and tooling entrypoints and [docs/architecture.md](architecture.md) for subsystem structure.
+This document owns benchmark workflow, current baselines, confirmed hotspots, and performance experiment history.
+See also: [docs/build.md](build.md) for build and tooling entrypoints, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for subsystem structure.
 
 ## Purpose
 
-This file records the current benchmark baselines, latest confirmed hotspots, and tested optimization hypotheses so future profiling work can build on prior results instead of repeating failed ideas.
+This file records the current benchmark baselines, latest confirmed hotspots, and tested performance hypotheses so future profiling work can build on prior results instead of repeating failed ideas.
 
 ## Benchmark Workflow
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
+- Build the benchmark executable with `build.cmd /benchmarks` for direct benchmark runs; normal `build.cmd` and release or validation builds do not build `CaseDashBenchmarks.exe`.
 - Measure the repeatable layout-edit benchmark with `build\CaseDashBenchmarks.exe edit-layout 240 2`.
 - Measure the in-memory layout-guide-sheet generation benchmark with `build\CaseDashBenchmarks.exe layout-guide-sheet 20 2`.
 - Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
@@ -18,8 +19,10 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler.
 - `CaseDashBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
+- Speed optimizations that replace `std::unordered_map` with a custom hash-based table keep the hash table in a separate owning `.h`/`.cpp` module and record the benchmark result here; large provider, renderer, or controller files do not carry local hashing and probing implementations.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
 - The theme-change benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
+- The edit-layout drag benchmark mirrors the app's drag path by applying layout mutations through the app-style config tail, refreshing layout dirty tracking, and forcing one redraw for each synthetic pointer move.
 - Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - Capture a layout-guide-sheet CPU profile with `profile_benchmark.cmd layout-guide-sheet 20 2`; the benchmark renders the sheet to an in-memory offscreen surface and deliberately excludes PNG encoding and file I/O.
 - The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
@@ -36,52 +39,62 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `snap avg_ms=2.34`
   - `paint_draw avg_ms=3.96`
 - Best measured `edit-layout` result reached during this workstream:
-  - `drag_loop per_iter_ms=2.36`
-  - `snap avg_ms=0.18`
-  - `apply avg_ms=0.08`
-  - `paint_draw avg_ms=2.09`
+  - `drag_loop per_iter_ms=2.11`
+  - `snap avg_ms=0.06`
+  - `apply avg_ms=0.05`
+  - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.32`
-  - `snap avg_ms=0.19`
-  - `apply avg_ms=0.09`
+  - `drag_loop per_iter_ms=2.15`
+  - `snap avg_ms=0.06`
+  - `apply avg_ms=0.05`
   - `paint_draw avg_ms=2.02`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.57`
-  - `telemetry_update avg_ms=2.50`
-  - `paint_total avg_ms=2.06`
-  - `paint_draw avg_ms=2.06`
-- Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.59`
-  - `switch_apply avg_ms=0.80`
-  - `dialog_refresh avg_ms=0.18`
-  - `switch_paint avg_ms=2.59`
-- Current repeatable `theme-change` result on the current tree:
-  - `theme_loop per_iter_ms=4.60`
-  - `config_copy avg_ms=0.01`
-  - `color_resolve avg_ms=0.04`
-  - `dashboard_config avg_ms=1.09`
-  - `edit_tree avg_ms=0.18`
-  - `theme_preview avg_ms=0.80`
-  - `theme_paint avg_ms=2.46`
-- Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.16`
-  - `hover_hit_test avg_ms=0.07`
+  - `update_loop per_iter_ms=4.46`
+  - `telemetry_update avg_ms=2.38`
   - `paint_total avg_ms=2.08`
   - `paint_draw avg_ms=2.08`
+- Current repeatable `layout-switch` result on the current tree:
+  - `switch_loop per_iter_ms=3.52`
+  - `switch_apply avg_ms=0.88`
+  - `dialog_refresh avg_ms=0.26`
+  - `switch_paint avg_ms=2.37`
+- Current repeatable `theme-change` result on the current tree:
+  - `theme_loop per_iter_ms=4.02`
+  - `config_copy avg_ms=0.01`
+  - `color_resolve avg_ms=0.05`
+  - `dashboard_config avg_ms=0.82`
+  - `edit_tree avg_ms=0.24`
+  - `theme_preview avg_ms=0.80`
+  - `theme_paint avg_ms=2.08`
+- Current repeatable `mouse-hover` result on the current tree:
+  - `hover_loop per_iter_ms=2.13`
+  - `hover_hit_test avg_ms=0.08`
+  - `paint_total avg_ms=2.05`
+  - `paint_draw avg_ms=2.05`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=84.04`
-  - `active_regions avg_ms=5.17`
-  - `sheet_plan avg_ms=1.14`
-  - `sheet_measure avg_ms=4.33`
-  - `sheet_place avg_ms=42.59`
-  - `sheet_draw avg_ms=30.65`
+  - `sheet_loop per_iter_ms=116.62`
+  - `active_regions avg_ms=4.89`
+  - `sheet_plan avg_ms=1.09`
+  - `sheet_measure avg_ms=4.50`
+  - `sheet_place avg_ms=75.93`
+  - `sheet_draw avg_ms=30.14`
 
 ## Current Confirmed Hotspots
 
-Current useful hotspot signals from the latest daemon-backed WPR capture on the full-D2D tree:
+Current useful benchmark and hotspot signals from the latest direct runs and daemon-backed WPR captures on the full-D2D tree:
 
-- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\26329_243_6102\` reports `update_loop per_iter_ms=4.64`, `telemetry_update avg_ms=2.56`, and `paint_draw avg_ms=2.08`; the benchmark-process inclusive module weight is centered on `d2d1.dll`, `DWrite.dll`, `Kernelbase.dll`, `PDH.DLL`, `advapi32.dll`, `clr.dll`, and `mscorlib.dll`. The app-inclusive call tree keeps `AmdAdlxGpuTelemetryProvider::Sample`, `FpsHybridProvider::Sample`, and `PresentedFpsEtwProvider::Sample` visible, so the capture still includes the real presented-FPS ETW sample overhead while using raw GPU Engine PDH values.
-- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=328.70`, with `sheet_place avg_ms=299.16` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=16.97`.
+- The latest daemon-backed `update-telemetry` captures under `build\profile_benchmark_daemon\requests\18014_1564_22035\` and `build\profile_benchmark_daemon\requests\18154_4993_3762\` report `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; `FindRetainedHistory` appears only as a tiny exclusive leaf in one capture at `0.12%`, while the app-inclusive weight stays in `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, `UpdateGpuMetrics`, and Direct2D/DirectWrite paint.
+- The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
+- A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
+- The latest direct `update-telemetry` rerun after extracting `GpuRawCounterMap` into `telemetry/fps/impl/` landed at `update_loop per_iter_ms=4.80`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.17`.
+- The direct reruns after the telemetry metric row-storage size pass landed at `update_loop per_iter_ms=4.76`, `telemetry_update avg_ms=2.57`, `paint_draw avg_ms=2.18`, and `edit-layout paint_draw avg_ms=2.18`; keep the fixed-slot metric and drive-row caches because a single borrowed row slot without fixed reuse made repeated paint noticeably slower in direct reruns.
+- The latest full direct benchmark refresh after the size-optimization work lands at or better than the previous maintained baselines: `edit-layout drag_loop per_iter_ms=2.15`, `update-telemetry update_loop per_iter_ms=4.46`, `layout-switch switch_loop per_iter_ms=3.52`, `theme-change theme_loop per_iter_ms=4.02`, `mouse-hover hover_loop per_iter_ms=2.13`, and `layout-guide-sheet sheet_loop per_iter_ms=116.62`; retain this current-tree code shape unless a future direct benchmark suite shows the improvement was noise.
+- The latest direct `edit-layout` rerun after the panel-icon mask-atlas pass landed at `drag_loop per_iter_ms=2.24`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.11`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
+- The latest direct `theme-change` rerun after the same pass landed at `theme_loop per_iter_ms=4.11`, `dashboard_config avg_ms=0.85`, `theme_preview avg_ms=0.84`, and `theme_paint avg_ms=2.18`.
+- The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.
+- The latest daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\29824_11608_6003\` reports `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; the string-construction leaves from renderer trace formatting are gone, and the remaining inclusive app weight is in `D2DRenderer::DrawTextBlock`, `D2DRenderer::FillSolidRect`, and `DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect`.
+- The latest direct `edit-layout` rerun after changing the D2D solid-brush cache to palette-id slots landed at `drag_loop per_iter_ms=2.34`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.19`; a preceding noisy run landed at `2.65 ms`/`2.50 ms`, so keep comparing this path through repeat direct runs.
+- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=116.62`, with `sheet_place avg_ms=75.93` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=30.14`.
 - The latest usable daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21425_18089_27400\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, and `D3D11.dll`; the exported call tree still under-symbolizes most app-owned leaf functions and does not surface a new dominant geometry-builder hotspot inside the benchmark process.
 - The latest daemon-backed `edit-layout` timing capture under `build\profile_benchmark_daemon\requests\18269_30044_21338\` reports `drag_loop per_iter_ms=2.54`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.27`; its WPR ETL is present, but the exported text summary and call-tree HTML are empty, so it does not replace the latest usable hotspot attribution above.
 - The current uncached capture is mildly collector-bound again on this machine: `TelemetryCollector::UpdateSnapshot()` now lands slightly above repaint in both the direct and daemon-backed runs after restoring the live Gigabyte collection allocation required for real board samples.
@@ -94,12 +107,12 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current no-cache split lands at roughly `2.50 ms` in `TelemetryCollector::UpdateSnapshot()` versus `2.06 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.72` to `2.76 ms` of the `3.60` to `3.66 ms` loop while the dialog refresh work stays around `0.15 ms`.
+- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current split lands at roughly `2.38 ms` in telemetry update versus `2.08 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.37 ms` of the `3.52 ms` loop while the dialog refresh work stays around `0.26 ms`.
 - The direct `layout-guide-sheet` benchmark remains placement-score bound after removing the pathological exhaustive stack-order search: measured callout preparation and offscreen drawing are separate timing buckets, and the remaining cost is mostly leader intersection scoring inside `sheet_place`.
-- The direct `edit-layout` benchmark remains paint-bound on this tree after restoring incremental renderer style updates: confirmation reruns land around `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`, so the remaining time sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
-- Suppressing layout-edit tooltip refresh while a drag is active does not regress the direct `edit-layout` benchmark; the post-change `240`-iteration run landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.17`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.11`.
-- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.08 ms` per step while repaint sits around `2.12` to `2.13 ms`.
+- The direct `edit-layout` benchmark remains paint-bound on this tree after the app-style drag harness update: current reruns land around `drag_loop per_iter_ms=2.15`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.02`, so the remaining measured frame cost sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
+- Suppressing layout-edit tooltip refresh while a drag is active avoids trace-enabled per-move tooltip work, and immediate drag redraw fixes the real app responsiveness issue that the old benchmark did not expose.
+- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.08 ms` per step while repaint sits around `2.05 ms`.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
@@ -110,18 +123,52 @@ These changes produced real wins and remain in the codebase:
 - Avoid full config copies during snap evaluation by applying preview weights directly in the renderer and resolving layout from there.
 - Group snap candidates by widget so one snap search can serve multiple target extents with shared extent evaluation.
 - Refactor layout similarity indicator collection to avoid repeated representative scans and reduce per-frame container churn.
+- Avoid formatting renderer trace strings while interactive drag tracing suppresses renderer details, so guide-size snap and apply preview passes do not pay for dropped diagnostics text.
+- Force active layout-edit drags to redraw on each processed pointer move, and skip tooltip refresh during the active drag so trace-enabled sessions do not spam per-frame tooltip skip markers.
+- Keep themed shell-icon refresh out of layout-only edit mutations; the icon is color-driven, so layout weight, font, reorder, and numeric widget edits should not rebuild it on every pointer move.
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
 - Reuse draw-time text layout results for dynamic text anchors and keep all text-anchor measurement on the renderer's shared DirectWrite layout path.
 - Reuse one cached `MetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
-- Decode embedded panel icons through WIC and scale them with `IWICBitmapScaler` before upload into render-target-local Direct2D bitmaps, so the renderer no longer depends on GDI+ for icon resources.
+- Decode the embedded 8-bit grayscale panel-icon mask atlas through WIC and crop fixed 64 x 64 slots through a target-local Direct2D alpha mask, so the renderer no longer depends on GDI+ for icon resources.
+- Cache Direct2D solid brushes by `RenderColorId` palette slot and clear the slots on palette rebuild, so draw code never needs a packed-RGBA brush lookup.
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
-- Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or tinted icon sources during edit-layout drag apply and layout switching.
+- Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or the panel-icon mask atlas during edit-layout drag apply and layout switching.
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
 
 ## Tested Hypotheses
+
+### Hypothesis: Retained histories can avoid a string-key hash index
+
+- Change:
+  - Remove `SystemSnapshot`'s `std::unordered_map<std::string, size_t>` retained-history index.
+  - Keep retained samples in the dump-facing vector, cache fixed CPU/GPU/network/storage histories by `RetainedHistoryKey` encoded vector indices, and leave dynamic board temperature/fan histories on the existing string series refs.
+- Result:
+  - Helped shipped size while keeping the retained-history lookup out of the telemetry-plus-draw profile.
+- Observed effect:
+  - A shared `StringPointerMap`/`StringIndexMap` wrapper around `std::unordered_map<std::string, const void*>` regressed the app to `1,187,328` bytes, so that abstraction was rejected.
+  - Removing the retained-history hash index reduced `build\CaseDash.exe` from `1,186,816` to `1,182,208` bytes. A plain vector scan and the final enum-index shape measured the same shipped size; the enum-index shape remains because fixed histories avoid repeated vector scans.
+  - Direct validation after the change landed at `update_loop per_iter_ms=5.72`, `telemetry_update avg_ms=3.36`, `paint_draw avg_ms=2.36`, and `edit-layout paint_draw avg_ms=2.33` on a slower-than-baseline run.
+  - Daemon-backed captures landed at `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; retained-history lookup was absent from the top app functions in one capture and only `0.12%` exclusive hits in the other.
+- Conclusion:
+  - Keep enum-indexed fixed retained histories plus dynamic string board histories. Do not add a project-owned unordered-map wrapper for this surface unless a future benchmark shows a larger non-dynamic string-key lookup domain.
+
+### Hypothesis: Keep FPS ETW process caches flat without regressing process-heavy machines
+
+- Change:
+  - Keep the FPS ETW provider's active process-name cache, per-process GPU usage totals, and present-event buckets as flat vectors after the size pass.
+  - Keep previous/current GPU raw counter lookup on `std::unordered_map<std::wstring, PDH_RAW_COUNTER>` because GPU Engine exposes one instance per process and engine, not one entry per active presenter.
+- Result:
+  - Helped shipped size without regressing the maintained telemetry-plus-draw benchmark on a process-heavy desktop.
+- Observed effect:
+  - The validation machine had `325` normal processes, `632` GPU Engine counter instances, and `28` GPU Engine process ids before the stress run.
+  - Direct `update-telemetry` reruns landed at `update_loop per_iter_ms=4.77` to `4.84`, `telemetry_update avg_ms=2.66` to `2.67`, and `paint_draw avg_ms=2.11` to `2.17`.
+  - With `300` additional hidden idle `timeout.exe` processes alive, the same direct benchmark reported `process_count=927`, `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
+  - The daemon-backed profile under `build\profile_benchmark_daemon\requests\10827_2817_24593\` landed at `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; `PresentedFpsEtwProvider::Sample` stayed at `0.79%` exclusive hits and the raw-counter hash lookup stayed at `0.40%` exclusive hits.
+- Conclusion:
+  - Keep flat vectors only for the tiny active process-level FPS sets. Keep GPU raw counter lookup hash-based, and do not flatten it for size because the instance count scales with the desktop's process and GPU-engine surface.
 
 ### Hypothesis: Use raw PDH arrays for presented-FPS GPU Engine process selection
 
@@ -201,7 +248,7 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Preserve incremental renderer style updates after the renderer package refactor
 
 - Change:
-  - Restore change detection inside `D2DRenderer::SetStyle` so it initializes Direct2D once, rebuilds palette state only when colors change, reloads tinted icon sources only when icon names or icon color change, and rebuilds DirectWrite text formats only when fonts or render scale change.
+  - Restore change detection inside `D2DRenderer::SetStyle` so it initializes Direct2D once, rebuilds palette state only when colors change, reloads panel-icon resources only when icon names change, and rebuilds DirectWrite text formats only when fonts or render scale change.
 - Result:
   - Helped materially and fixed a refactor regression.
 - Observed effect:
@@ -210,7 +257,7 @@ These changes produced real wins and remain in the codebase:
   - After the fix, `build\CaseDashBenchmarks.exe edit-layout 240 2` reruns landed at `drag_loop per_iter_ms=2.46` to `2.49`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.23`.
   - After the fix, `build\CaseDashBenchmarks.exe layout-switch 240 2` reruns landed at `switch_loop per_iter_ms=3.60` to `3.66`, `switch_apply avg_ms=0.73` to `0.74`, `dialog_refresh avg_ms=0.15`, and `switch_paint avg_ms=2.72` to `2.76`.
 - Conclusion:
-  - Layout-only config updates must keep renderer-owned resources hot. Rebuilding DirectWrite formats and tinted icon sources inside every `SetConfig` call dominates the apply phase and shows up immediately in both edit-layout drag and layout switching.
+  - Layout-only config updates must keep renderer-owned resources hot. Rebuilding DirectWrite formats and panel-icon resources inside every `SetConfig` call dominates the apply phase and shows up immediately in both edit-layout drag and layout switching.
 
 ### Hypothesis: Caching the embedded layout-edit template materially improves layout switching while the edit dialog is open
 
@@ -665,20 +712,21 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Replace the remaining panel-icon GDI+ decode and scale path with WIC
 
 - Change:
-  - Decode embedded PNG panel icons through WIC, keep the cached source bitmaps as `IWICBitmapSource`, scale them with `IWICBitmapScaler`, upload them into render-target-local Direct2D bitmaps on demand, and remove the `gdiplus` link dependency from the app and benchmark targets.
+  - Decode embedded PNG panel icons through WIC, originally as cached per-icon sources and later as one fixed 64 x 64 slot atlas, upload render-target-local Direct2D bitmaps on demand, and remove the `gdiplus` link dependency from the app and benchmark targets.
 - Result:
   - Neutral for throughput and worth keeping for dependency cleanup.
 - Observed effect:
   - `240`-iteration reruns landed at `drag_loop per_iter_ms=2.49` to `2.50`, `snap avg_ms=0.20`, `apply avg_ms=0.28`, and `paint_draw avg_ms=2.01` to `2.02`.
+  - A later size pass moved the panel icons to one 8-bit grayscale mask atlas and a target-local alpha mask; direct reruns landed at `edit-layout paint_draw avg_ms=2.11` and `theme-change theme_paint avg_ms=2.18`.
 - Why it helped:
   - The benchmark keeps the same Direct2D and DirectWrite hotspot shape while removing the last benchmark-process `GdiPlus.dll` dependency and keeping icon decode, scale, screenshot export, and bitmap upload on one WIC plus Direct2D asset path.
 - Conclusion:
-  - Keep the WIC-based icon path. Future renderer cleanup can assume panel icons, screenshots, and the live frame all stay off GDI+.
+  - Keep the WIC-based atlas icon path. Future renderer cleanup can assume panel icons, screenshots, and the live frame all stay off GDI+.
 
 ### Hypothesis: Keep widget renderer geometry primitive-only with generic paths and arcs
 
 - Change:
-  - Replace widget-facing gauge ring and pill-bar renderer helpers with primitive filled paths, stroked arcs, rounded rectangles, and ellipses; move gauge segment construction and capsule-bar layout into widget code; keep Direct2D conversion generic inside the renderer package.
+  - Replace widget-facing gauge ring and pill bar renderer helpers with primitive filled paths, stroked arcs, rounded rectangles, and ellipses; move gauge segment construction and pill bar layout into widget code; keep Direct2D conversion generic inside the renderer package.
 - Result:
   - Initially regressed the maintained layout-edit draw benchmark, then recovered after switching gauge segments from filled annular paths to widget-owned neutral arc primitives and batching those arcs into one renderer-private D2D path.
 - Observed effect:
@@ -690,7 +738,7 @@ These changes produced real wins and remain in the codebase:
   - Replacing gauge filled annular segment paths with widget-owned `RenderArc` geometry and neutral `DrawArc`/`DrawArcs` renderer primitives recovered most of the regression: `build\CaseDashBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.43`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.17`; confirmation reruns landed at `drag_loop per_iter_ms=2.47` to `2.48`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.20` to `2.22`.
   - Batching `DrawArcs` through a single renderer-private D2D path geometry instead of one path per arc plus a geometry group recovered the remaining cost: `build\CaseDashBenchmarks.exe edit-layout 240 2` landed at `drag_loop per_iter_ms=2.39` to `2.41`, `snap avg_ms=0.18` to `0.19`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.13` to `2.14`, while `build\CaseDashBenchmarks.exe edit-layout 480 2` landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.10`.
 - Conclusion:
-  - Keep the primitive-only widget renderer boundary, but avoid representing every widget-specific shape as a filled generic path when a neutral primitive maps to a cheaper renderer operation. Widgets still own gauge and capsule-bar geometry, while the renderer owns only generic path, arc, rounded-rect, ellipse, and polyline drawing; renderer-private batching is the right place to recover performance without reintroducing widget-specific renderer helpers.
+  - Keep the primitive-only widget renderer boundary, but avoid representing every widget-specific shape as a filled generic path when a neutral primitive maps to a cheaper renderer operation. Widgets still own gauge and pill bar geometry, while the renderer owns only generic path, arc, rounded-rect, ellipse, and polyline drawing; renderer-private batching is the right place to recover performance without reintroducing widget-specific renderer helpers.
 
 ### Hypothesis: Reuse one GDI+ `Graphics` object across the whole frame
 
@@ -721,7 +769,7 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Avoid full renderer reconfiguration when only layout weights change
 
 - Change:
-  - Keep `DashboardRenderer::SetConfig` on the drag apply path, but only rebuild palette state, panel-icon assets, DirectWrite text formats, and metric caches when the corresponding config inputs actually change instead of reloading all renderer resources on every layout-weight update.
+  - Keep `DashboardRenderer::SetConfig` on the drag apply path, but only rebuild palette state, the panel-icon mask atlas, DirectWrite text formats, and metric caches when the corresponding config inputs actually change instead of reloading all renderer resources on every layout-weight update.
 - Result:
   - Helped materially.
 - Observed effect:
@@ -730,33 +778,34 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - The regression was not just in draw; the drag path was also paying avoidable per-frame renderer reconfiguration churn. Preserve caches and resource rebuilds across layout-only config updates.
 
-### Hypothesis: Use size-oriented Release code generation for the single executable
+### Hypothesis: Guard dropped renderer trace formatting during guide drag
 
 - Change:
-  - Compile the Release app and benchmark targets with `/Os` plus `/GL`, link both with `/LTCG`, `/OPT:REF`, and non-incremental linking, and keep benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units on `/O2` inside that profile.
+  - Add a cheap renderer-trace guard and wrap layout-resolver trace call sites so interactive guide dragging does not build `renderer:*` strings that `WriteTrace` will discard.
+  - Keep the size-oriented flat similarity scan; restoring the older keyed/bucketed similarity code did not beat clean HEAD and cost executable bytes.
+  - Retest Direct2D dotted rectangle strokes for the active container outline; this remained worse than the manual filled-dot outline and was reverted.
 - Result:
-  - Helped executable size and did not introduce a meaningful additional benchmark regression relative to the same `/GL` plus `/LTCG` benchmark profile.
+  - Helped the guide-size drag path materially.
 - Observed effect:
-  - `build\CaseDash.exe` decreased from `1,783,808` bytes with `/O2`, `/GL`, and `/LTCG` to `1,465,344` bytes with the size-oriented profile.
-  - A full `/Os` probe without hot-source `/O2` overrides also produced `1,465,344` bytes, but was noisier on paint-heavy loops; retaining `/O2` on benchmark-sensitive files kept the same executable size in this build.
-  - The pre-change direct benchmark binary, which did not yet use the app's `/GL` plus `/LTCG` profile, measured `edit-layout` at `drag_loop per_iter_ms=2.57`, `layout-switch` at `switch_loop per_iter_ms=3.94`, `mouse-hover` at `hover_loop per_iter_ms=2.36`, `update-telemetry` at `update_loop per_iter_ms=5.39`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=108.38`.
-  - A temporary `/O2`, `/GL`, and `/LTCG` benchmark build measured `edit-layout` at `drag_loop per_iter_ms=2.62`, `layout-switch` at `switch_loop per_iter_ms=3.98`, `mouse-hover` at `hover_loop per_iter_ms=2.39`, `update-telemetry` at `update_loop per_iter_ms=5.68`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=101.14`.
-  - The final size-oriented benchmark build measured `edit-layout` at `drag_loop per_iter_ms=2.60`, `layout-switch` at `switch_loop per_iter_ms=4.04`, `mouse-hover` at `hover_loop per_iter_ms=2.34`, `update-telemetry` at `update_loop per_iter_ms=5.66`, and `layout-guide-sheet` at `sheet_loop per_iter_ms=98.06`.
-  - The daemon-backed `profile_benchmark.cmd update-telemetry 240 2` validation under `build\profile_benchmark_daemon\requests\24530_28119_478\` landed at `update_loop per_iter_ms=6.16`, `telemetry_update avg_ms=3.64`, and `paint_draw avg_ms=2.52`; the hotspot shape remained split between the real collector path and Direct2D/DirectWrite drawing, with no new app-owned exclusive hotspot dominating the profile.
+  - Before the guard, the fresh direct rerun landed at `drag_loop per_iter_ms=2.47`, `snap avg_ms=0.20`, `apply avg_ms=0.09`, and `paint_draw avg_ms=2.17`.
+  - After the guard, the final full direct rerun landed at `drag_loop per_iter_ms=2.22`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.09`; a daemon-backed profile landed at `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`.
+  - The dotted-stroke retest regressed the same benchmark to about `drag_loop per_iter_ms=3.10` to `3.27` and `paint_draw avg_ms=2.96` to `3.11`.
 - Conclusion:
-  - Keep the size-oriented Release profile. Compare future performance work against benchmarks built with the same Release profile as the app, because comparing against the old non-LTCG benchmark binary overstates the effect of `/Os`.
+  - The guide-size regression was not caused by the live similarity indicators needing to compute or draw less; it was avoidable diagnostics-string construction in the preview/apply layout passes while renderer trace output was suppressed. Keep the trace guard and keep the manual filled-dot outline.
 
-### Hypothesis: Remove `std::function` from production callback paths
+### Hypothesis: Force live drag redraw instead of waiting for queued paint
 
 - Change:
-  - Replace production `std::function` use with direct helpers for local recursion and mutation helpers, then switch synchronous renderer, layout-guide-sheet, snap-solver, and placement callbacks to a non-owning `FunctionRef` view.
+  - During active layout-edit drags, skip tooltip refresh work in `InvalidateLayoutEdit` and `InvalidateShell`, then call an immediate redraw after each processed drag pointer move.
+  - Keep themed shell-icon refresh out of layout-only edit mutations; the app icon is color-driven and does not change when layout weights, fonts, reorder state, or numeric widget parameters change.
+  - Update the edit-layout benchmark harness so drag mutations include renderer sync, layout dirty tracking, and one forced redraw per synthetic pointer move.
 - Result:
-  - Helped executable size modestly.
+  - Fixed the real-app lag where drag state advanced quickly but visible feedback updated only occasionally.
 - Observed effect:
-  - Removing only local helper type erasure reduced `build\CaseDash.exe` from `1,451,008` bytes to `1,445,888` bytes.
-  - Removing production `std::function` entirely reduced `build\CaseDash.exe` further to `1,440,768` bytes and `build\CaseDashBenchmarks.exe` to `1,078,272` bytes.
+  - The captured real drag in `build\casedash_trace.txt` lasted `6909.736 ms`, processed `687` snap/apply samples, and recorded only `25` paint samples before the fix.
+  - After the fix, live dragging tracks the pointer in the real app. The updated direct benchmark landed at `drag_loop per_iter_ms=2.12` to `2.15`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.00` to `2.02`.
 - Conclusion:
-  - Keep `FunctionRef` for synchronous callbacks that do not escape the call. Continue to use owning callback storage only when a callback must outlive the call stack.
+  - The user-visible lag was message-pump paint starvation, not a lack of compute or draw capacity. Keep explicit drag redraws in the real app and keep the benchmark aligned with that full drag path.
 
 ### Hypothesis: Theme preview construction belongs outside the dialog pane
 
@@ -768,153 +817,6 @@ These changes produced real wins and remain in the codebase:
   - `build\CaseDashBenchmarks.exe theme-change 240 2` landed at `theme_loop per_iter_ms=4.92`, with `dashboard_config avg_ms=1.05`, `edit_tree avg_ms=0.18`, `theme_preview avg_ms=1.00`, and `theme_paint avg_ms=2.61`.
 - Conclusion:
   - Keep theme-preview rendering behind the shared module and compare future theme-selector work against the full theme-change loop rather than a standalone triangle microbenchmark.
-
-### Hypothesis: Keep STL-heavy Gigabyte provider logic out of CLR metadata
-
-- Change:
-  - Split the Gigabyte SIV provider into a native provider implementation and a narrow C++/CLI bridge. The native file keeps the provider settings, sensor maps, metric templates, and sample shaping, while the CLR-enabled bridge owns only managed runtime state and reflection calls into the vendor assemblies. Keep native STL containers out of the CLR method boundary by having the bridge call a native capture sink with pinned UTF-16 strings.
-- Result:
-  - Helped executable size materially while keeping the single executable and the existing `std::unordered_map`-backed provider lookups.
-- Observed effect:
-  - Splitting the provider reduced `build\CaseDash.exe` from `1,440,768` bytes to `1,336,832` bytes and `build\CaseDashBenchmarks.exe` from `1,078,272` bytes to `974,848` bytes.
-  - Narrowing the CLR method boundary further reduced `build\CaseDash.exe` to `1,309,184` bytes and `build\CaseDashBenchmarks.exe` to `947,200` bytes.
-  - The CLR metadata directory in `build\CaseDash.exe` decreased from `126,840` bytes before the split to `45,532` bytes after the split and `25,904` bytes after the sink boundary.
-  - The app section sizes after the sink boundary are `.text=1,057,052`, `.rdata=174,840`, `.pdata=28,320`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,356` bytes.
-- Conclusion:
-  - Keep mixed-mode translation units narrow and avoid STL types in `/clr` method signatures. Native performance containers are fine, but they should stay in native `.cpp` files so their template spellings and provider implementation details do not inflate CLR metadata.
-
-### Hypothesis: Replace `std::filesystem` with a project filesystem utility
-
-- Change:
-  - Add a Win32-backed `FilePath` and filesystem helper module under `src/util/`, then route project and test path operations through that module instead of `std::filesystem`.
-- Result:
-  - Helped executable size modestly.
-- Observed effect:
-  - Removing project `std::filesystem` use reduced `build\CaseDash.exe` from `1,309,184` bytes to `1,303,040` bytes and `build\CaseDashBenchmarks.exe` from `947,200` bytes to `943,104` bytes.
-  - The app section sizes after the filesystem migration are `.text=1,053,628`, `.rdata=172,802`, `.pdata=27,948`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,304` bytes.
-- Conclusion:
-  - Keep common path and file operations in `src/util/file_path.*` instead of reintroducing `std::filesystem`; the size win is small but keeps filesystem-related standard-library machinery out of the single executable.
-
-### Hypothesis: Drive config parsing and writing through runtime field descriptor loops
-
-- Change:
-  - Keep the config declarations in `config.h` as the one-line-per-parameter source of truth, but route structured-section parsing and writing through per-section runtime field descriptor arrays instead of expanding every field into repeated `std::apply` lambda bodies.
-  - Replace exception-based config numeric parsing with `strtol`, `strtod`, and `strtoul` validation.
-- Result:
-  - Helped executable size materially.
-- Observed effect:
-  - The config descriptor-loop rewrite plus non-throwing numeric parsing reduced `build\CaseDash.exe` from `1,303,040` bytes to `1,253,376` bytes and `build\CaseDashBenchmarks.exe` from `943,104` bytes to `939,008` bytes.
-  - The app section sizes after the config rewrite are `.text=1,000,908`, `.rdata=173,580`, `.pdata=28,944`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
-  - A fresh linker map showed `config_writer.cpp.obj` falling from about `81.8 KiB` to about `35.4 KiB`, while `config_parser.cpp.obj` fell from about `44.6 KiB` to about `37.6 KiB`.
-- Conclusion:
-  - Keep config parser and writer dispatch table-driven at runtime while preserving `config.h` as the metadata source of truth. Avoid reintroducing per-field generated parser/writer lambda chains.
-
-### Hypothesis: Disable native C++ exception handling for app and benchmark targets
-
-- Change:
-  - Remove `/EHsc` from the native app and benchmark targets while leaving the C++/CLI bridge and test target exception model separate.
-  - Suppress expected MSVC C4530 diagnostics on the no-EH native targets because standard-library headers still contain exception-aware code paths.
-- Result:
-  - Helped executable size materially.
-- Observed effect:
-  - Removing native `/EHsc` reduced `build\CaseDash.exe` from `1,253,376` bytes to `1,152,512` bytes and `build\CaseDashBenchmarks.exe` from `939,008` bytes to `868,864` bytes.
-  - The app section sizes after disabling native exception handling are `.text=958,120`, `.rdata=121,074`, `.pdata=23,124`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,332` bytes.
-  - The benchmark section sizes after disabling native exception handling are `.text=709,772`, `.rdata=91,656`, `.pdata=17,532`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=2,588` bytes.
-- Conclusion:
-  - Keep native production and benchmark code on the no-EH profile. Keep managed exception handling isolated to the C++/CLI provider bridge and keep tests on `/EHsc` where assertion helpers and test support can still use ordinary C++ exceptions.
-
-### Hypothesis: Collapse config writer full-save and diff-save template paths
-
-- Change:
-  - Route full config saves through the same section-difference traversal used by minimal saves, with a null compare config selecting the full-write behavior.
-  - Move duplicated parser and writer UTF-8 config file helpers into `src/config/config_file_io.*`.
-- Result:
-  - Helped executable size through the writer traversal collapse; shared file I/O was neutral after LTCG.
-- Observed effect:
-  - Collapsing the full-save traversal reduced `build\CaseDash.exe` from `1,152,512` bytes to `1,144,832` bytes. `build\CaseDashBenchmarks.exe` stayed at `868,864` bytes because the benchmark target does not link the config writer.
-  - The app section sizes after the writer collapse are `.text=951,016`, `.rdata=120,914`, `.pdata=23,016`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,328` bytes.
-  - A parser experiment replacing the card-reference `std::set` with a flat string-view vector regressed the app to `1,145,856` bytes and was reverted.
-- Conclusion:
-  - Keep full and minimal config saves on one writer traversal so future schema growth does not duplicate save-template code. Do not retry the flat card-reference vector in the parser for size.
-
-### Hypothesis: Unify config parser and writer runtime field descriptors
-
-- Change:
-  - Move structured-section field decoding, encoding, equality checks, and layout-expression formatting into `src/config/config_runtime_fields.*`.
-  - Replace parser-only and writer-only descriptor tables with one `RuntimeConfigFieldDescriptor` table per structured section.
-- Result:
-  - Helped the distributed executable modestly.
-- Observed effect:
-  - Unifying runtime field descriptors reduced `build\CaseDash.exe` from `1,144,832` bytes to `1,142,784` bytes.
-  - The app section sizes after unifying descriptors are `.text=951,048`, `.rdata=119,266`, `.pdata=23,004`, `.rsrc=35,472`, `.data=8,192`, and `.reloc=3,132` bytes.
-- Conclusion:
-  - Keep parser and writer field dispatch on the shared runtime descriptor table. Future size work should target type-erased codec operations or direct fixed-arity parsing rather than recreating separate parser/writer descriptor tables.
-
-### Hypothesis: Replace per-field config callbacks with offset descriptors
-
-- Change:
-  - Store structured-section runtime field descriptors as `key`, field offset, value kind, and clamp policy.
-  - Replace the generated per-field decode, encode, and equality callbacks with shared switch-based runtime helpers.
-- Result:
-  - Helped the distributed executable by removing per-field callback instantiations.
-- Observed effect:
-  - Offset-based runtime descriptors reduced `build\CaseDash.exe` from `1,142,784` bytes to `1,135,104` bytes.
-- Conclusion:
-  - Keep config parser and writer field dispatch on the offset descriptor table. This preserves the `config.h` metadata source of truth while making runtime config I/O less template-heavy.
-
-### Hypothesis: Compact snapshot dump field I/O
-
-- Change:
-  - Replace repeated flat snapshot dump read/write chains with offset-based field descriptors for scalar CPU, GPU, network, storage, and time fields.
-  - Replace the dump parser's local `std::map<std::string, std::string>` key store with a flat key/value vector while preserving duplicate-key last-writer behavior.
-  - Store descriptor offsets directly with `offsetof` and route field reads and writes through shared typed accessors instead of per-field offset lambdas.
-- Result:
-  - Helped the distributed executable modestly.
-- Observed effect:
-  - Compacting snapshot dump I/O reduced `build\CaseDash.exe` from `1,135,104` bytes to `1,133,568` bytes.
-- Conclusion:
-  - Keep the flat key/value dump parser and descriptor-driven flat field I/O. Further dump-size work should target the larger variable-length dump sections only if the resulting code stays straightforward.
-
-### Hypothesis: Compact layout edit selection population
-
-- Change:
-  - Share the repeated editor visibility, empty font preview, right-pane completion, and populate-selection trace plumbing used by the layout edit selection branches.
-  - Keep the branch-specific control population in `PopulateLayoutEditSelection` so each editor mode still initializes the same values and trace payloads.
-- Result:
-  - Helped the distributed executable modestly.
-- Observed effect:
-  - Compacting layout edit selection population reduced `build\CaseDash.exe` from `1,133,568` bytes to `1,132,544` bytes.
-  - In the fresh linker map, `PopulateLayoutEditSelection` fell from `11,088` bytes to `9,172` bytes before accounting for the small shared helper functions.
-- Conclusion:
-  - Keep the common selection finish and trace plumbing shared. Further layout edit dialog size work should target larger standalone routines rather than adding branch-specific cleverness here.
-
-### Hypothesis: Disable MSVC STL vectorized algorithm dispatch
-
-- Change:
-  - Define `_USE_STD_VECTOR_ALGORITHMS=0` for the native app, tests, and benchmark targets.
-  - Keep app and benchmark builds on the same compile and link profile while removing the MSVC STL vectorized algorithm object and lookup tables from the linked binaries.
-- Result:
-  - Helped executable size materially without a confirmed benchmark regression.
-- Observed effect:
-  - Disabling vectorized STL algorithm dispatch reduced `build\CaseDash.exe` from `1,132,544` bytes to `1,107,456` bytes and `build\CaseDashBenchmarks.exe` from `868,864` bytes to `846,848` bytes.
-  - A fresh linker map no longer contains `msvcprt:vector_algorithms.obj`, which previously contributed about `25.7 KiB` across code and read-only data.
-  - Same-session baseline before the flag landed at `edit-layout drag_loop=6.18 ms`, `update-telemetry update_loop=6.16 ms`, `layout-switch switch_loop=4.46 ms`, `mouse-hover hover_loop=2.61 ms`, and `layout-guide-sheet sheet_loop=110.14 ms`; this pass was noisy but gives the local before-change measurement.
-  - Confirmation reruns with `_USE_STD_VECTOR_ALGORITHMS=0` landed at `edit-layout drag_loop=2.70 ms`, `update-telemetry update_loop=4.89 ms`, `layout-switch switch_loop=4.08 ms`, `mouse-hover hover_loop=2.59 ms`, and `layout-guide-sheet sheet_loop=91.23 ms`.
-- Conclusion:
-  - Keep `_USE_STD_VECTOR_ALGORITHMS=0` for the current native targets. The app's hot paths are not helped by the STL vectorized dispatch tables enough to justify the extra single-executable size.
-
-### Hypothesis: Drive color resolution from runtime field metadata
-
-- Change:
-  - Replace hardcoded theme token, `[colors]`, and layout-guide-sheet color chains in `color_resolver.cpp` with loops over `RuntimeConfigFieldDescriptors`.
-  - Use `FunctionRef` for borrowed color lookups and a fixed eight-digit hex parser in the resolver.
-- Result:
-  - Helped executable size modestly and keeps color resolution tied to the config metadata source of truth.
-- Observed effect:
-  - Metadata-driven color resolution reduced `build\CaseDash.exe` from the post-theme baseline of `1,208,320` bytes to `1,203,712` bytes.
-  - In the fresh linker map, `color_resolver.cpp.obj` fell from `8,821` bytes before the refactor to about `7.2 KiB`.
-- Conclusion:
-  - Keep color resolution table-driven through runtime config descriptors so future theme/color fields do not need new resolver-side `if` chains.
 
 ## Practical Guidance For Future Experiments
 

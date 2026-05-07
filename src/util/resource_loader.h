@@ -2,4 +2,9 @@
 
 #include <string>
 
-std::string LoadUtf8ResourceData(int resourceId);
+enum class TextResourceId {
+    ConfigTemplate,
+    LocalizationCatalog,
+};
+
+std::string LoadUtf8ResourceData(TextResourceId resourceId);

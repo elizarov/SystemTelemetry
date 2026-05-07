@@ -1,15 +1,13 @@
 #include "widget/impl/metric_list.h"
 
 #include <algorithm>
-#include <cmath>
 #include <optional>
 #include <string>
 #include <string_view>
 
 #include "telemetry/metrics.h"
-#include "util/numeric_safety.h"
 #include "util/strings.h"
-#include "util/utf8.h"
+#include "widget/impl/pill_bar.h"
 #include "widget/widget_host.h"
 
 namespace {
@@ -21,55 +19,35 @@ int EffectiveMetricRowHeight(const WidgetHost& renderer) {
     return valueHeight + rowGap + barHeight;
 }
 
-void FillCapsule(WidgetHost& renderer, const RenderRect& rect, RenderColorId color) {
-    const int width = rect.Width();
-    const int height = rect.Height();
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-    if (width <= height) {
-        renderer.Renderer().FillSolidEllipse(rect, color);
-    } else {
-        renderer.Renderer().FillSolidRoundedRect(rect, height / 2, color);
-    }
-}
-
-std::optional<RenderRect> DrawMetricCapsuleBar(
-    WidgetHost& renderer, const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    FillCapsule(renderer, rect, RenderColorId::Track);
-
-    const int width = rect.Width();
-    const int height = rect.Height();
-    if (width <= 0 || height <= 0 || !drawFill) {
-        return std::nullopt;
-    }
-
-    const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
-    const int straightWidth = std::max(0, width - height);
-    const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
-    RenderRect fillRect = rect;
-    fillRect.right = fillRect.left + fillWidth;
-    FillCapsule(renderer, fillRect, RenderColorId::Accent);
-
-    if (!peakRatio.has_value()) {
-        return std::nullopt;
-    }
-
-    const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
-    const int markerWidth = std::min(width, std::max(1, std::max(renderer.Renderer().ScaleLogical(4), height)));
-    const int centerX = rect.left + static_cast<int>(std::round(peak * width));
-    const int minLeft = rect.left;
-    const int maxLeft = rect.right - markerWidth;
-    const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
-    RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-    FillCapsule(renderer, markerRect, RenderColorId::PeakGhost);
-    return markerRect;
-}
-
 RenderRect OffsetRect(RenderRect rect, int dy) {
     rect.top += dy;
     rect.bottom += dy;
     return rect;
+}
+
+bool IsUtf8ContinuationByte(char ch) {
+    return (static_cast<unsigned char>(ch) & 0xC0u) == 0x80u;
+}
+
+size_t PreviousUtf8CodePointStart(std::string_view text, size_t end) {
+    if (end == 0) {
+        return 0;
+    }
+    size_t index = end - 1;
+    while (index > 0 && IsUtf8ContinuationByte(text[index])) {
+        --index;
+    }
+    return index;
+}
+
+size_t Utf8CodePointCount(std::string_view text) {
+    size_t count = 0;
+    for (size_t index = 0; index < text.size(); ++index) {
+        if (!IsUtf8ContinuationByte(text[index])) {
+            ++count;
+        }
+    }
+    return count;
 }
 
 std::string FitMiddleEllipsis(const Renderer& renderer, TextStyleId style, std::string_view text, int maxWidth) {
@@ -86,18 +64,18 @@ std::string FitMiddleEllipsis(const Renderer& renderer, TextStyleId style, std::
     if (renderer.MeasureTextWidth(style, kEllipsis) > maxWidth) {
         return {};
     }
-    const std::wstring wide = WideFromUtf8(original);
-    if (wide.empty()) {
+
+    if (Utf8CodePointCount(original) <= kEllipsis.size() + 2) {
         return std::string(kEllipsis);
     }
 
-    if (wide.size() <= kEllipsis.size() + 2) {
-        return std::string(kEllipsis);
-    }
-
-    const std::wstring lastLetter = wide.substr(wide.size() - 1);
-    for (size_t prefixLength = wide.size() - 2; prefixLength > 0; --prefixLength) {
-        std::string candidate = Utf8FromWide(wide.substr(0, prefixLength) + L"..." + lastLetter);
+    const size_t lastStart = PreviousUtf8CodePointStart(original, original.size());
+    const std::string_view lastLetter(original.data() + lastStart, original.size() - lastStart);
+    for (size_t prefixEnd = PreviousUtf8CodePointStart(original, lastStart); prefixEnd > 0;
+        prefixEnd = PreviousUtf8CodePointStart(original, prefixEnd)) {
+        std::string candidate = original.substr(0, prefixEnd);
+        candidate += kEllipsis;
+        candidate += lastLetter;
         if (renderer.MeasureTextWidth(style, candidate) <= maxWidth) {
             return candidate;
         }
@@ -171,7 +149,7 @@ void DrawMetricListRow(WidgetHost& renderer,
     const bool drawValue =
         row.state == MetricValueState::Available && renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank;
     const std::optional<RenderRect> peakMarkerRect =
-        DrawMetricCapsuleBar(renderer, barRect, row.ratio, row.peakRatio, drawValue);
+        DrawWidgetPillBar(renderer, barRect, row.ratio, row.peakRatio, drawValue);
     if (!registerEditRegions) {
         return;
     }
@@ -188,14 +166,6 @@ void DrawMetricListRow(WidgetHost& renderer,
 }
 
 }  // namespace
-
-WidgetClass MetricListWidget::Class() const {
-    return WidgetClass::MetricList;
-}
-
-std::unique_ptr<Widget> MetricListWidget::Clone() const {
-    return std::make_unique<MetricListWidget>(*this);
-}
 
 void MetricListWidget::Initialize(const LayoutNodeConfig& node) {
     metricRefs_.clear();
@@ -287,25 +257,35 @@ void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
     const auto dragState = renderer.ActiveMetricListReorderDrag(
         LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
     const int draggedIndex = dragState.has_value() ? dragState->currentIndex : -1;
-    const auto& rows = metrics.ResolveMetricList(metricRefs_);
+    const std::string* draggedMetricRef = nullptr;
     int rowIndex = 0;
-    for (const auto& row : rows) {
+    for (const auto& metricRef : metricRefs_) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
             break;
         }
+        const MetricValue* row = metrics.FindMetric(metricRef);
+        if (row == nullptr) {
+            continue;
+        }
         if (rowIndex != draggedIndex) {
-            DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, row, 0, true);
+            DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, *row, 0, true);
+        } else {
+            draggedMetricRef = &metricRef;
         }
 
         ++rowIndex;
     }
 
-    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < static_cast<int>(rows.size()) &&
+    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < rowIndex && draggedMetricRef != nullptr &&
         draggedIndex < static_cast<int>(layoutState_.rowRects.size())) {
+        const MetricValue* draggedRow = metrics.FindMetric(*draggedMetricRef);
+        if (draggedRow == nullptr) {
+            renderer.Renderer().PopClipRect();
+            return;
+        }
         const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
         const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
-        DrawMetricListRow(
-            renderer, widget, layoutState_, metricRefs_, draggedIndex, rows[draggedIndex], yOffset, false);
+        DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, false);
         const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
         const bool hoverEquivalent = renderer.CurrentRenderMode() == WidgetHost::RenderMode::LayoutGuideSheet;
         const RenderColorId outlineColor = hoverEquivalent ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;

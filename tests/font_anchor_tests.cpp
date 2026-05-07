@@ -41,7 +41,7 @@ bool ActiveRegionsContainFontParameter(const LayoutEditActiveRegions& regions, L
             region.kind != LayoutEditActiveRegionKind::DynamicEditAnchorTarget) {
             continue;
         }
-        const auto* anchorRegion = std::get_if<LayoutEditAnchorRegion>(&region.payload);
+        const auto* anchorRegion = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(region);
         if (anchorRegion == nullptr) {
             continue;
         }

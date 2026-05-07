@@ -26,8 +26,6 @@ public:
         RenderRect addRowAnchorRect{};
     };
 
-    WidgetClass Class() const override;
-    std::unique_ptr<Widget> Clone() const override;
     void Initialize(const LayoutNodeConfig& node) override;
     int PreferredHeight(const WidgetHost& renderer) const override;
     void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) override;

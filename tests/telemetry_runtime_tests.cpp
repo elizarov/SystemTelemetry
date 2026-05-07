@@ -15,23 +15,21 @@ std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
 
 namespace {
 
-class TelemetryRuntimeTest : public testing::Test {
+class TelemetryRuntimeTest : public testing::Test, public TelemetryUpdateSink {
 protected:
+    void OnTelemetryUpdate(const TelemetryUpdate& update) override {
+        {
+            const std::lock_guard lock(mutex_);
+            latest_ = update;
+            ++callbackCount_;
+        }
+        cv_.notify_all();
+    }
+
     std::unique_ptr<TelemetryRuntime> CreateRuntime() {
         TelemetryCollectorOptions options;
         options.fake = true;
-        return CreateTelemetryRuntime(options,
-            CurrentDirectoryPath(),
-            ExtractTelemetrySettings(config_),
-            trace_,
-            [&](const TelemetryUpdate& update) {
-                {
-                    const std::lock_guard lock(mutex_);
-                    latest_ = update;
-                    ++callbackCount_;
-                }
-                cv_.notify_all();
-            });
+        return CreateTelemetryRuntime(options, CurrentDirectoryPath(), ExtractTelemetrySettings(config_), trace_, this);
     }
 
     bool WaitForCallbackCount(int count) {

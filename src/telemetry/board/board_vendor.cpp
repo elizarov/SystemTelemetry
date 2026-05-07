@@ -8,15 +8,15 @@
 
 namespace {
 
-constexpr wchar_t kBiosKey[] = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
+constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 class UnsupportedBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
     explicit UnsupportedBoardTelemetryProvider(Trace& trace) : trace_(trace) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
+        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
+        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
         sample_.providerName = "Unsupported";
         sample_.boardManufacturer = boardManufacturer_;
         sample_.boardProduct = boardProduct_;
@@ -27,8 +27,8 @@ public:
             CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         sample_.available = false;
         sample_.diagnostics = "No supported board telemetry provider matches the baseboard manufacturer.";
-        trace_.Write("unsupported_board:initialize manufacturer=\"" + boardManufacturer_ + "\" product=\"" +
-                     boardProduct_ + "\"");
+        trace_.Write(TracePrefix::UnsupportedBoard,
+            "initialize manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
         return true;
     }
 
@@ -47,7 +47,7 @@ private:
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
     const std::string manufacturer =
-        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
+        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
     if (ContainsInsensitive(manufacturer, "micro-star") || ContainsInsensitive(manufacturer, "msi")) {
         return CreateMsiBoardTelemetryProvider(trace);
     }

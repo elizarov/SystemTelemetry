@@ -8,8 +8,7 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
-#include "util/strings.h"
-#include "util/utf8.h"
+#include "util/win32_format.h"
 
 namespace {
 
@@ -100,11 +99,11 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     if (FAILED(hr) || stream == nullptr) {
         return SetError(errorText, prefix + "_stream_failed hr=" + FormatHresult(hr));
     }
-    hr = stream->InitializeFromFilename(imagePath.c_str(), GENERIC_WRITE);
+    const std::wstring wideImagePath = imagePath.Wide();
+    hr = stream->InitializeFromFilename(wideImagePath.c_str(), GENERIC_WRITE);
     if (FAILED(hr)) {
-        return SetError(errorText,
-            prefix + "_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" + Utf8FromWide(imagePath.wstring()) +
-                "\"");
+        return SetError(
+            errorText, prefix + "_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" + imagePath.string() + "\"");
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;

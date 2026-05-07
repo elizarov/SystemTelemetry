@@ -46,7 +46,7 @@ public:
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
     virtual void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const = 0;
     virtual void RestackLayoutEditDialogAnchor(HWND dialogHwnd) = 0;
-    virtual void TraceLayoutEditDialogEvent(const std::string& event, const std::string& details = {}) const = 0;
+    virtual void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const = 0;
     virtual void OnLayoutEditDialogCloseRequested() = 0;
 };
 
@@ -64,7 +64,7 @@ public:
     void RefreshSelection();
     void RestackAnchor();
     void RefreshIcons();
-    bool SyncSelection(const std::optional<LayoutEditController::TooltipTarget>& target, bool bringToFront);
+    bool SyncSelection(const LayoutEditController::TooltipTarget* target, bool bringToFront);
     bool ShouldDashboardIgnoreMouse(POINT screenPoint) const;
     void SetSelectionHighlightVisible(bool visible);
     void UpdateSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight);

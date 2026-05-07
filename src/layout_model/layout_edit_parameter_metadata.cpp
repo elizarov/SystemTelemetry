@@ -1,94 +1,45 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 
-#include <cmath>
+#include <cstddef>
+#include <cstdint>
 #include <type_traits>
+
+#include "config/config.h"
 
 namespace {
 
 using Parameter = LayoutEditParameter;
 
-template <typename Meta> bool ApplyFieldEdit(AppConfig& config, double value) {
-    using PolicyTag = typename Meta::traits_type::policy_tag;
-    if constexpr (std::is_same_v<PolicyTag, configschema::FontSizePolicy>) {
-        UiFontConfig font = Meta::RawGet(config);
-        font.size = static_cast<int>(std::lround(value));
-        Meta::Get(config) = std::move(font);
-        return true;
+template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
+    if constexpr (std::is_same_v<Value, int>) {
+        return RuntimeConfigFieldValueKind::Int;
+    } else if constexpr (std::is_same_v<Value, double>) {
+        return RuntimeConfigFieldValueKind::Double;
+    } else if constexpr (std::is_same_v<Value, ColorConfig>) {
+        return RuntimeConfigFieldValueKind::HexColor;
+    } else if constexpr (std::is_same_v<Value, UiFontConfig>) {
+        return RuntimeConfigFieldValueKind::FontSpec;
     } else {
-        if constexpr (std::is_same_v<typename Meta::value_type, int>) {
-            Meta::Get(config) = static_cast<int>(std::lround(value));
-        } else {
-            Meta::Get(config) = static_cast<typename Meta::value_type>(value);
-        }
-        return true;
+        return RuntimeConfigFieldValueKind::String;
     }
 }
 
-template <typename Meta> std::optional<const UiFontConfig*> FindFontFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
-        return &Meta::RawGet(config);
+template <typename Policy> consteval RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
+    if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
+        return RuntimeConfigFieldPolicy::PositiveInt;
+    } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
+        return RuntimeConfigFieldPolicy::NonNegativeInt;
+    } else if constexpr (std::is_same_v<Policy, configschema::FontSizePolicy>) {
+        return RuntimeConfigFieldPolicy::FontSize;
+    } else if constexpr (std::is_same_v<Policy, configschema::DegreesPolicy>) {
+        return RuntimeConfigFieldPolicy::Degrees;
     } else {
-        return std::nullopt;
+        return RuntimeConfigFieldPolicy::None;
     }
 }
 
-template <typename Meta> std::optional<double> FindNumericFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, int>) {
-        return static_cast<double>(Meta::RawGet(config));
-    } else if constexpr (std::is_same_v<typename Meta::value_type, double>) {
-        return Meta::RawGet(config);
-    } else if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
-        return static_cast<double>(Meta::RawGet(config).size);
-    } else {
-        return std::nullopt;
-    }
-}
-
-template <typename Meta> std::optional<unsigned int> FindColorFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
-        return Meta::RawGet(config).ToRgba();
-    } else {
-        return std::nullopt;
-    }
-}
-
-template <typename Meta> std::optional<const ColorConfig*> FindColorConfigFieldValue(const AppConfig& config) {
-    if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
-        return &Meta::RawGet(config);
-    } else {
-        return std::nullopt;
-    }
-}
-
-template <typename Meta> constexpr auto NumericApplyFieldEditFn() {
-    if constexpr (std::is_same_v<typename Meta::value_type, int> || std::is_same_v<typename Meta::value_type, double> ||
-                  std::is_same_v<typename Meta::value_type, UiFontConfig>) {
-        return &ApplyFieldEdit<Meta>;
-    } else {
-        return static_cast<bool (*)(AppConfig&, double)>(nullptr);
-    }
-}
-
-template <typename Meta> bool ApplyFontFieldEdit(AppConfig& config, const UiFontConfig& value) {
-    if constexpr (std::is_same_v<typename Meta::value_type, UiFontConfig>) {
-        Meta::Set(config, value);
-        return true;
-    } else {
-        (void)config;
-        (void)value;
-        return false;
-    }
-}
-
-template <typename Meta> bool ApplyColorFieldEdit(AppConfig& config, unsigned int value) {
-    if constexpr (std::is_same_v<typename Meta::value_type, ColorConfig>) {
-        Meta::Set(config, ColorConfig::FromRgba(value));
-        return true;
-    } else {
-        (void)config;
-        (void)value;
-        return false;
-    }
+template <typename Meta> consteval std::uint32_t RootFieldOffset() {
+    return static_cast<std::uint32_t>(configschema::RootFieldOffset<Meta>());
 }
 
 std::string HumanizeSnakeCase(std::string_view value) {
@@ -106,51 +57,40 @@ std::string HumanizeSnakeCase(std::string_view value) {
     return text;
 }
 
-template <typename Meta> const LayoutEditConfigFieldMetadata& GetFieldMetadata() {
-    static const LayoutEditConfigFieldMetadata metadata{
-        Meta::section_name,
-        Meta::parameter_name,
-        Meta::traits_type::value_format,
-        std::is_same_v<typename Meta::value_type, UiFontConfig>,
-        &FindNumericFieldValue<Meta>,
-        &FindColorFieldValue<Meta>,
-        NumericApplyFieldEditFn<Meta>(),
-        &ApplyColorFieldEdit<Meta>,
-        &ApplyFontFieldEdit<Meta>,
-        &FindFontFieldValue<Meta>,
-        &FindColorConfigFieldValue<Meta>,
-    };
-    return metadata;
-}
+#define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA(name, meta)                                                    \
+    {meta::section_name.data(),                                                                                        \
+        meta::parameter_name.data(),                                                                                   \
+        meta::traits_type::value_format,                                                                               \
+        RuntimeFieldValueKindFor<typename meta::value_type>(),                                                         \
+        RuntimeFieldPolicyFor<typename meta::traits_type::policy_tag>(),                                               \
+        RootFieldOffset<meta>()},
 
-#define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO(name, meta) {Parameter::name, &GetFieldMetadata<meta>()},
+constexpr LayoutEditConfigFieldMetadata kParameterFields[] = {
+    CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA)};
 
-const LayoutEditParameterInfo kParameterInfo[] = {
-    CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO)};
+#undef CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_METADATA
 
-#undef CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_INFO
-
-constexpr size_t kParameterInfoCount = sizeof(kParameterInfo) / sizeof(kParameterInfo[0]);
+constexpr size_t kParameterInfoCount = sizeof(kParameterFields) / sizeof(kParameterFields[0]);
 static_assert(kParameterInfoCount == static_cast<size_t>(Parameter::Count));
 
 }  // namespace
 
-const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter) {
-    return kParameterInfo[static_cast<size_t>(parameter)];
+LayoutEditParameterInfo GetLayoutEditParameterInfo(LayoutEditParameter parameter) {
+    return LayoutEditParameterInfo{parameter};
 }
 
 const LayoutEditConfigFieldMetadata& GetLayoutEditConfigFieldMetadata(LayoutEditParameter parameter) {
-    return *GetLayoutEditParameterInfo(parameter).field;
+    return kParameterFields[static_cast<size_t>(parameter)];
 }
 
 bool IsFontLayoutEditParameter(LayoutEditParameter parameter) {
-    return GetLayoutEditConfigFieldMetadata(parameter).isFont;
+    return GetLayoutEditConfigFieldMetadata(parameter).valueKind == RuntimeConfigFieldValueKind::FontSpec;
 }
 
 std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter) {
     const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
     std::string label = HumanizeSnakeCase(field.parameterName);
-    if (field.isFont) {
+    if (IsFontLayoutEditParameter(parameter)) {
         label += " font";
     }
     return label;
@@ -161,7 +101,8 @@ std::optional<LayoutEditParameter> FindLayoutEditParameterByConfigField(
     for (size_t i = 0; i < kParameterInfoCount; ++i) {
         const auto parameter = static_cast<LayoutEditParameter>(i);
         const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
-        if (field.sectionName == sectionName && field.parameterName == parameterName) {
+        if (std::string_view(field.sectionName) == sectionName &&
+            std::string_view(field.parameterName) == parameterName) {
             return parameter;
         }
     }

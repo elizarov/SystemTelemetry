@@ -20,7 +20,7 @@ It's me, [Roman Elizarov](https://github.com/elizarov) &mdash; ex-project Lead f
 
 - Constraint-based layouts and a live editor.
 - Theme system that derives a full palette from a small set of key colors.
-- Small native executable: just over a 1 MB `.exe`, with frame drawing measured in milliseconds.
+- Small native executable: an `.exe` under 1 MB, with frame drawing measured in milliseconds.
 - Layouts for small panels from 5-inch 800x480 screens up to wide 9-inch 1920x480 screens.
 - Built-in display setup that computes full-screen scale, remembers placement, and prepares a matching startup wallpaper.
 - Machine-wide auto-start setup works for all users out of the box.

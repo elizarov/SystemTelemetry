@@ -6,6 +6,8 @@ if(NOT MSVC)
     message(FATAL_ERROR "CaseDash currently supports MSVC builds only.")
 endif()
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
 include(cmake/CaseDashVersion.cmake)
 casedash_configure_version_metadata()
 message(STATUS "Configuring CaseDash ${CASEDASH_VERSION}")
@@ -16,6 +18,8 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+option(CASEDASH_LINK_MAPS "Emit linker map files for CaseDash size analysis." OFF)
+
 foreach(cxx_flags_var IN ITEMS
     CMAKE_CXX_FLAGS
     CMAKE_CXX_FLAGS_DEBUG
@@ -24,6 +28,8 @@ foreach(cxx_flags_var IN ITEMS
     CMAKE_CXX_FLAGS_MINSIZEREL
 )
     string(REPLACE "/EHsc" "" ${cxx_flags_var} "${${cxx_flags_var}}")
+    # Size: source-local /Ob0 cold paths should not emit override warnings from CMake's default Release /Ob2.
+    string(REPLACE "/Ob2" "" ${cxx_flags_var} "${${cxx_flags_var}}")
 endforeach()
 
 set(output_root "${CMAKE_SOURCE_DIR}/build")
@@ -69,8 +75,32 @@ find_library(MSCOREE_LIB
 if(NOT MSCOREE_LIB)
     message(FATAL_ERROR "mscoree.lib was not found. Install the .NET Framework SDK through Visual Studio Build Tools 2022 and run build.cmd from a configured developer prompt.")
 endif()
+
+set(CASEDASH_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashCompressedResources.rc")
+set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources")
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        --output-dir "${CASEDASH_COMPRESSED_RESOURCE_DIR}"
+        --output-rc "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+        --resource-root "${CMAKE_SOURCE_DIR}/resources"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        "${CMAKE_SOURCE_DIR}/resources/localization.ini"
+    VERBATIM
+)
+set_source_files_properties("${CASEDASH_COMPRESSED_RESOURCE_RC}" PROPERTIES
+    OBJECT_DEPENDS "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+)
+
 add_executable(CaseDash WIN32
     resources/CaseDash.rc
+    ${CASEDASH_COMPRESSED_RESOURCE_RC}
     ${CASEDASH_VERSION_RC}
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
@@ -86,13 +116,19 @@ add_executable(CaseDash WIN32
     src/config/diagnostics_options.cpp
     src/display/display_config.cpp
     src/display/monitor.cpp
+    src/util/elevated_process.cpp
     src/util/file_path.cpp
+    src/util/message_box.cpp
+    src/util/numeric_format.cpp
     src/util/paths.cpp
     src/util/scale.cpp
+    src/util/lightweight_mutex.cpp
     src/util/strings.cpp
     src/util/temp_file.cpp
+    src/util/win32_format.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
+    src/dashboard/dashboard_menu_format.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
@@ -104,9 +140,10 @@ add_executable(CaseDash WIN32
     src/layout_edit_dialog/impl/trace.cpp
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
-    src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/board_metric_binding.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
+    src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_trace_session.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
@@ -122,6 +159,7 @@ add_executable(CaseDash WIN32
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/config/config.cpp
+    src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
     src/config/color_resolver.cpp
@@ -133,9 +171,9 @@ add_executable(CaseDash WIN32
     src/config/config_resolution.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/lightweight_mutex.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/numeric_safety.cpp
-    src/util/scale.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
@@ -149,10 +187,10 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/collector_network.cpp
     src/telemetry/impl/collector_real.cpp
-    src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -171,12 +209,15 @@ add_executable(CaseDash WIN32
     src/renderer/impl/d2d_renderer.cpp
     src/renderer/impl/d2d_cache.cpp
     src/renderer/impl/d2d_render_conversions.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -198,7 +239,7 @@ add_executable(CaseDash WIN32
 )
 
 set_source_files_properties(resources/CaseDash.rc PROPERTIES
-    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/app.ico;${CMAKE_SOURCE_DIR}/resources/config.ini;${CMAKE_SOURCE_DIR}/resources/localization.ini"
+    OBJECT_DEPENDS "${CMAKE_SOURCE_DIR}/resources/app.ico"
 )
 
 set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION_RC} PROPERTIES
@@ -215,6 +256,8 @@ set(casedash_release_speed_sources
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
@@ -253,6 +296,7 @@ set(casedash_release_speed_sources
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -263,7 +307,6 @@ set(casedash_release_speed_sources
     src/telemetry/impl/collector_cpu.cpp
     src/telemetry/impl/collector_fake.cpp
     src/telemetry/impl/collector_gpu.cpp
-    src/telemetry/impl/collector_network.cpp
     src/telemetry/impl/collector_real.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_storage.cpp
@@ -277,6 +320,7 @@ set(casedash_release_speed_sources
     src/widget/layout_edit_types.cpp
     src/widget/widget.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/clock_date.cpp
     src/widget/impl/clock_time.cpp
     src/widget/impl/drive_usage_list.cpp
@@ -292,6 +336,23 @@ set(casedash_release_speed_sources
 
 set_source_files_properties(${casedash_release_speed_sources} PROPERTIES
     COMPILE_OPTIONS "$<$<CONFIG:Release>:/O2>"
+)
+
+# Size: these retained cold/orchestration paths still measure smaller with inlining disabled under LTCG.
+set(casedash_release_noinline_sources
+    src/dashboard/dashboard_app.cpp
+    src/dashboard/dashboard_controller.cpp
+    src/diagnostics/app_icon_export.cpp
+    src/diagnostics/crash_report.cpp
+    src/diagnostics/diagnostics.cpp
+    src/display/display_config.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/main/main.cpp
+    src/telemetry/impl/collector_fake.cpp
+)
+
+set_property(SOURCE ${casedash_release_noinline_sources} APPEND PROPERTY
+    COMPILE_OPTIONS "$<$<CONFIG:Release>:/Ob0>"
 )
 
 add_library(CaseDashGigabyte OBJECT
@@ -327,6 +388,7 @@ target_compile_definitions(CaseDashGigabyte PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _HAS_EXCEPTIONS=0
 )
 
 target_compile_definitions(CaseDashMsi PRIVATE
@@ -334,6 +396,7 @@ target_compile_definitions(CaseDashMsi PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _HAS_EXCEPTIONS=0
 )
 
 target_compile_options(CaseDashGigabyte PRIVATE
@@ -371,6 +434,7 @@ target_compile_definitions(CaseDash PRIVATE
     _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
+    _HAS_EXCEPTIONS=0
     _USE_STD_VECTOR_ALGORITHMS=0
 )
 
@@ -379,9 +443,12 @@ target_compile_options(CaseDash PRIVATE
     /wd4530
     /permissive-
     /GR-
+    # Size: stack-cookie instrumentation is an explicit Release executable-size tradeoff; see docs/optimize_size.md.
+    $<$<CONFIG:Release>:/GS->
     /w14505
     /we4505
     /Zi
+    $<$<CONFIG:Release>:/Zc:threadSafeInit->
     $<$<CONFIG:Release>:/Os>
     $<$<CONFIG:Release>:/GL>
 )
@@ -391,6 +458,10 @@ target_link_options(CaseDash PRIVATE
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/LTCG>
+    # Size: the C++/CLI native-entry .nep thunk fits inside .text alignment slack.
+    $<$<CONFIG:Release>:/MERGE:.nep=.text>
+    $<$<CONFIG:Release>:/DYNAMICBASE:NO>
+    $<$<AND:$<CONFIG:Release>,$<BOOL:${CASEDASH_LINK_MAPS}>>:/MAP:$<TARGET_FILE_DIR:CaseDash>/CaseDash.map>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
@@ -402,14 +473,12 @@ target_link_libraries(CaseDash PRIVATE
     gdi32
     d2d1
     dwrite
-    windowscodecs
     pdh
     iphlpapi
     dxgi
     comctl32
     ws2_32
     ole32
-    oleaut32
     advapi32
     dbghelp
     wtsapi32
@@ -470,6 +539,7 @@ add_executable(CaseDashTests
     tests/telemetry_retained_history_tests.cpp
     tests/telemetry_runtime_tests.cpp
     src/config/config.cpp
+    src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
     src/config/color_resolver.cpp
@@ -497,11 +567,14 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
+    src/util/numeric_format.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/lightweight_mutex.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
+    src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
@@ -512,6 +585,7 @@ add_executable(CaseDashTests
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -528,6 +602,8 @@ add_executable(CaseDashTests
     src/renderer/impl/d2d_render_conversions.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
@@ -579,7 +655,6 @@ target_link_libraries(CaseDashTests PRIVATE
     gdi32
     d2d1
     dwrite
-    windowscodecs
     ole32
 )
 set_target_properties(CaseDashTests PROPERTIES
@@ -596,11 +671,15 @@ add_test(NAME CaseDashTests COMMAND CaseDashTests)
 
 add_executable(CaseDashBenchmarks
     resources/CaseDash.rc
+    ${CASEDASH_COMPRESSED_RESOURCE_RC}
     ${CASEDASH_BENCHMARKS_VERSION_RC}
     tests/benchmarks.cpp
     src/util/strings.cpp
+    src/util/numeric_format.cpp
+    src/util/win32_format.cpp
     src/util/scale.cpp
     src/config/config.cpp
+    src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
     src/config/color_resolver.cpp
@@ -625,6 +704,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -663,12 +743,15 @@ add_executable(CaseDashBenchmarks
     src/renderer/impl/d2d_renderer.cpp
     src/renderer/impl/d2d_cache.cpp
     src/renderer/impl/d2d_render_conversions.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/widget.cpp
     src/widget/layout_edit_types.cpp
     src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
     src/widget/impl/gauge.cpp
     src/widget/impl/metric_list.cpp
@@ -687,6 +770,7 @@ add_executable(CaseDashBenchmarks
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/lightweight_mutex.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -696,6 +780,18 @@ target_sources(CaseDashBenchmarks PRIVATE
     $<TARGET_OBJECTS:CaseDashGigabyte>
     $<TARGET_OBJECTS:CaseDashMsi>
 )
+
+get_target_property(casedash_release_inline_limited_sources CaseDash SOURCES)
+get_target_property(casedash_benchmarks_sources CaseDashBenchmarks SOURCES)
+list(APPEND casedash_release_inline_limited_sources ${casedash_benchmarks_sources})
+list(FILTER casedash_release_inline_limited_sources INCLUDE REGEX "\\.cpp$")
+list(REMOVE_DUPLICATES casedash_release_inline_limited_sources)
+list(REMOVE_ITEM casedash_release_inline_limited_sources ${casedash_release_noinline_sources})
+# Size: /Ob1 measured smaller for normal Release sources while the cold-path list keeps /Ob0.
+set_property(SOURCE ${casedash_release_inline_limited_sources} APPEND PROPERTY
+    COMPILE_OPTIONS "$<$<CONFIG:Release>:/Ob1>"
+)
+
 target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
@@ -726,6 +822,7 @@ target_link_options(CaseDashBenchmarks PRIVATE
     $<$<CONFIG:Release>:/DEBUG:FULL>
     $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/LTCG>
+    $<$<AND:$<CONFIG:Release>,$<BOOL:${CASEDASH_LINK_MAPS}>>:/MAP:$<TARGET_FILE_DIR:CaseDashBenchmarks>/CaseDashBenchmarks.map>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
@@ -736,13 +833,11 @@ target_link_libraries(CaseDashBenchmarks PRIVATE
     gdi32
     d2d1
     dwrite
-    windowscodecs
     pdh
     iphlpapi
     dxgi
     ws2_32
     ole32
-    oleaut32
     advapi32
     ${MSCOREE_LIB}
 )
@@ -751,7 +846,6 @@ set_target_properties(CaseDashBenchmarks PROPERTIES
     PDB_OUTPUT_DIRECTORY_RELEASE "${output_root}"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
-
 
 
 

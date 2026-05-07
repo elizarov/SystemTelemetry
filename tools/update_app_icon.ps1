@@ -9,7 +9,7 @@ $buildRoot = Join-Path $repoRoot 'build'
 $iconRoot = Join-Path $buildRoot 'app_icon'
 $exePath = Join-Path $buildRoot 'CaseDash.exe'
 $icoPath = Join-Path $repoRoot 'resources\app.ico'
-$sizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
+$sizes = @(16, 32, 64)
 
 if (-not $SkipBuild) {
     & (Join-Path $repoRoot 'build.cmd')
@@ -68,6 +68,11 @@ try {
     }
 } finally {
     $stream.Dispose()
+}
+
+& python (Join-Path $repoRoot 'tools\optimize_png_resources.py') $icoPath
+if ($LASTEXITCODE -ne 0) {
+    throw "App icon PNG optimization failed with exit code $LASTEXITCODE."
 }
 
 Write-Host "Updated $icoPath from rendered dark_cyan app icon assets."

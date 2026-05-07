@@ -7,7 +7,6 @@
 
 #include "renderer/png_export.h"
 #include "util/file_path.h"
-#include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
 
 namespace {
@@ -20,7 +19,8 @@ bool SetError(std::string* errorText, std::string text) {
 }
 
 bool DirectoryExists(const FilePath& path) {
-    const DWORD attributes = GetFileAttributesW(path.c_str());
+    const std::wstring widePath = path.Wide();
+    const DWORD attributes = GetFileAttributesW(widePath.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
@@ -30,14 +30,15 @@ bool EnsureDirectoryExists(const FilePath& path, std::string* errorText) {
     }
 
     const FilePath parent = path.ParentPath();
-    if (!parent.empty() && parent.wstring() != path.wstring() && !EnsureDirectoryExists(parent, errorText)) {
+    if (!parent.empty() && parent.string() != path.string() && !EnsureDirectoryExists(parent, errorText)) {
         return false;
     }
 
-    if (CreateDirectoryW(path.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
+    const std::wstring widePath = path.Wide();
+    if (CreateDirectoryW(widePath.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
         return true;
     }
-    return SetError(errorText, "app_icon:create_directory_failed path=" + Utf8FromWide(path.wstring()));
+    return SetError(errorText, "app_icon:create_directory_failed path=" + path.string());
 }
 
 bool SaveBitmapAsPng(const AppIconBitmap& bitmap, const FilePath& imagePath, std::string* errorText) {

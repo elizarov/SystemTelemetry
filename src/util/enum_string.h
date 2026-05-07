@@ -5,7 +5,6 @@
 #include <optional>
 #include <string_view>
 #include <type_traits>
-#include <unordered_map>
 
 template <typename Enum> struct EnumStringTraits;
 
@@ -38,23 +37,6 @@ template <typename Enum> constexpr const auto& CanonicalNames() {
     return Traits::names;
 }
 
-template <typename Enum> const auto& CanonicalNameMap() {
-    using Traits = EnumStringTraits<Enum>;
-    static_assert(std::is_enum_v<Enum>);
-    static_assert(ValidateCanonicalNames(Traits::names));
-
-    static const auto lookup = [] {
-        std::unordered_map<std::string_view, Enum> map;
-        map.reserve(Traits::names.size());
-        for (size_t index = 0; index < Traits::names.size(); ++index) {
-            map.emplace(Traits::names[index], static_cast<Enum>(index));
-        }
-        return map;
-    }();
-
-    return lookup;
-}
-
 }  // namespace enum_string_detail
 
 template <typename Enum> constexpr std::string_view EnumToString(Enum value) {
@@ -67,12 +49,13 @@ template <typename Enum> constexpr std::string_view EnumToString(Enum value) {
 }
 
 template <typename Enum> std::optional<Enum> EnumFromString(std::string_view text) {
-    const auto& lookup = enum_string_detail::CanonicalNameMap<Enum>();
-    const auto entry = lookup.find(text);
-    if (entry == lookup.end()) {
-        return std::nullopt;
+    const auto& names = enum_string_detail::CanonicalNames<Enum>();
+    for (size_t index = 0; index < names.size(); ++index) {
+        if (names[index] == text) {
+            return static_cast<Enum>(index);
+        }
     }
-    return entry->second;
+    return std::nullopt;
 }
 
 template <typename Enum> bool TryEnumFromString(std::string_view text, Enum& value) {

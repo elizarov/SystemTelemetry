@@ -2,14 +2,15 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
-std::wstring TrimWhitespace(std::wstring value);
-std::wstring StripOuterQuotes(std::wstring value);
-std::wstring NormalizeWindowsPath(std::wstring value);
-std::wstring QuoteCommandLineArgument(const std::wstring& value);
+using CommandLineArguments = std::vector<std::string>;
 
-std::vector<std::wstring> GetCommandLineArguments();
-bool HasSwitch(const std::string& target);
-std::optional<std::wstring> GetSwitchValue(const std::wstring& target);
-std::optional<std::wstring> GetColonSwitchValue(const std::wstring& target);
+CommandLineArguments GetCommandLineArguments();
+std::string NormalizeCommandPath(std::string value);
+std::string QuoteCommandLineArgument(std::string_view value);
+std::string BuildCommandLineExcludingSwitch(const CommandLineArguments& arguments, std::string_view excludedSwitch);
+bool HasSwitch(const CommandLineArguments& arguments, std::string_view target);
+std::optional<std::string> GetSwitchValue(const CommandLineArguments& arguments, std::string_view target);
+std::optional<std::string> GetColonSwitchValue(const CommandLineArguments& arguments, std::string_view target);

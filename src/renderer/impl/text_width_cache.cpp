@@ -1,45 +1,34 @@
 #include "renderer/impl/text_width_cache.h"
 
+#include <functional>
+
 namespace {
 
-size_t HashTextWidthKey(TextStyleId style, std::string_view text) {
+size_t TextWidthSlot(TextStyleId style, std::string_view text) {
     return (std::hash<int>{}(static_cast<int>(style)) * 1315423911u) ^ std::hash<std::string_view>{}(text);
 }
 
 }  // namespace
 
 void RendererTextWidthCache::Clear() {
-    widths_.clear();
+    for (Entry& entry : widths_) {
+        entry.text.clear();
+        entry.occupied = false;
+    }
 }
 
 std::optional<int> RendererTextWidthCache::Find(TextStyleId style, std::string_view text) const {
-    const LookupKey key{style, text};
-    if (const auto it = widths_.find(key); it != widths_.end()) {
-        return it->second;
+    const Entry& entry = widths_[TextWidthSlot(style, text) % widths_.size()];
+    if (entry.occupied && entry.style == style && std::string_view(entry.text) == text) {
+        return entry.width;
     }
     return std::nullopt;
 }
 
 void RendererTextWidthCache::Store(TextStyleId style, std::string_view text, int width) {
-    widths_.emplace(Key{style, std::string(text)}, width);
-}
-
-size_t RendererTextWidthCache::KeyHash::operator()(const Key& key) const {
-    return HashTextWidthKey(key.style, key.text);
-}
-
-size_t RendererTextWidthCache::KeyHash::operator()(const LookupKey& key) const {
-    return HashTextWidthKey(key.style, key.text);
-}
-
-bool RendererTextWidthCache::KeyEqual::operator()(const Key& left, const Key& right) const {
-    return left.style == right.style && left.text == right.text;
-}
-
-bool RendererTextWidthCache::KeyEqual::operator()(const Key& left, const LookupKey& right) const {
-    return left.style == right.style && std::string_view(left.text) == right.text;
-}
-
-bool RendererTextWidthCache::KeyEqual::operator()(const LookupKey& left, const Key& right) const {
-    return left.style == right.style && left.text == std::string_view(right.text);
+    Entry& entry = widths_[TextWidthSlot(style, text) % widths_.size()];
+    entry.style = style;
+    entry.text.assign(text);
+    entry.width = width;
+    entry.occupied = true;
 }

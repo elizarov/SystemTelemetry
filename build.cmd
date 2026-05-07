@@ -51,6 +51,14 @@ if exist "%CMAKE_BUILD_ROOT%\CMakeCache.txt" (
 )
 if not exist "%CMAKE_BUILD_ROOT%" mkdir "%CMAKE_BUILD_ROOT%"
 
+set "CASEDASH_LINK_MAPS_OPTION=OFF"
+if defined CASEDASH_LINK_MAPS set "CASEDASH_LINK_MAPS_OPTION=%CASEDASH_LINK_MAPS%"
+set "CASEDASH_CMAKE_OPTIONS=-DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCASEDASH_LINK_MAPS=%CASEDASH_LINK_MAPS_OPTION%"
+if /I not "%CASEDASH_LINK_MAPS_OPTION%"=="ON" (
+    del /q "%REPO_ROOT%\build\CaseDash.map" "%REPO_ROOT%\build\CaseDash.map.summary.txt" >nul 2>nul
+    del /q "%REPO_ROOT%\build\CaseDashBenchmarks.map" "%REPO_ROOT%\build\CaseDashBenchmarks.map.summary.txt" >nul 2>nul
+)
+
 set "VSINSTALLDIR_NORMALIZED="
 if defined VSINSTALLDIR (
     for /f "delims=" %%I in ("%VSINSTALLDIR%") do set "VSINSTALLDIR_NORMALIZED=%%I"
@@ -89,19 +97,34 @@ if exist "%REPO_ROOT%\vcpkg.json" if not defined CMAKE_TOOLCHAIN_FILE if not def
 )
 
 if defined VCPKG_TOOLCHAIN_FILE (
-    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DVCPKG_TARGET_TRIPLET=x64-windows "-DVCPKG_INSTALLED_DIR=%REPO_VCPKG_INSTALLED_DIR%" "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN_FILE%"
+    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS% -DVCPKG_TARGET_TRIPLET=x64-windows "-DVCPKG_INSTALLED_DIR=%REPO_VCPKG_INSTALLED_DIR%" "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN_FILE%"
 ) else (
-    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" -DCMAKE_EXPORT_COMPILE_COMMANDS=ON
+    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS%
 )
 if errorlevel 1 goto build_done
 
-if "%~1"=="" (
-    set "BUILD_CONFIG=Release"
+set "BUILD_CONFIG=Release"
+set "BUILD_BENCHMARKS=0"
+
+:parse_build_args
+if "%~1"=="" goto build_args_done
+if /I "%~1"=="/benchmarks" (
+    set "BUILD_BENCHMARKS=1"
+) else if /I "%~1"=="/benchmark" (
+    set "BUILD_BENCHMARKS=1"
 ) else (
     set "BUILD_CONFIG=%~1"
 )
+shift
+goto parse_build_args
 
-cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%"
+:build_args_done
+
+if "%BUILD_BENCHMARKS%"=="1" (
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashBenchmarks
+) else (
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests
+)
 
 :build_done
 set "BUILD_RC=%errorlevel%"

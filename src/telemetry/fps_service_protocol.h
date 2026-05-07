@@ -8,8 +8,8 @@
 
 #include "telemetry/fps_provider.h"
 
-inline constexpr wchar_t kFpsServiceName[] = L"CashDashService";
-inline constexpr wchar_t kFpsServicePipeName[] = L"\\\\.\\pipe\\CashDashService";
+inline constexpr char kFpsServiceName[] = "CashDashService";
+inline constexpr char kFpsServicePipeName[] = "\\\\.\\pipe\\CashDashService";
 
 enum class CashDashServiceRequestId : uint32_t {
     PresentedFpsSample = 1,

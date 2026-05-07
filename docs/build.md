@@ -1,7 +1,7 @@
 # Build And Development
 
 This document owns build prerequisites, developer setup, build and test commands, install flow, and developer entrypoint scripts.
-See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md](hardware.md) for supported hardware-provider requirements, [docs/diagnostics.md](diagnostics.md) for diagnostics validation commands, [docs/release.md](release.md) for release publication, and [docs/architecture.md](architecture.md) for subsystem and build-graph structure.
+See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md](hardware.md) for supported hardware-provider requirements, [docs/diagnostics.md](diagnostics.md) for diagnostics validation commands, [docs/release.md](release.md) for release publication, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for subsystem and build-graph structure.
 
 ## Requirements
 
@@ -9,6 +9,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md
 - Visual Studio 2026 Insiders (`18`) Build Tools with CMake support
 - Visual Studio 2026 Insiders (`18`) C++/CLI support
 - .NET Framework 4.8 SDK
+- Python 3 available on `PATH` or discoverable by CMake for generated build resources and repository tooling
 - vcpkg available either through the active Visual Studio developer environment or through `VCPKG_ROOT`
 - NuGet package restore access for the WiX Toolset SDK when building the MSI package; the installer project accepts the WiX 7 OSMF EULA for non-interactive local and CI builds.
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
@@ -30,9 +31,11 @@ Always build through the repository entrypoint:
 build.cmd
 ```
 
-`build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, restores `build\cmake\compile_commands.json` for `clangd`-based editors, and keeps vcpkg download plus registry caches in a user-local cache root so fresh worktrees reuse the same bootstrap downloads.
+`build.cmd` configures and builds the maintained CMake tree under `build\cmake\`, keeps the final executable under `build\`, preserves the repo-root `vcpkg\` manifest install tree across clean builds, restores `build\cmake\compile_commands.json` for `clangd`-based editors, and keeps vcpkg download plus registry caches in a user-local cache root so fresh worktrees reuse the same bootstrap downloads. The default build targets are `CaseDash` and `CaseDashTests`; `CaseDashBenchmarks` is built only when `build.cmd /benchmarks` or `build.cmd Release /benchmarks` is requested. CMake generates one compressed embedded text-resource atlas under `build\cmake\generated\compressed_resources\` from the maintained config and localization source files in `resources\`, and the generator validates those source files as BOM-free UTF-8 before writing the atlas.
 
 By default the shared cache root is `%LOCALAPPDATA%\CaseDash\cache`, falls back to `%USERPROFILE%\.casedash\cache` when `LOCALAPPDATA` is unavailable, and can be overridden with `CASEDASH_CACHE_ROOT`. `build.cmd` exports `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE` from that root unless the caller already set them.
+
+Release linker maps are opt-in size-investigation artifacts and are not produced by the normal build. Run `build_maps.cmd` to configure `CASEDASH_LINK_MAPS=ON`, force the app executable to relink, write `build\CaseDash.map`, and write the maintained summary to `build\CaseDash.map.summary.txt`. Add `/benchmarks` only when benchmark maps are needed; that also writes `build\CaseDashBenchmarks.map` and `build\CaseDashBenchmarks.map.summary.txt`. For ad hoc inspection of an existing map, run `python tools\analyze_link_map.py build\CaseDash.map --top 25`. The analyzer estimates symbol sizes from adjacent MSVC map addresses, so its object, library, and symbol rankings are investigation guides rather than exact byte ownership. The manual GitHub `Size Map Artifacts` workflow runs the same app map build on `windows-2025-vs2026` and uploads `CaseDash.exe`, `CaseDash.map`, `CaseDash.map.summary.txt`, and artifact metadata for remote toolchain comparisons. Size assumptions and experiment history live in [docs/optimize_size.md](optimize_size.md).
 
 ## Test
 
@@ -52,7 +55,7 @@ Build the runtime and MSI package through the repository entrypoint:
 package.cmd
 ```
 
-`package.cmd` runs `build.cmd`, generates the WiX dialog bitmap under `build\installer_dialog_bmp\`, restores the WiX Toolset SDK through MSBuild, builds the x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. Local installation uses that MSI package. Release asset and installer behavior, including upgrade preservation of runtime-owned executable-side files, is maintained in [docs/release.md](release.md).
+`package.cmd` runs `build.cmd`, generates the WiX dialog and banner bitmaps under `build\installer_dialog_bmp\`, restores the WiX Toolset SDK through MSBuild, builds the x64 per-machine MSI from `installer\`, writes `build\CaseDash-<VERSION>.msi`, and writes the matching SHA-256 checksum. Local installation uses that MSI package. Release asset and installer behavior, including upgrade preservation of runtime-owned executable-side files, is maintained in [docs/release.md](release.md).
 
 ## Website
 
@@ -71,31 +74,33 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery.
 - `test.cmd` is the maintained entrypoint for running the CTest suite against the built Release tree, and it prints verbose CTest output so GitHub runner logs show each test command and its stdout even when tests pass.
 - The repo `pre-commit` hook launches `tools\pre_commit_checks.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1` and runs `lint.cmd` before each commit. Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files. The hook temporarily stashes unstaged and untracked files while it formats and lints the staged snapshot, restores them before exit, and aborts the commit when formatting or lint checks fail.
-- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, no-local-`NOLINT` checks, header-body checks, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes selected provider bridge files, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
+- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, no-local-`NOLINT` checks, header-body checks, source-policy checks such as the project-wide `std::function`, `std::filesystem`, and wide-literal bans, and optional `clang-tidy` runs. Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG. The optional tidy sweep checks maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes selected provider bridge files, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors, and filters maintained include-cleaner false positives.
 - `lint.cmd tidy` runs a full optional `clang-tidy` sweep and commonly needs at least eight minutes on the current toolchain before it can report success or failure. Local development avoids this slow sweep unless explicitly requested. GitHub Actions owns the routine tidy sweep with `CASEDASH_TIDY_TIMEOUT_SECONDS` set to a larger per-file timeout and `CASEDASH_TIDY_MAX_PARALLEL` set for runner stability.
 - `tools\update_readme_images.ps1` is the maintained entrypoint for updating the committed README screenshots under `docs\image\`. It builds the app by default and exports the `dark_cyan` and `blueprint_light` screenshots from built-in fake telemetry with fixed `/scale:2` rendering. Pass `-SkipBuild` only when `build\CaseDash.exe` is already current.
+- `tools\optimize_png_resources.py` losslessly recompresses committed PNG resources and PNG-backed ICO frames. `tools\update_app_icon.ps1` runs it after regenerating `resources\app.ico`.
 - `package.cmd` is the maintained local entrypoint for producing the release MSI outside the GitHub Release workflow. It normalizes `major.minor` versions from `VERSION` to `major.minor.0` for Windows Installer product-version rules while keeping the output filename on the original `VERSION` text.
 - `web-build.cmd` is the maintained local entrypoint for producing the generated static website under `web\dist\`.
 - CMake enables MSVC warning C4505 and treats it as an error so unreferenced internal functions are caught during normal builds when MSVC can diagnose them.
 - Native C++ targets compile with `/GR-`; production code uses explicit project type tags instead of native RTTI. C++/CLI provider bridges keep managed casts in their `/clr` translation units.
-- Release app and benchmark builds compile size-oriented code with `/Os` and `/GL`, then link with `/LTCG`, `/OPT:REF`, and non-incremental linking so whole-program optimization and reference elimination reduce the shipped executable while benchmarks measure the same optimization profile. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` inside that Release profile so size work does not distort the maintained performance loops. Tests keep the normal Release compile/link path for faster local validation.
+- Release app and benchmark builds compile size-oriented code with `/Os` and `/GL`, then link with `/LTCG`, `/OPT:REF`, and non-incremental linking so whole-program optimization and reference elimination reduce the shipped executable while benchmarks measure the same optimization profile. The shipped Release app also links with `/DYNAMICBASE:NO` as an explicit executable-size tradeoff tracked in [docs/optimize_size.md](optimize_size.md). Native app code and the C++/CLI bridge targets define `_HAS_EXCEPTIONS=0`; managed bridge `try`/`catch` handling remains enabled for hardware-provider interop. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` inside that Release profile so size work does not distort the maintained performance loops. Tests keep the normal Release compile/link path for faster local validation. The benchmark target is opt-in through `build.cmd /benchmarks`; `profile_benchmark.cmd` requests that target when it needs the benchmark executable.
 - `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests. Daemon-backed requests write the ETL, xperf detail summary, process-filtered call tree, hotspot summary, and benchmark stdout under `build\profile_benchmark_daemon\requests\`.
 - `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs. GitHub Actions does not use this machine-local script; `build.cmd`, `format.cmd`, and `lint.cmd tidy` resolve Visual Studio and LLVM tools from the runner environment.
 
 ## GitHub Validation
 
 - The `Validation` workflow runs on branch pushes, pull requests, and manual dispatch.
-- The workflow restores the shared vcpkg download and registry caches under `.github-cache\CaseDash` inside the checked-out workspace before validation, then saves the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads.
-- The workflow checks formatting first with `format.cmd`, then builds with `build.cmd`, runs tests with `test.cmd`, builds the WiX MSI with `package.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
+- GitHub workflows restore the shared vcpkg download and registry caches under `.github-cache\CaseDash` inside the checked-out workspace before validation, then save the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads. Cache restore and save failures are best-effort and do not block validation.
+- The workflow checks formatting first with `format.cmd`, then builds with `build.cmd /benchmarks`, runs tests with `test.cmd`, builds the WiX MSI with `package.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
 - The workflow uploads `build\CaseDash.exe` as the `CaseDash-exe` artifact after validation succeeds.
 - The workflow uploads `build\CaseDash-<VERSION>.msi` and its checksum as the `CaseDash-msi` artifact after validation succeeds.
 - The workflow uploads `build\clang_tidy_report.txt` as an artifact when it is produced.
+- The manual-only `Size Map Artifacts` workflow builds through `build_maps.cmd` without tests, packaging, or tidy, then uploads `CaseDash-size-map-exe` and `CaseDash-size-map` artifacts for executable-size and linker-map comparison across runner toolchains.
 
 ## Releases
 
 - [docs/release.md](release.md) owns the official release workflow.
 - `VERSION` is the maintained base version used by CMake-generated build metadata.
 - Tagged release builds use tags in the form `v<VERSION>`, such as `v0.1`.
-- The `Release` workflow validates the tag, builds and tests CaseDash, packages `CaseDash.exe`, builds the WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
+- The `Release` workflow validates the tag, publishes notes from the top [docs/changelog.md](changelog.md) chunk, builds CaseDash with benchmarks, runs tests, packages `CaseDash.exe`, builds the WiX MSI, writes SHA-256 checksums, and creates the GitHub Release.
 

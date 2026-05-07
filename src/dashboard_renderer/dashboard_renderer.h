@@ -8,11 +8,11 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "config/config.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
+#include "dashboard_renderer/impl/metric_lookup_cache.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_active_region.h"
 #include "renderer/renderer.h"
@@ -106,7 +106,6 @@ private:
 
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
-    bool UsesFixedPreferredHeightInRows(const WidgetLayout& widget) const;
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -136,11 +135,12 @@ private:
     int WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const;
     bool IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const;
     bool MatchesWidgetIdentity(const WidgetLayout& widget, const LayoutEditWidgetIdentity& identity) const;
-    std::optional<LayoutEditAnchorRegion> FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
+    const LayoutEditAnchorRegion* FindEditableAnchorRegion(const LayoutEditAnchorKey& key) const;
     static bool IsContainerNode(const LayoutNodeConfig& node);
     RendererStyle BuildRendererStyle() const;
     const MetricSource& ResolveMetrics(const SystemSnapshot& snapshot);
     void InvalidateMetricSourceCache();
+    bool ShouldWriteRendererTrace() const;
     void WriteTrace(const std::string& text) const;
     bool SaveLayoutGuideSheetSurfacePng(const FilePath& imagePath, int width, int height, Renderer::DrawCallback draw);
     bool RenderLayoutGuideSheetSurfaceOffscreen(int width, int height, Renderer::DrawCallback draw);
@@ -166,8 +166,7 @@ private:
     std::unique_ptr<MetricSource> cachedMetricSource_;
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
-    mutable std::unordered_map<std::string, const MetricDefinitionConfig*> metricDefinitionCache_;
-    mutable std::unordered_map<std::string, std::string> metricSampleValueTextCache_;
+    mutable MetricLookupCache metricLookupCache_;
     std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;

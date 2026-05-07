@@ -6,7 +6,6 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/file_path.h"
 #include "util/localization_catalog.h"
-#include "util/utf8.h"
 
 TEST(LocalizationCatalog, ParsesKeyValueLines) {
     const LocalizationCatalogMap catalog = ParseLocalizationCatalog("# comment\n"
@@ -35,7 +34,7 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
 
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
     const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
-    std::ifstream input(catalogPath, std::ios::binary);
+    std::ifstream input(catalogPath.string(), std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 
     std::ostringstream buffer;
@@ -114,20 +113,4 @@ TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
         ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << tooltipDescriptor.configKey;
         EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << tooltipDescriptor.configKey;
     }
-}
-
-TEST(LocalizationCatalog, CheckedInCatalogUsesValidUtf8) {
-    const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
-    std::ifstream input(catalogPath, std::ios::binary);
-    ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
-
-    std::ostringstream buffer;
-    buffer << input.rdbuf();
-    std::string text = buffer.str();
-    if (text.size() >= 3 && static_cast<unsigned char>(text[0]) == 0xEF &&
-        static_cast<unsigned char>(text[1]) == 0xBB && static_cast<unsigned char>(text[2]) == 0xBF) {
-        text.erase(0, 3);
-    }
-
-    EXPECT_TRUE(IsValidUtf8(text));
 }

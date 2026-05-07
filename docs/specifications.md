@@ -31,7 +31,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 
 - The active named layout selects one static dashboard composition at a time.
 - The active named theme selects the base color tokens used by derived dashboard colors.
-- The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background matching the dashboard card fill composited over the app background; the embedded `resources/app.ico` remains the Windows shell fallback used before runtime theme application and by executable metadata.
+- The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background matching the dashboard card fill composited over the app background; the embedded `resources/app.ico` carries only `16`, `32`, and `64` pixel fallback frames for Windows shell use before runtime theme application and by executable metadata.
 - The renderer resolves card and widget rectangles after config load or reload and keeps rendering in those resolved coordinates until the next reload.
 - The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition.
 - Cards with no title and no icon reserve no header area.
@@ -64,7 +64,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
 - Canceling the MSI setup from a setup wizard page and confirming exit closes the installer immediately.
-- The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured.
+- The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the generated dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured. The banner bitmap uses the WiX banner bitmap size, keeps a uniform pale background above a blue underline, and places a separately generated dark_cyan app icon at native size in the right-hand area.
 - The MSI registration uses the embedded CaseDash app icon for the Windows installed-apps entry.
 - Installing a CaseDash MSI replaces any existing CaseDash MSI registration, including newer, older, and same-version packages.
 - MSI upgrade preserves runtime-owned files beside `CaseDash.exe`, including the executable-side `config.ini` and `casedash_blank.png`, while updating the installed executable.
@@ -93,7 +93,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 
 ## Refresh, Units, And Instance Behavior
 
-- The telemetry runtime owns collection on a 0.5 second cadence and publishes each new snapshot to the dashboard when collection finishes.
+- The telemetry runtime owns collection on a 0.5 second cadence, skips missed intervals after process stalls or machine sleep, and publishes each new snapshot to the dashboard when collection finishes.
 - CPU, GPU, network, storage, drive activity, retained histories, and the clock all refresh from that telemetry-owned cadence.
 - The dashboard redraws after receiving a new telemetry snapshot instead of driving collection from the UI message loop.
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.

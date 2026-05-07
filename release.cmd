@@ -52,21 +52,24 @@ if defined RELEASE_FORCE (
     echo Force release enabled; existing tag v%RELEASE_VERSION% will be replaced.
 )
 
-set /p "CONFIRM=Prepare CaseDash %RELEASE_VERSION% release, update VERSION if needed, run validation, tag, and push? Type %RELEASE_VERSION% to continue: "
+set /p "CONFIRM=Prepare CaseDash %RELEASE_VERSION% release, update VERSION and changelog if needed, run validation, tag, and push? Type %RELEASE_VERSION% to continue: "
 if not "%CONFIRM%"=="%RELEASE_VERSION%" (
     echo Release cancelled.
     exit /b 1
 )
 
+call powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\tools\release_changelog.ps1" -Mode Prepare -Version "%RELEASE_VERSION%"
+if errorlevel 1 exit /b %errorlevel%
+
 > VERSION echo %RELEASE_VERSION%
 
-git add VERSION
-git diff --cached --quiet -- VERSION
+git add VERSION docs/changelog.md
+git diff --cached --quiet -- VERSION docs/changelog.md
 if errorlevel 1 (
-    git commit -m "Changed version to %RELEASE_VERSION%"
+    git commit -m "Changed version to %RELEASE_VERSION%" -- VERSION docs/changelog.md
     if errorlevel 1 exit /b %errorlevel%
 ) else (
-    echo VERSION already contains %RELEASE_VERSION%; continuing without a version commit.
+    echo VERSION and docs\changelog.md already contain release state; continuing without a release metadata commit.
 )
 
 call "%REPO_ROOT%\format.cmd"
@@ -75,7 +78,7 @@ if errorlevel 1 exit /b %errorlevel%
 call "%REPO_ROOT%\lint.cmd"
 if errorlevel 1 exit /b %errorlevel%
 
-call "%REPO_ROOT%\build.cmd"
+call "%REPO_ROOT%\build.cmd" /benchmarks
 if errorlevel 1 exit /b %errorlevel%
 
 call "%REPO_ROOT%\test.cmd"

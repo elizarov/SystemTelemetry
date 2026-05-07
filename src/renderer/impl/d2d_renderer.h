@@ -7,7 +7,6 @@
 #include <dwrite.h>
 #include <string>
 #include <string_view>
-#include <utility>
 #include <vector>
 #include <wincodec.h>
 #include <wrl/client.h>
@@ -103,7 +102,7 @@ private:
     bool IsDrawActive() const;
 
     RendererStyle style_{};
-    std::vector<std::pair<std::string, Microsoft::WRL::ComPtr<IWICBitmapSource>>> icons_;
+    Microsoft::WRL::ComPtr<IWICBitmapSource> panelIconAtlas_;
     std::array<Microsoft::WRL::ComPtr<IDWriteTextFormat>, 9> dwriteTextFormats_{};
     TextStyleMetrics textStyleMetrics_{};
     RendererPalette palette_;
@@ -113,6 +112,8 @@ private:
     HWND hwnd_ = nullptr;
     Microsoft::WRL::ComPtr<ID2D1Factory> d2dFactory_;
     Microsoft::WRL::ComPtr<ID2D1HwndRenderTarget> d2dWindowRenderTarget_;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> panelIconAtlasMask_;
+    ID2D1RenderTarget* panelIconAtlasMaskTarget_ = nullptr;
     Microsoft::WRL::ComPtr<IDWriteFactory> dwriteFactory_;
     Microsoft::WRL::ComPtr<IWICImagingFactory> wicFactory_;
     Microsoft::WRL::ComPtr<ID2D1StrokeStyle> d2dSolidStrokeStyle_;

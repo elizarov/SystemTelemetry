@@ -380,8 +380,6 @@ struct LayoutConfig {
 
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
-
-    bool operator==(const LayoutConfig& other) const;
 };
 
 struct AppConfig {
@@ -391,8 +389,6 @@ struct AppConfig {
     CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);
     CONFIG_BINDING_LIST();
-
-    bool operator==(const AppConfig& other) const;
 };
 
 CONFIG_EDITABLE_ROOT_BINDING_PATH(UiFontSetConfig, AppConfig, AppConfig::layoutBinding, LayoutConfig::fontsBinding);
@@ -417,5 +413,6 @@ bool IsRuntimePlaceholderMetricId(std::string_view id);
 const MetricDefinitionConfig* FindEffectiveMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);
 TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config);
 TelemetrySettings ExtractTelemetrySettings(const AppConfig& config);
+void ApplyResolvedTelemetrySelections(AppConfig& config, const ResolvedTelemetrySelections& resolvedSelections);
 AppConfig BuildEffectiveRuntimeConfig(const AppConfig& uiConfig, const ResolvedTelemetrySelections& resolvedSelections);
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition);

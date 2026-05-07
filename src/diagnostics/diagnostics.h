@@ -13,6 +13,7 @@
 #include "config/diagnostics_options.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "diagnostics/snapshot_dump.h"
+#include "util/command_line.h"
 #include "util/file_path.h"
 #include "util/trace.h"
 
@@ -25,7 +26,8 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
     LayoutSimilarityIndicatorMode similarityIndicatorMode,
     const std::string& editLayoutWidgetName,
     Trace& trace,
-    std::optional<RenderPoint> hoverPoint = std::nullopt,
+    bool hasHoverPoint = false,
+    RenderPoint hoverPoint = {},
     std::string* errorText = nullptr);
 bool SaveLayoutGuideSheet(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
@@ -36,7 +38,7 @@ bool SaveLayoutGuideSheet(const FilePath& imagePath,
 bool SaveRenderedAppIcon(
     const FilePath& imagePath, const AppConfig& config, int size, std::string* errorText = nullptr);
 
-DiagnosticsOptions GetDiagnosticsOptions();
+DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine);
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
 LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
@@ -49,11 +51,20 @@ public:
 
     bool Initialize();
     bool ShouldShowDialogs() const;
+    void WriteTraceMarker(const char* text);
     void WriteTraceMarker(const std::string& text);
+    void WriteTraceMarker(TracePrefix prefix, const char* text);
+    void WriteTraceMarker(TracePrefix prefix, const std::string& text);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
-    void ReportError(const std::string& traceText, const std::wstring& message);
+    void ReportError(const std::string& traceText, std::string_view message);
+    void ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message);
+    bool ReportSaveError(const char* traceEvent,
+        const char* messageAction,
+        const FilePath& path,
+        std::string_view detail = {},
+        std::string_view traceSuffix = {});
     void ShowFileOpenError(const char* label, const FilePath& path);
 
     DiagnosticsOptions options_;
@@ -68,29 +79,29 @@ private:
     std::FILE* traceFile_ = nullptr;
 };
 
-std::optional<double> TryParseScaleValue(const std::wstring& text);
-std::optional<int> TryParseAppIconSizeValue(const std::wstring& text);
-std::optional<double> GetScaleSwitchValue();
-std::optional<std::string> GetLayoutSwitchValue();
-std::optional<std::string> GetThemeSwitchValue();
+std::optional<double> TryParseScaleValue(const std::string& text);
+std::optional<int> TryParseAppIconSizeValue(const std::string& text);
+std::optional<double> GetScaleSwitchValue(const CommandLineArguments& commandLine);
+std::optional<std::string> GetLayoutSwitchValue(const CommandLineArguments& commandLine);
+std::optional<std::string> GetThemeSwitchValue(const CommandLineArguments& commandLine);
 bool ApplyDiagnosticsLayoutOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 bool ApplyDiagnosticsThemeOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 FilePath ResolveDiagnosticsOutputPath(
-    const FilePath& workingDirectory, const FilePath& configuredPath, const wchar_t* defaultFileName);
+    const FilePath& workingDirectory, const FilePath& configuredPath, std::string_view defaultFileName);
 std::optional<FilePath> PromptSavePath(HWND owner,
     const FilePath& initialDirectory,
-    const wchar_t* defaultFileName,
-    const wchar_t* filter,
-    const wchar_t* defaultExtension);
+    std::string_view defaultFileName,
+    std::string_view filter,
+    std::string_view defaultExtension);
 int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
-std::wstring FormatTelemetryInitializeError(std::string_view errorText);
+std::string FormatTelemetryInitializeError(std::string_view errorText);
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);
 bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
@@ -98,5 +109,5 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     DiagnosticsSession* diagnostics,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);

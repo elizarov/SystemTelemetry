@@ -10,7 +10,6 @@ TEST(WidgetFactory, CreatesCardChromeSeparatelyFromEnumWidgets) {
 
     std::unique_ptr<Widget> chrome = CreateCardChromeWidget(card);
     ASSERT_NE(chrome, nullptr);
-    EXPECT_EQ(chrome->Class(), WidgetClass::Unknown);
 
     EXPECT_NE(CreateWidget("gauge"), nullptr);
     EXPECT_EQ(CreateWidget("card_chrome"), nullptr);

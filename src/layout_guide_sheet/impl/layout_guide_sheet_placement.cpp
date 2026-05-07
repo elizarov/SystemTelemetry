@@ -3,6 +3,9 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <string_view>
+
+#include "util/trace.h"
 
 namespace {
 
@@ -13,6 +16,15 @@ long long Cross(RenderPoint a, RenderPoint b, RenderPoint c) {
 
 bool PointsEqual(RenderPoint lhs, RenderPoint rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y;
+}
+
+int Min3Int(int first, int second, int third) {
+    // Size: avoid std::min/std::max initializer_list helper code in guide-sheet layout.
+    return std::min(std::min(first, second), third);
+}
+
+int Max3Int(int first, int second, int third) {
+    return std::max(std::max(first, second), third);
 }
 
 bool LeaderSegmentsIntersect(RenderPoint a, RenderPoint b, RenderPoint c, RenderPoint d) {
@@ -50,6 +62,20 @@ bool SegmentIntersectsRect(RenderPoint a, RenderPoint b, const RenderRect& rect)
 
 RenderRect TargetSafeRect(RenderPoint target, int radius) {
     return RenderRect{target.x - radius, target.y - radius, target.x + radius + 1, target.y + radius + 1};
+}
+
+const char* ExitSideName(LayoutGuideSheetExitSide side) {
+    switch (side) {
+        case LayoutGuideSheetExitSide::Left:
+            return "left";
+        case LayoutGuideSheetExitSide::Right:
+            return "right";
+        case LayoutGuideSheetExitSide::Top:
+            return "top";
+        case LayoutGuideSheetExitSide::Bottom:
+            return "bottom";
+    }
+    return "right";
 }
 
 RenderPoint TransformPoint(RenderPoint point, const RenderRect& source, const RenderRect& dest) {
@@ -124,6 +150,7 @@ struct CardCalloutColumns {
     std::vector<size_t> left;
     std::vector<size_t> right;
     std::vector<size_t> bottom;
+    int leaderRepairPasses = 0;
 };
 
 struct BlockLayout {
@@ -211,13 +238,73 @@ int SideMembershipPenalty(const CardCalloutColumns& candidate, const CardCallout
     return penalty;
 }
 
+bool PlannedIndexLessByTargetX(size_t lhs,
+    size_t rhs,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
+    const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
+    if (lhsCenter.x != rhsCenter.x) {
+        return lhsCenter.x < rhsCenter.x;
+    }
+    if (lhsCenter.y != rhsCenter.y) {
+        return lhsCenter.y < rhsCenter.y;
+    }
+    return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
+}
+
+bool PlannedIndexLessByTargetY(size_t lhs,
+    size_t rhs,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
+    const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
+    if (lhsCenter.y != rhsCenter.y) {
+        return lhsCenter.y < rhsCenter.y;
+    }
+    if (lhsCenter.x != rhsCenter.x) {
+        return lhsCenter.x < rhsCenter.x;
+    }
+    return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
+}
+
+void StableSortPlannedIndexesByTargetX(std::vector<size_t>& plannedIndexes,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    // Size: callout lists are small; insertion sort avoids std::stable_sort template code.
+    for (size_t i = 1; i < plannedIndexes.size(); ++i) {
+        const size_t current = plannedIndexes[i];
+        size_t j = i;
+        while (j > 0 && PlannedIndexLessByTargetX(current, plannedIndexes[j - 1], plannedCallouts, callouts)) {
+            plannedIndexes[j] = plannedIndexes[j - 1];
+            --j;
+        }
+        plannedIndexes[j] = current;
+    }
+}
+
+void StableSortPlannedIndexesByTargetY(std::vector<size_t>& plannedIndexes,
+    const std::vector<PlannedCallout>& plannedCallouts,
+    const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
+    for (size_t i = 1; i < plannedIndexes.size(); ++i) {
+        const size_t current = plannedIndexes[i];
+        size_t j = i;
+        while (j > 0 && PlannedIndexLessByTargetY(current, plannedIndexes[j - 1], plannedCallouts, callouts)) {
+            plannedIndexes[j] = plannedIndexes[j - 1];
+            --j;
+        }
+        plannedIndexes[j] = current;
+    }
+}
+
 }  // namespace
 
 LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
     std::vector<LayoutGuideSheetCardPlacement>& cardPlacements,
     std::vector<LayoutGuideSheetPlacementCallout>& callouts,
     const LayoutGuideSheetPlacementStyle& style,
-    const LayoutGuideSheetConstrainCalloutWidth& constrainCalloutWidth) {
+    const LayoutGuideSheetConstrainCalloutWidth& constrainCalloutWidth,
+    std::vector<std::string>* traceDetails) {
     LayoutGuideSheetPlacementResult result;
     std::vector<PlannedCallout> plannedCallouts;
     plannedCallouts.reserve(callouts.size());
@@ -247,18 +334,7 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                 cardPlanned.push_back(plannedIndex);
             }
         }
-        std::stable_sort(cardPlanned.begin(), cardPlanned.end(), [&](size_t lhs, size_t rhs) {
-            const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
-            const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
-            if (lhsCenter.x != rhsCenter.x) {
-                return lhsCenter.x < rhsCenter.x;
-            }
-            if (lhsCenter.y != rhsCenter.y) {
-                return lhsCenter.y < rhsCenter.y;
-            }
-            return callouts[plannedCallouts[lhs].calloutIndex].order <
-                   callouts[plannedCallouts[rhs].calloutIndex].order;
-        });
+        StableSortPlannedIndexesByTargetX(cardPlanned, plannedCallouts, callouts);
         const size_t leftCount = cardPlanned.size() == 1 ? (plannedCallouts[cardPlanned.front()].target.Center().x <
                                                                        cardPlacements[cardIndex].sourceRect.Center().x
                                                                    ? 1
@@ -266,22 +342,8 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                                                          : cardPlanned.size() / 2;
         plannedByCard[cardIndex].left.assign(cardPlanned.begin(), cardPlanned.begin() + leftCount);
         plannedByCard[cardIndex].right.assign(cardPlanned.begin() + leftCount, cardPlanned.end());
-        const auto sortByTargetY = [&](std::vector<size_t>& plannedIndexes) {
-            std::stable_sort(plannedIndexes.begin(), plannedIndexes.end(), [&](size_t lhs, size_t rhs) {
-                const RenderPoint lhsCenter = plannedCallouts[lhs].target.Center();
-                const RenderPoint rhsCenter = plannedCallouts[rhs].target.Center();
-                if (lhsCenter.y != rhsCenter.y) {
-                    return lhsCenter.y < rhsCenter.y;
-                }
-                if (lhsCenter.x != rhsCenter.x) {
-                    return lhsCenter.x < rhsCenter.x;
-                }
-                return callouts[plannedCallouts[lhs].calloutIndex].order <
-                       callouts[plannedCallouts[rhs].calloutIndex].order;
-            });
-        };
-        sortByTargetY(plannedByCard[cardIndex].left);
-        sortByTargetY(plannedByCard[cardIndex].right);
+        StableSortPlannedIndexesByTargetY(plannedByCard[cardIndex].left, plannedCallouts, callouts);
+        StableSortPlannedIndexesByTargetY(plannedByCard[cardIndex].right, plannedCallouts, callouts);
     }
 
     const auto stackedHeight = [&](const std::vector<size_t>& plannedIndexes) {
@@ -327,8 +389,8 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             block.itemX + block.itemWidth + (block.rightWidth > 0 ? style.calloutGap + block.rightWidth : 0);
         int topX = block.itemX + (block.itemWidth - topWidth) / 2;
         int bottomX = block.itemX + (block.itemWidth - bottomWidth) / 2;
-        const int minX = std::min({0, topX, bottomX});
-        const int maxX = std::max({mainWidth, topX + topWidth, bottomX + bottomWidth});
+        const int minX = Min3Int(0, topX, bottomX);
+        const int maxX = Max3Int(mainWidth, topX + topWidth, bottomX + bottomWidth);
         block.itemX -= minX;
         block.width = maxX - minX;
         return block;
@@ -665,15 +727,12 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
         return passes;
     };
 
-    std::vector<int> plannedIntersectionScores(cardPlacements.size(), 0);
-    std::vector<int> sideRepairPasses(cardPlacements.size(), 0);
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
         const CardCalloutColumns preferredSplit = plannedByCard[cardIndex];
         CardCalloutColumns columns = preferredSplit;
         promoteInitialTopBottom(columns);
-        sideRepairPasses[cardIndex] =
+        columns.leaderRepairPasses =
             static_cast<int>(optimizeByConflictSwaps(columns, preferredSplit, cardPlacements[cardIndex]));
-        plannedIntersectionScores[cardIndex] = countLeaderIntersections(columns, cardPlacements[cardIndex]);
         plannedByCard[cardIndex] = std::move(columns);
     }
 
@@ -744,11 +803,6 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             break;
         }
     }
-    for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
-        plannedIntersectionScores[cardIndex] =
-            countLeaderIntersections(plannedByCard[cardIndex], cardPlacements[cardIndex]);
-    }
-
     std::vector<BlockLayout> blocks(cardPlacements.size());
     int contentWidth = 0;
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
@@ -851,57 +905,70 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
     }
     result.sheetHeight = cardPlacements.empty() ? style.sheetMargin * 2 : contentBottom + style.sheetMargin;
 
-    std::vector<const LayoutGuideSheetPlacementCallout*> leaders;
-    for (const LayoutGuideSheetPlacementCallout& callout : callouts) {
-        for (const LayoutGuideSheetPlacementCallout* leader : leaders) {
-            if (callout.sourceCardId != leader->sourceCardId) {
-                continue;
+    if (traceDetails != nullptr) {
+        std::vector<size_t> leaders;
+        leaders.reserve(callouts.size());
+        for (size_t calloutIndex = 0; calloutIndex < callouts.size(); ++calloutIndex) {
+            const LayoutGuideSheetPlacementCallout& callout = callouts[calloutIndex];
+            const size_t sourceCardIndex = cardOrder(callout.sourceCardId);
+            const auto calloutKey = [&](size_t index) -> std::string_view {
+                return index < callouts.size() ? callouts[index].key : std::string_view{};
+            };
+            const auto sourceCardId = [&]() -> std::string_view {
+                if (sourceCardIndex < cardPlacements.size()) {
+                    return cardPlacements[sourceCardIndex].id;
+                }
+                return callout.sourceCardId;
+            };
+            const auto recordIntersection = [&](const char* kind,
+                                                size_t firstIndex,
+                                                size_t secondIndex,
+                                                LayoutGuideSheetExitSide firstSide,
+                                                LayoutGuideSheetExitSide secondSide) {
+                traceDetails->push_back("intersection_card=" + Trace::QuoteText(sourceCardId()) +
+                                        " intersection_kind=" + Trace::QuoteText(kind) +
+                                        " first_side=" + Trace::QuoteText(ExitSideName(firstSide)) +
+                                        " first_callout=" + Trace::QuoteText(calloutKey(firstIndex)) +
+                                        " second_side=" + Trace::QuoteText(ExitSideName(secondSide)) +
+                                        " second_callout=" + Trace::QuoteText(calloutKey(secondIndex)));
+            };
+            for (size_t leaderIndex : leaders) {
+                const LayoutGuideSheetPlacementCallout& leader = callouts[leaderIndex];
+                if (callout.sourceCardId != leader.sourceCardId) {
+                    continue;
+                }
+                if (LeaderSegmentsIntersect(callout.targetAttachment,
+                        callout.bubbleAttachment,
+                        leader.targetAttachment,
+                        leader.bubbleAttachment)) {
+                    recordIntersection("leader_cross", calloutIndex, leaderIndex, callout.exitSide, leader.exitSide);
+                }
+                if (SegmentIntersectsRect(callout.targetAttachment,
+                        callout.bubbleAttachment,
+                        TargetSafeRect(leader.targetAttachment, style.targetSafeRadius))) {
+                    recordIntersection(
+                        "target_safe_zone", calloutIndex, leaderIndex, callout.exitSide, leader.exitSide);
+                }
+                if (SegmentIntersectsRect(leader.targetAttachment,
+                        leader.bubbleAttachment,
+                        TargetSafeRect(callout.targetAttachment, style.targetSafeRadius))) {
+                    recordIntersection(
+                        "target_safe_zone", leaderIndex, calloutIndex, leader.exitSide, callout.exitSide);
+                }
             }
-            if (LeaderSegmentsIntersect(callout.targetAttachment,
-                    callout.bubbleAttachment,
-                    leader->targetAttachment,
-                    leader->bubbleAttachment)) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "leader_cross",
-                    callout.key,
-                    leader->key,
-                    callout.exitSide,
-                    leader->exitSide});
-            }
-            if (SegmentIntersectsRect(callout.targetAttachment,
-                    callout.bubbleAttachment,
-                    TargetSafeRect(leader->targetAttachment, style.targetSafeRadius))) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "target_safe_zone",
-                    callout.key,
-                    leader->key,
-                    callout.exitSide,
-                    leader->exitSide});
-            }
-            if (SegmentIntersectsRect(leader->targetAttachment,
-                    leader->bubbleAttachment,
-                    TargetSafeRect(callout.targetAttachment, style.targetSafeRadius))) {
-                result.remainingIntersections.push_back(LayoutGuideSheetLeaderIntersectionTrace{callout.sourceCardId,
-                    "target_safe_zone",
-                    leader->key,
-                    callout.key,
-                    leader->exitSide,
-                    callout.exitSide});
-            }
+            leaders.push_back(calloutIndex);
         }
-        leaders.push_back(&callout);
-    }
 
-    result.blocks.reserve(cardPlacements.size());
-    for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
-        const CardCalloutColumns& columns = plannedByCard[cardIndex];
-        result.blocks.push_back(LayoutGuideSheetPlacementBlockTrace{cardPlacements[cardIndex].id,
-            plannedIntersectionScores[cardIndex],
-            sideRepairPasses[cardIndex],
-            columns.left.size(),
-            columns.top.size(),
-            columns.right.size(),
-            columns.bottom.size()});
+        for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
+            const CardCalloutColumns& columns = plannedByCard[cardIndex];
+            const int leaderScore = countLeaderIntersections(columns, cardPlacements[cardIndex]);
+            const std::string& cardId = cardPlacements[cardIndex].id;
+            traceDetails->push_back(
+                "leader_score_" + cardId + "=" + std::to_string(leaderScore) + " leader_repair_passes_" + cardId + "=" +
+                std::to_string(columns.leaderRepairPasses) + " leader_columns_" + cardId + "=\"" +
+                std::to_string(columns.left.size()) + "," + std::to_string(columns.top.size()) + "," +
+                std::to_string(columns.right.size()) + "," + std::to_string(columns.bottom.size()) + "\"");
+        }
     }
     return result;
 }

@@ -4,10 +4,10 @@
 
 #include <chrono>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <shellapi.h>
 #include <string>
+#include <string_view>
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
@@ -16,6 +16,8 @@
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_trace_session.h"
 #include "util/file_path.h"
+#include "util/lightweight_mutex.h"
+#include "util/trace.h"
 
 class DashboardShellUi;
 
@@ -24,7 +26,7 @@ public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {}, bool bringToFrontOnRun = false);
     ~DashboardApp();
     bool Initialize(HINSTANCE instance);
-    const std::wstring& LastError() const;
+    const std::string& LastError() const;
     int Run();
     bool InitializeFonts() override;
     void SetRenderConfig(const AppConfig& config);
@@ -48,8 +50,8 @@ public:
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
     std::optional<FilePath> PromptDiagnosticsSavePath(
-        const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
-    void ShowError(const std::wstring& message) const override;
+        std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const override;
+    void ShowError(std::string_view message) const override;
 
 private:
     friend class DashboardShellUi;
@@ -68,7 +70,8 @@ private:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override;
-    void StartMoveMode(std::optional<POINT> cursorAnchorClientPoint = std::nullopt);
+    void StartMoveMode();
+    void StartMoveModeAt(POINT cursorAnchorClientPoint);
     void StopMoveMode();
     void UpdateMoveTracking();
     void SyncDashboardMoveOverlayState();
@@ -81,8 +84,9 @@ private:
     bool ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const;
     void SuspendCoveredLayoutEditHover();
     void UpdateLayoutEditMouseTracking();
+    void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(const std::string& event, const std::string& details = {}) const;
+    void TraceLayoutEditUiEvent(TracePrefix prefix, const char* event, const std::string& details = {}) const;
     std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
@@ -97,10 +101,11 @@ private:
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
+    void StartMoveMode(bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint);
 
-    void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) override;
+    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
-    void EndLayoutEditTraceSession(const std::string& reason) override;
+    void EndLayoutEditTraceSession(const char* reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
@@ -112,6 +117,8 @@ private:
     void SetLayoutEditInteractiveDragTraceActive(bool active) override;
     void RebuildLayoutEditArtifacts() override;
     bool ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) override;
+    bool ApplyLayoutGuideAdjacentWeights(
+        const LayoutEditLayoutTarget& target, size_t separatorIndex, int firstWeight, int secondWeight);
     bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override;
     bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) override;
@@ -134,8 +141,9 @@ private:
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
-    std::wstring layoutEditTooltipText_;
-    std::wstring lastError_;
+    std::string layoutEditTooltipText_;
+    std::wstring layoutEditTooltipWideText_;
+    std::string lastError_;
     bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};
@@ -143,9 +151,11 @@ private:
     bool layoutEditTooltipRefreshSuppressed_ = false;
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
-    std::optional<POINT> moveCursorAnchorClientPoint_;
+    POINT moveCursorAnchorClientPoint_{};
+    bool hasMoveCursorAnchorClientPoint_ = false;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
-    std::mutex pendingTelemetryMutex_;
-    std::optional<TelemetryUpdate> pendingTelemetryUpdate_;
+    LightweightMutex pendingTelemetryLock_;
+    TelemetryUpdate pendingTelemetryUpdate_{};
+    bool hasPendingTelemetryUpdate_ = false;
     LayoutEditTraceSession layoutEditTraceSession_{};
 };

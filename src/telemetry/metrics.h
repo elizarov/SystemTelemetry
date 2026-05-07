@@ -3,7 +3,6 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "config/config.h"
@@ -58,12 +57,14 @@ std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format);
 
 class MetricSource {
 public:
-    struct ThroughputCacheEntry {
-        ThroughputMetric metric;
-    };
-
     struct ThroughputSharedState {
-        std::unordered_map<std::string, std::vector<double>> historyByMetricRef;
+        struct HistoryEntry {
+            const char* metricRef = nullptr;
+            std::vector<double> samples;
+        };
+
+        HistoryEntry histories[4];
+        size_t historyCount = 0;
         double networkMaxGraph = 10.0;
         double storageMaxGraph = 10.0;
         double timeMarkerOffsetSamples = 0.0;
@@ -72,24 +73,60 @@ public:
     MetricSource(const SystemSnapshot& snapshot, const MetricsSectionConfig& metrics);
 
     const std::string& ResolveText(const std::string& metricRef) const;
+    // Size: list widgets consume rows immediately, so these borrow fixed cache slots instead of row vectors.
+    // Pointers can be invalidated by later lookups after the fixed slots are reused.
+    const MetricValue* FindMetric(const std::string& metricRef) const;
     const MetricValue& ResolveMetric(const std::string& metricRef) const;
-    const std::vector<MetricValue>& ResolveMetricList(const std::vector<std::string>& metricRefs) const;
     const ThroughputMetric& ResolveThroughput(const std::string& metricRef) const;
     const std::string& ResolveNetworkFooter() const;
-    const std::vector<DriveRow>& ResolveDriveRows() const;
+    const DriveRow* FindDriveRow(size_t rowIndex) const;
     const std::string& ResolveClockTime(std::string_view format) const;
     const std::string& ResolveClockDate(std::string_view format) const;
 
 private:
+    struct MetricCacheEntry {
+        std::string key;
+        MetricValue metric;
+        bool resolved = false;
+    };
+
+    struct DriveRowCacheEntry {
+        DriveRow row;
+        size_t rowIndex = 0;
+    };
+
+    static constexpr size_t kMetricCacheCapacity = 16;
+    static constexpr size_t kDriveRowCacheCapacity = 8;
+
+    const MetricCacheEntry& CacheMetric(const std::string& metricRef) const;
+    const DriveRowCacheEntry& CacheDriveRow(size_t rowIndex) const;
+    void InitializeDriveRows() const;
+
     const SystemSnapshot& snapshot_;
     const MetricsSectionConfig& metrics_;
-    mutable std::unordered_map<std::string, std::string> textCache_;
-    mutable std::unordered_map<std::string, MetricValue> metricCache_;
-    mutable std::unordered_map<std::string, std::vector<MetricValue>> metricListCache_;
-    mutable std::unordered_map<std::string, ThroughputCacheEntry> throughputCache_;
-    mutable std::optional<ThroughputSharedState> throughputSharedState_;
-    mutable std::optional<std::string> networkFooterCache_;
-    mutable std::optional<std::vector<DriveRow>> driveRowsCache_;
-    mutable std::unordered_map<std::string, std::string> clockTimeCache_;
-    mutable std::unordered_map<std::string, std::string> clockDateCache_;
+    mutable ThroughputSharedState throughputSharedState_;
+    mutable std::string textCacheKey_;
+    mutable std::string textCache_;
+    mutable MetricCacheEntry metricCache_[kMetricCacheCapacity];
+    mutable std::string throughputCacheKey_;
+    mutable ThroughputMetric throughputCache_;
+    mutable std::string networkFooterCache_;
+    mutable DriveRowCacheEntry driveRowCache_[kDriveRowCacheCapacity];
+    mutable std::string clockTimeCacheKey_;
+    mutable std::string clockTimeCache_;
+    mutable std::string clockDateCacheKey_;
+    mutable std::string clockDateCache_;
+    mutable const MetricDefinitionConfig* driveUsageDefinition_ = nullptr;
+    mutable const MetricDefinitionConfig* driveFreeDefinition_ = nullptr;
+    mutable double driveRowsTotalReadMbps_ = 0.0;
+    mutable double driveRowsTotalWriteMbps_ = 0.0;
+    mutable size_t metricCacheCount_ = 0;
+    mutable size_t driveRowCacheCount_ = 0;
+    mutable bool throughputSharedStateReady_ = false;
+    mutable bool textCached_ = false;
+    mutable bool throughputCached_ = false;
+    mutable bool networkFooterCached_ = false;
+    mutable bool driveRowsCached_ = false;
+    mutable bool clockTimeCached_ = false;
+    mutable bool clockDateCached_ = false;
 };

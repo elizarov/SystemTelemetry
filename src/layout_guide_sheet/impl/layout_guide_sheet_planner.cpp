@@ -1,45 +1,44 @@
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 #include <optional>
-#include <set>
 
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_model/layout_edit_hit_priority.h"
-#include "util/utf8.h"
 
 namespace {
 
 std::optional<TooltipPayload> TooltipPayloadFromActiveRegion(const LayoutEditActiveRegion& region) {
-    if (const auto* guide = std::get_if<LayoutEditGuide>(&region.payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region)) {
         return *guide;
     }
-    if (const auto* guide = std::get_if<LayoutEditWidgetGuide>(&region.payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetGuide>(region)) {
         return *guide;
     }
-    if (const auto* anchor = std::get_if<LayoutEditGapAnchor>(&region.payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditGapAnchor>(region)) {
         return *anchor;
     }
-    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&region.payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(region)) {
         return *anchor;
     }
-    if (const auto* color = std::get_if<LayoutEditColorRegion>(&region.payload)) {
+    if (const auto* color = LayoutEditActiveRegionPayloadAs<LayoutEditColorRegion>(region)) {
         return *color;
     }
     return std::nullopt;
 }
 
-std::pair<std::string, std::string> SplitTooltipLines(const std::wstring& text) {
-    const size_t crlf = text.find(L"\r\n");
-    const size_t lf = text.find(L'\n');
-    const size_t split = crlf != std::wstring::npos ? crlf : lf;
-    if (split == std::wstring::npos) {
-        return {Utf8FromWide(text), {}};
+std::pair<std::string, std::string> SplitTooltipLines(const std::string& text) {
+    const size_t crlf = text.find("\r\n");
+    const size_t lf = text.find('\n');
+    const size_t split = crlf != std::string::npos ? crlf : lf;
+    if (split == std::string::npos) {
+        return {text, {}};
     }
     const size_t descriptionStart = split + (split == crlf ? 2 : 1);
-    return {Utf8FromWide(text.substr(0, split)), Utf8FromWide(text.substr(descriptionStart))};
+    return {text.substr(0, split), text.substr(descriptionStart)};
 }
 
 bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
@@ -73,16 +72,16 @@ bool WidgetIdentityBelongsToSelectedCard(
 
 bool PayloadBelongsToSelectedCard(
     const LayoutEditActiveRegionPayload& payload, const std::vector<std::string>& selectedCardIds) {
-    if (const auto* guide = std::get_if<LayoutEditGuide>(&payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(payload)) {
         return ContainsCardId(selectedCardIds, guide->renderCardId);
     }
-    if (const auto* guide = std::get_if<LayoutEditWidgetGuide>(&payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetGuide>(payload)) {
         return WidgetIdentityBelongsToSelectedCard(guide->widget, selectedCardIds);
     }
-    if (const auto* anchor = std::get_if<LayoutEditGapAnchor>(&payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditGapAnchor>(payload)) {
         return WidgetIdentityBelongsToSelectedCard(anchor->key.widget, selectedCardIds);
     }
-    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(payload)) {
         return WidgetIdentityBelongsToSelectedCard(anchor->key.widget, selectedCardIds);
     }
     return true;
@@ -127,37 +126,31 @@ bool IsRepresentativeWidgetClass(WidgetClass widgetClass) {
            widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
 }
 
-std::vector<WidgetClass> UniqueWidgetClasses(const LayoutGuideSheetCardSummary& card) {
-    std::vector<WidgetClass> classes;
-    for (WidgetClass widgetClass : card.widgetClasses) {
-        if (!IsRepresentativeWidgetClass(widgetClass) ||
-            std::find(classes.begin(), classes.end(), widgetClass) != classes.end()) {
-            continue;
-        }
-        classes.push_back(widgetClass);
-    }
-    return classes;
-}
-
 bool IsContainerChildOrderAnchor(const LayoutEditActiveRegionPayload& payload) {
-    const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload);
+    const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(payload);
     return anchor != nullptr && std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor->key.subject);
 }
 
-size_t CoverageCount(const std::vector<WidgetClass>& covered, const std::vector<WidgetClass>& universe) {
-    return static_cast<size_t>(std::count_if(universe.begin(), universe.end(), [&](WidgetClass widgetClass) {
-        return std::find(covered.begin(), covered.end(), widgetClass) != covered.end();
-    }));
+unsigned int WidgetClassBit(WidgetClass widgetClass) {
+    const unsigned int index = static_cast<unsigned int>(widgetClass);
+    return IsRepresentativeWidgetClass(widgetClass) && index < sizeof(unsigned int) * 8 ? 1u << index : 0u;
 }
 
-void AddCardCoverage(std::vector<WidgetClass>& covered, const LayoutGuideSheetCardSummary& card) {
+unsigned int CardWidgetClassMask(const LayoutGuideSheetCardSummary& card) {
+    unsigned int mask = 0;
     for (WidgetClass widgetClass : card.widgetClasses) {
-        if (!IsRepresentativeWidgetClass(widgetClass) ||
-            std::find(covered.begin(), covered.end(), widgetClass) != covered.end()) {
-            continue;
-        }
-        covered.push_back(widgetClass);
+        mask |= WidgetClassBit(widgetClass);
     }
+    return mask;
+}
+
+size_t CountBits(unsigned int value) {
+    size_t count = 0;
+    while (value != 0) {
+        count += value & 1u;
+        value >>= 1;
+    }
+    return count;
 }
 
 std::string LayoutGuideSheetCalloutKey(
@@ -196,31 +189,30 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::string& parameterLine,
     const std::string& descriptionLine,
     const LayoutEditActiveRegion& region,
-    const TooltipPayload& payload,
     int priority,
     size_t& order) {
     std::optional<LayoutEditAnchorKey> hoverAnchorKey;
-    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&region.payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(region)) {
         hoverAnchorKey = anchor->key;
     }
     std::optional<LayoutEditWidgetGuide> hoverWidgetGuide;
-    if (const auto* guide = std::get_if<LayoutEditWidgetGuide>(&region.payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetGuide>(region)) {
         hoverWidgetGuide = *guide;
     }
     std::optional<LayoutEditGuide> hoverLayoutGuide;
-    if (const auto* guide = std::get_if<LayoutEditGuide>(&region.payload)) {
+    if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region)) {
         hoverLayoutGuide = *guide;
     }
     std::optional<LayoutEditGapAnchorKey> hoverGapAnchorKey;
-    if (const auto* anchor = std::get_if<LayoutEditGapAnchor>(&region.payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditGapAnchor>(region)) {
         hoverGapAnchorKey = anchor->key;
     }
     std::optional<AnchorShape> hoverAnchorShape;
-    if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&region.payload)) {
+    if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(region)) {
         hoverAnchorShape = anchor->shape;
     }
     std::optional<LayoutEditParameter> hoverColorParameter;
-    if (const auto* color = std::get_if<LayoutEditColorRegion>(&region.payload)) {
+    if (const auto* color = LayoutEditActiveRegionPayloadAs<LayoutEditColorRegion>(region)) {
         hoverColorParameter = color->parameter;
     }
 
@@ -259,76 +251,86 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         region.box,
         priority,
         order++});
-    (void)payload;
 }
 
 }  // namespace
 
 std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGuideSheetCardSummary>& cards) {
-    std::vector<WidgetClass> universe;
+    std::vector<unsigned int> cardMasks;
+    cardMasks.reserve(cards.size());
+    unsigned int universe = 0;
     for (const LayoutGuideSheetCardSummary& card : cards) {
-        AddCardCoverage(universe, card);
+        const unsigned int mask = CardWidgetClassMask(card);
+        cardMasks.push_back(mask);
+        universe |= mask;
     }
-    if (universe.empty()) {
-        return cards.empty() ? std::vector<std::string>{} : std::vector<std::string>{cards.front().id};
+    if (universe == 0) {
+        std::vector<std::string> selected;
+        if (!cards.empty()) {
+            selected.push_back(cards.front().id);
+        }
+        return selected;
     }
 
-    std::vector<size_t> bestIndexes;
+    size_t bestMask = 0;
     size_t bestCoverage = 0;
     size_t bestWidgetCount = 0;
+    size_t bestCardCount = 0;
     const size_t combinationCount = cards.size() >= sizeof(size_t) * 8 ? 0 : (size_t{1} << cards.size());
     for (size_t mask = 1; mask < combinationCount; ++mask) {
-        std::vector<WidgetClass> covered;
-        std::vector<size_t> indexes;
+        unsigned int covered = 0;
         size_t widgetCount = 0;
+        size_t cardCount = 0;
         for (size_t i = 0; i < cards.size(); ++i) {
             if ((mask & (size_t{1} << i)) == 0) {
                 continue;
             }
-            indexes.push_back(i);
-            widgetCount += UniqueWidgetClasses(cards[i]).size();
-            AddCardCoverage(covered, cards[i]);
+            ++cardCount;
+            widgetCount += CountBits(cardMasks[i]);
+            covered |= cardMasks[i];
         }
-        const size_t coverage = CoverageCount(covered, universe);
-        const bool better =
-            bestIndexes.empty() || coverage > bestCoverage ||
-            (coverage == bestCoverage && indexes.size() < bestIndexes.size()) ||
-            (coverage == bestCoverage && indexes.size() == bestIndexes.size() && widgetCount > bestWidgetCount);
+        const size_t coverage = CountBits(covered);
+        const bool better = bestMask == 0 || coverage > bestCoverage ||
+                            (coverage == bestCoverage && cardCount < bestCardCount) ||
+                            (coverage == bestCoverage && cardCount == bestCardCount && widgetCount > bestWidgetCount);
         if (better) {
-            bestIndexes = std::move(indexes);
+            bestMask = mask;
             bestCoverage = coverage;
+            bestCardCount = cardCount;
             bestWidgetCount = widgetCount;
         }
-        if (bestCoverage == universe.size() && bestIndexes.size() == 1) {
+        if (bestCoverage == CountBits(universe) && bestCardCount == 1) {
             break;
         }
     }
 
     std::vector<std::string> selected;
-    selected.reserve(bestIndexes.size());
-    for (size_t index : bestIndexes) {
-        selected.push_back(cards[index].id);
+    selected.reserve(bestCardCount);
+    for (size_t index = 0; index < cards.size(); ++index) {
+        if ((bestMask & (size_t{1} << index)) != 0) {
+            selected.push_back(cards[index].id);
+        }
     }
     return selected;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const AppConfig& config,
+void BuildLayoutGuideSheetCallouts(const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
-    const std::vector<std::string>& selectedCardIds) {
-    std::vector<LayoutGuideSheetCalloutRequest> callouts;
-    size_t order = 0;
+    const std::vector<std::string>& selectedCardIds,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts) {
+    size_t order = callouts.size();
     for (const LayoutEditActiveRegion& region : regions) {
         const std::optional<TooltipPayload> payload = TooltipPayloadFromActiveRegion(region);
         if (!payload.has_value()) {
             continue;
         }
         std::string tooltipError;
-        const auto tooltipText = BuildLayoutEditTooltipTextForPayload(config, *payload, &tooltipError);
-        if (!tooltipText.has_value()) {
+        std::string tooltipText;
+        if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }
-        auto [parameterLine, descriptionLine] = SplitTooltipLines(*tooltipText);
+        auto [parameterLine, descriptionLine] = SplitTooltipLines(tooltipText);
         if (parameterLine.empty()) {
             continue;
         }
@@ -348,64 +350,52 @@ std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const 
         const std::string key = LayoutGuideSheetCalloutKey(parameterLine, descriptionLine, *payload);
         const auto parameter = TooltipPayloadParameter(*payload);
         const int priority = parameter.has_value() ? GetLayoutEditParameterHitPriority(*parameter) : 500;
-        AddOrUpdateCallout(
-            callouts, key, sourceCard.cardId, parameterLine, descriptionLine, region, *payload, priority, order);
+        AddOrUpdateCallout(callouts, key, sourceCard.cardId, parameterLine, descriptionLine, region, priority, order);
     }
-    return callouts;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallouts(
-    const AppConfig& config, const LayoutEditActiveRegions& regions) {
-    std::vector<LayoutGuideSheetCalloutRequest> callouts;
-    size_t order = 0;
+void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
+    const LayoutEditActiveRegions& regions,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts) {
+    size_t order = callouts.size();
     for (const LayoutEditActiveRegion& region : regions) {
         const std::optional<TooltipPayload> payload = TooltipPayloadFromActiveRegion(region);
         if (!payload.has_value()) {
             continue;
         }
         std::string tooltipError;
-        const auto tooltipText = BuildLayoutEditTooltipTextForPayload(config, *payload, &tooltipError);
-        if (!tooltipText.has_value()) {
+        std::string tooltipText;
+        if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }
-        auto [parameterLine, descriptionLine] = SplitTooltipLines(*tooltipText);
+        auto [parameterLine, descriptionLine] = SplitTooltipLines(tooltipText);
         if (parameterLine.empty()) {
             continue;
         }
         const std::string key = LayoutGuideSheetCalloutKey(parameterLine, descriptionLine, *payload);
         const auto parameter = TooltipPayloadParameter(*payload);
         const int priority = parameter.has_value() ? GetLayoutEditParameterHitPriority(*parameter) : 500;
-        AddOrUpdateCallout(callouts,
-            key,
-            kLayoutGuideSheetOverviewSourceId,
-            parameterLine,
-            descriptionLine,
-            region,
-            *payload,
-            priority,
-            order);
+        AddOrUpdateCallout(
+            callouts, key, kLayoutGuideSheetOverviewSourceId, parameterLine, descriptionLine, region, priority, order);
     }
-    return callouts;
 }
 
-std::vector<LayoutGuideSheetCalloutRequest> MergeLayoutGuideSheetCallouts(
-    const std::vector<LayoutGuideSheetCalloutRequest>& overviewCallouts,
+void AppendLayoutGuideSheetCardCallouts(std::vector<LayoutGuideSheetCalloutRequest>& merged,
     const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts) {
-    std::vector<LayoutGuideSheetCalloutRequest> merged = overviewCallouts;
-    std::set<LayoutEditParameter> coveredColorParameters;
+    std::array<bool, static_cast<size_t>(LayoutEditParameter::Count)> coveredColorParameters{};
     for (const LayoutGuideSheetCalloutRequest& callout : merged) {
         if (callout.hoverColorParameter.has_value()) {
-            coveredColorParameters.insert(*callout.hoverColorParameter);
+            coveredColorParameters[static_cast<size_t>(*callout.hoverColorParameter)] = true;
         }
     }
     for (const LayoutGuideSheetCalloutRequest& callout : cardCallouts) {
-        if (callout.hoverColorParameter.has_value() && coveredColorParameters.contains(*callout.hoverColorParameter)) {
-            continue;
-        }
         if (callout.hoverColorParameter.has_value()) {
-            coveredColorParameters.insert(*callout.hoverColorParameter);
+            bool& covered = coveredColorParameters[static_cast<size_t>(*callout.hoverColorParameter)];
+            if (covered) {
+                continue;
+            }
+            covered = true;
         }
         merged.push_back(callout);
     }
-    return merged;
 }

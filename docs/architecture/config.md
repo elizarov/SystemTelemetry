@@ -9,6 +9,7 @@
 - Write minimal overlay saves and full embedded-template-shaped exports.
 - Own offset-based runtime field descriptors and config schema reflection data.
 - Own config-facing enums and DTOs such as widget class, metric display style, telemetry settings, layout fields, and color expressions.
+- Own config-language color text formatting, including the canonical `#RRGGBBAA` spelling shared by config saves, diagnostics traces, layout-edit text, and dialog traces.
 - Keep shared color-space conversion and expression resolution inside config so dialog and renderer callers do not carry duplicate color math.
 - Validate metric ids through the injected `ConfigMetricCatalog` contract. The production metric catalog remains owned by `telemetry`.
 

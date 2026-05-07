@@ -109,7 +109,8 @@ void SaveStructuredSectionDifferences(
         const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
         for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
             if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
-                updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
+                updateKey(
+                    sectionName, std::string(field.key, field.keyLength), EncodeRuntimeConfigField(field, &owner));
             }
         }
     } else {
@@ -126,7 +127,7 @@ void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type&
     const std::string sectionName = Section::FormatName(suffix);
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
         if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
-            updateKey(sectionName, std::string(field.key), EncodeRuntimeConfigField(field, &owner));
+            updateKey(sectionName, std::string(field.key, field.keyLength), EncodeRuntimeConfigField(field, &owner));
         }
     }
 }
@@ -332,6 +333,17 @@ std::string BuildSavedConfigText(
     SaveKnownStructuredSectionDifferences(config, compareConfig, updateKey);
     RemoveLeadingEmptyLines(lines);
     return JoinConfigLines(lines);
+}
+
+bool LayoutConfigHasDifferences(const LayoutConfig& config, const LayoutConfig& compareConfig) {
+    if (config.structure != compareConfig.structure || config.cardsLayout != compareConfig.cardsLayout) {
+        return true;
+    }
+    AppConfig current;
+    current.layout = config;
+    AppConfig saved;
+    saved.layout = compareConfig;
+    return !BuildSavedConfigText("", current, &saved).empty();
 }
 
 bool SaveConfig(const FilePath& path, const AppConfig& config, const ConfigParseContext& context) {

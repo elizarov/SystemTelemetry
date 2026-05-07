@@ -24,13 +24,13 @@ public:
 
     bool SavePng(const FilePath& imagePath,
         const SystemSnapshot& snapshot,
-        const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+        std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         std::vector<std::string>* traceDetails = nullptr,
         std::string* errorText = nullptr,
         LayoutGuideSheetRenderStats* stats = nullptr);
     bool RenderOffscreen(const SystemSnapshot& snapshot,
-        const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+        std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         std::vector<std::string>* traceDetails = nullptr,
         std::string* errorText = nullptr,
@@ -42,7 +42,7 @@ private:
     using SurfaceRenderer = FunctionRef<bool(int width, int height, SurfaceDrawCallback draw)>;
 
     bool Render(const SystemSnapshot& snapshot,
-        const std::vector<LayoutGuideSheetCalloutRequest>& calloutRequests,
+        std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         const SurfaceRenderer& renderSurface,
         std::vector<std::string>* traceDetails,

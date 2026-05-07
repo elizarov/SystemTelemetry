@@ -3,7 +3,6 @@
 #include <cstdint>
 #include <span>
 #include <string>
-#include <string_view>
 
 #include "config/config.h"
 
@@ -28,8 +27,9 @@ enum class RuntimeConfigFieldPolicy : std::uint8_t {
 };
 
 struct RuntimeConfigFieldDescriptor {
-    std::string_view key;
+    const char* key = "";
     std::uint32_t offset = 0;
+    std::uint8_t keyLength = 0;
     RuntimeConfigFieldValueKind kind = RuntimeConfigFieldValueKind::String;
     RuntimeConfigFieldPolicy policy = RuntimeConfigFieldPolicy::None;
 };

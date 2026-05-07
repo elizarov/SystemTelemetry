@@ -4,7 +4,7 @@
 
 ## Responsibilities
 
-- Define edit-target identity, active-region payloads, artifact matching, and hit-priority behavior.
+- Define edit-target identity, active-region payloads, artifact matching, hit-priority behavior, and shared anchor-shape drawing helpers.
 - Own read-only layout-node parameter metadata and guide-weight preview helpers.
 - Share dashboard overlay state contracts without depending on dashboard shell or renderer implementation.
 - Resolve focus and selection helpers, anchor subject extraction, and edit-artifact ordering policy.

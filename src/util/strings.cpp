@@ -2,7 +2,7 @@
 
 #include <algorithm>
 #include <cctype>
-#include <cstdio>
+#include <utility>
 
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
@@ -85,18 +85,6 @@ bool EqualsInsensitive(const std::string& left, const std::string& right) {
     return ToLower(left) == ToLower(right);
 }
 
-bool EqualsInsensitive(const std::wstring& left, const std::wstring& right) {
-    if (left.size() != right.size()) {
-        return false;
-    }
-    for (size_t i = 0; i < left.size(); ++i) {
-        if (::towlower(left[i]) != ::towlower(right[i])) {
-            return false;
-        }
-    }
-    return true;
-}
-
 std::string JoinNames(const std::vector<std::string>& names) {
     std::string joined;
     for (size_t i = 0; i < names.size(); ++i) {
@@ -108,72 +96,28 @@ std::string JoinNames(const std::vector<std::string>& names) {
     return joined;
 }
 
-std::string FormatHresult(HRESULT value) {
-    char buffer[32];
-    sprintf_s(buffer, "0x%08lX", static_cast<unsigned long>(value));
-    return buffer;
-}
-
-std::string FormatHexColorText(unsigned int value) {
-    char buffer[16];
-    sprintf_s(buffer, "#%08X", value);
-    return buffer;
-}
-
-std::string FormatDoubleGeneral(double value, int precision) {
-    char format[16];
-    sprintf_s(format, "%%.%dg", precision);
-    char buffer[64];
-    sprintf_s(buffer, format, value);
-    return buffer;
-}
-
-std::string FormatDoubleFixed(double value, int precision) {
-    char format[16];
-    sprintf_s(format, "%%.%df", precision);
-    char buffer[64];
-    sprintf_s(buffer, format, value);
-    return buffer;
-}
-
-std::string FormatDoubleFixedTrimmed(double value, int precision) {
-    std::string text = FormatDoubleFixed(value, precision);
-    if (const size_t dot = text.find('.'); dot != std::string::npos) {
-        while (!text.empty() && text.back() == '0') {
-            text.pop_back();
+void SortStrings(std::vector<std::string>& values) {
+    // Size: keep string sorting in one concrete helper instead of re-instantiating std::sort at call sites.
+    for (size_t i = 1; i < values.size(); ++i) {
+        std::string value = std::move(values[i]);
+        size_t insert = i;
+        while (insert > 0 && value < values[insert - 1]) {
+            values[insert] = std::move(values[insert - 1]);
+            --insert;
         }
-        if (!text.empty() && text.back() == '.') {
-            text.pop_back();
+        values[insert] = std::move(value);
+    }
+}
+
+void SortUniqueStrings(std::vector<std::string>& values) {
+    SortStrings(values);
+    size_t out = 0;
+    for (auto& value : values) {
+        if (out != 0 && values[out - 1] == value) {
+            continue;
         }
+        values[out] = std::move(value);
+        ++out;
     }
-    return text;
-}
-
-std::string FormatNetworkFooterText(const std::string& adapterName, const std::string& ipAddress) {
-    if (adapterName.empty()) {
-        return ipAddress;
-    }
-    if (ipAddress.empty()) {
-        return adapterName;
-    }
-    return adapterName + " | " + ipAddress;
-}
-
-std::string FormatStorageDriveMenuText(const std::string& driveLetter, const std::string& volumeLabel, double totalGb) {
-    std::string text = driveLetter + ":";
-    if (!volumeLabel.empty()) {
-        text += " | " + volumeLabel;
-    }
-    text += " | " + FormatStorageDriveSize(totalGb);
-    return text;
-}
-
-std::string FormatStorageDriveSize(double totalGb) {
-    char buffer[64];
-    if (totalGb >= 1024.0) {
-        sprintf_s(buffer, "%.1f TB", totalGb / 1024.0);
-    } else {
-        sprintf_s(buffer, "%.0f GB", totalGb);
-    }
-    return buffer;
+    values.resize(out);
 }

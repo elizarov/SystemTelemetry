@@ -5,16 +5,21 @@
 namespace {
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {
-    const auto it = std::find_if(
-        layout.cards.begin(), layout.cards.end(), [&](LayoutCardConfig& card) { return card.id == cardId; });
-    return it != layout.cards.end() ? &(*it) : nullptr;
+    for (LayoutCardConfig& card : layout.cards) {
+        if (card.id == cardId) {
+            return &card;
+        }
+    }
+    return nullptr;
 }
 
 LayoutSectionConfig* FindNamedLayoutByName(AppConfig& config, const std::string& name) {
-    const auto it = std::find_if(config.layout.layouts.begin(),
-        config.layout.layouts.end(),
-        [&](LayoutSectionConfig& layout) { return layout.name == name; });
-    return it != config.layout.layouts.end() ? &(*it) : nullptr;
+    for (LayoutSectionConfig& layout : config.layout.layouts) {
+        if (layout.name == name) {
+            return &layout;
+        }
+    }
+    return nullptr;
 }
 
 LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector<size_t>& path) {
@@ -28,6 +33,28 @@ LayoutNodeConfig* FindLayoutNodeByPath(LayoutNodeConfig& root, const std::vector
     return node;
 }
 
+bool ApplyWeightsToNode(LayoutNodeConfig* node, const std::vector<int>& weights) {
+    if (node == nullptr || node->children.size() != weights.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < weights.size(); ++i) {
+        node->children[i].weight = std::max(1, weights[i]);
+    }
+    return true;
+}
+
+bool ApplyAdjacentWeightsToNode(LayoutNodeConfig* node, size_t separatorIndex, int firstWeight, int secondWeight) {
+    if (node == nullptr || separatorIndex + 1 >= node->children.size()) {
+        return false;
+    }
+    for (LayoutNodeConfig& child : node->children) {
+        child.weight = std::max(1, child.weight);
+    }
+    node->children[separatorIndex].weight = std::max(1, firstWeight);
+    node->children[separatorIndex + 1].weight = std::max(1, secondWeight);
+    return true;
+}
+
 }  // namespace
 
 bool ApplyGuideWeights(AppConfig& config, const LayoutEditLayoutTarget& target, const std::vector<int>& weights) {
@@ -35,27 +62,43 @@ bool ApplyGuideWeights(AppConfig& config, const LayoutEditLayoutTarget& target, 
         return false;
     }
 
-    const auto applyWeights = [&](LayoutNodeConfig* node) -> bool {
-        if (node == nullptr || node->children.size() != weights.size()) {
-            return false;
-        }
-        for (size_t i = 0; i < weights.size(); ++i) {
-            node->children[i].weight = std::max(1, weights[i]);
-        }
-        return true;
-    };
-
     bool updated = false;
     if (target.editCardId.empty()) {
-        updated = applyWeights(FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath));
+        updated =
+            ApplyWeightsToNode(FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath), weights);
         if (!updated) {
             return false;
         }
         if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            applyWeights(FindLayoutNodeByPath(namedLayout->cardsLayout, target.nodePath));
+            ApplyWeightsToNode(FindLayoutNodeByPath(namedLayout->cardsLayout, target.nodePath), weights);
         }
     } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, target.editCardId)) {
-        updated = applyWeights(FindLayoutNodeByPath(card->layout, target.nodePath));
+        updated = ApplyWeightsToNode(FindLayoutNodeByPath(card->layout, target.nodePath), weights);
+    }
+
+    return updated;
+}
+
+bool ApplyGuideAdjacentWeights(
+    AppConfig& config, const LayoutEditLayoutTarget& target, size_t separatorIndex, int firstWeight, int secondWeight) {
+    bool updated = false;
+    if (target.editCardId.empty()) {
+        updated = ApplyAdjacentWeightsToNode(FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath),
+            separatorIndex,
+            firstWeight,
+            secondWeight);
+        if (!updated) {
+            return false;
+        }
+        if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
+            ApplyAdjacentWeightsToNode(FindLayoutNodeByPath(namedLayout->cardsLayout, target.nodePath),
+                separatorIndex,
+                firstWeight,
+                secondWeight);
+        }
+    } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, target.editCardId)) {
+        updated = ApplyAdjacentWeightsToNode(
+            FindLayoutNodeByPath(card->layout, target.nodePath), separatorIndex, firstWeight, secondWeight);
     }
 
     return updated;

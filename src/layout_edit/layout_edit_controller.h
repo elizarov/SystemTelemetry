@@ -5,7 +5,6 @@
 #include <chrono>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "config/config.h"
@@ -45,15 +44,15 @@ public:
         LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
-    virtual void BeginLayoutEditTraceSession(const std::string& kind, const std::string& detail) = 0;
+    virtual void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) = 0;
     virtual void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) = 0;
-    virtual void EndLayoutEditTraceSession(const std::string& reason) = 0;
+    virtual void EndLayoutEditTraceSession(const char* reason) = 0;
 };
 
 class LayoutEditController {
 public:
     struct TooltipTarget {
-        std::optional<RenderPoint> clientPoint;
+        RenderPoint clientPoint{};
         TooltipPayload payload;
     };
 
@@ -70,19 +69,9 @@ public:
     bool HandleSetCursor(HWND hwnd);
     bool HasActiveDrag() const;
     void CancelInteraction();
-    std::optional<TooltipTarget> CurrentTooltipTarget();
+    bool CurrentTooltipTarget(TooltipTarget& target);
 
 private:
-    struct WeightVectorHash {
-        size_t operator()(const std::vector<int>& weights) const {
-            size_t hash = 0;
-            for (int weight : weights) {
-                hash = (hash * 1315423911u) ^ std::hash<int>{}(weight);
-            }
-            return hash;
-        }
-    };
-
     struct ExtentCacheKey {
         std::vector<int> weights;
         LayoutEditWidgetIdentity widget;
@@ -94,17 +83,10 @@ private:
         }
     };
 
-    struct ExtentCacheKeyHash {
-        size_t operator()(const ExtentCacheKey& key) const {
-            size_t hash = WeightVectorHash{}(key.weights);
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(static_cast<int>(key.widget.kind));
-            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.renderCardId);
-            hash = (hash * 1315423911u) ^ std::hash<std::string>{}(key.widget.editCardId);
-            for (size_t index : key.widget.nodePath) {
-                hash = (hash * 1315423911u) ^ std::hash<size_t>{}(index);
-            }
-            return hash;
-        }
+    struct ExtentCacheEntry {
+        ExtentCacheKey key;
+        bool hasExtent = false;
+        int extent = 0;
     };
 
     struct LayoutDragState {
@@ -112,7 +94,8 @@ private:
         std::vector<int> initialWeights;
         std::vector<LayoutGuideSnapCandidate> snapCandidates;
         int dragStartCoordinate = 0;
-        std::unordered_map<ExtentCacheKey, std::optional<int>, ExtentCacheKeyHash> extentCache;
+        // Size: drag sessions reuse only a few extent keys; flat entries beat hash-table machinery.
+        std::vector<ExtentCacheEntry> extentCache;
     };
 
     struct WidgetEditDragState {
@@ -177,8 +160,7 @@ private:
     void SyncRendererInteractionState();
     void ClearInteractionState();
     void SetCursorForPoint(RenderPoint clientPoint);
-    std::optional<std::vector<int>> FindSnappedLayoutGuideWeights(
-        LayoutDragState& drag, const std::vector<int>& freeWeights);
+    bool FindSnappedLayoutGuideWeights(LayoutDragState& drag, std::vector<int>& weights);
 
     LayoutEditHost& host_;
     std::optional<LayoutEditGuide> hoveredLayoutGuide_;
@@ -195,5 +177,6 @@ private:
     std::optional<AnchorEditDragState> activeAnchorEditDrag_;
     std::optional<MetricListReorderDragState> activeMetricListReorderDrag_;
     std::optional<ContainerChildReorderDragState> activeContainerChildReorderDrag_;
-    std::optional<RenderPoint> lastClientPoint_;
+    RenderPoint lastClientPoint_{};
+    bool hasLastClientPoint_ = false;
 };

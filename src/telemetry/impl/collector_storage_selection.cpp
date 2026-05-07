@@ -2,6 +2,9 @@
 
 #include <algorithm>
 #include <cctype>
+#include <utility>
+
+#include "util/strings.h"
 
 bool IsSelectableStorageDriveType(UINT driveType) {
     return driveType == DRIVE_FIXED || driveType == DRIVE_REMOVABLE;
@@ -18,6 +21,18 @@ std::string NormalizeStorageDriveLetter(const std::string& drive) {
     return std::string(1, static_cast<char>(std::toupper(ch)));
 }
 
+void SortStorageDriveCandidatesByLetter(std::vector<StorageDriveCandidate>& candidates) {
+    for (size_t i = 1; i < candidates.size(); ++i) {
+        StorageDriveCandidate candidate = std::move(candidates[i]);
+        size_t insert = i;
+        while (insert > 0 && candidate.letter < candidates[insert - 1].letter) {
+            candidates[insert] = std::move(candidates[insert - 1]);
+            --insert;
+        }
+        candidates[insert] = std::move(candidate);
+    }
+}
+
 std::vector<std::string> NormalizeConfiguredStorageDriveLetters(const std::vector<std::string>& drives) {
     std::vector<std::string> normalized;
     normalized.reserve(drives.size());
@@ -30,7 +45,7 @@ std::vector<std::string> NormalizeConfiguredStorageDriveLetters(const std::vecto
             normalized.push_back(letter);
         }
     }
-    std::sort(normalized.begin(), normalized.end());
+    SortStrings(normalized);
     return normalized;
 }
 

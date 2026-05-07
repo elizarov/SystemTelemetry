@@ -23,22 +23,10 @@ RenderRect MakeCircleAnchorRect(int centerX, int centerY, int representedDiamete
 
 CardChromeWidget::CardChromeWidget(const LayoutCardConfig& card) : title_(card.title), iconName_(card.icon) {}
 
-WidgetClass CardChromeWidget::Class() const {
-    return WidgetClass::Unknown;
-}
-
-std::unique_ptr<Widget> CardChromeWidget::Clone() const {
-    return std::make_unique<CardChromeWidget>(*this);
-}
-
 void CardChromeWidget::Initialize(const LayoutNodeConfig&) {}
 
 int CardChromeWidget::PreferredHeight(const WidgetHost&) const {
     return 0;
-}
-
-bool CardChromeWidget::IsHoverable() const {
-    return false;
 }
 
 void CardChromeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) {

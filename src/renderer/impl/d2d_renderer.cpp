@@ -3,14 +3,13 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
-#include <set>
 #include <utility>
 
 #include "renderer/impl/d2d_render_conversions.h"
 #include "renderer/png_export.h"
 #include "resource.h"
-#include "util/strings.h"
 #include "util/utf8.h"
+#include "util/win32_format.h"
 
 namespace {
 
@@ -42,18 +41,23 @@ DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& opt
     }
 }
 
-UINT GetIconResourceId(std::string_view iconName) {
+constexpr int kPanelIconAtlasCellSize = 64;
+constexpr char kLocaleName[] = "en-us";
+constexpr wchar_t kPngResourceType[] = L"PNG";   // FindResourceW requires a UTF-16 resource type.
+constexpr wchar_t kTextMeasureSample[] = L"Ag";  // DWrite text layout measures UTF-16 sample text.
+
+int GetPanelIconAtlasSlot(std::string_view iconName) {
     if (iconName == "cpu")
-        return IDR_PANEL_ICON_CPU;
+        return 0;
     if (iconName == "gpu")
-        return IDR_PANEL_ICON_GPU;
+        return 1;
     if (iconName == "network")
-        return IDR_PANEL_ICON_NETWORK;
+        return 2;
     if (iconName == "storage")
-        return IDR_PANEL_ICON_STORAGE;
+        return 3;
     if (iconName == "time")
-        return IDR_PANEL_ICON_TIME;
-    return 0;
+        return 4;
+    return -1;
 }
 
 UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style) {
@@ -80,7 +84,7 @@ UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style)
     return fonts.text;
 }
 
-Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactory* wicFactory, UINT resourceId) {
+Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceMask(IWICImagingFactory* wicFactory, UINT resourceId) {
     Microsoft::WRL::ComPtr<IWICBitmapSource> bitmapSource;
     if (wicFactory == nullptr) {
         return bitmapSource;
@@ -91,7 +95,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
         return bitmapSource;
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), L"PNG");
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), kPngResourceType);
     if (resource == nullptr) {
         return bitmapSource;
     }
@@ -147,7 +151,7 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
     }
 
     hr = converter->Initialize(
-        frame.Get(), GUID_WICPixelFormat32bppPBGRA, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
+        frame.Get(), GUID_WICPixelFormat8bppGray, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
     if (FAILED(hr)) {
         return bitmapSource;
     }
@@ -156,47 +160,33 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceBitmap(IWICImagingFactor
     return bitmapSource;
 }
 
-Microsoft::WRL::ComPtr<IWICBitmapSource> TintMonochromeBitmapSource(
-    IWICImagingFactory* wicFactory, IWICBitmapSource* source, RenderColor color) {
-    Microsoft::WRL::ComPtr<IWICBitmapSource> tintedBitmap;
-    if (wicFactory == nullptr || source == nullptr) {
-        return tintedBitmap;
+Microsoft::WRL::ComPtr<ID2D1Bitmap> CreatePanelIconAtlasMaskBitmap(
+    ID2D1RenderTarget* target, IWICBitmapSource* source) {
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+    if (target == nullptr || source == nullptr) {
+        return bitmap;
     }
 
     UINT width = 0;
     UINT height = 0;
     if (FAILED(source->GetSize(&width, &height)) || width == 0 || height == 0) {
-        return tintedBitmap;
+        return bitmap;
     }
 
-    const UINT stride = width * 4;
-    std::vector<BYTE> pixels(static_cast<size_t>(stride) * static_cast<size_t>(height));
-    if (FAILED(source->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()))) {
-        return tintedBitmap;
+    const UINT maskStride = width;
+    std::vector<BYTE> mask(static_cast<size_t>(maskStride) * static_cast<size_t>(height));
+    if (FAILED(source->CopyPixels(nullptr, maskStride, static_cast<UINT>(mask.size()), mask.data()))) {
+        return bitmap;
     }
 
-    for (size_t offset = 0; offset + 3 < pixels.size(); offset += 4) {
-        const BYTE alpha = static_cast<BYTE>((static_cast<unsigned int>(pixels[offset + 3]) * color.a) / 255u);
-        pixels[offset + 0] = static_cast<BYTE>((static_cast<unsigned int>(color.b) * alpha) / 255u);
-        pixels[offset + 1] = static_cast<BYTE>((static_cast<unsigned int>(color.g) * alpha) / 255u);
-        pixels[offset + 2] = static_cast<BYTE>((static_cast<unsigned int>(color.r) * alpha) / 255u);
-        pixels[offset + 3] = alpha;
+    const D2D1_BITMAP_PROPERTIES properties =
+        D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    if (FAILED(target->CreateBitmap(
+            D2D1::SizeU(width, height), mask.data(), maskStride, properties, bitmap.GetAddressOf()))) {
+        return {};
     }
 
-    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
-    if (FAILED(wicFactory->CreateBitmapFromMemory(width,
-            height,
-            GUID_WICPixelFormat32bppPBGRA,
-            stride,
-            static_cast<UINT>(pixels.size()),
-            pixels.data(),
-            bitmap.GetAddressOf())) ||
-        bitmap == nullptr) {
-        return tintedBitmap;
-    }
-
-    tintedBitmap = bitmap;
-    return tintedBitmap;
+    return bitmap;
 }
 
 }  // namespace
@@ -215,8 +205,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
     const bool initialized = d2dFactory_ != nullptr && dwriteFactory_ != nullptr;
     const bool colorsChanged =
         style_.colors != nextStyle.colors || style_.layoutGuideSheet != nextStyle.layoutGuideSheet;
-    const bool iconSourcesChanged = !initialized || style_.iconNames != nextStyle.iconNames ||
-                                    style_.colors.iconColor != nextStyle.colors.iconColor;
+    const bool iconSourcesChanged = !initialized || style_.iconNames != nextStyle.iconNames;
     const bool textFormatsChanged =
         !initialized || style_.fonts != nextStyle.fonts || std::abs(style_.scale - nextStyle.scale) >= 0.0001;
 
@@ -226,6 +215,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
     }
     if (colorsChanged || !initialized) {
         palette_.Rebuild(style_.colors, style_.layoutGuideSheet);
+        d2dCache_.Clear();
     }
     if (iconSourcesChanged && !LoadIcons()) {
         return false;
@@ -520,6 +510,8 @@ void D2DRenderer::ShutdownDirect2D() {
     d2dClipDepth_ = 0;
     d2dActiveRenderTarget_ = nullptr;
     d2dCache_.ResetTarget();
+    panelIconAtlasMask_.Reset();
+    panelIconAtlasMaskTarget_ = nullptr;
     d2dDashedStrokeStyle_.Reset();
     d2dSolidStrokeStyle_.Reset();
     d2dWindowRenderTarget_.Reset();
@@ -603,6 +595,8 @@ void D2DRenderer::EndDirect2DDraw() {
     d2dActiveRenderTarget_ = nullptr;
     if (!activeWindowTarget) {
         d2dCache_.ResetTarget();
+        panelIconAtlasMask_.Reset();
+        panelIconAtlasMaskTarget_ = nullptr;
     }
     if (activeWindowTarget && hr == D2DERR_RECREATE_TARGET) {
         DiscardWindowTarget("recreate_target");
@@ -633,13 +627,15 @@ void D2DRenderer::DiscardWindowTarget(std::string_view reason) {
     }
     d2dWindowRenderTarget_.Reset();
     d2dCache_.ResetTarget();
+    panelIconAtlasMask_.Reset();
+    panelIconAtlasMaskTarget_ = nullptr;
 }
 
 ID2D1SolidColorBrush* D2DRenderer::D2DSolidBrush(RenderColorId colorId) {
     if (d2dActiveRenderTarget_ == nullptr) {
         return nullptr;
     }
-    return d2dCache_.SolidBrush(d2dActiveRenderTarget_, palette_.Get(colorId));
+    return d2dCache_.SolidBrush(d2dActiveRenderTarget_, palette_, colorId);
 }
 
 void D2DRenderer::PushClipRect(const RenderRect& rect) {
@@ -680,7 +676,34 @@ bool D2DRenderer::DrawIcon(std::string_view iconName, const RenderRect& rect) {
     if (!IsDrawActive() || iconName.empty() || rect.IsEmpty()) {
         return false;
     }
-    d2dCache_.DrawIcon(wicFactory_.Get(), d2dActiveRenderTarget_, icons_, iconName, rect);
+    const int atlasSlot = GetPanelIconAtlasSlot(iconName);
+    if (atlasSlot < 0) {
+        return false;
+    }
+    if (panelIconAtlas_ == nullptr) {
+        return true;
+    }
+    if (panelIconAtlasMaskTarget_ != d2dActiveRenderTarget_) {
+        panelIconAtlasMask_.Reset();
+        panelIconAtlasMaskTarget_ = d2dActiveRenderTarget_;
+    }
+    if (panelIconAtlasMask_ == nullptr) {
+        panelIconAtlasMask_ = CreatePanelIconAtlasMaskBitmap(d2dActiveRenderTarget_, panelIconAtlas_.Get());
+    }
+    ID2D1SolidColorBrush* brush = D2DSolidBrush(RenderColorId::Icon);
+    if (panelIconAtlasMask_ == nullptr || brush == nullptr) {
+        return false;
+    }
+    const D2D1_RECT_F sourceRect = D2D1::RectF(0.0f,
+        static_cast<float>(atlasSlot * kPanelIconAtlasCellSize),
+        static_cast<float>(kPanelIconAtlasCellSize),
+        static_cast<float>((atlasSlot + 1) * kPanelIconAtlasCellSize));
+    const D2D1_ANTIALIAS_MODE previousAntialiasMode = d2dActiveRenderTarget_->GetAntialiasMode();
+    // FillOpacityMask requires aliased antialias mode even though the icon edge alpha stays in the mask.
+    d2dActiveRenderTarget_->SetAntialiasMode(D2D1_ANTIALIAS_MODE_ALIASED);
+    d2dActiveRenderTarget_->FillOpacityMask(
+        panelIconAtlasMask_.Get(), brush, D2D1_OPACITY_MASK_CONTENT_GRAPHICS, D2DRectFromRenderRect(rect), sourceRect);
+    d2dActiveRenderTarget_->SetAntialiasMode(previousAntialiasMode);
     return true;
 }
 
@@ -969,6 +992,7 @@ bool D2DRenderer::CreateDWriteTextFormats() {
         return true;
     }
 
+    const std::wstring localeName = WideFromUtf8(kLocaleName);
     const auto createFormat = [&](TextStyleId style) {
         UiFontConfig fontConfig = FontConfigForStyle(style_.fonts, style);
         fontConfig.size = ScaleLogical(fontConfig.size);
@@ -980,7 +1004,7 @@ bool D2DRenderer::CreateDWriteTextFormats() {
             DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL,
             static_cast<FLOAT>(fontConfig.size),
-            L"en-us",
+            localeName.c_str(),
             format.GetAddressOf());
         if (FAILED(hr) || format == nullptr) {
             return false;
@@ -1055,37 +1079,29 @@ bool D2DRenderer::LoadIcons() {
     if (wicFactory_ == nullptr && !InitializeWic()) {
         return false;
     }
-    std::set<std::string> uniqueIcons(style_.iconNames.begin(), style_.iconNames.end());
-    for (const auto& iconName : uniqueIcons) {
+    bool needsAtlas = false;
+    for (const auto& iconName : style_.iconNames) {
         if (iconName.empty()) {
             continue;
         }
-        const UINT resourceId = GetIconResourceId(iconName);
-        if (resourceId == 0) {
+        if (GetPanelIconAtlasSlot(iconName) < 0) {
             lastError_ = "renderer:icon_unknown name=\"" + iconName + "\"";
             ReleaseIcons();
             return false;
         }
-        auto bitmap = LoadPngResourceBitmap(wicFactory_.Get(), resourceId);
-        if (bitmap == nullptr) {
-            // Tests can render built-in layouts without linking app icon resources.
-            continue;
-        }
-        auto tintedBitmap =
-            TintMonochromeBitmapSource(wicFactory_.Get(), bitmap.Get(), palette_.Get(RenderColorId::Icon));
-        if (tintedBitmap == nullptr) {
-            lastError_ = "renderer:icon_tint_failed name=\"" + iconName + "\" resource=" + std::to_string(resourceId);
-            ReleaseIcons();
-            return false;
-        }
-        icons_.push_back({iconName, std::move(tintedBitmap)});
+        needsAtlas = true;
+    }
+    if (needsAtlas) {
+        // Tests can render built-in layouts without linking app icon resources.
+        panelIconAtlas_ = LoadPngResourceMask(wicFactory_.Get(), IDR_PANEL_ICONS);
     }
     return true;
 }
 
 void D2DRenderer::ReleaseIcons() {
-    d2dCache_.ClearIconBitmaps();
-    icons_.clear();
+    panelIconAtlas_ = nullptr;
+    panelIconAtlasMask_.Reset();
+    panelIconAtlasMaskTarget_ = nullptr;
 }
 
 bool D2DRenderer::RebuildTextFormatsAndMetrics() {
@@ -1105,9 +1121,7 @@ bool D2DRenderer::RebuildTextFormatsAndMetrics() {
             return 0;
         }
         Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
-        const wchar_t sample[] = L"Ag";
-        if (FAILED(dwriteFactory_->CreateTextLayout(
-                sample, static_cast<UINT32>(std::size(sample) - 1), format, 1024.0f, 1024.0f, &layout)) ||
+        if (FAILED(dwriteFactory_->CreateTextLayout(kTextMeasureSample, 2, format, 1024.0f, 1024.0f, &layout)) ||
             layout == nullptr) {
             return 0;
         }

@@ -2,8 +2,9 @@
 
 #include <cmath>
 
+#include "config/color_format.h"
 #include "layout_edit/layout_edit_service.h"
-#include "util/strings.h"
+#include "util/numeric_format.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
     if (format == configschema::ValueFormat::String || format == configschema::ValueFormat::FontSpec ||
@@ -18,7 +19,7 @@ std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat
 }
 
 std::string FormatLayoutEditTooltipValue(unsigned int value) {
-    return FormatHexColorText(value);
+    return FormatRgbaColorText(value);
 }
 
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {

@@ -6,6 +6,8 @@
 #include <cstdio>
 #include <dbghelp.h>
 #include <string>
+#include <string_view>
+#include <utility>
 
 #include "build_version.h"
 #include "diagnostics/constants.h"
@@ -19,51 +21,44 @@ namespace {
 
 DiagnosticsOptions g_diagnosticsOptions;
 LONG g_handlingCrash = 0;
+constexpr wchar_t kAppendBinaryMode[] = L"ab";  // _wfopen_s mode string follows the widened trace path.
+constexpr wchar_t kWriteBinaryMode[] = L"wb";   // _wfopen_s mode string follows the widened report path.
 
-std::wstring TimestampForFileName() {
+std::string CrashReportFileName() {
     SYSTEMTIME time{};
     GetLocalTime(&time);
-    wchar_t buffer[32];
-    swprintf_s(buffer,
-        L"%04u%02u%02u_%02u%02u%02u_%03u",
+    char buffer[80];
+    sprintf_s(buffer,
+        "casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
         time.wYear,
         time.wMonth,
         time.wDay,
         time.wHour,
         time.wMinute,
         time.wSecond,
-        time.wMilliseconds);
+        time.wMilliseconds,
+        static_cast<unsigned long>(GetCurrentProcessId()));
     return buffer;
 }
 
-std::string TimestampText() {
-    SYSTEMTIME time{};
-    GetLocalTime(&time);
-    char buffer[40];
-    sprintf_s(buffer,
-        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
-        time.wYear,
-        time.wMonth,
-        time.wDay,
-        time.wHour,
-        time.wMinute,
-        time.wSecond,
-        time.wMilliseconds);
-    return buffer;
+FilePath PathWithSuffix(const FilePath& path, std::string_view suffix) {
+    std::string text = path.string();
+    text += suffix;
+    return FilePath(std::move(text));
 }
 
 FilePath ResolveCrashOutputBase() {
-    const std::wstring fileName =
-        L"casedash_crash_" + TimestampForFileName() + L"_" + std::to_wstring(GetCurrentProcessId());
-    FilePath base = GetWorkingDirectory() / fileName;
+    const std::string fileName = CrashReportFileName();
+    FilePath base = GetWorkingDirectory() / FilePath(fileName);
     FILE* probe = nullptr;
-    const FilePath probePath(base.wstring() + L".tmp");
-    if (_wfopen_s(&probe, probePath.c_str(), L"wb") == 0 && probe != nullptr) {
+    const FilePath probePath = PathWithSuffix(base, ".tmp");
+    const std::wstring wideProbePath = probePath.Wide();
+    if (_wfopen_s(&probe, wideProbePath.c_str(), kWriteBinaryMode) == 0 && probe != nullptr) {
         fclose(probe);
         RemoveFileIfExists(probePath);
         return base;
     }
-    return TempDirectoryPath() / fileName;
+    return TempDirectoryPath() / FilePath(fileName);
 }
 
 std::string ExceptionCodeText(DWORD code) {
@@ -81,7 +76,7 @@ std::string PointerText(const void* address) {
     return buffer;
 }
 
-std::wstring ModulePathForAddress(void* address) {
+std::string ModulePathForAddress(void* address) {
     HMODULE module = nullptr;
     if (!GetModuleHandleExW(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
             reinterpret_cast<LPCWSTR>(address),
@@ -89,7 +84,7 @@ std::wstring ModulePathForAddress(void* address) {
         return {};
     }
 
-    std::wstring path(MAX_PATH, L'\0');
+    std::wstring path(MAX_PATH, wchar_t{});
     for (;;) {
         const DWORD length = GetModuleFileNameW(module, path.data(), static_cast<DWORD>(path.size()));
         if (length == 0) {
@@ -97,21 +92,17 @@ std::wstring ModulePathForAddress(void* address) {
         }
         if (length < path.size() - 1) {
             path.resize(length);
-            return path;
+            return Utf8FromWide(path);
         }
         path.resize(path.size() * 2);
     }
 }
 
-void AppendLine(std::string& text, const std::string& key, const std::string& value) {
+void AppendLine(std::string& text, const char* key, const std::string& value) {
     text += key;
     text += ": ";
     text += value;
     text += "\r\n";
-}
-
-void AppendLine(std::string& text, const std::string& key, const std::wstring& value) {
-    AppendLine(text, key, Utf8FromWide(value));
 }
 
 std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* exceptionPointers) {
@@ -120,7 +111,7 @@ std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* e
 
     std::string text;
     AppendLine(text, "event", "unhandled_exception");
-    AppendLine(text, "timestamp", TimestampText());
+    AppendLine(text, "timestamp", Trace::FormatTimestamp());
     AppendLine(text, "version", casedash::version::kVersion);
     AppendLine(text, "build_kind", casedash::version::kBuildKind);
     AppendLine(text, "git_commit", casedash::version::kGitCommit);
@@ -131,17 +122,18 @@ std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* e
     AppendLine(text, "exception_address", PointerText(exceptionAddress));
     AppendLine(text, "faulting_module", ModulePathForAddress(const_cast<void*>(exceptionAddress)));
     if (const auto executablePath = GetExecutablePath(); executablePath.has_value()) {
-        AppendLine(text, "executable", *executablePath);
+        AppendLine(text, "executable", executablePath->string());
     }
-    AppendLine(text, "working_directory", GetWorkingDirectory().wstring());
-    AppendLine(text, "command_line", GetCommandLineW());
-    AppendLine(text, "minidump", dumpPath.wstring());
+    AppendLine(text, "working_directory", GetWorkingDirectory().string());
+    AppendLine(text, "command_line", Utf8FromWide(GetCommandLineW()));
+    AppendLine(text, "minidump", dumpPath.string());
     return text;
 }
 
 bool WriteMinidump(const FilePath& dumpPath, EXCEPTION_POINTERS* exceptionPointers) {
+    const std::wstring wideDumpPath = dumpPath.Wide();
     HANDLE dumpFile =
-        CreateFileW(dumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
+        CreateFileW(wideDumpPath.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_ALWAYS, FILE_ATTRIBUTE_NORMAL, nullptr);
     if (dumpFile == INVALID_HANDLE_VALUE) {
         return false;
     }
@@ -170,7 +162,8 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const FilePath tracePath =
         ResolveDiagnosticsOutputPath(GetWorkingDirectory(), g_diagnosticsOptions.tracePath, kDefaultTraceFileName);
     FILE* traceFile = nullptr;
-    if (_wfopen_s(&traceFile, tracePath.c_str(), L"ab") != 0 || traceFile == nullptr) {
+    const std::wstring wideTracePath = tracePath.Wide();
+    if (_wfopen_s(&traceFile, wideTracePath.c_str(), kAppendBinaryMode) != 0 || traceFile == nullptr) {
         return;
     }
 
@@ -178,9 +171,9 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const std::string code = record != nullptr ? ExceptionCodeText(record->ExceptionCode) : "unknown";
     const std::string address = PointerText(record != nullptr ? record->ExceptionAddress : nullptr);
     Trace trace(traceFile);
-    trace.Write("crash:unhandled_exception code=" + Trace::QuoteText(code) + " address=" + Trace::QuoteText(address) +
-                " report=" + Trace::QuoteText(PathToUtf8(reportPath)) +
-                " minidump=" + Trace::QuoteText(PathToUtf8(dumpPath)));
+    trace.Write(TracePrefix::Crash,
+        "unhandled_exception code=" + Trace::QuoteText(code) + " address=" + Trace::QuoteText(address) +
+            " report=" + Trace::QuoteText(reportPath.string()) + " minidump=" + Trace::QuoteText(dumpPath.string()));
     fclose(traceFile);
 }
 
@@ -190,14 +183,15 @@ LONG WINAPI HandleUnhandledException(EXCEPTION_POINTERS* exceptionPointers) {
     }
 
     const FilePath outputBase = ResolveCrashOutputBase();
-    const FilePath dumpPath(outputBase.wstring() + L".dmp");
-    const FilePath reportPath(outputBase.wstring() + L".txt");
+    const FilePath dumpPath = PathWithSuffix(outputBase, ".dmp");
+    const FilePath reportPath = PathWithSuffix(outputBase, ".txt");
     const bool dumpWritten = WriteMinidump(dumpPath, exceptionPointers);
     std::string reportText = BuildCrashReportText(dumpPath, exceptionPointers);
     AppendLine(reportText, "minidump_written", dumpWritten ? "yes" : "no");
     WriteFileBinary(reportPath, reportText);
     AppendCrashTrace(reportPath, dumpPath, exceptionPointers);
-    OutputDebugStringW((L"CaseDash crash report written to " + reportPath.wstring() + L"\n").c_str());
+    const std::wstring debugText = WideFromUtf8("CaseDash crash report written to " + reportPath.string() + "\n");
+    OutputDebugStringW(debugText.c_str());
     return EXCEPTION_CONTINUE_SEARCH;
 }
 

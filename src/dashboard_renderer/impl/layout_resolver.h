@@ -1,10 +1,9 @@
 #pragma once
 
 #include <cstddef>
-#include <memory>
 #include <optional>
 #include <string>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 #include "config/config.h"
@@ -37,7 +36,7 @@ public:
     };
 
     struct ParsedWidgetInfo {
-        std::unique_ptr<Widget> widgetPrototype;
+        WidgetClass widgetClass = WidgetClass::Unknown;
         int preferredHeight = 0;
         bool fixedPreferredHeightInRows = false;
         bool verticalSpring = false;
@@ -143,5 +142,7 @@ private:
     std::vector<LayoutEditColorRegion> staticColorEditRegions_;
     std::vector<LayoutEditColorRegion> dynamicColorEditRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
-    mutable std::unordered_map<const LayoutNodeConfig*, ParsedWidgetInfo> parsedWidgetInfoCache_;
+    // Size: this per-layout cache is tiny; a flat scan measured smaller than std::unordered_map.
+    // Size: keep only parsed widget facts here; storing cloneable widget prototypes kept larger per-widget virtual code.
+    mutable std::vector<std::pair<const LayoutNodeConfig*, ParsedWidgetInfo>> parsedWidgetInfoCache_;
 };

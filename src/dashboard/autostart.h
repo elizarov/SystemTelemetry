@@ -5,7 +5,7 @@
 #include <optional>
 #include <string>
 
-std::optional<std::wstring> ReadAutoStartCommand();
+std::optional<std::string> ReadAutoStartCommand();
 bool IsAutoStartEnabledForCurrentExecutable();
 LSTATUS WriteAutoStartRegistryValue(bool enabled);
 bool UpdateAutoStartElevated(bool enabled, HWND owner);

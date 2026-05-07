@@ -9,7 +9,9 @@
 #include <cstdlib>
 #include <type_traits>
 
+#include "config/color_format.h"
 #include "config/config_parser.h"
+#include "util/numeric_format.h"
 #include "util/strings.h"
 
 namespace {
@@ -61,7 +63,7 @@ ColorConfig ParseHexColorOrDefault(const std::string& value, ColorConfig fallbac
         return fallback;
     }
     ColorConfig color = ColorConfig::FromRgba(static_cast<unsigned int>(parsed));
-    color.expression = FormatHexColorText(color.ToRgba());
+    color.expression = FormatRgbaColorText(color.ToRgba());
     return color;
 }
 
@@ -86,7 +88,7 @@ void ParseFontSpec(UiFontConfig& font, const std::string& value) {
 }
 
 std::string FormatHexColor(ColorConfig color) {
-    return FormatHexColorText(color.ToRgba());
+    return FormatRgbaColorText(color.ToRgba());
 }
 
 std::string FormatColorConfigValue(const ColorConfig& color) {
@@ -105,7 +107,7 @@ std::string FormatFontSpec(const UiFontConfig& font) {
     return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
 }
 
-template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
+template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
     if constexpr (std::is_same_v<Value, int>) {
         return RuntimeConfigFieldValueKind::Int;
     } else if constexpr (std::is_same_v<Value, double>) {
@@ -127,7 +129,7 @@ template <typename Value> RuntimeConfigFieldValueKind RuntimeFieldValueKindFor()
     }
 }
 
-template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
+template <typename Policy> consteval RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
         return RuntimeConfigFieldPolicy::PositiveInt;
     } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
@@ -141,24 +143,28 @@ template <typename Policy> RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
     }
 }
 
-template <typename Field> std::uint32_t RuntimeFieldOffset() {
-    typename Field::owner_type owner{};
-    const auto* ownerBytes = reinterpret_cast<const char*>(&owner);
-    const auto* fieldBytes = reinterpret_cast<const char*>(&Field::RawGet(owner));
-    return static_cast<std::uint32_t>(fieldBytes - ownerBytes);
+template <typename Field> consteval std::uint32_t RuntimeFieldOffset() {
+    return static_cast<std::uint32_t>(configschema::ReflectedFieldOffset<Field>());
 }
 
-template <typename Field> RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
+template <typename Field> consteval RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
     using Policy = typename Field::layout_edit_traits_type::policy_tag;
-    return RuntimeConfigFieldDescriptor{Field::key.view(),
+    static_assert(Field::key.view().size() <= UCHAR_MAX, "Runtime config field keys must fit descriptor byte length.");
+    return RuntimeConfigFieldDescriptor{Field::key.value,
         RuntimeFieldOffset<Field>(),
+        static_cast<std::uint8_t>(Field::key.view().size()),
         RuntimeFieldValueKindFor<typename Field::field_type>(),
         RuntimeFieldPolicyFor<Policy>()};
 }
 
-template <typename... Field> auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
+template <typename... Field> consteval auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
     return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{MakeRuntimeFieldDescriptor<Field>()...};
 }
+
+template <typename Section> struct RuntimeConfigFieldDescriptorTable {
+    using Fields = decltype(MakeRuntimeFieldDescriptors(typename Section::fields_type{}));
+    static constexpr Fields fields = MakeRuntimeFieldDescriptors(typename Section::fields_type{});
+};
 
 char* FieldAddress(void* owner, const RuntimeConfigFieldDescriptor& field) {
     return static_cast<char*>(owner) + field.offset;
@@ -326,8 +332,7 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
 
 #define CASEDASH_DEFINE_RUNTIME_FIELDS(section_type)                                                                   \
     template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>() {          \
-        static const auto fields = MakeRuntimeFieldDescriptors(typename section_type::fields_type{});                  \
-        return fields;                                                                                                 \
+        return RuntimeConfigFieldDescriptorTable<section_type>::fields;                                                \
     }
 
 CASEDASH_CONFIG_FIELD_SECTIONS(CASEDASH_DEFINE_RUNTIME_FIELDS)

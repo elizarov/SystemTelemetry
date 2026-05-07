@@ -6,10 +6,52 @@
 #include <optional>
 
 #include "telemetry/metrics.h"
-#include "util/numeric_safety.h"
+#include "widget/impl/pill_bar.h"
 #include "widget/widget_host.h"
 
 namespace {
+
+enum class DriveUsageHeaderSlot {
+    Read,
+    Write,
+    Usage,
+    Free,
+};
+
+struct DriveUsageHeaderText {
+    DriveUsageHeaderSlot slot;
+    const char* metricRef;
+    const char* fallback;
+    int editAnchorId;
+    int metricAnchorId;
+    TextHorizontalAlign horizontalAlign;
+    bool clip;
+};
+
+constexpr DriveUsageHeaderText kDriveUsageHeaderText[] = {
+    {DriveUsageHeaderSlot::Read, "drive.activity.read", "R", 0, 100, TextHorizontalAlign::Center, false},
+    {DriveUsageHeaderSlot::Write, "drive.activity.write", "W", 1, 101, TextHorizontalAlign::Center, false},
+    {DriveUsageHeaderSlot::Usage, "drive.usage", "Usage", 2, 102, TextHorizontalAlign::Center, true},
+    {DriveUsageHeaderSlot::Free, "drive.free", "Free", 3, 103, TextHorizontalAlign::Trailing, true},
+};
+
+const RenderRect& DriveUsageHeaderRect(const DriveUsageListWidget::LayoutState& layout, DriveUsageHeaderSlot slot) {
+    switch (slot) {
+        case DriveUsageHeaderSlot::Read:
+            return layout.headerReadLabelRect;
+        case DriveUsageHeaderSlot::Write:
+            return layout.headerWriteLabelRect;
+        case DriveUsageHeaderSlot::Usage:
+            return layout.usageHeaderRect;
+        case DriveUsageHeaderSlot::Free:
+            return layout.headerColumns.free;
+    }
+    return layout.usageHeaderRect;
+}
+
+TextLayoutOptions DriveUsageHeaderTextOptions(const DriveUsageHeaderText& text) {
+    return TextLayoutOptions::SingleLine(text.horizontalAlign, TextVerticalAlign::Center, text.clip);
+}
 
 std::string ResolveDriveMetricLabel(const WidgetHost& renderer, std::string_view metricRef, std::string_view fallback) {
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metricRef);
@@ -136,55 +178,43 @@ void DrawSegmentIndicator(WidgetHost& renderer,
     }
 }
 
-void FillCapsule(WidgetHost& renderer, const RenderRect& rect, RenderColorId color) {
-    const int width = rect.Width();
-    const int height = rect.Height();
-    if (width <= 0 || height <= 0) {
-        return;
-    }
-    if (width <= height) {
-        renderer.Renderer().FillSolidEllipse(rect, color);
-    } else {
-        renderer.Renderer().FillSolidRoundedRect(rect, height / 2, color);
-    }
-}
-
-std::optional<RenderRect> DrawUsageCapsuleBar(
-    WidgetHost& renderer, const RenderRect& rect, double ratio, std::optional<double> peakRatio, bool drawFill) {
-    FillCapsule(renderer, rect, RenderColorId::Track);
-
-    const int width = rect.Width();
-    const int height = rect.Height();
-    if (width <= 0 || height <= 0 || !drawFill) {
-        return std::nullopt;
-    }
-
-    const double clampedRatio = ClampFinite(ratio, 0.0, 1.0);
-    const int straightWidth = std::max(0, width - height);
-    const int fillWidth = std::min(width, height + static_cast<int>(std::round(clampedRatio * straightWidth)));
-    RenderRect fillRect = rect;
-    fillRect.right = fillRect.left + fillWidth;
-    FillCapsule(renderer, fillRect, RenderColorId::Accent);
-
-    if (!peakRatio.has_value()) {
-        return std::nullopt;
-    }
-
-    const double peak = ClampFinite(*peakRatio, 0.0, 1.0);
-    const int markerWidth = std::min(width, std::max(1, std::max(renderer.Renderer().ScaleLogical(4), height)));
-    const int centerX = rect.left + static_cast<int>(std::round(peak * width));
-    const int minLeft = rect.left;
-    const int maxLeft = rect.right - markerWidth;
-    const int markerLeft = std::clamp(centerX - markerWidth / 2, minLeft, maxLeft);
-    RenderRect markerRect{markerLeft, rect.top, markerLeft + markerWidth, rect.bottom};
-    FillCapsule(renderer, markerRect, RenderColorId::PeakGhost);
-    return markerRect;
-}
-
 int EffectiveDriveHeaderHeight(const WidgetHost& renderer) {
     const int headerGap =
         std::max(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.driveUsageList.headerGap));
     return renderer.Renderer().TextMetrics().smallText + headerGap;
+}
+
+void DrawDriveHeaderLabels(WidgetHost& renderer, const DriveUsageListWidget::LayoutState& layout) {
+    for (const DriveUsageHeaderText& text : kDriveUsageHeaderText) {
+        renderer.Renderer().DrawText(DriveUsageHeaderRect(layout, text.slot),
+            ResolveDriveMetricLabel(renderer, text.metricRef, text.fallback),
+            TextStyleId::Small,
+            RenderColorId::MutedText,
+            DriveUsageHeaderTextOptions(text));
+    }
+}
+
+void RegisterDriveHeaderStaticTextAnchors(
+    WidgetHost& renderer, const WidgetLayout& widget, const DriveUsageListWidget::LayoutState& layout) {
+    for (const DriveUsageHeaderText& text : kDriveUsageHeaderText) {
+        const RenderRect& rect = DriveUsageHeaderRect(layout, text.slot);
+        const std::string label = ResolveDriveMetricLabel(renderer, text.metricRef, text.fallback);
+        const TextLayoutOptions options = DriveUsageHeaderTextOptions(text);
+        renderer.EditArtifacts().RegisterStaticTextAnchor(rect,
+            label,
+            TextStyleId::Small,
+            options,
+            renderer.MakeEditableTextBinding(widget,
+                WidgetHost::LayoutEditParameter::FontSmall,
+                text.editAnchorId,
+                renderer.Config().layout.fonts.smallText.size),
+            WidgetHost::LayoutEditParameter::ColorMutedText);
+        renderer.EditArtifacts().RegisterStaticTextAnchor(rect,
+            label,
+            TextStyleId::Small,
+            options,
+            renderer.MakeMetricTextBinding(widget, text.metricRef, text.metricAnchorId));
+    }
 }
 
 int EffectiveDriveRowHeight(const WidgetHost& renderer) {
@@ -197,14 +227,6 @@ int EffectiveDriveRowHeight(const WidgetHost& renderer) {
 }
 
 }  // namespace
-
-WidgetClass DriveUsageListWidget::Class() const {
-    return WidgetClass::DriveUsageList;
-}
-
-std::unique_ptr<Widget> DriveUsageListWidget::Clone() const {
-    return std::make_unique<DriveUsageListWidget>(*this);
-}
 
 void DriveUsageListWidget::Initialize(const LayoutNodeConfig&) {}
 
@@ -331,36 +353,14 @@ void DriveUsageListWidget::ResolveLayoutState(const WidgetHost& renderer, const 
 }
 
 void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
-    const std::string readLabel = ResolveDriveMetricLabel(renderer, "drive.activity.read", "R");
-    const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
-    const std::string usageLabel = ResolveDriveMetricLabel(renderer, "drive.usage", "Usage");
-    const std::string freeLabel = ResolveDriveMetricLabel(renderer, "drive.free", "Free");
-
     renderer.Renderer().PushClipRect(widget.rect);
-    renderer.Renderer().DrawText(layoutState_.headerReadLabelRect,
-        readLabel,
-        TextStyleId::Small,
-        RenderColorId::MutedText,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
-    renderer.Renderer().DrawText(layoutState_.headerWriteLabelRect,
-        writeLabel,
-        TextStyleId::Small,
-        RenderColorId::MutedText,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false));
-    renderer.Renderer().DrawText(layoutState_.usageHeaderRect,
-        usageLabel,
-        TextStyleId::Small,
-        RenderColorId::MutedText,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-    renderer.Renderer().DrawText(layoutState_.headerColumns.free,
-        freeLabel,
-        TextStyleId::Small,
-        RenderColorId::MutedText,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
+    DrawDriveHeaderLabels(renderer, layoutState_);
 
-    const auto rows = metrics.ResolveDriveRows();
-    for (size_t rowIndex = 0; rowIndex < rows.size() && rowIndex < layoutState_.rowBands.size(); ++rowIndex) {
-        const auto& drive = rows[rowIndex];
+    for (size_t rowIndex = 0; rowIndex < layoutState_.rowBands.size(); ++rowIndex) {
+        const DriveRow* drive = metrics.FindDriveRow(rowIndex);
+        if (drive == nullptr) {
+            break;
+        }
         const int textBaseId = 100 + static_cast<int>(rowIndex) * 3;
         const ColumnRects& columns = layoutState_.rowColumns[rowIndex];
         const RenderRect& readIndicatorRect = layoutState_.rowReadIndicatorRects[rowIndex];
@@ -368,7 +368,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
         const RenderRect& barRect = layoutState_.rowBarRects[rowIndex];
 
         const WidgetHost::TextLayoutResult labelLayout = renderer.Renderer().DrawTextBlock(columns.label,
-            drive.label,
+            drive->label,
             TextStyleId::Label,
             RenderColorId::Foreground,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
@@ -382,19 +382,19 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             readIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
-            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive.readActivity,
+            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive->readActivity,
             RenderColorId::Track,
             RenderColorId::Accent);
         DrawSegmentIndicator(renderer,
             writeIndicatorRect,
             layoutState_.activitySegments,
             layoutState_.activitySegmentGap,
-            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive.writeActivity,
+            renderer.CurrentRenderMode() == WidgetHost::RenderMode::Blank ? 0.0 : drive->writeActivity,
             RenderColorId::Track,
             RenderColorId::Accent);
-        DrawUsageCapsuleBar(renderer,
+        DrawWidgetPillBar(renderer,
             barRect,
-            drive.usedPercent / 100.0,
+            drive->usedPercent / 100.0,
             std::nullopt,
             renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank);
         const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
@@ -404,7 +404,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             RenderRect{splitX, barRect.top, barRect.right, barRect.bottom});
         if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
             const WidgetHost::TextLayoutResult percentLayout = renderer.Renderer().DrawTextBlock(columns.percent,
-                drive.usedText,
+                drive->usedText,
                 TextStyleId::Label,
                 RenderColorId::Foreground,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center));
@@ -417,7 +417,7 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
             renderer.EditArtifacts().RegisterDynamicTextAnchor(
                 percentLayout, renderer.MakeMetricTextBinding(widget, "drive.usage", textBaseId + 101));
             const WidgetHost::TextLayoutResult freeLayout = renderer.Renderer().DrawTextBlock(columns.free,
-                drive.freeText,
+                drive->freeText,
                 TextStyleId::Small,
                 RenderColorId::MutedText,
                 TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center));
@@ -449,54 +449,7 @@ void DriveUsageListWidget::BuildStaticAnchors(WidgetHost& renderer, const Widget
             AnchorDragAxis::Both, RenderPoint{layoutState_.activityAnchorCenterX, layoutState_.firstRowContentTop}),
         .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
         .targetOutline = LayoutEditTargetOutline::Hidden});
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
-        ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeEditableTextBinding(
-            widget, WidgetHost::LayoutEditParameter::FontSmall, 0, renderer.Config().layout.fonts.smallText.size),
-        WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerReadLabelRect,
-        ResolveDriveMetricLabel(renderer, "drive.activity.read", "R"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeMetricTextBinding(widget, "drive.activity.read", 100));
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
-        ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeEditableTextBinding(
-            widget, WidgetHost::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
-        WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerWriteLabelRect,
-        ResolveDriveMetricLabel(renderer, "drive.activity.write", "W"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center, false),
-        renderer.MakeMetricTextBinding(widget, "drive.activity.write", 101));
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
-        ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
-        renderer.MakeEditableTextBinding(
-            widget, WidgetHost::LayoutEditParameter::FontSmall, 2, renderer.Config().layout.fonts.smallText.size),
-        WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.usageHeaderRect,
-        ResolveDriveMetricLabel(renderer, "drive.usage", "Usage"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
-        renderer.MakeMetricTextBinding(widget, "drive.usage", 102));
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerColumns.free,
-        ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
-        renderer.MakeEditableTextBinding(
-            widget, WidgetHost::LayoutEditParameter::FontSmall, 3, renderer.Config().layout.fonts.smallText.size),
-        WidgetHost::LayoutEditParameter::ColorMutedText);
-    renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.headerColumns.free,
-        ResolveDriveMetricLabel(renderer, "drive.free", "Free"),
-        TextStyleId::Small,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Trailing, TextVerticalAlign::Center),
-        renderer.MakeMetricTextBinding(widget, "drive.free", 103));
+    RegisterDriveHeaderStaticTextAnchors(renderer, widget, layoutState_);
     for (int rowIndex = 0;
         rowIndex < layoutState_.visibleRows && rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
         rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());

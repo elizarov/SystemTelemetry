@@ -1,10 +1,12 @@
 #include "config/config_io.h"
 
+#include <string>
+
 #include "config/config_parser.h"
 #include "util/paths.h"
 
 FilePath GetRuntimeConfigPath() {
-    return GetExecutableDirectory() / L"config.ini";
+    return GetExecutableDirectory() / "config.ini";
 }
 
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParseContext& context) {
@@ -14,8 +16,8 @@ AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParse
 }
 
 bool CanWriteRuntimeConfig(const FilePath& path) {
-    const std::wstring widePath = path.wstring();
     if (FileExists(path)) {
+        const std::wstring widePath = path.Wide();
         HANDLE file = CreateFileW(widePath.c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
@@ -31,10 +33,11 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     }
 
     const FilePath parent = path.has_parent_path() ? path.parent_path() : CurrentDirectoryPath();
-    const std::wstring probeName = L".config-write-test-" + std::to_wstring(GetCurrentProcessId()) + L"-" +
-                                   std::to_wstring(GetTickCount64()) + L".tmp";
+    const std::string probeName =
+        ".config-write-test-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64()) + ".tmp";
     const FilePath probePath = parent / probeName;
-    HANDLE probe = CreateFileW(probePath.wstring().c_str(),
+    const std::wstring wideProbePath = probePath.Wide();
+    HANDLE probe = CreateFileW(wideProbePath.c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,

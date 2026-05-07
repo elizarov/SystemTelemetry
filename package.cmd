@@ -67,6 +67,8 @@ set "MSBUILD_REPO_ROOT=%REPO_ROOT:\=/%"
 set "MSBUILD_SOURCE_EXE=%MSBUILD_REPO_ROOT%/build/CaseDash.exe"
 set "INSTALLER_DIALOG_BMP=%REPO_ROOT%\build\installer_dialog_bmp\CaseDash_WixUIDialogBmp.bmp"
 set "MSBUILD_INSTALLER_DIALOG_BMP=%MSBUILD_REPO_ROOT%/build/installer_dialog_bmp/CaseDash_WixUIDialogBmp.bmp"
+set "INSTALLER_BANNER_BMP=%REPO_ROOT%\build\installer_dialog_bmp\CaseDash_WixUIBannerBmp.bmp"
+set "MSBUILD_INSTALLER_BANNER_BMP=%MSBUILD_REPO_ROOT%/build/installer_dialog_bmp/CaseDash_WixUIBannerBmp.bmp"
 
 if not exist "%SOURCE_EXE%" (
     echo Missing build output: "%SOURCE_EXE%"
@@ -79,10 +81,10 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\tools\generate_installer_dialog_bmp.ps1" -SkipBuild -BmpPath "%INSTALLER_DIALOG_BMP%"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%REPO_ROOT%\tools\generate_installer_dialog_bmp.ps1" -SkipBuild -BmpPath "%INSTALLER_DIALOG_BMP%" -BannerBmpPath "%INSTALLER_BANNER_BMP%"
 if errorlevel 1 exit /b %errorlevel%
 
-msbuild "%REPO_ROOT%\installer\CaseDash.Installer.wixproj" /restore /p:Configuration=Release /p:Platform=x64 /p:CaseDashVersionText="%CASEDASH_VERSION_TEXT%" /p:ProductVersion="%CASEDASH_MSI_VERSION%" /p:CaseDashExePath="%MSBUILD_SOURCE_EXE%" /p:CaseDashDialogBmpPath="%MSBUILD_INSTALLER_DIALOG_BMP%" /p:OutputPath="%MSBUILD_REPO_ROOT%/build/" /p:BaseIntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/obj/" /p:IntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/"
+msbuild "%REPO_ROOT%\installer\CaseDash.Installer.wixproj" /restore /p:Configuration=Release /p:Platform=x64 /p:CaseDashVersionText="%CASEDASH_VERSION_TEXT%" /p:ProductVersion="%CASEDASH_MSI_VERSION%" /p:CaseDashExePath="%MSBUILD_SOURCE_EXE%" /p:CaseDashDialogBmpPath="%MSBUILD_INSTALLER_DIALOG_BMP%" /p:CaseDashBannerBmpPath="%MSBUILD_INSTALLER_BANNER_BMP%" /p:OutputPath="%MSBUILD_REPO_ROOT%/build/" /p:BaseIntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/obj/" /p:IntermediateOutputPath="%MSBUILD_REPO_ROOT%/build/installer/"
 if errorlevel 1 exit /b %errorlevel%
 
 if not exist "%OUTPUT_MSI%" (

@@ -213,12 +213,9 @@ TEST(LayoutEditParameterApply, AppliesColorFieldsViaMetadata) {
     for (const auto& testCase : cases) {
         const auto& field = GetLayoutEditConfigFieldMetadata(testCase.parameter);
         ASSERT_EQ(field.valueFormat, configschema::ValueFormat::ColorHex);
-        ASSERT_NE(field.applyColorValue, nullptr);
-        ASSERT_NE(field.colorValue, nullptr);
+        ASSERT_EQ(field.valueKind, RuntimeConfigFieldValueKind::HexColor);
 
-        ASSERT_TRUE(field.applyColorValue(config, testCase.value));
-        ASSERT_TRUE(field.colorValue(config).has_value());
-        EXPECT_EQ(*field.colorValue(config), testCase.value);
+        ASSERT_TRUE(ApplyLayoutEditParameterColorValue(config, testCase.parameter, testCase.value));
         ASSERT_TRUE(FindLayoutEditParameterColorValue(config, testCase.parameter).has_value());
         EXPECT_EQ(*FindLayoutEditParameterColorValue(config, testCase.parameter), testCase.value);
     }

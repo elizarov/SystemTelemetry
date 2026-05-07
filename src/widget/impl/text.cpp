@@ -5,14 +5,6 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_host.h"
 
-WidgetClass TextWidget::Class() const {
-    return WidgetClass::Text;
-}
-
-std::unique_ptr<Widget> TextWidget::Clone() const {
-    return std::make_unique<TextWidget>(*this);
-}
-
 void TextWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
 }
@@ -20,10 +12,6 @@ void TextWidget::Initialize(const LayoutNodeConfig& node) {
 int TextWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().text +
            (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.text.bottomGap));
-}
-
-bool TextWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
 }
 
 void TextWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {

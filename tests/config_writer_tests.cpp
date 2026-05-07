@@ -14,7 +14,7 @@ namespace {
 
 std::string ReadConfigTemplateFromSourceTree() {
     const FilePath configPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
-    std::ifstream input(configPath, std::ios::binary);
+    std::ifstream input(configPath.string(), std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();
@@ -162,6 +162,22 @@ TEST(ConfigWriter, MinimalSaveDoesNotEmitLeadingEmptyLineForEmptyInitialText) {
 
     EXPECT_THAT(output, testing::StartsWith("[display]\r\n"));
     EXPECT_THAT(output, testing::Not(testing::StartsWith("\r\n")));
+}
+
+TEST(ConfigWriter, LayoutConfigDifferenceCheckUsesMetadataAndSelectedStructure) {
+    LayoutConfig saved;
+    saved.structure.cardsLayout = LayoutNodeConfig{.name = "rows"};
+    saved.cardsLayout = saved.structure.cardsLayout;
+
+    LayoutConfig current = saved;
+    EXPECT_FALSE(LayoutConfigHasDifferences(current, saved));
+
+    current.dashboard.outerMargin = saved.dashboard.outerMargin + 1;
+    EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
+
+    current = saved;
+    current.structure.cardsLayout.name = "columns";
+    EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
 }
 
 TEST(ConfigWriter, MinimalSavePreservesLeadingCommentsWithoutLeadingEmptyLine) {

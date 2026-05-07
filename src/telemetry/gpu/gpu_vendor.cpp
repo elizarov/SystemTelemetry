@@ -57,8 +57,8 @@ std::optional<PrimaryGpuAdapter> QueryPrimaryGpuAdapter(Trace& trace) {
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
         char buffer[128];
-        sprintf_s(buffer, "gpu_vendor:adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
-        trace.Write(buffer);
+        sprintf_s(buffer, "adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
+        trace.Write(TracePrefix::GpuVendor, buffer);
         return std::nullopt;
     }
 
@@ -67,14 +67,13 @@ std::optional<PrimaryGpuAdapter> QueryPrimaryGpuAdapter(Trace& trace) {
         IDXGIAdapter1* adapter = nullptr;
         const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
         if (enumHr == DXGI_ERROR_NOT_FOUND) {
-            trace.Write("gpu_vendor:adapter_enum done");
+            trace.Write(TracePrefix::GpuVendor, "adapter_enum done");
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
             char buffer[128];
-            sprintf_s(
-                buffer, "gpu_vendor:adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
-            trace.Write(buffer);
+            sprintf_s(buffer, "adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
+            trace.Write(TracePrefix::GpuVendor, buffer);
             break;
         }
 
@@ -86,30 +85,30 @@ std::optional<PrimaryGpuAdapter> QueryPrimaryGpuAdapter(Trace& trace) {
             selected = PrimaryGpuAdapter{adapterName, desc.VendorId, ClassifyGpuVendor(desc.VendorId, adapterName)};
             char buffer[256];
             sprintf_s(buffer,
-                "gpu_vendor:adapter_selected index=%u vendor_id=0x%04X vendor=%s name=\"%s\"",
+                "adapter_selected index=%u vendor_id=0x%04X vendor=%s name=\"%s\"",
                 adapterIndex,
                 desc.VendorId,
                 VendorName(selected->vendor).c_str(),
                 adapterName.c_str());
-            trace.Write(buffer);
+            trace.Write(TracePrefix::GpuVendor, buffer);
             adapter->Release();
             break;
         }
 
         char buffer[256];
         sprintf_s(buffer,
-            "gpu_vendor:adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
+            "adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
             adapterIndex,
             static_cast<unsigned int>(descHr),
-            Trace::BoolText(software).c_str(),
+            Trace::BoolText(software),
             adapterName.c_str());
-        trace.Write(buffer);
+        trace.Write(TracePrefix::GpuVendor, buffer);
         adapter->Release();
     }
 
     factory->Release();
     if (!selected.has_value()) {
-        trace.Write("gpu_vendor:adapter_selected none");
+        trace.Write(TracePrefix::GpuVendor, "adapter_selected none");
     }
     return selected;
 }
@@ -137,11 +136,11 @@ public:
         const UINT vendorId = adapter_.has_value() ? adapter_->vendorId : 0;
         char buffer[256];
         sprintf_s(buffer,
-            "unsupported_gpu:initialize vendor_id=0x%04X name=\"%s\" fps=\"%s\"",
+            "initialize vendor_id=0x%04X name=\"%s\" fps=\"%s\"",
             vendorId,
             adapterName.c_str(),
             fpsDiagnostics_.c_str());
-        trace_.Write(buffer);
+        trace_.Write(TracePrefix::UnsupportedGpu, buffer);
         return true;
     }
 
@@ -156,8 +155,8 @@ public:
                 sample.fps = *fpsSample.fps;
                 sample.available = true;
             }
-            trace_.WriteLazy([&] {
-                return "unsupported_gpu:get_presented_fps available=" + Trace::BoolText(fpsSample.fps.has_value()) +
+            trace_.WriteLazy(TracePrefix::UnsupportedGpu, [&] {
+                return std::string("get_presented_fps available=") + Trace::BoolText(fpsSample.fps.has_value()) +
                        " value=" +
                        (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
                                                   : std::string("fps=N/A")) +
@@ -182,7 +181,7 @@ private:
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace) {
     std::optional<PrimaryGpuAdapter> adapter = QueryPrimaryGpuAdapter(trace);
     const GpuVendor vendor = adapter.has_value() ? adapter->vendor : GpuVendor::Unknown;
-    trace.Write("gpu_vendor:create vendor=" + VendorName(vendor));
+    trace.Write(TracePrefix::GpuVendor, "create vendor=" + VendorName(vendor));
     if (vendor == GpuVendor::Nvidia) {
         return CreateNvidiaGpuTelemetryProvider(trace);
     }

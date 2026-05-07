@@ -1,6 +1,6 @@
 #include "layout_edit/layout_edit_trace_session.h"
 
-#include "util/strings.h"
+#include "util/numeric_format.h"
 
 namespace {
 
@@ -14,13 +14,13 @@ double DurationMilliseconds(std::chrono::nanoseconds value) {
 
 }  // namespace
 
-void LayoutEditTraceSession::Begin(Trace& trace, const std::string& kind, const std::string& detail) {
+void LayoutEditTraceSession::Begin(Trace& trace, const char* kind, const std::string& detail) {
     *this = {};
     active_ = true;
     kind_ = kind;
     detail_ = detail;
     startedAt_ = std::chrono::steady_clock::now();
-    trace.Write("layout_edit_drag:start kind=\"" + kind + "\" detail=\"" + detail + "\"");
+    trace.Write(TracePrefix::LayoutEditDrag, "start kind=\"" + kind_ + "\" detail=\"" + detail_ + "\"");
 }
 
 void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -51,7 +51,7 @@ void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chron
     ++stats->samples;
 }
 
-void LayoutEditTraceSession::End(Trace& trace, const std::string& reason) {
+void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
     if (!active_) {
         *this = {};
         return;
@@ -65,17 +65,19 @@ void LayoutEditTraceSession::End(Trace& trace, const std::string& reason) {
         text += " avg_";
         text += name;
         text += "_ms=" + FormatMilliseconds(averageMs);
-        text += " " + std::string(name) + "_samples=" + std::to_string(stats.samples);
+        text += ' ';
+        text += name;
+        text += "_samples=" + std::to_string(stats.samples);
     };
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;
     std::string summary =
-        "layout_edit_drag:end kind=\"" + kind_ + "\" detail=\"" + detail_ + "\" reason=\"" + reason + "\" elapsed_ms=" +
+        "end kind=\"" + kind_ + "\" detail=\"" + detail_ + "\" reason=\"" + reason + "\" elapsed_ms=" +
         FormatMilliseconds(DurationMilliseconds(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed)));
     appendAverage(summary, "snap", snap_);
     appendAverage(summary, "apply", apply_);
     appendAverage(summary, "paint_total", paintTotal_);
     appendAverage(summary, "paint_draw", paintDraw_);
-    trace.Write(summary);
+    trace.Write(TracePrefix::LayoutEditDrag, summary);
     *this = {};
 }

@@ -25,6 +25,7 @@ jobs:
       - name: Restore vcpkg caches
         id: vcpkg-cache-restore
         uses: actions/cache/restore@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
@@ -40,7 +41,7 @@ jobs:
 
       - name: Build
         shell: cmd
-        run: build.cmd
+        run: build.cmd /benchmarks
 
       - name: Run tests
         shell: cmd
@@ -81,8 +82,9 @@ jobs:
       - name: Save vcpkg caches
         if: always()
         uses: actions/cache/save@v5
+        continue-on-error: true
         with:
           path: |
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
             ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
-          key: ${{ steps.vcpkg-cache-restore.outputs.cache-primary-key }}
+          key: vcpkg-windows-2025-vs2026-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/validation.yml') }}-${{ github.run_id }}

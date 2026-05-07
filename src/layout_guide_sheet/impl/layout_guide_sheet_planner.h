@@ -10,14 +10,15 @@
 
 std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGuideSheetCardSummary>& cards);
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetCallouts(const AppConfig& config,
+void BuildLayoutGuideSheetCallouts(const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
-    const std::vector<std::string>& selectedCardIds);
+    const std::vector<std::string>& selectedCardIds,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts);
 
-std::vector<LayoutGuideSheetCalloutRequest> BuildLayoutGuideSheetOverviewCallouts(
-    const AppConfig& config, const LayoutEditActiveRegions& regions);
+void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
+    const LayoutEditActiveRegions& regions,
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts);
 
-std::vector<LayoutGuideSheetCalloutRequest> MergeLayoutGuideSheetCallouts(
-    const std::vector<LayoutGuideSheetCalloutRequest>& overviewCallouts,
+void AppendLayoutGuideSheetCardCallouts(std::vector<LayoutGuideSheetCalloutRequest>& merged,
     const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts);

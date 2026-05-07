@@ -44,6 +44,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/renderer/png_export.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
     'src/renderer/renderer.h|windows.h',
+    'src/util/elevated_process.h|windows.h',
     'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
     'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
     'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',
@@ -59,9 +60,12 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/telemetry/telemetry.h|windows.h',
     'src/util/file_path.cpp|windows.h',
     'src/util/command_line.cpp|windows.h',
+    'src/util/message_box.cpp|windows.h',
     'src/util/scale.h|windows.h',
+    'src/util/lightweight_mutex.cpp|windows.h',
     'src/util/strings.h|windows.h',
     'src/util/temp_file.cpp|windows.h',
+    'src/util/trace.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
     'src/dashboard/dashboard_app.h|constants.h',
     'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',
@@ -294,6 +298,39 @@ function Get-TrackedTidyFiles {
     return $files | Sort-Object FullName
 }
 
+function Invoke-GitOutput {
+    param(
+        [string]$RepoRoot,
+        [string[]]$Arguments
+    )
+
+    $previousErrorActionPreference = $ErrorActionPreference
+    $hasNativeCommandPreference = Test-Path -Path variable:PSNativeCommandUseErrorActionPreference
+    if ($hasNativeCommandPreference) {
+        $previousNativeCommandPreference = $PSNativeCommandUseErrorActionPreference
+    }
+
+    try {
+        $ErrorActionPreference = 'Continue'
+        if ($hasNativeCommandPreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        $output = & git -C $RepoRoot @Arguments 2>$null
+        $exitCode = $LASTEXITCODE
+    } finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+        if ($hasNativeCommandPreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativeCommandPreference
+        }
+    }
+
+    if ($exitCode -ne 0) {
+        throw "git $($Arguments -join ' ') failed with exit code $exitCode."
+    }
+
+    return $output
+}
+
 function Get-ChangedTidyFiles {
     param(
         [string]$RepoRoot
@@ -310,14 +347,28 @@ function Get-ChangedTidyFiles {
     }
 
     if ($headExists) {
-        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR HEAD -- $pathSpecs 2>$null
+        $gitDiffOutput = Invoke-GitOutput -RepoRoot $RepoRoot -Arguments @(
+            'diff'
+            '--name-only'
+            '--diff-filter=ACMR'
+            'HEAD'
+            '--'
+            $pathSpecs
+        )
         foreach ($entry in $gitDiffOutput) {
             if (-not [string]::IsNullOrWhiteSpace($entry)) {
                 $changedFiles.Add($entry.Trim())
             }
         }
     } else {
-        $gitDiffOutput = & git -C $RepoRoot diff --name-only --diff-filter=ACMR --cached -- $pathSpecs 2>$null
+        $gitDiffOutput = Invoke-GitOutput -RepoRoot $RepoRoot -Arguments @(
+            'diff'
+            '--name-only'
+            '--diff-filter=ACMR'
+            '--cached'
+            '--'
+            $pathSpecs
+        )
         foreach ($entry in $gitDiffOutput) {
             if (-not [string]::IsNullOrWhiteSpace($entry)) {
                 $changedFiles.Add($entry.Trim())
@@ -325,7 +376,13 @@ function Get-ChangedTidyFiles {
         }
     }
 
-    $untrackedOutput = & git -C $RepoRoot ls-files --others --exclude-standard -- $pathSpecs 2>$null
+    $untrackedOutput = Invoke-GitOutput -RepoRoot $RepoRoot -Arguments @(
+        'ls-files'
+        '--others'
+        '--exclude-standard'
+        '--'
+        $pathSpecs
+    )
     foreach ($entry in $untrackedOutput) {
         if (-not [string]::IsNullOrWhiteSpace($entry)) {
             $changedFiles.Add($entry.Trim())

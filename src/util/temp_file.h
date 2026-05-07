@@ -1,5 +1,7 @@
 #pragma once
 
+#include <string_view>
+
 #include "util/file_path.h"
 
-FilePath CreateTempFilePath(const wchar_t* prefix);
+FilePath CreateTempFilePath(std::string_view prefix);

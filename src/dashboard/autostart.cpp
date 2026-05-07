@@ -1,46 +1,48 @@
 #include "dashboard/autostart.h"
 
-#include <shellapi.h>
-
 #include "dashboard/fps_service.h"
 #include "util/command_line.h"
+#include "util/elevated_process.h"
 #include "util/paths.h"
+#include "util/utf8.h"
 
 namespace {
 
-constexpr wchar_t kAutoStartRunSubKey[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr wchar_t kAutoStartValueName[] = L"CaseDash";
+constexpr char kAutoStartRunSubKey[] = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr char kAutoStartValueName[] = "CaseDash";
 
 }  // namespace
 
-std::optional<std::wstring> ReadAutoStartCommand() {
+std::optional<std::string> ReadAutoStartCommand() {
+    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
+    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
-    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, kAutoStartRunSubKey, 0, KEY_QUERY_VALUE, &key);
+    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, runSubKey.c_str(), 0, KEY_QUERY_VALUE, &key);
     if (openStatus != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
     DWORD type = 0;
     DWORD size = 0;
-    const LSTATUS queryStatus = RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, nullptr, &size);
+    const LSTATUS queryStatus = RegQueryValueExW(key, valueName.c_str(), nullptr, &type, nullptr, &size);
     if (queryStatus != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) || size < sizeof(wchar_t)) {
         RegCloseKey(key);
         return std::nullopt;
     }
 
-    std::wstring value(size / sizeof(wchar_t), L'\0');
+    std::wstring value(size / sizeof(wchar_t), wchar_t{});
     const LSTATUS readStatus =
-        RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
+        RegQueryValueExW(key, valueName.c_str(), nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
     RegCloseKey(key);
     if (readStatus != ERROR_SUCCESS || value.empty()) {
         return std::nullopt;
     }
 
-    const size_t terminator = value.find(L'\0');
+    const size_t terminator = value.find(wchar_t{});
     if (terminator != std::wstring::npos) {
         value.resize(terminator);
     }
-    return value;
+    return Utf8FromWide(value);
 }
 
 bool IsAutoStartEnabledForCurrentExecutable() {
@@ -49,15 +51,17 @@ bool IsAutoStartEnabledForCurrentExecutable() {
     if (!executablePath.has_value() || !registeredCommand.has_value()) {
         return false;
     }
-    return NormalizeWindowsPath(*registeredCommand) == NormalizeWindowsPath(*executablePath) &&
+    return NormalizeCommandPath(*registeredCommand) == NormalizeCommandPath(executablePath->string()) &&
            IsFpsServiceRunningForCurrentExecutable();
 }
 
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
+    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
+    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
     DWORD disposition = 0;
     const LSTATUS createStatus = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-        kAutoStartRunSubKey,
+        runSubKey.c_str(),
         0,
         nullptr,
         REG_OPTION_NON_VOLATILE,
@@ -76,15 +80,15 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             RegCloseKey(key);
             return ERROR_FILE_NOT_FOUND;
         }
-        const std::wstring command = QuoteCommandLineArgument(*executablePath);
+        const std::wstring command = WideFromUtf8(QuoteCommandLineArgument(executablePath->string()));
         result = RegSetValueExW(key,
-            kAutoStartValueName,
+            valueName.c_str(),
             0,
             REG_SZ,
             reinterpret_cast<const BYTE*>(command.c_str()),
             static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
     } else {
-        result = RegDeleteValueW(key, kAutoStartValueName);
+        result = RegDeleteValueW(key, valueName.c_str());
         if (result == ERROR_FILE_NOT_FOUND) {
             result = ERROR_SUCCESS;
         }
@@ -105,29 +109,10 @@ int RunElevatedAutoStartMode(bool enabled) {
 }
 
 bool UpdateAutoStartElevated(bool enabled, HWND owner) {
-    const auto executablePath = GetExecutablePath();
-    if (!executablePath.has_value()) {
-        return false;
-    }
-
-    std::wstring parameters = enabled ? L"/set-autostart on" : L"/set-autostart off";
-    SHELLEXECUTEINFOW executeInfo{};
-    executeInfo.cbSize = sizeof(executeInfo);
-    executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
-    executeInfo.hwnd = owner;
-    executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters.c_str();
-    executeInfo.nShow = SW_HIDE;
-    if (!ShellExecuteExW(&executeInfo)) {
-        return false;
-    }
-
-    WaitForSingleObject(executeInfo.hProcess, INFINITE);
     DWORD exitCode = 1;
-    GetExitCodeProcess(executeInfo.hProcess, &exitCode);
-    CloseHandle(executeInfo.hProcess);
-    return exitCode == 0;
+    return RunElevatedSelfAndWait(
+               owner, enabled ? "/set-autostart on" : "/set-autostart off", {}, SW_HIDE, &exitCode) &&
+           exitCode == 0;
 }
 
 bool UpdateAutoStartRegistration(bool enabled, HWND owner) {

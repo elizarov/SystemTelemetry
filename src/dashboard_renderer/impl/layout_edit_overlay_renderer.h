@@ -24,12 +24,6 @@ public:
     void Draw(const DashboardOverlayState& overlayState, const MetricSource& metrics);
 
 private:
-    struct SimilarityIndicator {
-        LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
-        RenderRect rect{};
-        int exactTypeOrdinal = 0;
-    };
-
     void DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const;
     void DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const;
     void DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const;

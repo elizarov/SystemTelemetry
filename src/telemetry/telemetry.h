@@ -2,13 +2,12 @@
 
 #include <windows.h>
 
+#include <cstddef>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 #include "config/telemetry_settings.h"
@@ -45,6 +44,30 @@ struct RetainedHistorySeries {
     std::string seriesRef;
     std::vector<double> samples;
 };
+
+struct SystemSnapshot;
+
+enum class RetainedHistoryKey : uint8_t {
+    CpuRam,
+    CpuLoad,
+    CpuClock,
+    GpuLoad,
+    GpuTemperature,
+    GpuClock,
+    GpuFan,
+    GpuFps,
+    GpuVram,
+    NetworkUpload,
+    NetworkDownload,
+    StorageRead,
+    StorageWrite,
+    Count,
+};
+
+constexpr size_t kRetainedHistoryKeyCount = static_cast<size_t>(RetainedHistoryKey::Count);
+
+const char* RetainedHistorySeriesRef(RetainedHistoryKey key);
+bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key);
 
 struct ProcessorTelemetry {
     std::string name = "CPU";
@@ -88,7 +111,7 @@ struct SystemSnapshot {
     std::vector<NamedScalarMetric> boardTemperatures;
     std::vector<NamedScalarMetric> boardFans;
     std::vector<RetainedHistorySeries> retainedHistories;
-    std::unordered_map<std::string, size_t> retainedHistoryIndexByRef;
+    uint16_t retainedHistoryIndexByKey[kRetainedHistoryKeyCount] = {};
     NetworkTelemetry network;
     StorageTelemetry storage;
     std::vector<DriveInfo> drives;
@@ -123,7 +146,13 @@ struct TelemetryCollectorOptions {
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
 
-using TelemetryUpdateCallback = std::function<void(const TelemetryUpdate& update)>;
+class TelemetryUpdateSink {
+public:
+    virtual void OnTelemetryUpdate(const TelemetryUpdate& update) = 0;
+
+protected:
+    ~TelemetryUpdateSink() = default;
+};
 
 class TelemetryRuntime {
 public:
@@ -167,5 +196,5 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,
-    TelemetryUpdateCallback callback,
+    TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);

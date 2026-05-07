@@ -3,23 +3,11 @@
 #include "telemetry/metrics.h"
 #include "widget/widget_host.h"
 
-WidgetClass NetworkFooterWidget::Class() const {
-    return WidgetClass::NetworkFooter;
-}
-
-std::unique_ptr<Widget> NetworkFooterWidget::Clone() const {
-    return std::make_unique<NetworkFooterWidget>(*this);
-}
-
 void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
 int NetworkFooterWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().footer +
            (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
-}
-
-bool NetworkFooterWidget::UsesFixedPreferredHeightInRows() const {
-    return true;
 }
 
 void NetworkFooterWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {

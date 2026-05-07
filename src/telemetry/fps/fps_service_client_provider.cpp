@@ -12,6 +12,7 @@
 #include "telemetry/fps/fps_etw_provider.h"
 #include "telemetry/fps_service_protocol.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -83,13 +84,14 @@ private:
 
 std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     diagnostics.clear();
-    if (!WaitNamedPipeW(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
+    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
+    if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
         diagnostics = "CashDash service pipe is unavailable: " + Win32ErrorText(GetLastError());
         return std::nullopt;
     }
 
     Handle pipe(CreateFileW(
-        kFpsServicePipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
         diagnostics = "Failed to connect to CashDash service pipe: " + Win32ErrorText(GetLastError());
         return std::nullopt;
@@ -145,14 +147,15 @@ public:
         const std::optional<FpsTelemetrySample> sample = QueryServiceSample(diagnostics);
         if (!sample.has_value()) {
             diagnostics_ = diagnostics.empty() ? "FPS service did not return a sample." : diagnostics;
-            trace_.Write("fps_service_client:initialize_failed diagnostics=" + Trace::QuoteText(diagnostics_));
+            trace_.Write(
+                TracePrefix::FpsServiceClient, "initialize_failed diagnostics=" + Trace::QuoteText(diagnostics_));
             return false;
         }
 
         cachedSample_ = *sample;
         diagnostics_ = sample->diagnostics.empty() ? "FPS service provider active." : sample->diagnostics;
         initialized_ = true;
-        trace_.Write("fps_service_client:initialize_done diagnostics=" + Trace::QuoteText(diagnostics_));
+        trace_.Write(TracePrefix::FpsServiceClient, "initialize_done diagnostics=" + Trace::QuoteText(diagnostics_));
         return true;
     }
 
@@ -170,9 +173,8 @@ public:
             unavailable.processId = cachedSample_->processId;
             unavailable.processName = cachedSample_->processName;
         }
-        trace_.WriteLazy([&] {
-            return "fps_service_client:sample_failed diagnostics=" + Trace::QuoteText(unavailable.diagnostics);
-        });
+        trace_.WriteLazy(TracePrefix::FpsServiceClient,
+            [&] { return "sample_failed diagnostics=" + Trace::QuoteText(unavailable.diagnostics); });
         return unavailable;
     }
 
@@ -212,7 +214,7 @@ public:
         if (serviceRetrySample_ >= kServiceRetrySampleInterval) {
             serviceRetrySample_ = 0;
             if (TryInitializeServiceProvider()) {
-                trace_.Write("fps_provider:service_recovered");
+                trace_.Write(TracePrefix::FpsProvider, "service_recovered");
                 return serviceProvider_->Sample();
             }
         }
@@ -234,7 +236,7 @@ private:
             return true;
         }
 
-        trace_.Write("fps_provider:service_unavailable fallback=local_etw");
+        trace_.Write(TracePrefix::FpsProvider, "service_unavailable fallback=local_etw");
         return false;
     }
 

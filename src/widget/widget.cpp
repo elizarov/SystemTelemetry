@@ -12,23 +12,9 @@
 #include "widget/impl/vertical_spacer.h"
 #include "widget/impl/vertical_spring.h"
 
-bool Widget::UsesFixedPreferredHeightInRows() const {
-    return false;
-}
-
-bool Widget::IsHoverable() const {
-    return true;
-}
-
-bool Widget::IsVerticalSpring() const {
-    return false;
-}
-
 void Widget::ResolveLayoutState(const WidgetHost&, const RenderRect&) {}
 
 void Widget::Draw(WidgetHost&, const WidgetLayout&, const MetricSource&) const {}
-
-void Widget::FinalizeLayoutGroup(WidgetHost&, const std::vector<WidgetLayout*>&) {}
 
 void Widget::BuildEditGuides(WidgetHost&, const WidgetLayout&) const {}
 
@@ -72,4 +58,28 @@ std::unique_ptr<Widget> CreateWidget(std::string_view name) {
 
 std::unique_ptr<Widget> CreateCardChromeWidget(const LayoutCardConfig& card) {
     return std::make_unique<CardChromeWidget>(card);
+}
+
+void FinalizeWidgetLayoutGroup(
+    WidgetHost& renderer, WidgetClass widgetClass, const std::vector<WidgetLayout*>& widgets) {
+    if (widgetClass == WidgetClass::Gauge) {
+        FinalizeGaugeLayoutGroup(renderer, widgets);
+    }
+}
+
+bool IsWidgetHoverable(WidgetClass widgetClass) {
+    return widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
+}
+
+bool WidgetUsesFixedPreferredHeightInRows(WidgetClass widgetClass) {
+    switch (widgetClass) {
+        case WidgetClass::Text:
+        case WidgetClass::NetworkFooter:
+        case WidgetClass::VerticalSpacer:
+        case WidgetClass::ClockTime:
+        case WidgetClass::ClockDate:
+            return true;
+        default:
+            return false;
+    }
 }

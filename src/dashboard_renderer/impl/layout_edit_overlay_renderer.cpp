@@ -3,12 +3,11 @@
 #include <algorithm>
 #include <cmath>
 #include <optional>
-#include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
+#include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 
@@ -76,6 +75,32 @@ RenderColorId ActiveEditColor(const DashboardOverlayState& overlayState) {
 
 bool UseActiveEditEmphasis(const DashboardOverlayState& overlayState, bool active) {
     return active && !overlayState.forceHoverEquivalentAffordances;
+}
+
+struct SimilarityTypeKey {
+    WidgetClass widgetClass = WidgetClass::Unknown;
+    int extent = 0;
+
+    bool operator==(const SimilarityTypeKey& other) const {
+        return widgetClass == other.widgetClass && extent == other.extent;
+    }
+};
+
+struct VisibleWidgetEntry {
+    const WidgetLayout* widget = nullptr;
+    SimilarityTypeKey type;
+    bool hasExactType = false;
+    int exactTypeOrdinal = 0;
+};
+
+std::vector<VisibleWidgetEntry>::iterator FindVisibleWidgetEntry(
+    std::vector<VisibleWidgetEntry>& entries, const WidgetLayout* widget) {
+    for (auto it = entries.begin(); it != entries.end(); ++it) {
+        if (it->widget == widget) {
+            return it;
+        }
+    }
+    return entries.end();
 }
 
 }  // namespace
@@ -159,18 +184,18 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         if (!key.has_value()) {
             return;
         }
-        const auto region = renderer_.FindEditableAnchorRegion(*key);
-        if (region.has_value()) {
+        const LayoutEditAnchorRegion* region = renderer_.FindEditableAnchorRegion(*key);
+        if (region != nullptr) {
             appendRelatedHighlights(*region, active);
         }
     };
     if (overlayState.selectedTreeHighlight.has_value()) {
         const auto collectSelected = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
             for (const auto& region : regions) {
+                const auto* special =
+                    std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
                 if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) ||
-                    (std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) &&
-                        std::get<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) ==
-                            LayoutEditSelectionHighlightSpecial::AllTexts &&
+                    (special != nullptr && *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
                         LayoutEditAnchorParameter(region.key).has_value() &&
                         IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
                     appendHighlight(region, true);
@@ -273,81 +298,19 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
             DrawDottedHighlightRect(highlighted.targetRect, outlineColor, activeEmphasis);
         }
 
-        if (highlighted.shape == AnchorShape::Circle) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            renderer_.Renderer().DrawSolidEllipse(
-                highlighted.anchorRect, RenderStroke::Solid(outlineColor, outlineWidth));
-        } else if (highlighted.shape == AnchorShape::Diamond) {
-            renderer_.Renderer().FillSolidDiamond(highlighted.anchorRect, outlineColor);
-        } else if (highlighted.shape == AnchorShape::Wedge) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            const RenderPoint topRight{highlighted.anchorRect.right, highlighted.anchorRect.top};
-            const RenderPoint bottomLeft{highlighted.anchorRect.left, highlighted.anchorRect.bottom};
-            const RenderPoint bottomRight{highlighted.anchorRect.right, highlighted.anchorRect.bottom};
-            renderer_.Renderer().DrawSolidLine(
-                bottomLeft, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-            renderer_.Renderer().DrawSolidLine(topRight, bottomRight, RenderStroke::Solid(outlineColor, outlineWidth));
-        } else if (highlighted.shape == AnchorShape::VerticalReorder ||
-                   highlighted.shape == AnchorShape::HorizontalReorder) {
-            const int outlineWidth = (std::max)(1, renderer_.ScaleLogical(1));
-            const int centerX = highlighted.anchorRect.left +
-                                (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int centerY = highlighted.anchorRect.top +
-                                (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const int gapHalf = (std::max)(1, renderer_.ScaleLogical(1));
-            const auto stroke = RenderStroke::Solid(outlineColor, static_cast<float>(outlineWidth));
-            if (highlighted.shape == AnchorShape::HorizontalReorder) {
-                const int halfHeight =
-                    (std::max)(1, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-                const RenderPoint leftApex{highlighted.anchorRect.left, centerY};
-                const RenderPoint leftTop{centerX - gapHalf, centerY - halfHeight};
-                const RenderPoint leftBottom{centerX - gapHalf, centerY + halfHeight};
-                const RenderPoint rightApex{highlighted.anchorRect.right, centerY};
-                const RenderPoint rightTop{centerX + gapHalf, centerY - halfHeight};
-                const RenderPoint rightBottom{centerX + gapHalf, centerY + halfHeight};
-                renderer_.Renderer().DrawSolidLine(leftApex, leftTop, stroke);
-                renderer_.Renderer().DrawSolidLine(leftTop, leftBottom, stroke);
-                renderer_.Renderer().DrawSolidLine(leftBottom, leftApex, stroke);
-                renderer_.Renderer().DrawSolidLine(rightTop, rightApex, stroke);
-                renderer_.Renderer().DrawSolidLine(rightApex, rightBottom, stroke);
-                renderer_.Renderer().DrawSolidLine(rightBottom, rightTop, stroke);
-            } else {
-                const int halfWidth =
-                    (std::max)(1, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-                const RenderPoint upApex{centerX, highlighted.anchorRect.top};
-                const RenderPoint upLeft{centerX - halfWidth, centerY - gapHalf};
-                const RenderPoint upRight{centerX + halfWidth, centerY - gapHalf};
-                const RenderPoint downApex{centerX, highlighted.anchorRect.bottom};
-                const RenderPoint downLeft{centerX - halfWidth, centerY + gapHalf};
-                const RenderPoint downRight{centerX + halfWidth, centerY + gapHalf};
-                renderer_.Renderer().DrawSolidLine(upApex, upLeft, stroke);
-                renderer_.Renderer().DrawSolidLine(upLeft, upRight, stroke);
-                renderer_.Renderer().DrawSolidLine(upRight, upApex, stroke);
-                renderer_.Renderer().DrawSolidLine(downLeft, downApex, stroke);
-                renderer_.Renderer().DrawSolidLine(downApex, downRight, stroke);
-                renderer_.Renderer().DrawSolidLine(downRight, downLeft, stroke);
-            }
-        } else if (highlighted.shape == AnchorShape::Plus) {
-            const float outlineWidth = static_cast<float>(
-                activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-            const int centerX = highlighted.anchorRect.left +
-                                (std::max<LONG>(0, highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int centerY = highlighted.anchorRect.top +
-                                (std::max<LONG>(0, highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const int halfWidth =
-                (std::max)(2, static_cast<int>(highlighted.anchorRect.right - highlighted.anchorRect.left) / 2);
-            const int halfHeight =
-                (std::max)(2, static_cast<int>(highlighted.anchorRect.bottom - highlighted.anchorRect.top) / 2);
-            const auto stroke = RenderStroke::Solid(outlineColor, outlineWidth);
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{centerX - halfWidth, centerY}, RenderPoint{centerX + halfWidth, centerY}, stroke);
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{centerX, centerY - halfHeight}, RenderPoint{centerX, centerY + halfHeight}, stroke);
-        } else {
-            renderer_.Renderer().FillSolidRect(highlighted.anchorRect, outlineColor);
-        }
+        const bool reorderShape =
+            highlighted.shape == AnchorShape::VerticalReorder || highlighted.shape == AnchorShape::HorizontalReorder;
+        const int outlineWidth = reorderShape ? (std::max)(1, renderer_.ScaleLogical(1))
+                                              : (activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2))
+                                                                : (std::max)(1, renderer_.ScaleLogical(1)));
+        DrawLayoutEditAnchorShape(renderer_.Renderer(),
+            highlighted.shape,
+            highlighted.anchorRect,
+            outlineColor,
+            static_cast<float>(outlineWidth),
+            (std::max)(1, renderer_.ScaleLogical(1)),
+            true,
+            true);
     }
 }
 
@@ -471,10 +434,9 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     }
     for (const auto& guide : layoutResolver_.layoutEditGuides_) {
         const bool matchesFocus = MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
+        const auto* containerKey = std::get_if<LayoutContainerEditKey>(&*overlayState.selectedTreeHighlight);
         const bool matchesContainer =
-            std::holds_alternative<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight) &&
-            MatchesLayoutContainerEditKey(std::get<LayoutContainerEditKey>(*overlayState.selectedTreeHighlight),
-                {guide.editCardId, guide.nodePath});
+            containerKey != nullptr && MatchesLayoutContainerEditKey(*containerKey, {guide.editCardId, guide.nodePath});
         if (matchesFocus || matchesContainer) {
             appendRect(guide.containerRect);
         }
@@ -486,10 +448,10 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     }
     const auto collectAnchorTargets = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
         for (const auto& region : regions) {
+            const auto* special =
+                std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
             if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) ||
-                (std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) &&
-                    std::get<LayoutEditSelectionHighlightSpecial>(*overlayState.selectedTreeHighlight) ==
-                        LayoutEditSelectionHighlightSpecial::AllTexts &&
+                (special != nullptr && *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
                     LayoutEditAnchorParameter(region.key).has_value() &&
                     IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
                 if (const auto parameter = LayoutEditAnchorParameter(region.key); parameter.has_value()) {
@@ -521,7 +483,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     if (const auto* widgetClass = std::get_if<WidgetClass>(&*overlayState.selectedTreeHighlight)) {
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
-                if (widget.widget != nullptr && widget.widget->Class() == *widgetClass) {
+                if (widget.widget != nullptr && widget.widgetClass == *widgetClass) {
                     DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
                 }
             }
@@ -593,7 +555,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         if (*special == LayoutEditSelectionHighlightSpecial::AllTexts) {
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 for (const auto& widget : card.widgets) {
-                    if (widget.widget != nullptr && widget.widget->Class() == WidgetClass::Text) {
+                    if (widget.widget != nullptr && widget.widgetClass == WidgetClass::Text) {
                         DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
                     }
                 }
@@ -822,24 +784,22 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
     const RenderRect outlineRect =
         outside ? rect.Inflate(padding, padding)
                 : RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
-    const float outlineWidth = static_cast<float>(
-        active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
     const RenderRect drawRect = outlineRect.IsEmpty() ? rect : outlineRect;
-    auto& renderer = renderer_;
-    const int strokeWidth = (std::max)(1, static_cast<int>(std::lround(outlineWidth)));
+    const int strokeWidth =
+        active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1));
     const int dotLength = (std::max)(strokeWidth + 1, renderer_.ScaleLogical(active ? 6 : 5));
     const int gapLength = (std::max)(strokeWidth + 1, renderer_.ScaleLogical(active ? 5 : 4));
 
     const auto drawHorizontal = [&](int y, int left, int right) {
         for (int x = left; x < right; x += dotLength + gapLength) {
             const int segmentRight = (std::min)(x + dotLength, right);
-            renderer.Renderer().FillSolidRect(RenderRect{x, y, segmentRight, y + strokeWidth}, color);
+            renderer_.Renderer().FillSolidRect(RenderRect{x, y, segmentRight, y + strokeWidth}, color);
         }
     };
     const auto drawVertical = [&](int x, int top, int bottom) {
         for (int y = top; y < bottom; y += dotLength + gapLength) {
             const int segmentBottom = (std::min)(y + dotLength, bottom);
-            renderer.Renderer().FillSolidRect(RenderRect{x, y, x + strokeWidth, segmentBottom}, color);
+            renderer_.Renderer().FillSolidRect(RenderRect{x, y, x + strokeWidth, segmentBottom}, color);
         }
     };
 
@@ -859,143 +819,119 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
         return;
     }
 
-    struct SimilarityTypeKey {
-        WidgetClass widgetClass = WidgetClass::Unknown;
-        int extent = 0;
-
-        bool operator==(const SimilarityTypeKey& other) const {
-            return widgetClass == other.widgetClass && extent == other.extent;
-        }
-
-        bool operator<(const SimilarityTypeKey& other) const {
-            if (widgetClass != other.widgetClass) {
-                return widgetClass < other.widgetClass;
-            }
-            return extent < other.extent;
-        }
-    };
-
-    struct SimilarityTypeKeyHash {
-        size_t operator()(const SimilarityTypeKey& key) const {
-            size_t hash = std::hash<int>{}(static_cast<int>(key.widgetClass));
-            hash = (hash * 1315423911u) ^ std::hash<int>{}(key.extent);
-            return hash;
-        }
-    };
-
     LayoutGuideAxis axis = LayoutGuideAxis::Horizontal;
     const char* axisLabel = "horizontal";
-    std::vector<const WidgetLayout*> affectedWidgets;
+    const LayoutEditGuide* activeGuide = nullptr;
+    bool allWidgetsAffected = false;
     std::vector<const WidgetLayout*> allWidgets;
     if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllHorizontal) {
         axis = LayoutGuideAxis::Vertical;
         axisLabel = "horizontal";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        affectedWidgets = allWidgets;
+        allWidgetsAffected = true;
     } else if (overlayState.similarityIndicatorMode == LayoutSimilarityIndicatorMode::AllVertical) {
         axis = LayoutGuideAxis::Horizontal;
         axisLabel = "vertical";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        affectedWidgets = allWidgets;
+        allWidgetsAffected = true;
     } else {
         if (!overlayState.activeLayoutEditGuide.has_value()) {
             return;
         }
-        const LayoutEditGuide& guide = *overlayState.activeLayoutEditGuide;
-        axis = guide.axis;
+        activeGuide = &*overlayState.activeLayoutEditGuide;
+        axis = activeGuide->axis;
         axisLabel = axis == LayoutGuideAxis::Vertical ? "horizontal" : "vertical";
         allWidgets = renderer_.CollectSimilarityIndicatorWidgets(axis);
-        for (const WidgetLayout* widget : allWidgets) {
-            if (renderer_.IsWidgetAffectedByGuide(*widget, guide)) {
-                affectedWidgets.push_back(widget);
-            }
+    }
+    bool hasAffectedWidget = false;
+    for (const WidgetLayout* widget : allWidgets) {
+        if (allWidgetsAffected ||
+            (activeGuide != nullptr && renderer_.IsWidgetAffectedByGuide(*widget, *activeGuide))) {
+            hasAffectedWidget = true;
+            break;
         }
     }
-    if (affectedWidgets.empty()) {
+    if (!hasAffectedWidget) {
         return;
     }
+    const auto isAffectedWidget = [&](const WidgetLayout* widget) {
+        return allWidgetsAffected ||
+               (activeGuide != nullptr && renderer_.IsWidgetAffectedByGuide(*widget, *activeGuide));
+    };
 
-    std::unordered_map<WidgetClass, std::vector<const WidgetLayout*>> widgetsByClass;
-    widgetsByClass.reserve(allWidgets.size());
-    for (const WidgetLayout* widget : allWidgets) {
-        if (widget->widget == nullptr) {
+    // Size: one flat list tracks visibility, exact type, and ordinal; three vectors measured larger.
+    std::vector<VisibleWidgetEntry> visibleWidgets;
+    visibleWidgets.reserve(allWidgets.size());
+    auto addVisibleWidget = [&](const WidgetLayout* widget) -> std::vector<VisibleWidgetEntry>::iterator {
+        auto found = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (found == visibleWidgets.end()) {
+            visibleWidgets.push_back(VisibleWidgetEntry{widget, {}, false, 0});
+            found = visibleWidgets.end() - 1;
+        }
+        return found;
+    };
+    auto addExactType = [&](const WidgetLayout* widget, SimilarityTypeKey type) {
+        auto found = addVisibleWidget(widget);
+        if (!found->hasExactType) {
+            found->type = type;
+            found->hasExactType = true;
+        }
+    };
+    for (const WidgetLayout* affected : allWidgets) {
+        if (!isAffectedWidget(affected)) {
             continue;
         }
-        widgetsByClass[widget->widget->Class()].push_back(widget);
-    }
-
-    std::unordered_set<const WidgetLayout*> visibleWidgets;
-    visibleWidgets.reserve(allWidgets.size());
-    std::unordered_map<const WidgetLayout*, SimilarityTypeKey> exactTypeByWidget;
-    exactTypeByWidget.reserve(allWidgets.size());
-    for (const WidgetLayout* affected : affectedWidgets) {
         const int affectedExtent = renderer_.WidgetExtentForAxis(*affected, axis);
         if (affectedExtent <= 0 || affected->widget == nullptr) {
             continue;
         }
-        const SimilarityTypeKey typeKey{affected->widget->Class(), affectedExtent};
+        const SimilarityTypeKey typeKey{affected->widgetClass, affectedExtent};
         bool hasExactMatch = false;
-        const auto classIt = widgetsByClass.find(typeKey.widgetClass);
-        if (classIt == widgetsByClass.end()) {
-            continue;
-        }
-        for (const WidgetLayout* candidate : classIt->second) {
+        for (const WidgetLayout* candidate : allWidgets) {
             if (candidate == affected || candidate->widget == nullptr ||
-                candidate->widget->Class() != affected->widget->Class()) {
+                candidate->widgetClass != affected->widgetClass) {
                 continue;
             }
             const int candidateExtent = renderer_.WidgetExtentForAxis(*candidate, axis);
             if (candidateExtent <= 0 || std::abs(candidateExtent - affectedExtent) > threshold) {
                 continue;
             }
-            visibleWidgets.insert(affected);
-            visibleWidgets.insert(candidate);
+            addVisibleWidget(affected);
+            addVisibleWidget(candidate);
             if (candidateExtent == affectedExtent) {
                 hasExactMatch = true;
-                exactTypeByWidget.try_emplace(candidate, typeKey);
+                addExactType(candidate, typeKey);
             }
         }
         if (hasExactMatch) {
-            exactTypeByWidget.try_emplace(affected, typeKey);
+            addExactType(affected, typeKey);
         }
     }
-
-    std::unordered_map<SimilarityTypeKey, int, SimilarityTypeKeyHash> exactTypeOrdinals;
-    exactTypeOrdinals.reserve(exactTypeByWidget.size());
-    int nextOrdinal = 1;
-    for (const WidgetLayout* widget : allWidgets) {
-        if (!visibleWidgets.contains(widget)) {
-            continue;
-        }
-        const auto exactIt = exactTypeByWidget.find(widget);
-        if (exactIt == exactTypeByWidget.end() || exactTypeOrdinals.contains(exactIt->second)) {
-            continue;
-        }
-        exactTypeOrdinals[exactIt->second] = nextOrdinal++;
-    }
-
-    std::vector<SimilarityIndicator> indicators;
-    indicators.reserve(visibleWidgets.size());
-    for (const WidgetLayout* widget : allWidgets) {
-        if (!visibleWidgets.contains(widget)) {
-            continue;
-        }
-        const auto exactIt = exactTypeByWidget.find(widget);
-        const int exactTypeOrdinal = exactIt == exactTypeByWidget.end() ? 0 : exactTypeOrdinals[exactIt->second];
-        indicators.push_back(SimilarityIndicator{
-            axis,
-            widget->rect,
-            exactTypeOrdinal,
-        });
-    }
-    if (indicators.empty()) {
+    if (visibleWidgets.empty()) {
         return;
     }
 
-    for (const auto& entry : exactTypeOrdinals) {
-        renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
-                             "\" class=" + std::to_string(static_cast<int>(entry.first.widgetClass)) + " extent=" +
-                             std::to_string(entry.first.extent) + " ordinal=" + std::to_string(entry.second));
+    int nextOrdinal = 1;
+    for (const WidgetLayout* widget : allWidgets) {
+        auto visible = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (visible == visibleWidgets.end() || !visible->hasExactType) {
+            continue;
+        }
+        const auto existingType = std::find_if(visibleWidgets.begin(), visibleWidgets.end(), [&](const auto& entry) {
+            return entry.hasExactType && entry.exactTypeOrdinal > 0 && entry.type == visible->type;
+        });
+        if (existingType != visibleWidgets.end()) {
+            visible->exactTypeOrdinal = existingType->exactTypeOrdinal;
+        } else {
+            visible->exactTypeOrdinal = nextOrdinal++;
+            // Perf: interactive drag traces intentionally drop renderer details, so avoid formatting them every paint.
+            if (!renderer_.interactiveDragTraceActive_) {
+                renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                                     "\" class=" + std::to_string(static_cast<int>(visible->type.widgetClass)) +
+                                     " extent=" + std::to_string(visible->type.extent) +
+                                     " ordinal=" + std::to_string(visible->exactTypeOrdinal));
+            }
+        }
     }
 
     const RenderColorId color = RenderColorId::LayoutGuide;
@@ -1005,9 +941,14 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
     const int notchDepth = std::max(3, renderer_.ScaleLogical(4));
     const int notchSpacing = std::max(3, renderer_.ScaleLogical(4));
 
-    for (const SimilarityIndicator& indicator : indicators) {
-        const RenderRect& rect = indicator.rect;
-        if (indicator.axis == LayoutGuideAxis::Vertical) {
+    for (const WidgetLayout* widget : allWidgets) {
+        auto visible = FindVisibleWidgetEntry(visibleWidgets, widget);
+        if (visible == visibleWidgets.end()) {
+            continue;
+        }
+        const int exactTypeOrdinal = visible->exactTypeOrdinal;
+        const RenderRect& rect = widget->rect;
+        if (axis == LayoutGuideAxis::Vertical) {
             const int y = rect.top + offset;
             const int left = rect.left + inset;
             const int right = rect.right - inset;
@@ -1017,9 +958,9 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             renderer_.Renderer().DrawSolidLine(RenderPoint{left, y}, RenderPoint{left + cap, y + cap + 1}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{right - cap, y - cap}, RenderPoint{right, y}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{right, y}, RenderPoint{right - cap, y + cap + 1}, stroke);
-            if (indicator.exactTypeOrdinal > 0) {
+            if (exactTypeOrdinal > 0) {
                 const int cx = left + std::max(0, (right - left) / 2);
-                const int count = indicator.exactTypeOrdinal;
+                const int count = exactTypeOrdinal;
                 const int totalWidth = (count - 1) * notchSpacing;
                 int notchX = cx - (totalWidth / 2);
                 for (int i = 0; i < count; ++i) {
@@ -1038,9 +979,9 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             renderer_.Renderer().DrawSolidLine(RenderPoint{x, top}, RenderPoint{x + cap + 1, top + cap}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{x - cap, bottom - cap}, RenderPoint{x, bottom}, stroke);
             renderer_.Renderer().DrawSolidLine(RenderPoint{x, bottom}, RenderPoint{x + cap + 1, bottom - cap}, stroke);
-            if (indicator.exactTypeOrdinal > 0) {
+            if (exactTypeOrdinal > 0) {
                 const int cy = top + std::max(0, (bottom - top) / 2);
-                const int count = indicator.exactTypeOrdinal;
+                const int count = exactTypeOrdinal;
                 const int totalHeight = (count - 1) * notchSpacing;
                 int notchY = cy - (totalHeight / 2);
                 for (int i = 0; i < count; ++i) {

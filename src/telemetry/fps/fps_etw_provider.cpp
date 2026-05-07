@@ -4,20 +4,19 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <cstdio>
 #include <cstdlib>
-#include <cwchar>
-#include <deque>
 #include <evntcons.h>
 #include <evntrace.h>
-#include <mutex>
 #include <optional>
 #include <pdhmsg.h>
 #include <string>
-#include <thread>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
+#include "telemetry/fps/impl/gpu_raw_counter_map.h"
 #include "telemetry/impl/collector_support.h"
+#include "util/lightweight_mutex.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -39,6 +38,8 @@ constexpr double kProcessSwitchHysteresisRatio = 1.35;
 constexpr double kGpu3dActiveThresholdPercent = 5.0;
 constexpr double kGpu3dDominanceRatio = 3.0;
 constexpr size_t kMaximumEventsPerProcess = 4096;
+constexpr wchar_t kGpuEngine3dMarker[] = L"engtype_3D";  // ETW GPU engine instance names are UTF-16.
+constexpr wchar_t kGpuEnginePidMarker[] = L"pid_";       // ETW GPU engine instance names are UTF-16.
 
 struct EtwSessionProperties {
     EVENT_TRACE_PROPERTIES properties{};
@@ -49,6 +50,10 @@ enum class PresentEventSource {
     Runtime,
     Kernel,
 };
+
+const char* PresentEventSourceName(PresentEventSource source) {
+    return source == PresentEventSource::Runtime ? "runtime" : "dxgkrnl";
+}
 
 std::string Win32ErrorText(ULONG status) {
     char message[256]{};
@@ -78,36 +83,37 @@ bool IsPermissionDenied(ULONG status) {
 }
 
 std::wstring BuildSessionName() {
-    return L"CaseDashPresentedFps-" + std::to_wstring(GetCurrentProcessId());
+    char buffer[64] = {};
+    sprintf_s(buffer, "CaseDashPresentedFps-%lu", static_cast<unsigned long>(GetCurrentProcessId()));
+    return WideFromUtf8(buffer);
 }
 
-std::wstring LowerAscii(std::wstring value) {
-    for (wchar_t& ch : value) {
-        if (ch >= L'A' && ch <= L'Z') {
-            ch = static_cast<wchar_t>(ch - L'A' + L'a');
+void LowerAsciiInPlace(wchar_t* value, size_t length) {
+    for (size_t i = 0; i < length; ++i) {
+        if (value[i] >= static_cast<wchar_t>('A') && value[i] <= static_cast<wchar_t>('Z')) {
+            value[i] = static_cast<wchar_t>(value[i] - static_cast<wchar_t>('A') + static_cast<wchar_t>('a'));
         }
     }
-    return value;
 }
 
-std::wstring BaseName(std::wstring path) {
-    const size_t slash = path.find_last_of(L"\\/");
-    if (slash != std::wstring::npos) {
-        path.erase(0, slash + 1);
+std::string CleanProcessDisplayNameUtf8(wchar_t* path, size_t pathLength) {
+    size_t nameStart = 0;
+    for (size_t i = 0; i < pathLength; ++i) {
+        if (path[i] == static_cast<wchar_t>('\\') || path[i] == static_cast<wchar_t>('/')) {
+            nameStart = i + 1;
+        }
     }
-    return path;
-}
-
-std::wstring CleanProcessDisplayName(std::wstring processName) {
-    processName = BaseName(processName);
-    const size_t dot = processName.find_last_of(L'.');
-    if (dot != std::wstring::npos) {
-        processName.erase(dot);
+    size_t nameEnd = pathLength;
+    for (size_t i = nameStart; i < pathLength; ++i) {
+        if (path[i] == static_cast<wchar_t>('.')) {
+            nameEnd = i;
+        }
     }
-    return LowerAscii(processName);
+    LowerAsciiInPlace(path + nameStart, nameEnd - nameStart);
+    return Utf8FromWide(std::wstring_view(path + nameStart, nameEnd - nameStart));
 }
 
-std::wstring QueryProcessBaseName(DWORD processId, bool& permissionRequired) {
+std::string QueryProcessBaseName(DWORD processId, bool& permissionRequired) {
     permissionRequired = false;
     HANDLE process = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId);
     if (process == nullptr) {
@@ -121,19 +127,18 @@ std::wstring QueryProcessBaseName(DWORD processId, bool& permissionRequired) {
     const DWORD error = ok ? ERROR_SUCCESS : GetLastError();
     CloseHandle(process);
     permissionRequired = error == ERROR_ACCESS_DENIED;
-    return ok ? CleanProcessDisplayName(std::wstring(path, pathLength)) : std::wstring{};
+    return ok ? CleanProcessDisplayNameUtf8(path, pathLength) : std::string{};
 }
 
-bool IsExcludedProcessName(const std::wstring& processName) {
-    const std::wstring lowerName = LowerAscii(processName);
-    return lowerName.empty() || lowerName == L"casedash" || lowerName == L"dwm";
+bool IsExcludedProcessName(const std::string& processName) {
+    return processName.empty() || processName == "casedash" || processName == "dwm";
 }
 
 DWORD ExtractProcessIdFromGpuEngineInstance(const wchar_t* instance) {
     if (instance == nullptr) {
         return 0;
     }
-    const wchar_t* marker = wcsstr(instance, L"pid_");
+    const wchar_t* marker = wcsstr(instance, kGpuEnginePidMarker);
     if (marker == nullptr) {
         return 0;
     }
@@ -144,7 +149,7 @@ DWORD ExtractProcessIdFromGpuEngineInstance(const wchar_t* instance) {
 }
 
 bool IsGpu3dEngineInstance(const wchar_t* instance) {
-    return instance != nullptr && wcsstr(instance, L"engtype_3D") != nullptr;
+    return instance != nullptr && wcsstr(instance, kGpuEngine3dMarker) != nullptr;
 }
 
 class PresentedFpsEtwProvider final : public FpsTelemetryProvider {
@@ -156,7 +161,7 @@ public:
     }
 
     bool Initialize() override {
-        std::lock_guard lock(mutex_);
+        LightweightMutexLock lock(mutex_);
         if (initialized_) {
             return true;
         }
@@ -164,7 +169,7 @@ public:
         LARGE_INTEGER frequency{};
         if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
             diagnostics_ = "QueryPerformanceFrequency failed.";
-            trace_.Write("fps_etw:initialize_failed diagnostics=\"" + diagnostics_ + "\"");
+            trace_.Write(TracePrefix::FpsEtw, "initialize_failed diagnostics=\"" + diagnostics_ + "\"");
             return false;
         }
         qpcFrequency_ = frequency.QuadPart;
@@ -181,11 +186,11 @@ public:
         sessionProps.properties.MaximumBuffers = 16;
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-        trace_.Write("fps_etw:start_trace status=" + Win32ErrorText(status));
+        trace_.Write(TracePrefix::FpsEtw, "start_trace status=" + Win32ErrorText(status));
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-            trace_.Write("fps_etw:start_trace_retry status=" + Win32ErrorText(status));
+            trace_.Write(TracePrefix::FpsEtw, "start_trace_retry status=" + Win32ErrorText(status));
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
@@ -200,8 +205,9 @@ public:
         dxgiEnabled_ = dxgiStatus == ERROR_SUCCESS;
         d3d9Enabled_ = d3d9Status == ERROR_SUCCESS;
         dxgkrnlEnabled_ = dxgkrnlStatus == ERROR_SUCCESS;
-        trace_.Write("fps_etw:enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
-                     " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
+        trace_.Write(TracePrefix::FpsEtw,
+            "enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
+                " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
@@ -224,21 +230,19 @@ public:
             return false;
         }
 
-        processingThread_ = std::thread([this] {
-            TRACEHANDLE handle = INVALID_PROCESSTRACE_HANDLE;
-            {
-                std::lock_guard threadLock(mutex_);
-                handle = traceHandle_;
-            }
-            const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-            trace_.Write("fps_etw:process_trace_done status=" + Win32ErrorText(processStatus));
-        });
+        processingThread_ = CreateThread(nullptr, 0, &PresentedFpsEtwProvider::ProcessTraceThread, this, 0, nullptr);
+        if (processingThread_ == nullptr) {
+            diagnostics_ = "Failed to create FPS ETW processing thread: " + Win32ErrorText(GetLastError());
+            StopLocked();
+            return false;
+        }
 
         diagnostics_ = "Presented FPS ETW provider active.";
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.Write("fps_etw:initialize_done dxgi=" + Trace::BoolText(dxgiEnabled_) +
-                     " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
+        trace_.Write(TracePrefix::FpsEtw,
+            std::string("initialize_done dxgi=") + Trace::BoolText(dxgiEnabled_) +
+                " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
         return true;
     }
 
@@ -246,7 +250,7 @@ public:
         LARGE_INTEGER now{};
         QueryPerformanceCounter(&now);
 
-        std::lock_guard lock(mutex_);
+        LightweightMutexLock lock(mutex_);
         FpsTelemetrySample sample;
         sample.diagnostics = diagnostics_;
         sample.available = initialized_;
@@ -265,11 +269,10 @@ public:
         ProcessEventSelection bestSelection = SelectBestSourceLocked(runtimeSelection, kernelSelection);
         bestSelection = ApplyProcessHysteresisLocked(bestSelection, minimumQpc);
 
-        const std::optional<FpsTelemetrySample> blockedByGpuSelection =
-            BuildUnavailableDominantGpuSampleLocked(bestSelection);
-        if (blockedByGpuSelection.has_value()) {
+        FpsTelemetrySample blockedByGpuSelection;
+        if (BuildUnavailableDominantGpuSampleLocked(bestSelection, blockedByGpuSelection)) {
             ResetSelectionLocked();
-            return *blockedByGpuSelection;
+            return blockedByGpuSelection;
         }
 
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
@@ -282,15 +285,15 @@ public:
         const double rawFps = static_cast<double>(bestSelection.count) / kFpsWindowSeconds;
         const double fps = SmoothFpsLocked(rawFps, bestSelection);
         sample.processId = bestSelection.processId;
-        sample.processName = Utf8FromWide(ResolveProcessNameLocked(bestSelection.processId));
+        sample.processName = ResolveProcessNameLocked(bestSelection.processId);
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
-        sample.diagnostics =
-            BuildDiagnosticsLocked(" process=" + sample.processName + " source=" + bestSelection.sourceName +
-                                   " window_count=" + std::to_string(bestSelection.count) + " " +
-                                   Trace::FormatValueDouble("raw_fps", rawFps, 1) + " " +
-                                   Trace::FormatValueDouble("smoothed_fps", fps, 1) + GpuUsageDiagnostics());
+        sample.diagnostics = BuildDiagnosticsLocked(
+            " process=" + sample.processName + " source=" + PresentEventSourceName(bestSelection.source) +
+            " window_count=" + std::to_string(bestSelection.count) + " " +
+            Trace::FormatValueDouble("raw_fps", rawFps, 1) + " " + Trace::FormatValueDouble("smoothed_fps", fps, 1) +
+            GpuUsageDiagnostics());
         return sample;
     }
 
@@ -298,30 +301,98 @@ private:
     struct ProcessEventSelection {
         DWORD processId = 0;
         size_t count = 0;
-        std::string sourceName;
+        PresentEventSource source = PresentEventSource::Runtime;
     };
 
-    ProcessEventSelection SelectBestProcessLocked(
-        std::unordered_map<DWORD, std::deque<uint64_t>>& eventsByProcess, uint64_t minimumQpc) {
+    struct ProcessPresentEvents {
+        DWORD processId = 0;
+        std::vector<uint64_t> events;
+        size_t firstEvent = 0;
+    };
+
+    struct ProcessNameCacheEntry {
+        DWORD processId = 0;
+        std::string name;
+        bool permissionRequired = false;
+    };
+
+    struct ProcessGpuUsage {
+        DWORD processId = 0;
+        double usage = 0.0;
+    };
+
+    using ProcessPresentEventBuckets = std::vector<ProcessPresentEvents>;
+
+    ProcessPresentEvents* FindProcessPresentEvents(ProcessPresentEventBuckets& buckets, DWORD processId) {
+        for (ProcessPresentEvents& bucket : buckets) {
+            if (bucket.processId == processId) {
+                return &bucket;
+            }
+        }
+        return nullptr;
+    }
+
+    ProcessPresentEvents& EnsureProcessPresentEvents(ProcessPresentEventBuckets& buckets, DWORD processId) {
+        if (ProcessPresentEvents* bucket = FindProcessPresentEvents(buckets, processId); bucket != nullptr) {
+            return *bucket;
+        }
+        buckets.push_back(ProcessPresentEvents{processId, {}});
+        return buckets.back();
+    }
+
+    size_t PresentEventCount(const ProcessPresentEvents& bucket) const {
+        return bucket.firstEvent <= bucket.events.size() ? bucket.events.size() - bucket.firstEvent : 0;
+    }
+
+    void CompactPresentEvents(ProcessPresentEvents& bucket) {
+        if (bucket.firstEvent == 0) {
+            return;
+        }
+        if (bucket.firstEvent >= bucket.events.size()) {
+            bucket.events.clear();
+            bucket.firstEvent = 0;
+            return;
+        }
+        if (bucket.firstEvent >= 256 && bucket.firstEvent * 2 >= bucket.events.size()) {
+            bucket.events.erase(
+                bucket.events.begin(), bucket.events.begin() + static_cast<std::ptrdiff_t>(bucket.firstEvent));
+            bucket.firstEvent = 0;
+        }
+    }
+
+    void TrimPresentEventsBefore(ProcessPresentEvents& bucket, uint64_t minimumQpc) {
+        while (bucket.firstEvent < bucket.events.size() && bucket.events[bucket.firstEvent] < minimumQpc) {
+            ++bucket.firstEvent;
+        }
+        CompactPresentEvents(bucket);
+    }
+
+    void PushPresentEvent(ProcessPresentEvents& bucket, uint64_t qpc) {
+        if (PresentEventCount(bucket) >= kMaximumEventsPerProcess) {
+            ++bucket.firstEvent;
+        }
+        bucket.events.push_back(qpc);
+        CompactPresentEvents(bucket);
+    }
+
+    ProcessEventSelection SelectBestProcessLocked(ProcessPresentEventBuckets& eventsByProcess, uint64_t minimumQpc) {
         ProcessEventSelection selection;
-        selection.sourceName = &eventsByProcess == &runtimeEventsByProcess_ ? "runtime" : "dxgkrnl";
+        selection.source =
+            &eventsByProcess == &runtimeEventsByProcess_ ? PresentEventSource::Runtime : PresentEventSource::Kernel;
 
         for (auto it = eventsByProcess.begin(); it != eventsByProcess.end();) {
-            auto& events = it->second;
-            while (!events.empty() && events.front() < minimumQpc) {
-                events.pop_front();
-            }
-            if (events.empty()) {
-                processNames_.erase(it->first);
-                processNamePermissionRequiredByProcess_.erase(it->first);
+            TrimPresentEventsBefore(*it, minimumQpc);
+            const size_t eventCount = PresentEventCount(*it);
+            if (eventCount == 0) {
+                EraseProcessNameCache(it->processId);
                 it = eventsByProcess.erase(it);
                 continue;
             }
 
-            const std::wstring processName = ResolveProcessNameLocked(it->first);
-            if (!IsExcludedProcessName(processName) && IsBetterSelectionLocked(it->first, events.size(), selection)) {
-                selection.processId = it->first;
-                selection.count = events.size();
+            const std::string& processName = ResolveProcessNameLocked(it->processId);
+            if (!IsExcludedProcessName(processName) && IsBetterSelectionLocked(it->processId, eventCount, selection)) {
+                selection.processId = it->processId;
+                selection.count = eventCount;
             }
             ++it;
         }
@@ -365,56 +436,54 @@ private:
         return count > current.count;
     }
 
-    std::optional<FpsTelemetrySample> BuildUnavailableDominantGpuSampleLocked(const ProcessEventSelection& selected) {
+    bool BuildUnavailableDominantGpuSampleLocked(const ProcessEventSelection& selected, FpsTelemetrySample& sample) {
         if (topGpu3dProcessId_ == 0 || topGpu3dUsage_ < kGpu3dActiveThresholdPercent) {
-            return std::nullopt;
+            return false;
         }
 
         const double selectedGpu3d = Gpu3dUsageForProcess(selected.processId);
         if (topGpu3dProcessId_ != selected.processId &&
             topGpu3dUsage_ < (std::max)(selectedGpu3d, 0.1) * kGpu3dDominanceRatio) {
-            return std::nullopt;
+            return false;
         }
         if (topGpu3dProcessId_ == selected.processId && selected.count >= 2) {
-            return std::nullopt;
+            return false;
         }
 
-        FpsTelemetrySample sample;
         sample.processId = topGpu3dProcessId_;
-        sample.processName = Utf8FromWide(ResolveProcessNameLocked(topGpu3dProcessId_));
+        sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
         sample.diagnostics = BuildDiagnosticsLocked(
             " top GPU 3D application has no matching present events. process=" + sample.processName +
-            " selected_process=" + Utf8FromWide(ResolveProcessNameLocked(selected.processId)) +
-            " selected_source=" + selected.sourceName + " selected_window_count=" + std::to_string(selected.count) +
+            " selected_process=" + ResolveProcessNameLocked(selected.processId) + " selected_source=" +
+            PresentEventSourceName(selected.source) + " selected_window_count=" + std::to_string(selected.count) +
             GpuUsageDiagnosticsForProcess(selected.processId));
-        return sample;
+        return true;
     }
 
     ProcessEventSelection ApplyProcessHysteresisLocked(const ProcessEventSelection& candidate, uint64_t minimumQpc) {
-        if (selectedProcessId_ == 0 || selectedSourceName_.empty() || candidate.processId == selectedProcessId_) {
+        if (selectedProcessId_ == 0 || candidate.processId == selectedProcessId_) {
             return candidate;
         }
 
-        auto& previousEvents = selectedSourceName_ == "runtime" ? runtimeEventsByProcess_ : kernelEventsByProcess_;
-        const auto previousIt = previousEvents.find(selectedProcessId_);
-        if (previousIt == previousEvents.end()) {
+        ProcessPresentEventBuckets& previousEvents =
+            selectedSource_ == PresentEventSource::Runtime ? runtimeEventsByProcess_ : kernelEventsByProcess_;
+        ProcessPresentEvents* previousBucket = FindProcessPresentEvents(previousEvents, selectedProcessId_);
+        if (previousBucket == nullptr) {
             return candidate;
         }
 
-        auto& events = previousIt->second;
-        while (!events.empty() && events.front() < minimumQpc) {
-            events.pop_front();
-        }
-        if (events.size() < 2) {
+        TrimPresentEventsBefore(*previousBucket, minimumQpc);
+        const size_t previousCount = PresentEventCount(*previousBucket);
+        if (previousCount < 2) {
             return candidate;
         }
 
         ProcessEventSelection previous;
         previous.processId = selectedProcessId_;
-        previous.count = events.size();
-        previous.sourceName = selectedSourceName_;
+        previous.count = previousCount;
+        previous.source = selectedSource_;
         // Preserve the active presenter through short ETW delivery bursts and near-ties between presenting apps.
         if (candidate.processId == 0 || static_cast<double>(candidate.count) <
                                             static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio) {
@@ -424,27 +493,66 @@ private:
     }
 
     double SmoothFpsLocked(double rawFps, const ProcessEventSelection& selection) {
-        const bool sameSelection =
-            selection.processId == selectedProcessId_ && selection.sourceName == selectedSourceName_;
+        const bool sameSelection = selection.processId == selectedProcessId_ && selection.source == selectedSource_;
         if (!sameSelection || !smoothedFps_.has_value()) {
             smoothedFps_ = rawFps;
         } else {
             smoothedFps_ = (*smoothedFps_ * (1.0 - kFpsSmoothingAlpha)) + (rawFps * kFpsSmoothingAlpha);
         }
         selectedProcessId_ = selection.processId;
-        selectedSourceName_ = selection.sourceName;
+        selectedSource_ = selection.source;
         return *smoothedFps_;
     }
 
     void ResetSelectionLocked() {
         smoothedFps_.reset();
         selectedProcessId_ = 0;
-        selectedSourceName_.clear();
     }
 
     double Gpu3dUsageForProcess(DWORD processId) const {
-        const auto it = gpu3dUsageByProcess_.find(processId);
-        return it != gpu3dUsageByProcess_.end() ? it->second : 0.0;
+        for (const ProcessGpuUsage& entry : gpu3dUsageByProcess_) {
+            if (entry.processId == processId) {
+                return entry.usage;
+            }
+        }
+        return 0.0;
+    }
+
+    double& Gpu3dUsageSlot(DWORD processId) {
+        for (ProcessGpuUsage& entry : gpu3dUsageByProcess_) {
+            if (entry.processId == processId) {
+                return entry.usage;
+            }
+        }
+        gpu3dUsageByProcess_.push_back(ProcessGpuUsage{processId, 0.0});
+        return gpu3dUsageByProcess_.back().usage;
+    }
+
+    ProcessNameCacheEntry* FindProcessNameCache(DWORD processId) {
+        for (ProcessNameCacheEntry& entry : processNames_) {
+            if (entry.processId == processId) {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
+
+    const ProcessNameCacheEntry* FindProcessNameCache(DWORD processId) const {
+        for (const ProcessNameCacheEntry& entry : processNames_) {
+            if (entry.processId == processId) {
+                return &entry;
+            }
+        }
+        return nullptr;
+    }
+
+    void EraseProcessNameCache(DWORD processId) {
+        for (auto it = processNames_.begin(); it != processNames_.end(); ++it) {
+            if (it->processId == processId) {
+                processNames_.erase(it);
+                return;
+            }
+        }
     }
 
     void InitializeGpu3dUsageLocked() {
@@ -461,7 +569,7 @@ private:
         }
 
         const PDH_STATUS addStatus =
-            AddCounterCompat(gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &gpu3dCounter_);
+            AddCounterCompat(gpuQuery_, "\\GPU Engine(*)\\Utilization Percentage", &gpu3dCounter_);
         if (addStatus != ERROR_SUCCESS || gpu3dCounter_ == nullptr) {
             gpuUsageDiagnostics_ = " gpu3d_add=" + PdhStatusCodeString(addStatus);
             PdhCloseQuery(gpuQuery_);
@@ -474,7 +582,7 @@ private:
     }
 
     void CapturePreviousGpu3dRawValuesLocked() {
-        previousGpuRawByInstance_.clear();
+        previousGpuRawByInstance_.Clear();
         if (gpuQuery_ == nullptr || gpu3dCounter_ == nullptr) {
             return;
         }
@@ -493,10 +601,10 @@ private:
             return;
         }
 
-        previousGpuRawByInstance_.reserve(itemCount);
+        previousGpuRawByInstance_.Reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
             if (IsGpu3dEngineInstance(items[i].szName) && items[i].RawValue.CStatus == ERROR_SUCCESS) {
-                previousGpuRawByInstance_[items[i].szName] = items[i].RawValue;
+                previousGpuRawByInstance_.Set(items[i].szName, items[i].RawValue);
             }
         }
     }
@@ -529,27 +637,27 @@ private:
             return;
         }
 
-        currentGpuRawByInstance_.clear();
-        currentGpuRawByInstance_.reserve(itemCount);
+        currentGpuRawByInstance_.Clear();
+        currentGpuRawByInstance_.Reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
             const wchar_t* instance = items[i].szName;
             if (!IsGpu3dEngineInstance(instance) || items[i].RawValue.CStatus != ERROR_SUCCESS) {
                 continue;
             }
-            currentGpuRawByInstance_[instance] = items[i].RawValue;
+            currentGpuRawByInstance_.Set(instance, items[i].RawValue);
 
             const DWORD processId = ExtractProcessIdFromGpuEngineInstance(instance);
             if (processId == 0 || IsExcludedProcessName(ResolveProcessNameLocked(processId))) {
                 continue;
             }
 
-            const auto previousIt = previousGpuRawByInstance_.find(instance);
-            if (previousIt == previousGpuRawByInstance_.end()) {
+            const PDH_RAW_COUNTER* previous = previousGpuRawByInstance_.Find(instance);
+            if (previous == nullptr) {
                 continue;
             }
 
             PDH_FMT_COUNTERVALUE formatted{};
-            PDH_RAW_COUNTER previousRaw = previousIt->second;
+            PDH_RAW_COUNTER previousRaw = *previous;
             PDH_RAW_COUNTER currentRaw = items[i].RawValue;
             const PDH_STATUS formatStatus =
                 PdhCalculateCounterFromRawValue(gpu3dCounter_, PDH_FMT_DOUBLE, &previousRaw, &currentRaw, &formatted);
@@ -561,18 +669,18 @@ private:
             if (value <= 0.0) {
                 continue;
             }
-            double& total = gpu3dUsageByProcess_[processId];
+            double& total = Gpu3dUsageSlot(processId);
             total += value;
             if (total > topGpu3dUsage_) {
                 topGpu3dUsage_ = total;
                 topGpu3dProcessId_ = processId;
             }
         }
-        previousGpuRawByInstance_.swap(currentGpuRawByInstance_);
+        previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
         gpuUsageDiagnostics_ = " gpu3d_collect=" + PdhStatusCodeString(collectStatus) +
                                " gpu3d_fetch=" + PdhStatusCodeString(status) +
-                               " top_gpu3d_process=" + Utf8FromWide(ResolveProcessNameLocked(topGpu3dProcessId_)) +
+                               " top_gpu3d_process=" + ResolveProcessNameLocked(topGpu3dProcessId_) +
                                " top_gpu3d_pid=" + std::to_string(static_cast<unsigned long>(topGpu3dProcessId_)) +
                                " " + Trace::FormatValueDouble("top_gpu3d", topGpu3dUsage_, 1);
     }
@@ -595,14 +703,16 @@ private:
     }
 
     void Stop() {
-        std::thread threadToJoin;
+        HANDLE threadToJoin = nullptr;
         {
-            std::lock_guard lock(mutex_);
+            LightweightMutexLock lock(mutex_);
             StopLocked();
-            threadToJoin = std::move(processingThread_);
+            threadToJoin = processingThread_;
+            processingThread_ = nullptr;
         }
-        if (threadToJoin.joinable()) {
-            threadToJoin.join();
+        if (threadToJoin != nullptr) {
+            WaitForSingleObject(threadToJoin, INFINITE);
+            CloseHandle(threadToJoin);
         }
     }
 
@@ -623,30 +733,35 @@ private:
             gpuQuery_ = nullptr;
             gpu3dCounter_ = nullptr;
             gpuQueryInitialized_ = false;
-            previousGpuRawByInstance_.clear();
-            currentGpuRawByInstance_.clear();
+            previousGpuRawByInstance_.Clear();
+            currentGpuRawByInstance_.Clear();
         }
         initialized_ = false;
     }
 
-    std::wstring ResolveProcessNameLocked(DWORD processId) {
-        const auto cached = processNames_.find(processId);
-        if (cached != processNames_.end()) {
-            return cached->second;
+    const std::string& ResolveProcessNameLocked(DWORD processId) {
+        const ProcessNameCacheEntry* cached = FindProcessNameCache(processId);
+        if (cached != nullptr) {
+            return cached->name;
         }
 
         bool permissionRequired = false;
-        std::wstring processName = QueryProcessBaseName(processId, permissionRequired);
+        std::string processName = QueryProcessBaseName(processId, permissionRequired);
         if (processName.empty()) {
-            processName = permissionRequired ? L"!admin" : L"pid:" + std::to_wstring(processId);
+            processName =
+                permissionRequired ? "!admin" : "pid:" + std::to_string(static_cast<unsigned long>(processId));
         }
-        processNamePermissionRequiredByProcess_[processId] = permissionRequired;
-        return processNames_.emplace(processId, std::move(processName)).first->second;
+        ProcessNameCacheEntry entry;
+        entry.processId = processId;
+        entry.name = std::move(processName);
+        entry.permissionRequired = permissionRequired;
+        processNames_.push_back(std::move(entry));
+        return processNames_.back().name;
     }
 
     bool IsProcessNamePermissionRequiredLocked(DWORD processId) const {
-        const auto it = processNamePermissionRequiredByProcess_.find(processId);
-        return it != processNamePermissionRequiredByProcess_.end() && it->second;
+        const ProcessNameCacheEntry* entry = FindProcessNameCache(processId);
+        return entry != nullptr && entry->permissionRequired;
     }
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
@@ -675,24 +790,22 @@ private:
         LARGE_INTEGER receivedAt{};
         QueryPerformanceCounter(&receivedAt);
 
-        std::lock_guard lock(mutex_);
+        LightweightMutexLock lock(mutex_);
         const PresentEventSource source = isDxgKrnlPresent ? PresentEventSource::Kernel : PresentEventSource::Runtime;
-        auto& events = source == PresentEventSource::Runtime ? runtimeEventsByProcess_[header.ProcessId]
-                                                             : kernelEventsByProcess_[header.ProcessId];
+        ProcessPresentEventBuckets& buckets =
+            source == PresentEventSource::Runtime ? runtimeEventsByProcess_ : kernelEventsByProcess_;
+        ProcessPresentEvents& events = EnsureProcessPresentEvents(buckets, header.ProcessId);
         // Some fallback DxgKrnl paths are delivered with timestamps that do not compare cleanly to the
         // consumer's QPC clock. Use receive time so the rolling counter stays stable across providers.
-        events.push_back(static_cast<uint64_t>(receivedAt.QuadPart));
-        while (events.size() > kMaximumEventsPerProcess) {
-            events.pop_front();
-        }
+        PushPresentEvent(events, static_cast<uint64_t>(receivedAt.QuadPart));
 
         uint64_t& sourceCount = source == PresentEventSource::Runtime ? runtimePresentEvents_ : kernelPresentEvents_;
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
-            trace_.Write(
-                "fps_etw:present source=" + std::string(source == PresentEventSource::Runtime ? "runtime" : "dxgkrnl") +
-                " pid=" + std::to_string(static_cast<unsigned long>(header.ProcessId)) + " event_id=" +
-                std::to_string(header.EventDescriptor.Id) + " source_events=" + std::to_string(sourceCount));
+            trace_.Write(TracePrefix::FpsEtw,
+                "present source=" + std::string(PresentEventSourceName(source)) +
+                    " pid=" + std::to_string(static_cast<unsigned long>(header.ProcessId)) + " event_id=" +
+                    std::to_string(header.EventDescriptor.Id) + " source_events=" + std::to_string(sourceCount));
         }
     }
 
@@ -703,19 +816,36 @@ private:
         }
     }
 
+    static DWORD WINAPI ProcessTraceThread(void* context) {
+        static_cast<PresentedFpsEtwProvider*>(context)->ProcessTraceLoop();
+        return 0;
+    }
+
+    void ProcessTraceLoop() {
+        TRACEHANDLE handle = INVALID_PROCESSTRACE_HANDLE;
+        {
+            LightweightMutexLock threadLock(mutex_);
+            handle = traceHandle_;
+        }
+        const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
+        trace_.Write(TracePrefix::FpsEtw, "process_trace_done status=" + Win32ErrorText(processStatus));
+    }
+
     Trace& trace_;
-    mutable std::mutex mutex_;
+    mutable LightweightMutex mutex_;
     TRACEHANDLE sessionHandle_ = 0;
     TRACEHANDLE traceHandle_ = INVALID_PROCESSTRACE_HANDLE;
-    std::thread processingThread_;
+    HANDLE processingThread_ = nullptr;
     std::wstring sessionName_;
-    std::unordered_map<DWORD, std::deque<uint64_t>> runtimeEventsByProcess_;
-    std::unordered_map<DWORD, std::deque<uint64_t>> kernelEventsByProcess_;
-    std::unordered_map<DWORD, std::wstring> processNames_;
-    std::unordered_map<DWORD, bool> processNamePermissionRequiredByProcess_;
-    std::unordered_map<DWORD, double> gpu3dUsageByProcess_;
-    std::unordered_map<std::wstring, PDH_RAW_COUNTER> previousGpuRawByInstance_;
-    std::unordered_map<std::wstring, PDH_RAW_COUNTER> currentGpuRawByInstance_;
+    // Size: active presenting process sets are tiny; flat buckets avoid unordered_map machinery in this provider.
+    ProcessPresentEventBuckets runtimeEventsByProcess_;
+    ProcessPresentEventBuckets kernelEventsByProcess_;
+    std::vector<ProcessNameCacheEntry> processNames_;
+    std::vector<ProcessGpuUsage> gpu3dUsageByProcess_;
+    // Size/perf: GPU Engine exposes hundreds of per-engine instances on process-heavy machines; use a narrow
+    // open-addressed table instead of general STL hash maps.
+    GpuRawCounterMap previousGpuRawByInstance_;
+    GpuRawCounterMap currentGpuRawByInstance_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
     PDH_HQUERY gpuQuery_ = nullptr;
@@ -723,7 +853,7 @@ private:
     DWORD selectedProcessId_ = 0;
     DWORD topGpu3dProcessId_ = 0;
     double topGpu3dUsage_ = 0.0;
-    std::string selectedSourceName_;
+    PresentEventSource selectedSource_ = PresentEventSource::Runtime;
     std::string diagnostics_ = "FPS ETW provider not initialized.";
     std::string gpuUsageDiagnostics_;
     uint64_t runtimePresentEvents_ = 0;

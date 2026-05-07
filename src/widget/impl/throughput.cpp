@@ -160,14 +160,6 @@ int EffectiveThroughputPreferredHeight(const WidgetHost& renderer) {
 
 }  // namespace
 
-WidgetClass ThroughputWidget::Class() const {
-    return WidgetClass::Throughput;
-}
-
-std::unique_ptr<Widget> ThroughputWidget::Clone() const {
-    return std::make_unique<ThroughputWidget>(*this);
-}
-
 void ThroughputWidget::Initialize(const LayoutNodeConfig& node) {
     metric_ = node.parameter;
 }

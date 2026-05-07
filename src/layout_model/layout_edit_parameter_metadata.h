@@ -1,10 +1,11 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <string_view>
 
-#include "config/config.h"
+#include "config/config_runtime_fields.h"
 #include "widget/layout_edit_parameter_id.h"
 
 struct LayoutEditTooltipDescriptor {
@@ -15,25 +16,19 @@ struct LayoutEditTooltipDescriptor {
 };
 
 struct LayoutEditConfigFieldMetadata {
-    std::string_view sectionName;
-    std::string_view parameterName;
+    const char* sectionName = "";
+    const char* parameterName = "";
     configschema::ValueFormat valueFormat = configschema::ValueFormat::Integer;
-    bool isFont = false;
-    std::optional<double> (*numericValue)(const AppConfig& config) = nullptr;
-    std::optional<unsigned int> (*colorValue)(const AppConfig& config) = nullptr;
-    bool (*applyValue)(AppConfig& config, double value) = nullptr;
-    bool (*applyColorValue)(AppConfig& config, unsigned int value) = nullptr;
-    bool (*applyFontValue)(AppConfig& config, const UiFontConfig& value) = nullptr;
-    std::optional<const UiFontConfig*> (*fontValue)(const AppConfig& config) = nullptr;
-    std::optional<const ColorConfig*> (*colorConfigValue)(const AppConfig& config) = nullptr;
+    RuntimeConfigFieldValueKind valueKind = RuntimeConfigFieldValueKind::Int;
+    RuntimeConfigFieldPolicy policy = RuntimeConfigFieldPolicy::None;
+    std::uint32_t rootOffset = 0;
 };
 
 struct LayoutEditParameterInfo {
     LayoutEditParameter parameter = LayoutEditParameter::MetricListLabelWidth;
-    const LayoutEditConfigFieldMetadata* field = nullptr;
 };
 
-const LayoutEditParameterInfo& GetLayoutEditParameterInfo(LayoutEditParameter parameter);
+LayoutEditParameterInfo GetLayoutEditParameterInfo(LayoutEditParameter parameter);
 const LayoutEditConfigFieldMetadata& GetLayoutEditConfigFieldMetadata(LayoutEditParameter parameter);
 bool IsFontLayoutEditParameter(LayoutEditParameter parameter);
 std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter);

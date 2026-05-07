@@ -1,10 +1,10 @@
 #pragma once
 
+#include <array>
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 
 #include "renderer/render_types.h"
 
@@ -16,34 +16,14 @@ public:
     void Store(TextStyleId style, std::string_view text, int width);
 
 private:
-    struct Key {
+    struct Entry {
         TextStyleId style = TextStyleId::Text;
         std::string text;
-
-        bool operator==(const Key& other) const {
-            return style == other.style && text == other.text;
-        }
+        int width = 0;
+        bool occupied = false;
     };
 
-    struct LookupKey {
-        TextStyleId style = TextStyleId::Text;
-        std::string_view text;
-    };
+    static constexpr size_t kSlotCount = 256;
 
-    struct KeyHash {
-        using is_transparent = void;
-
-        size_t operator()(const Key& key) const;
-        size_t operator()(const LookupKey& key) const;
-    };
-
-    struct KeyEqual {
-        using is_transparent = void;
-
-        bool operator()(const Key& left, const Key& right) const;
-        bool operator()(const Key& left, const LookupKey& right) const;
-        bool operator()(const LookupKey& left, const Key& right) const;
-    };
-
-    std::unordered_map<Key, int, KeyHash, KeyEqual> widths_;
+    std::array<Entry, kSlotCount> widths_{};
 };

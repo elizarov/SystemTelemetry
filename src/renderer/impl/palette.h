@@ -15,7 +15,6 @@ struct RenderColor {
 
     bool operator==(const RenderColor& other) const = default;
 
-    std::uint32_t PackedRgba() const;
     D2D1_COLOR_F ToD2DColorF() const;
 };
 

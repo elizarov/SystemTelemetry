@@ -42,11 +42,11 @@ FilePath ResolveExecutableRelativePath(const FilePath& configuredPath) {
     return JoinPath(GetExecutableDirectory(), configuredPath);
 }
 
-std::optional<std::wstring> GetExecutablePath() {
+std::optional<FilePath> GetExecutablePath() {
     std::array<wchar_t, kModulePathBufferLength> modulePath{};
     const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
     if (length == 0 || length >= modulePath.size()) {
         return std::nullopt;
     }
-    return std::wstring(modulePath.data(), length);
+    return FilePath(std::wstring(modulePath.data(), length));
 }

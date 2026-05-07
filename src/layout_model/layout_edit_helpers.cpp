@@ -7,22 +7,28 @@ bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const Layou
         return false;
     }
     if (const auto* leftParameter = std::get_if<LayoutEditParameter>(&left.subject)) {
-        return *leftParameter == std::get<LayoutEditParameter>(right.subject);
+        const auto* rightParameter = std::get_if<LayoutEditParameter>(&right.subject);
+        return rightParameter != nullptr && *leftParameter == *rightParameter;
     }
     if (const auto* leftMetric = std::get_if<LayoutMetricEditKey>(&left.subject)) {
-        return MatchesLayoutMetricEditKey(*leftMetric, std::get<LayoutMetricEditKey>(right.subject));
+        const auto* rightMetric = std::get_if<LayoutMetricEditKey>(&right.subject);
+        return rightMetric != nullptr && MatchesLayoutMetricEditKey(*leftMetric, *rightMetric);
     }
     if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left.subject)) {
-        return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right.subject));
+        const auto* rightCardTitle = std::get_if<LayoutCardTitleEditKey>(&right.subject);
+        return rightCardTitle != nullptr && MatchesLayoutCardTitleEditKey(*leftCardTitle, *rightCardTitle);
     }
     if (const auto* leftNodeField = std::get_if<LayoutNodeFieldEditKey>(&left.subject)) {
-        return MatchesLayoutNodeFieldEditKey(*leftNodeField, std::get<LayoutNodeFieldEditKey>(right.subject));
+        const auto* rightNodeField = std::get_if<LayoutNodeFieldEditKey>(&right.subject);
+        return rightNodeField != nullptr && MatchesLayoutNodeFieldEditKey(*leftNodeField, *rightNodeField);
     }
-    return MatchesLayoutContainerEditKey(
-        LayoutContainerEditKey{std::get<LayoutContainerChildOrderEditKey>(left.subject).editCardId,
-            std::get<LayoutContainerChildOrderEditKey>(left.subject).nodePath},
-        LayoutContainerEditKey{std::get<LayoutContainerChildOrderEditKey>(right.subject).editCardId,
-            std::get<LayoutContainerChildOrderEditKey>(right.subject).nodePath});
+    const auto* leftContainer = std::get_if<LayoutContainerChildOrderEditKey>(&left.subject);
+    const auto* rightContainer = std::get_if<LayoutContainerChildOrderEditKey>(&right.subject);
+    if (leftContainer == nullptr || rightContainer == nullptr) {
+        return false;
+    }
+    return MatchesLayoutContainerEditKey(LayoutContainerEditKey{leftContainer->editCardId, leftContainer->nodePath},
+        LayoutContainerEditKey{rightContainer->editCardId, rightContainer->nodePath});
 }
 
 }  // namespace
@@ -91,25 +97,33 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
         return false;
     }
     if (const auto* leftParameter = std::get_if<LayoutEditParameter>(&left)) {
-        return *leftParameter == std::get<LayoutEditParameter>(right);
+        const auto* rightParameter = std::get_if<LayoutEditParameter>(&right);
+        return rightParameter != nullptr && *leftParameter == *rightParameter;
     }
     if (const auto* leftWeight = std::get_if<LayoutWeightEditKey>(&left)) {
-        return MatchesLayoutWeightEditKey(*leftWeight, std::get<LayoutWeightEditKey>(right));
+        const auto* rightWeight = std::get_if<LayoutWeightEditKey>(&right);
+        return rightWeight != nullptr && MatchesLayoutWeightEditKey(*leftWeight, *rightWeight);
     }
     if (const auto* leftMetric = std::get_if<LayoutMetricEditKey>(&left)) {
-        return MatchesLayoutMetricEditKey(*leftMetric, std::get<LayoutMetricEditKey>(right));
+        const auto* rightMetric = std::get_if<LayoutMetricEditKey>(&right);
+        return rightMetric != nullptr && MatchesLayoutMetricEditKey(*leftMetric, *rightMetric);
     }
     if (const auto* leftCardTitle = std::get_if<LayoutCardTitleEditKey>(&left)) {
-        return MatchesLayoutCardTitleEditKey(*leftCardTitle, std::get<LayoutCardTitleEditKey>(right));
+        const auto* rightCardTitle = std::get_if<LayoutCardTitleEditKey>(&right);
+        return rightCardTitle != nullptr && MatchesLayoutCardTitleEditKey(*leftCardTitle, *rightCardTitle);
     }
     if (const auto* leftThemeColor = std::get_if<ThemeColorEditKey>(&left)) {
-        return MatchesThemeColorEditKey(*leftThemeColor, std::get<ThemeColorEditKey>(right));
+        const auto* rightThemeColor = std::get_if<ThemeColorEditKey>(&right);
+        return rightThemeColor != nullptr && MatchesThemeColorEditKey(*leftThemeColor, *rightThemeColor);
     }
     if (const auto* leftNodeField = std::get_if<LayoutNodeFieldEditKey>(&left)) {
-        return MatchesLayoutNodeFieldEditKey(*leftNodeField, std::get<LayoutNodeFieldEditKey>(right));
+        const auto* rightNodeField = std::get_if<LayoutNodeFieldEditKey>(&right);
+        return rightNodeField != nullptr && MatchesLayoutNodeFieldEditKey(*leftNodeField, *rightNodeField);
     }
-    return MatchesLayoutContainerEditKey(
-        std::get<LayoutContainerEditKey>(left), std::get<LayoutContainerEditKey>(right));
+    const auto* leftContainer = std::get_if<LayoutContainerEditKey>(&left);
+    const auto* rightContainer = std::get_if<LayoutContainerEditKey>(&right);
+    return leftContainer != nullptr && rightContainer != nullptr &&
+           MatchesLayoutContainerEditKey(*leftContainer, *rightContainer);
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide) {
@@ -130,15 +144,16 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditAnchorKey& key) {
     if (const auto* parameter = std::get_if<LayoutEditParameter>(&focusKey)) {
-        return key.subject.index() == 0 && *parameter == std::get<LayoutEditParameter>(key.subject);
+        const auto* anchorParameter = std::get_if<LayoutEditParameter>(&key.subject);
+        return anchorParameter != nullptr && *parameter == *anchorParameter;
     }
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&focusKey)) {
-        return key.subject.index() == 1 &&
-               MatchesLayoutMetricEditKey(*metricKey, std::get<LayoutMetricEditKey>(key.subject));
+        const auto* anchorMetricKey = std::get_if<LayoutMetricEditKey>(&key.subject);
+        return anchorMetricKey != nullptr && MatchesLayoutMetricEditKey(*metricKey, *anchorMetricKey);
     }
     if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&focusKey)) {
-        return key.subject.index() == 2 &&
-               MatchesLayoutCardTitleEditKey(*cardTitleKey, std::get<LayoutCardTitleEditKey>(key.subject));
+        const auto* anchorCardTitleKey = std::get_if<LayoutCardTitleEditKey>(&key.subject);
+        return anchorCardTitleKey != nullptr && MatchesLayoutCardTitleEditKey(*cardTitleKey, *anchorCardTitleKey);
     }
     if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&focusKey)) {
         const auto* anchorKey = std::get_if<LayoutNodeFieldEditKey>(&key.subject);

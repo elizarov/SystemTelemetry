@@ -9,23 +9,26 @@
 
 namespace {
 
-bool IsSeparator(wchar_t ch) {
-    return ch == L'\\' || ch == L'/';
+constexpr wchar_t kReadBinaryMode[] = L"rb";   // _wfopen_s mode string follows the widened file path.
+constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened file path.
+
+bool IsSeparator(char ch) {
+    return ch == '\\' || ch == '/';
 }
 
-bool HasDrivePrefix(std::wstring_view path) {
-    return path.size() >= 2 && path[1] == L':' &&
-           ((path[0] >= L'A' && path[0] <= L'Z') || (path[0] >= L'a' && path[0] <= L'z'));
+bool HasDrivePrefix(std::string_view path) {
+    return path.size() >= 2 && path[1] == ':' &&
+           ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
 }
 
-size_t RootLength(std::wstring_view path) {
+size_t RootLength(std::string_view path) {
     if (path.size() >= 2 && IsSeparator(path[0]) && IsSeparator(path[1])) {
-        size_t serverEnd = path.find_first_of(L"\\/", 2);
-        if (serverEnd == std::wstring_view::npos) {
+        size_t serverEnd = path.find_first_of("\\/", 2);
+        if (serverEnd == std::string_view::npos) {
             return path.size();
         }
-        size_t shareEnd = path.find_first_of(L"\\/", serverEnd + 1);
-        return shareEnd == std::wstring_view::npos ? path.size() : shareEnd + 1;
+        size_t shareEnd = path.find_first_of("\\/", serverEnd + 1);
+        return shareEnd == std::string_view::npos ? path.size() : shareEnd + 1;
     }
     if (HasDrivePrefix(path)) {
         return path.size() >= 3 && IsSeparator(path[2]) ? 3 : 2;
@@ -33,7 +36,7 @@ size_t RootLength(std::wstring_view path) {
     return !path.empty() && IsSeparator(path[0]) ? 1 : 0;
 }
 
-std::wstring TrimTrailingSeparators(std::wstring path) {
+std::string TrimTrailingSeparators(std::string path) {
     const size_t rootLength = RootLength(path);
     while (path.size() > rootLength && IsSeparator(path.back())) {
         path.pop_back();
@@ -43,14 +46,16 @@ std::wstring TrimTrailingSeparators(std::wstring path) {
 
 }  // namespace
 
-FilePath::FilePath(const wchar_t* path) : path_(path != nullptr ? path : L"") {}
+FilePath::FilePath(const wchar_t* path)
+    : path_(Utf8FromWide(path != nullptr ? std::wstring_view(path) : std::wstring_view())) {}
 
-FilePath::FilePath(const char* utf8Path)
-    : path_(WideFromUtf8(utf8Path != nullptr ? std::string_view(utf8Path) : std::string_view())) {}
+FilePath::FilePath(const char* utf8Path) : path_(utf8Path != nullptr ? utf8Path : "") {}
 
-FilePath::FilePath(std::wstring path) : path_(std::move(path)) {}
+FilePath::FilePath(std::wstring path) : path_(Utf8FromWide(path)) {}
 
-FilePath::FilePath(std::string_view utf8Path) : path_(WideFromUtf8(utf8Path)) {}
+FilePath::FilePath(std::string path) : path_(std::move(path)) {}
+
+FilePath::FilePath(std::string_view utf8Path) : path_(utf8Path) {}
 
 bool FilePath::Empty() const {
     return path_.empty();
@@ -77,13 +82,13 @@ bool FilePath::has_parent_path() const {
 }
 
 FilePath FilePath::ParentPath() const {
-    std::wstring trimmed = TrimTrailingSeparators(path_);
+    std::string trimmed = TrimTrailingSeparators(path_);
     const size_t rootLength = RootLength(trimmed);
     if (trimmed.size() <= rootLength) {
         return {};
     }
-    const size_t separator = trimmed.find_last_of(L"\\/");
-    if (separator == std::wstring::npos) {
+    const size_t separator = trimmed.find_last_of("\\/");
+    if (separator == std::string::npos) {
         return {};
     }
     if (separator < rootLength) {
@@ -96,32 +101,12 @@ FilePath FilePath::parent_path() const {
     return ParentPath();
 }
 
-const std::wstring& FilePath::Wide() const {
-    return path_;
-}
-
-const std::wstring& FilePath::wstring() const {
-    return Wide();
+std::wstring FilePath::Wide() const {
+    return WideFromUtf8(path_);
 }
 
 std::string FilePath::string() const {
-    return Utf8FromWide(path_);
-}
-
-const wchar_t* FilePath::c_str() const {
-    return path_.c_str();
-}
-
-FilePath::operator std::wstring() const {
     return path_;
-}
-
-FilePath PathFromUtf8(std::string_view path) {
-    return FilePath(WideFromUtf8(path));
-}
-
-std::string PathToUtf8(const FilePath& path) {
-    return Utf8FromWide(path.Wide());
 }
 
 FilePath JoinPath(const FilePath& base, const FilePath& child) {
@@ -131,16 +116,12 @@ FilePath JoinPath(const FilePath& base, const FilePath& child) {
     if (child.Empty()) {
         return base;
     }
-    std::wstring joined = base.Wide();
+    std::string joined = base.string();
     if (!joined.empty() && !IsSeparator(joined.back())) {
-        joined.push_back(L'\\');
+        joined.push_back('\\');
     }
-    joined += child.Wide();
+    joined += child.string();
     return FilePath(std::move(joined));
-}
-
-FilePath JoinPath(const FilePath& base, const wchar_t* child) {
-    return JoinPath(base, FilePath(child));
 }
 
 FilePath JoinPath(const FilePath& base, const char* child) {
@@ -151,16 +132,8 @@ FilePath operator/(const FilePath& base, const FilePath& child) {
     return JoinPath(base, child);
 }
 
-FilePath operator/(const FilePath& base, const wchar_t* child) {
-    return JoinPath(base, child);
-}
-
 FilePath operator/(const FilePath& base, const char* child) {
     return JoinPath(base, child);
-}
-
-FilePath operator/(const FilePath& base, const std::wstring& child) {
-    return JoinPath(base, FilePath(child));
 }
 
 FilePath CurrentDirectoryPath() {
@@ -168,13 +141,13 @@ FilePath CurrentDirectoryPath() {
     if (length == 0) {
         return {};
     }
-    std::wstring path(length, L'\0');
+    std::wstring path(length, wchar_t{});
     const DWORD written = GetCurrentDirectoryW(length, path.data());
     if (written == 0 || written >= length) {
         return {};
     }
     path.resize(written);
-    return FilePath(std::move(path));
+    return FilePath(path);
 }
 
 FilePath TempDirectoryPath() {
@@ -182,20 +155,21 @@ FilePath TempDirectoryPath() {
     if (length == 0) {
         return {};
     }
-    std::wstring path(length, L'\0');
+    std::wstring path(length, wchar_t{});
     const DWORD written = GetTempPathW(length, path.data());
     if (written == 0 || written >= length) {
         return {};
     }
     path.resize(written);
-    return FilePath(std::move(path));
+    return FilePath(path);
 }
 
 bool FileExists(const FilePath& path) {
     if (path.Empty()) {
         return false;
     }
-    const DWORD attributes = GetFileAttributesW(path.c_str());
+    const std::wstring widePath = path.Wide();
+    const DWORD attributes = GetFileAttributesW(widePath.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
@@ -203,7 +177,8 @@ bool RemoveFileIfExists(const FilePath& path) {
     if (path.Empty()) {
         return false;
     }
-    if (DeleteFileW(path.c_str())) {
+    const std::wstring widePath = path.Wide();
+    if (DeleteFileW(widePath.c_str())) {
         return true;
     }
     return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -211,7 +186,8 @@ bool RemoveFileIfExists(const FilePath& path) {
 
 std::optional<std::string> ReadFileBinary(const FilePath& path) {
     FILE* file = nullptr;
-    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
+    const std::wstring widePath = path.Wide();
+    if (_wfopen_s(&file, widePath.c_str(), kReadBinaryMode) != 0 || file == nullptr) {
         return std::nullopt;
     }
     if (fseek(file, 0, SEEK_END) != 0) {
@@ -235,7 +211,8 @@ std::optional<std::string> ReadFileBinary(const FilePath& path) {
 
 bool WriteFileBinary(const FilePath& path, std::string_view text) {
     FILE* file = nullptr;
-    if (_wfopen_s(&file, path.c_str(), L"wb") != 0 || file == nullptr) {
+    const std::wstring widePath = path.Wide();
+    if (_wfopen_s(&file, widePath.c_str(), kWriteBinaryMode) != 0 || file == nullptr) {
         return false;
     }
     const bool ok = text.empty() || fwrite(text.data(), 1, text.size(), file) == text.size();

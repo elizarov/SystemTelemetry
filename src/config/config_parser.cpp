@@ -4,6 +4,7 @@
 #include <cerrno>
 #include <cstdlib>
 #include <set>
+#include <string_view>
 #include <type_traits>
 
 #include "config/color_resolver.h"
@@ -11,7 +12,6 @@
 #include "config/config_resolution.h"
 #include "config/config_runtime_fields.h"
 #include "config/widget_class.h"
-#include "resource.h"
 #include "util/resource_loader.h"
 #include "util/strings.h"
 
@@ -57,7 +57,7 @@ template <typename Section>
 bool ApplyStructuredSectionFields(
     typename Section::owner_type& owner, const std::string& key, const std::string& value) {
     for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-        if (key == field.key) {
+        if (key == std::string_view(field.key, field.keyLength)) {
             DecodeRuntimeConfigField(field, &owner, value);
             return true;
         }
@@ -400,7 +400,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
-    return LoadUtf8ResourceData(IDR_CONFIG_TEMPLATE);
+    return LoadUtf8ResourceData(TextResourceId::ConfigTemplate);
 }
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigParseContext& context) {
