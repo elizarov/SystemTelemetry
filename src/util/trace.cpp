@@ -1,37 +1,13 @@
 #include "util/trace.h"
 
-#include <chrono>
+#include <windows.h>
+
 #include <cstdio>
-#include <ctime>
 
 #include "util/lightweight_mutex.h"
 #include "util/numeric_format.h"
 
 namespace {
-
-std::tm LocalTime(std::time_t time) {
-#pragma warning(suppress : 4996)
-    const std::tm* localTime = std::localtime(&time);
-    return localTime != nullptr ? *localTime : std::tm{};
-}
-
-std::string FormatTraceTimestamp() {
-    const auto now = std::chrono::system_clock::now();
-    const auto seconds = std::chrono::time_point_cast<std::chrono::seconds>(now);
-    const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(now - seconds).count();
-    const std::tm localTime = LocalTime(std::chrono::system_clock::to_time_t(now));
-    char buffer[32];
-    sprintf_s(buffer,
-        "%04d-%02d-%02d %02d:%02d:%02d.%03lld",
-        localTime.tm_year + 1900,
-        localTime.tm_mon + 1,
-        localTime.tm_mday,
-        localTime.tm_hour,
-        localTime.tm_min,
-        localTime.tm_sec,
-        static_cast<long long>(milliseconds));
-    return buffer;
-}
 
 LightweightMutex& TraceWriteLock() {
     static LightweightMutex lock;
@@ -92,7 +68,7 @@ const char* TracePrefixText(TracePrefix prefix) {
 
 void WriteTraceLine(std::FILE* output, const char* prefix, const char* text) {
     const LightweightMutexLock lock(TraceWriteLock());
-    std::string line = "[trace " + FormatTraceTimestamp() + "] ";
+    std::string line = "[trace " + Trace::FormatTimestamp() + "] ";
     line += prefix;
     line += text;
     line += "\n";
@@ -132,6 +108,22 @@ void Trace::Write(TracePrefix prefix, const std::string& text) const {
 
 const char* Trace::BoolText(bool value) {
     return value ? "yes" : "no";
+}
+
+std::string Trace::FormatTimestamp() {
+    SYSTEMTIME localTime{};
+    GetLocalTime(&localTime);
+    char buffer[32];
+    sprintf_s(buffer,
+        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+        localTime.wYear,
+        localTime.wMonth,
+        localTime.wDay,
+        localTime.wHour,
+        localTime.wMinute,
+        localTime.wSecond,
+        localTime.wMilliseconds);
+    return buffer;
 }
 
 std::string Trace::FormatValueDouble(const char* label, double value, int precision) {

@@ -38,22 +38,6 @@ std::wstring CrashReportFileName() {
     return buffer;
 }
 
-std::string TimestampText() {
-    SYSTEMTIME time{};
-    GetLocalTime(&time);
-    char buffer[40];
-    sprintf_s(buffer,
-        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
-        time.wYear,
-        time.wMonth,
-        time.wDay,
-        time.wHour,
-        time.wMinute,
-        time.wSecond,
-        time.wMilliseconds);
-    return buffer;
-}
-
 FilePath PathWithSuffix(const FilePath& path, const wchar_t* suffix) {
     std::wstring text = path.wstring();
     text += suffix;
@@ -110,14 +94,14 @@ std::wstring ModulePathForAddress(void* address) {
     }
 }
 
-void AppendLine(std::string& text, const std::string& key, const std::string& value) {
+void AppendLine(std::string& text, const char* key, const std::string& value) {
     text += key;
     text += ": ";
     text += value;
     text += "\r\n";
 }
 
-void AppendLine(std::string& text, const std::string& key, const std::wstring& value) {
+void AppendLine(std::string& text, const char* key, const std::wstring& value) {
     AppendLine(text, key, Utf8FromWide(value));
 }
 
@@ -127,7 +111,7 @@ std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* e
 
     std::string text;
     AppendLine(text, "event", "unhandled_exception");
-    AppendLine(text, "timestamp", TimestampText());
+    AppendLine(text, "timestamp", Trace::FormatTimestamp());
     AppendLine(text, "version", casedash::version::kVersion);
     AppendLine(text, "build_kind", casedash::version::kBuildKind);
     AppendLine(text, "git_commit", casedash::version::kGitCommit);

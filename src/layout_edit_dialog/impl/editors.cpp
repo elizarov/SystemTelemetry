@@ -453,7 +453,7 @@ std::vector<std::string> ReadMetricListOrderDialogRows(const LayoutEditDialogSta
     return metricRefs;
 }
 
-bool ApplyMetricListOrderRows(LayoutEditDialogState* state, HWND, const std::vector<std::string>& metricRefs) {
+bool ApplyMetricListOrderRows(LayoutEditDialogState* state, const std::vector<std::string>& metricRefs) {
     const auto* key = SelectedMetricListOrderKey(state);
     return key != nullptr &&
            state->dialog->Host().ApplyLayoutEditPreview(LayoutEditFocusKey{*key}, LayoutEditValue{metricRefs});
@@ -498,7 +498,7 @@ template <typename Mutate> bool MutateMetricListOrderRows(LayoutEditDialogState*
     }
     std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
     mutate(metricRefs);
-    if (!ApplyMetricListOrderRows(state, hwnd, metricRefs)) {
+    if (!ApplyMetricListOrderRows(state, metricRefs)) {
         return false;
     }
     PopulateLayoutEditSelection(state, hwnd);
@@ -766,7 +766,6 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
             SetDialogControlIntegerOrEmpty(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_EDIT, hasFont ? (**font).size : 0, hasFont);
             SetDialogControlIntegerOrEmpty(
                 hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, hasFont ? (**font).weight : 0, hasFont);
-            DestroyMetricListOrderEditorControls(state);
             ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Font);
             SetFontSamplePreview(state,
                 hwnd,
@@ -1388,7 +1387,7 @@ bool HandleMetricListOrderEditorCommand(LayoutEditDialogState* state, HWND hwnd,
             controlId, IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE, state->metricListRowControls.size()) &&
         notificationCode == CBN_SELCHANGE) {
         const std::vector<std::string> metricRefs = ReadMetricListOrderDialogRows(state, hwnd);
-        ApplyMetricListOrderRows(state, hwnd, metricRefs);
+        ApplyMetricListOrderRows(state, metricRefs);
         return true;
     }
 
