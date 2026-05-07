@@ -64,6 +64,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/util/lightweight_mutex.cpp|windows.h',
     'src/util/strings.h|windows.h',
     'src/util/temp_file.cpp|windows.h',
+    'src/util/trace.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
     'src/dashboard/dashboard_app.h|constants.h',
     'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',

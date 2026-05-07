@@ -34,6 +34,12 @@ Use this skill to investigate a failed workflow from the failing run outward, th
    - Keep edits scoped to the failed diagnostic and the owning module.
    - When the owning module is lint tooling, keep allowlist changes exact and explain why the source include remains correct.
    - Update docs only when the failure or fix changes documented behavior, commands, or a recurring project pitfall.
+   - When the investigation reveals a reusable CI pitfall or workflow lesson, update this skill's Lessons Learned section before the final response so the next run starts smarter.
+
+## Lessons Learned
+
+- Some direct Windows SDK headers are not self-contained under the CaseDash build defines. For example, replacing `windows.h` with `sysinfoapi.h` for `SYSTEMTIME` and `GetLocalTime` can fail with `winnt.h` reporting `No Target Architecture`. In that case, keep `windows.h` in source and add a precise include-cleaner allowlist entry.
+- If a clang-tidy fix only changes `tools/run_clang_tidy.ps1`, `lint.cmd tidy changed` can legitimately report no eligible changed project source or header files. Treat that as validation of the lint entrypoint and script parsing, not as proof that a full tidy sweep ran.
 
 ## Local Validation
 
