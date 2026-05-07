@@ -1,7 +1,6 @@
 #include "telemetry/metrics.h"
 
 #include <algorithm>
-#include <array>
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
@@ -14,7 +13,7 @@ namespace {
 
 constexpr char kBoardTemperaturePrefix[] = "board.temp.";
 constexpr char kBoardFanPrefix[] = "board.fan.";
-constexpr std::string_view kPermissionRequiredText = "!admin";
+constexpr char kPermissionRequiredText[] = "!admin";
 
 enum class MetricPayloadKind {
     Text,
@@ -719,7 +718,7 @@ std::string NumberText(int value) {
 }
 
 std::string MonthName(int month) {
-    static constexpr std::array<std::string_view, 12> kNames{
+    static constexpr const char* kNames[]{
         "January",
         "February",
         "March",
@@ -737,23 +736,22 @@ std::string MonthName(int month) {
 }
 
 std::string MonthShortName(int month) {
-    static constexpr std::array<std::string_view, 12> kNames{
+    static constexpr const char* kNames[]{
         "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"};
     return month >= 1 && month <= 12 ? std::string(kNames[static_cast<size_t>(month - 1)]) : std::string{};
 }
 
 std::string WeekdayName(int dayOfWeek) {
-    static constexpr std::array<std::string_view, 7> kNames{
-        "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
+    static constexpr const char* kNames[]{"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
     return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
 }
 
 std::string WeekdayShortName(int dayOfWeek) {
-    static constexpr std::array<std::string_view, 7> kNames{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
+    static constexpr const char* kNames[]{"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
     return dayOfWeek >= 0 && dayOfWeek <= 6 ? std::string(kNames[static_cast<size_t>(dayOfWeek)]) : std::string{};
 }
 
-enum class FormatTokenKind {
+enum class FormatTokenKind : std::uint8_t {
     Hour24TwoDigit,
     Hour24,
     Hour12TwoDigit,
@@ -777,9 +775,12 @@ enum class FormatTokenKind {
 };
 
 struct FormatToken {
-    std::string_view token;
+    const char* text = "";
+    std::uint8_t length = 0;
     FormatTokenKind kind = FormatTokenKind::Hour24TwoDigit;
 };
+
+static_assert(sizeof(FormatToken) == 16);
 
 std::string ResolveFormatToken(const SYSTEMTIME& time, FormatTokenKind kind) {
     switch (kind) {
@@ -838,9 +839,10 @@ std::string FormatWithTokens(
         bool matched = false;
         for (size_t tokenIndex = 0; tokenIndex < tokenCount; ++tokenIndex) {
             const FormatToken& token = tokens[tokenIndex];
-            if (format.substr(index, token.token.size()) == token.token) {
+            if (format.size() - index >= token.length &&
+                format.compare(index, token.length, token.text, token.length) == 0) {
                 output += ResolveFormatToken(time, token.kind);
-                index += token.token.size();
+                index += token.length;
                 matched = true;
                 break;
             }
@@ -856,35 +858,35 @@ std::string FormatWithTokens(
 }  // namespace
 
 std::string FormatClockTime(const SYSTEMTIME& time, std::string_view format) {
-    static constexpr std::array<FormatToken, 10> kTokens{{
-        {"HH", FormatTokenKind::Hour24TwoDigit},
-        {"H", FormatTokenKind::Hour24},
-        {"hh", FormatTokenKind::Hour12TwoDigit},
-        {"h", FormatTokenKind::Hour12},
-        {"MM", FormatTokenKind::MinuteTwoDigit},
-        {"M", FormatTokenKind::Minute},
-        {"SS", FormatTokenKind::SecondTwoDigit},
-        {"S", FormatTokenKind::Second},
-        {"AM", FormatTokenKind::UpperMeridiem},
-        {"am", FormatTokenKind::LowerMeridiem},
-    }};
-    return FormatWithTokens(time, format, kTokens.data(), kTokens.size());
+    static constexpr FormatToken kTokens[]{
+        {"HH", 2, FormatTokenKind::Hour24TwoDigit},
+        {"H", 1, FormatTokenKind::Hour24},
+        {"hh", 2, FormatTokenKind::Hour12TwoDigit},
+        {"h", 1, FormatTokenKind::Hour12},
+        {"MM", 2, FormatTokenKind::MinuteTwoDigit},
+        {"M", 1, FormatTokenKind::Minute},
+        {"SS", 2, FormatTokenKind::SecondTwoDigit},
+        {"S", 1, FormatTokenKind::Second},
+        {"AM", 2, FormatTokenKind::UpperMeridiem},
+        {"am", 2, FormatTokenKind::LowerMeridiem},
+    };
+    return FormatWithTokens(time, format, kTokens, sizeof(kTokens) / sizeof(kTokens[0]));
 }
 
 std::string FormatClockDate(const SYSTEMTIME& time, std::string_view format) {
-    static constexpr std::array<FormatToken, 10> kTokens{{
-        {"YYYY", FormatTokenKind::YearFull},
-        {"YY", FormatTokenKind::YearShort},
-        {"MMMM", FormatTokenKind::MonthName},
-        {"MMM", FormatTokenKind::MonthShortName},
-        {"MM", FormatTokenKind::MonthTwoDigit},
-        {"M", FormatTokenKind::Month},
-        {"DD", FormatTokenKind::DayTwoDigit},
-        {"D", FormatTokenKind::Day},
-        {"dddd", FormatTokenKind::WeekdayName},
-        {"ddd", FormatTokenKind::WeekdayShortName},
-    }};
-    return FormatWithTokens(time, format, kTokens.data(), kTokens.size());
+    static constexpr FormatToken kTokens[]{
+        {"YYYY", 4, FormatTokenKind::YearFull},
+        {"YY", 2, FormatTokenKind::YearShort},
+        {"MMMM", 4, FormatTokenKind::MonthName},
+        {"MMM", 3, FormatTokenKind::MonthShortName},
+        {"MM", 2, FormatTokenKind::MonthTwoDigit},
+        {"M", 1, FormatTokenKind::Month},
+        {"DD", 2, FormatTokenKind::DayTwoDigit},
+        {"D", 1, FormatTokenKind::Day},
+        {"dddd", 4, FormatTokenKind::WeekdayName},
+        {"ddd", 3, FormatTokenKind::WeekdayShortName},
+    };
+    return FormatWithTokens(time, format, kTokens, sizeof(kTokens) / sizeof(kTokens[0]));
 }
 
 bool IsStaticTextMetric(std::string_view metricRef) {
