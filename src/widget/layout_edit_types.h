@@ -12,12 +12,12 @@
 
 struct WidgetLayout;
 
-enum class LayoutGuideAxis {
+enum class LayoutGuideAxis : std::uint8_t {
     Horizontal,
     Vertical,
 };
 
-enum class AnchorShape {
+enum class AnchorShape : std::uint8_t {
     Circle,
     Diamond,
     Square,
@@ -27,23 +27,23 @@ enum class AnchorShape {
     Plus,
 };
 
-enum class AnchorDragAxis {
+enum class AnchorDragAxis : std::uint8_t {
     Horizontal,
     Vertical,
     Both,
 };
 
-enum class AnchorDragMode {
+enum class AnchorDragMode : std::uint8_t {
     AxisDelta,
     RadialDistance,
 };
 
-enum class LayoutEditAnchorVisibility {
+enum class LayoutEditAnchorVisibility : std::uint8_t {
     Always,
     WhenWidgetHovered,
 };
 
-enum class LayoutEditTargetOutline {
+enum class LayoutEditTargetOutline : std::uint8_t {
     Hidden,
     Visible,
 };
@@ -72,7 +72,7 @@ struct LayoutEditWidgetIdentity {
     std::string editCardId;
     std::vector<size_t> nodePath;
 
-    enum class Kind {
+    enum class Kind : std::uint8_t {
         Widget,
         CardChrome,
         DashboardChrome,
@@ -99,7 +99,7 @@ struct ThemeColorEditKey {
     std::string tokenName;
 };
 
-enum class LayoutNodeField {
+enum class LayoutNodeField : std::uint8_t {
     Parameter,
 };
 
@@ -240,7 +240,7 @@ struct LayoutContainerEditKey {
     std::vector<size_t> nodePath;
 };
 
-enum class LayoutEditSelectionHighlightSpecial {
+enum class LayoutEditSelectionHighlightSpecial : std::uint8_t {
     AllCards,
     AllTexts,
     DashboardBounds,

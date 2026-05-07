@@ -458,6 +458,8 @@ target_link_options(CaseDash PRIVATE
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
     $<$<CONFIG:Release>:/LTCG>
+    # Size: the C++/CLI native-entry .nep thunk fits inside .text alignment slack.
+    $<$<CONFIG:Release>:/MERGE:.nep=.text>
     $<$<CONFIG:Release>:/DYNAMICBASE:NO>
     $<$<AND:$<CONFIG:Release>,$<BOOL:${CASEDASH_LINK_MAPS}>>:/MAP:$<TARGET_FILE_DIR:CaseDash>/CaseDash.map>
     $<$<CONFIG:Release>:/INCREMENTAL:NO>

@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -47,7 +48,7 @@ struct BoardSectionCodec {};
 
 struct MetricsSectionCodec {};
 
-enum class ValueFormat {
+enum class ValueFormat : std::uint8_t {
     String,
     Integer,
     FloatingPoint,

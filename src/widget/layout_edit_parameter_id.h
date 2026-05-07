@@ -1,5 +1,7 @@
 #pragma once
 
+#include <cstdint>
+
 #include "config/config.h"
 
 #define CASEDASH_LAYOUT_EDIT_PARAMETER(X, name, section_type, field_member) X(name, section_type::field_member##Meta)
@@ -111,7 +113,7 @@
 
 #define CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM(name, meta) name,
 
-enum class LayoutEditParameter {
+enum class LayoutEditParameter : std::uint8_t {
     // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
     CASEDASH_LAYOUT_EDIT_PARAMETER_ITEMS(CASEDASH_DECLARE_LAYOUT_EDIT_PARAMETER_ENUM) Count,
 };
