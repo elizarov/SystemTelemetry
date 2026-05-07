@@ -230,6 +230,8 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not replace the layout-edit dialog trace field labels with full `" prefix="` strings. That trial regressed the retained dialog trace field loop from `905,728` to `906,240` bytes.
 - Rewriting `BuildTraceFocusKeyText` around one append-built string and rewriting `Trace::QuoteText` around reserve/append loops were executable-neutral in this pass; keep the clearer existing string shapes.
 - Do not broaden crash-report `AppendLine` value parameters to `std::string_view`. That trial regressed the retained literal-key pass from `905,216` to `905,728` bytes; the extra `const char*` value overload was executable-neutral and was reverted.
+- Do not replace the layout-edit derived-color dialog reader's `std::optional<ColorExpression>` return with a bool plus out-parameter by itself. The trial stayed executable-neutral at `895,488` bytes and made the cold editor path less direct.
+- Do not extract the repeated dashboard-shell "Failed to open the Edit Configuration window." message box into a shared helper by itself. The trial stayed executable-neutral at `895,488` bytes, so keep the local call sites unless a broader shell error-reporting pass removes more code.
 
 ## Notes
 
