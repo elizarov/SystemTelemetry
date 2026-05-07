@@ -22,10 +22,11 @@
         Name="InstallFolder"
         Type="raw" />
     </Property>
+    <!-- Directory-sourced launch avoids MSI 2753 when the success dialog runs after install finalization. -->
     <CustomAction
       Id="LaunchCaseDash"
-      FileRef="CaseDashExeFile"
-      ExeCommand="/bring-to-front"
+      Directory="INSTALLFOLDER"
+      ExeCommand="&quot;[INSTALLFOLDER]CaseDash.exe&quot; /bring-to-front"
       Execute="immediate"
       Impersonate="yes"
       Return="asyncNoWait" />
