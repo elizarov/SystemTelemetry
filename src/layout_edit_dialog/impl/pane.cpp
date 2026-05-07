@@ -137,7 +137,7 @@ struct CheckSliderRowLayout {
 };
 
 constexpr LayoutEditRightPaneMetrics kLayoutEditRightPaneMetrics{};
-constexpr wchar_t kDialogRedrawSuspendCountProperty[] = L"CaseDash.LayoutEdit.RedrawSuspendCount";
+constexpr char kDialogRedrawSuspendCountProperty[] = "CaseDash.LayoutEdit.RedrawSuspendCount";
 constexpr double kLchGradientChromaMax = 0.4;
 constexpr int kColorModeControls[] = {IDC_LAYOUT_EDIT_COLOR_MODE_LABEL, IDC_LAYOUT_EDIT_COLOR_MODE_COMBO};
 constexpr int kDerivedColorControls[] = {IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
@@ -642,7 +642,8 @@ int Max4Int(int first, int second, int third, int fourth) {
 }
 
 int WindowRedrawSuspendCount(HWND hwnd) {
-    return static_cast<int>(reinterpret_cast<intptr_t>(GetPropW(hwnd, kDialogRedrawSuspendCountProperty)));
+    const std::wstring propertyName = WideFromUtf8(kDialogRedrawSuspendCountProperty);
+    return static_cast<int>(reinterpret_cast<intptr_t>(GetPropW(hwnd, propertyName.c_str())));
 }
 
 void BeginWindowRedrawSuspension(HWND hwnd) {
@@ -654,7 +655,8 @@ void BeginWindowRedrawSuspension(HWND hwnd) {
     if (count == 0) {
         SendMessageW(hwnd, WM_SETREDRAW, FALSE, 0);
     }
-    SetPropW(hwnd, kDialogRedrawSuspendCountProperty, reinterpret_cast<HANDLE>(static_cast<intptr_t>(count + 1)));
+    const std::wstring propertyName = WideFromUtf8(kDialogRedrawSuspendCountProperty);
+    SetPropW(hwnd, propertyName.c_str(), reinterpret_cast<HANDLE>(static_cast<intptr_t>(count + 1)));
 }
 
 void EndWindowRedrawSuspension(HWND hwnd, const RECT* redrawRect, UINT redrawFlags) {
@@ -664,14 +666,16 @@ void EndWindowRedrawSuspension(HWND hwnd, const RECT* redrawRect, UINT redrawFla
 
     const int count = WindowRedrawSuspendCount(hwnd);
     if (count <= 1) {
-        RemovePropW(hwnd, kDialogRedrawSuspendCountProperty);
+        const std::wstring propertyName = WideFromUtf8(kDialogRedrawSuspendCountProperty);
+        RemovePropW(hwnd, propertyName.c_str());
         SendMessageW(hwnd, WM_SETREDRAW, TRUE, 0);
         if (redrawFlags != 0) {
             RedrawWindow(hwnd, redrawRect, nullptr, redrawFlags);
         }
         return;
     }
-    SetPropW(hwnd, kDialogRedrawSuspendCountProperty, reinterpret_cast<HANDLE>(static_cast<intptr_t>(count - 1)));
+    const std::wstring propertyName = WideFromUtf8(kDialogRedrawSuspendCountProperty);
+    SetPropW(hwnd, propertyName.c_str(), reinterpret_cast<HANDLE>(static_cast<intptr_t>(count - 1)));
 }
 
 bool DialogControlHasClass(HWND hwnd, int controlId, const wchar_t* expectedClassName) {
@@ -731,7 +735,7 @@ std::wstring ReadWindowTextWide(HWND window) {
     }
 
     const int length = GetWindowTextLengthW(window);
-    std::wstring text(length, L'\0');
+    std::wstring text(length, wchar_t{});
     if (length > 0) {
         GetWindowTextW(window, text.data(), length + 1);
     }
@@ -778,7 +782,7 @@ HWND CreateLayoutEditControl(HWND hwnd, const LayoutEditControlSpec& spec, WPARA
     const RECT initialRect = DialogUnitRect(hwnd, spec.left, spec.top, spec.width, spec.height);
     HWND control = CreateWindowExW(0,
         kLayoutEditControlClassNames[kind],
-        wideText.empty() ? L"" : wideText.c_str(),
+        wideText.c_str(),
         WS_CHILD | WS_VISIBLE | kLayoutEditControlStyles[kind],
         initialRect.left,
         initialRect.top,
@@ -1338,7 +1342,8 @@ int MeasureTextWidthForControl(HWND hwnd, int controlId, std::wstring_view text)
     HFONT font = reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0));
     HFONT previous = font != nullptr ? reinterpret_cast<HFONT>(SelectObject(dc, font)) : nullptr;
     SIZE size{};
-    const std::wstring_view measuredText = text.empty() ? std::wstring_view(L" ", 1) : text;
+    const std::wstring fallbackText = WideFromUtf8(" ");
+    const std::wstring_view measuredText = text.empty() ? std::wstring_view(fallbackText) : text;
     GetTextExtentPoint32W(dc, measuredText.data(), static_cast<int>(measuredText.size()), &size);
     if (previous != nullptr) {
         SelectObject(dc, previous);
@@ -1359,7 +1364,8 @@ int MeasureTextHeightForControl(HWND hwnd, int controlId, std::wstring_view text
     HFONT font = reinterpret_cast<HFONT>(SendMessageW(control, WM_GETFONT, 0, 0));
     HFONT previous = font != nullptr ? reinterpret_cast<HFONT>(SelectObject(dc, font)) : nullptr;
     RECT rect{0, 0, std::max(1, width), 0};
-    const std::wstring_view measuredText = text.empty() ? std::wstring_view(L" ", 1) : text;
+    const std::wstring fallbackText = WideFromUtf8(" ");
+    const std::wstring_view measuredText = text.empty() ? std::wstring_view(fallbackText) : text;
     UINT flags = DT_NOPREFIX | DT_CALCRECT | (singleLine ? DT_SINGLELINE : DT_WORDBREAK);
     DrawTextW(dc, measuredText.data(), static_cast<int>(measuredText.size()), &rect, flags);
     if (previous != nullptr) {
@@ -1435,13 +1441,13 @@ void DestroyDialogFonts(LayoutEditDialogState* state) {
     DestroyDialogFont(state->fontSampleFont);
 }
 
-void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text) {
+void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, std::string_view text) {
     if (state == nullptr) {
         return;
     }
     state->statusIsError = kind == LayoutEditStatusKind::Error;
     state->statusText = text;
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, text.c_str());
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, text);
 }
 
 void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int color) {
@@ -1449,10 +1455,10 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
         return;
     }
     state->previewColor = RGB((color >> 24) & 0xFFu, (color >> 16) & 0xFFu, (color >> 8) & 0xFFu);
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, L"Sample text in the selected color");
-    std::wstring derivedHexText = L"Hex: ";
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, "Sample text in the selected color");
+    std::string derivedHexText = "Hex: ";
     derivedHexText += FormatDialogColorHex(color);
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL, derivedHexText.c_str());
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL, derivedHexText);
     InvalidateDialogControls(hwnd, kColorPreviewInvalidationControls, ARRAYSIZE(kColorPreviewInvalidationControls));
 }
 
@@ -1686,7 +1692,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int revertHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_REVERT);
     const int statusWidth = std::max(1, paneWidth - revertWidth - metrics.inlineGap);
     const int statusHeight =
-        MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, state->statusText, statusWidth);
+        MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, WideFromUtf8(state->statusText), statusWidth);
     const int statusRowHeight = std::max(statusHeight, revertHeight);
     const int statusTop = footerTop - metrics.statusToFooterGap - statusRowHeight;
     SetDialogControlBounds(hwnd,
@@ -1709,14 +1715,18 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     y += titleHeight + metrics.headerGap;
 
     const std::wstring locationText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_LOCATION);
-    const int locationHeight = MeasureTextHeightForControl(
-        hwnd, IDC_LAYOUT_EDIT_LOCATION, locationText.empty() ? L" " : locationText, paneWidth, true);
+    const std::wstring blankText = WideFromUtf8(" ");
+    const int locationHeight = MeasureTextHeightForControl(hwnd,
+        IDC_LAYOUT_EDIT_LOCATION,
+        locationText.empty() ? std::wstring_view(blankText) : std::wstring_view(locationText),
+        paneWidth,
+        true);
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_LOCATION, paneLeft, y, paneWidth, locationHeight);
     y += locationHeight + metrics.headerGap;
 
     const std::wstring descriptionText = ReadDialogControlTextWide(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION);
     const int descriptionSingleLineHeight =
-        MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, L"Ag", paneWidth, true);
+        MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, WideFromUtf8("Ag"), paneWidth, true);
     const int descriptionHeight =
         std::max(MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, descriptionText, paneWidth),
             descriptionSingleLineHeight * 2);
@@ -2258,7 +2268,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 MeasureTextWidthForControl(hwnd,
                     IDC_LAYOUT_EDIT_REVERT,
                     state->metricListAddRowButton != nullptr ? ReadWindowTextWide(state->metricListAddRowButton)
-                                                             : L"Add row") +
+                                                             : WideFromUtf8("Add row")) +
                     28);
             const int rowVisibleHeight = comboFieldVisibleHeight;
             const int comboDropHeight = std::max(220, rowVisibleHeight + 180);
@@ -2367,17 +2377,16 @@ void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
                                  state->selectedNode->label.rfind("layout.", 0) == 0;
     const bool canRevert =
         state != nullptr && (state->selectedLeaf != nullptr || isFontsSection || isThemeSection || isLayoutSection);
-    SetDlgItemTextW(hwnd,
+    SetDialogControlTextUtf8(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
-        isFontsSection    ? L"Revert Font Changes"
-        : isThemeSection  ? L"Revert Theme"
-        : isLayoutSection ? L"Revert Layout"
-                          : L"Revert Field");
+        isFontsSection    ? "Revert Font Changes"
+        : isThemeSection  ? "Revert Theme"
+        : isLayoutSection ? "Revert Layout"
+                          : "Revert Field");
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }
 
-std::wstring LayoutEditConfiguredSectionDescription(
-    const LayoutEditDialogState* state, const LayoutEditTreeNode* node) {
+std::string LayoutEditConfiguredSectionDescription(const LayoutEditDialogState* state, const LayoutEditTreeNode* node) {
     if (state == nullptr || node == nullptr || node->kind != LayoutEditTreeNodeKind::Section) {
         return {};
     }
@@ -2386,35 +2395,35 @@ std::wstring LayoutEditConfiguredSectionDescription(
         const auto it = std::find_if(config.layout.themes.begin(),
             config.layout.themes.end(),
             [&](const ThemeConfig& theme) { return theme.name == config.display.theme; });
-        return it != config.layout.themes.end() ? WideFromUtf8(it->description) : L"";
+        return it != config.layout.themes.end() ? it->description : "";
     }
     if (node->label.rfind("layout.", 0) == 0) {
         const auto it = std::find_if(config.layout.layouts.begin(),
             config.layout.layouts.end(),
             [&](const LayoutSectionConfig& layout) { return layout.name == config.display.layout; });
-        return it != config.layout.layouts.end() ? WideFromUtf8(it->description) : L"";
+        return it != config.layout.layouts.end() ? it->description : "";
     }
     return {};
 }
 
 void SetLayoutEditDescription(LayoutEditDialogState* state, HWND hwnd, const LayoutEditTreeNode* node) {
     if (node == nullptr) {
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_TITLE, L"No matching setting");
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, L"");
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, L"Try a different filter or clear it to see the full tree.");
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_SUMMARY, L"");
-        SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_HINT, L"Select a field to edit it here.");
+        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_TITLE, "No matching setting");
+        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_LOCATION, "");
+        SetDialogControlTextUtf8(
+            hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, "Try a different filter or clear it to see the full tree.");
+        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_SUMMARY, "");
+        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_HINT, "Select a field to edit it here.");
         return;
     }
 
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_TITLE, BuildLayoutEditNodeTitle(node).c_str());
-    const std::wstring location = WideFromUtf8(node->locationText);
-    std::wstring description = LayoutEditConfiguredSectionDescription(state, node);
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_TITLE, BuildLayoutEditNodeTitle(node));
+    std::string description = LayoutEditConfiguredSectionDescription(state, node);
     if (description.empty()) {
-        description = WideFromUtf8(FindLocalizedText(node->descriptionKey));
+        description = FindLocalizedText(node->descriptionKey);
     }
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_LOCATION, location.c_str());
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, description.c_str());
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_SUMMARY, BuildLayoutEditSummaryText(node).c_str());
-    SetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_HINT, BuildLayoutEditHintText(node).c_str());
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_LOCATION, node->locationText);
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, description);
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_SUMMARY, BuildLayoutEditSummaryText(node));
+    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_HINT, BuildLayoutEditHintText(node));
 }

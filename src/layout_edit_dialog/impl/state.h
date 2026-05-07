@@ -23,7 +23,7 @@ enum class LayoutEditStatusKind {
 
 struct LayoutEditValidationResult {
     bool valid = true;
-    std::wstring message;
+    std::string message;
 };
 
 inline constexpr int IDC_LAYOUT_EDIT_METRIC_LIST_ROW_COMBO_BASE = 11000;
@@ -61,8 +61,8 @@ struct LayoutEditDialogState {
     COLORREF customColors[16]{};
     HFONT titleFont = nullptr;
     HFONT fontSampleFont = nullptr;
-    std::wstring currentFilter;
-    std::wstring statusText;
+    std::string currentFilter;
+    std::string statusText;
     bool statusIsError = false;
     bool activeSelectionValid = true;
     LayoutEditEditorKind activeEditorKind = LayoutEditEditorKind::Summary;

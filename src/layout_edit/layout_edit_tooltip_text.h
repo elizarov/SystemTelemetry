@@ -8,5 +8,5 @@
 const char* LayoutEditTooltipPayloadTraceKind(const TooltipPayload& payload);
 bool BuildLayoutEditTooltipTextForPayload(const AppConfig& config,
     const TooltipPayload& payload,
-    std::wstring& tooltipText,
+    std::string& tooltipText,
     std::string* errorReason = nullptr);

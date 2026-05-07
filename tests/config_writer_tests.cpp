@@ -14,7 +14,7 @@ namespace {
 
 std::string ReadConfigTemplateFromSourceTree() {
     const FilePath configPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
-    std::ifstream input(configPath, std::ios::binary);
+    std::ifstream input(configPath.string(), std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();

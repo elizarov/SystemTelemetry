@@ -4,6 +4,7 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "diagnostics/diagnostics.h"
@@ -24,7 +25,7 @@ struct DashboardSessionState {
     bool hasUnsavedLayoutEditChanges = false;
     // Size: allocate the saved layout only during edit mode; an always-live second LayoutConfig measured larger.
     std::unique_ptr<LayoutConfig> layoutEditSessionSavedLayout;
-    std::wstring lastError;
+    std::string lastError;
 };
 
 class DashboardShellHost : public TelemetryUpdateSink {
@@ -54,8 +55,8 @@ public:
     virtual void EnqueueTelemetryUpdate(const TelemetryUpdate& update) = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
     virtual std::optional<FilePath> PromptDiagnosticsSavePath(
-        const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const = 0;
-    virtual void ShowError(const std::wstring& message) const = 0;
+        std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const = 0;
+    virtual void ShowError(std::string_view message) const = 0;
 };
 
 class DashboardController {

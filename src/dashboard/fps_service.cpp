@@ -21,6 +21,8 @@ namespace {
 constexpr DWORD kServiceStopWaitMs = 10000;
 constexpr DWORD kPipeBufferBytes = 4096;
 constexpr DWORD kPipeRequestBytes = 128;
+constexpr char kFpsServiceDisplayName[] = "CaseDash Service";
+constexpr char kPipeSecurityDescriptor[] = "D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;AU)";
 
 SERVICE_STATUS_HANDLE g_serviceStatusHandle = nullptr;
 SERVICE_STATUS g_serviceStatus{};
@@ -146,11 +148,11 @@ void SetServiceStatusState(DWORD state, DWORD win32ExitCode = NO_ERROR, DWORD wa
 }
 
 std::string BuildFpsServiceBinaryPath() {
-    const std::optional<std::wstring> executablePath = GetExecutablePath();
+    const std::optional<FilePath> executablePath = GetExecutablePath();
     if (!executablePath.has_value()) {
         return {};
     }
-    return QuoteCommandLineArgument(Utf8FromWide(*executablePath)) + " /service";
+    return QuoteCommandLineArgument(executablePath->string()) + " /service";
 }
 
 DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceHandle& service) {
@@ -159,7 +161,8 @@ DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceH
         return GetLastError();
     }
 
-    service = ServiceHandle(OpenServiceW(manager.Get(), kFpsServiceName, desiredAccess));
+    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
+    service = ServiceHandle(OpenServiceW(manager.Get(), serviceName.c_str(), desiredAccess));
     return service.Get() != nullptr ? ERROR_SUCCESS : GetLastError();
 }
 
@@ -227,8 +230,9 @@ DWORD StopServiceIfRunning(SC_HANDLE service) {
 
 SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
     PSECURITY_DESCRIPTOR descriptor = nullptr;
+    const std::wstring securityDescriptorText = WideFromUtf8(kPipeSecurityDescriptor);
     ConvertStringSecurityDescriptorToSecurityDescriptorW(
-        L"D:P(A;;GA;;;SY)(A;;GA;;;BA)(A;;GRGW;;;AU)", SDDL_REVISION_1, &descriptor, nullptr);
+        securityDescriptorText.c_str(), SDDL_REVISION_1, &descriptor, nullptr);
     securityDescriptor = LocalMemory(descriptor);
 
     SECURITY_ATTRIBUTES attributes{};
@@ -241,7 +245,8 @@ SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
 Handle CreateFpsPipeInstance() {
     LocalMemory securityDescriptor;
     SECURITY_ATTRIBUTES securityAttributes = PipeSecurityAttributes(securityDescriptor);
-    return Handle(CreateNamedPipeW(kFpsServicePipeName,
+    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
+    return Handle(CreateNamedPipeW(pipeName.c_str(),
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
@@ -362,7 +367,8 @@ void WINAPI ServiceControlHandler(DWORD control) {
 }
 
 void WINAPI ServiceMain(DWORD, LPWSTR*) {
-    g_serviceStatusHandle = RegisterServiceCtrlHandlerW(kFpsServiceName, ServiceControlHandler);
+    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
+    g_serviceStatusHandle = RegisterServiceCtrlHandlerW(serviceName.c_str(), ServiceControlHandler);
     if (g_serviceStatusHandle == nullptr) {
         return;
     }
@@ -401,8 +407,9 @@ bool IsFpsServiceCommandLine(const CommandLineArguments& commandLine) {
 }
 
 int RunFpsServiceMode() {
+    std::wstring serviceName = WideFromUtf8(kFpsServiceName);
     SERVICE_TABLE_ENTRYW serviceTable[] = {
-        {const_cast<LPWSTR>(kFpsServiceName), ServiceMain},
+        {serviceName.data(), ServiceMain},
         {nullptr, nullptr},
     };
     return StartServiceCtrlDispatcherW(serviceTable) ? 0 : 1;
@@ -414,6 +421,8 @@ DWORD InstallOrUpdateFpsService() {
         return ERROR_FILE_NOT_FOUND;
     }
     const std::wstring wideBinaryPath = WideFromUtf8(binaryPath);
+    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
+    const std::wstring serviceDisplayName = WideFromUtf8(kFpsServiceDisplayName);
 
     ServiceHandle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
     if (manager.Get() == nullptr) {
@@ -421,8 +430,8 @@ DWORD InstallOrUpdateFpsService() {
     }
 
     ServiceHandle service(CreateServiceW(manager.Get(),
-        kFpsServiceName,
-        L"CaseDash Service",
+        serviceName.c_str(),
+        serviceDisplayName.c_str(),
         SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
@@ -439,8 +448,8 @@ DWORD InstallOrUpdateFpsService() {
         if (createError != ERROR_SERVICE_EXISTS) {
             return createError;
         }
-        service = ServiceHandle(
-            OpenServiceW(manager.Get(), kFpsServiceName, SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START));
+        service = ServiceHandle(OpenServiceW(
+            manager.Get(), serviceName.c_str(), SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START));
         if (service.Get() == nullptr) {
             return GetLastError();
         }
@@ -454,7 +463,7 @@ DWORD InstallOrUpdateFpsService() {
                 nullptr,
                 nullptr,
                 nullptr,
-                L"CaseDash Service")) {
+                serviceDisplayName.c_str())) {
             return GetLastError();
         }
     }

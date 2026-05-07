@@ -11,7 +11,7 @@ namespace {
 
 std::string ReadTemplateText() {
     const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream input(path.string(), std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return buffer.str();
@@ -19,7 +19,7 @@ std::string ReadTemplateText() {
 
 LocalizationCatalogMap ReadLocalizationCatalog() {
     const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream input(path.string(), std::ios::binary);
     std::ostringstream buffer;
     buffer << input.rdbuf();
     return ParseLocalizationCatalog(buffer.str());

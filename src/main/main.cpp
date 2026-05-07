@@ -10,16 +10,19 @@
 #include "diagnostics/crash_report.h"
 #include "diagnostics/diagnostics.h"
 #include "display/display_config.h"
+#include "util/app_strings.h"
 #include "util/command_line.h"
 #include "util/elevated_process.h"
 #include "util/file_path.h"
+#include "util/message_box.h"
 #include "util/paths.h"
 #include "util/utf8.h"
 
 namespace {
 
 void ShutdownPreviousInstance() {
-    HWND existing = FindWindowW(kWindowClassName, nullptr);
+    const std::wstring windowClassName = WideFromUtf8(kWindowClassName);
+    HWND existing = FindWindowW(windowClassName.c_str(), nullptr);
     if (existing == nullptr) {
         return;
     }
@@ -37,7 +40,7 @@ void ShutdownPreviousInstance() {
     PostMessageW(existing, WM_CLOSE, 0, 0);
     for (int attempt = 0; attempt < 40; ++attempt) {
         Sleep(100);
-        existing = FindWindowW(kWindowClassName, nullptr);
+        existing = FindWindowW(windowClassName.c_str(), nullptr);
         if (existing == nullptr) {
             return;
         }
@@ -63,11 +66,9 @@ std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& comma
     }
 
     const std::string parameters = BuildCommandLineExcludingSwitch(commandLine, "/elevate");
-    const std::wstring wideParameters = WideFromUtf8(parameters);
     // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
-    const std::wstring workingDirectory = GetWorkingDirectory().wstring();
     DWORD exitCode = 1;
-    return RunElevatedSelfAndWait(nullptr, wideParameters.c_str(), workingDirectory.c_str(), SW_SHOWNORMAL, &exitCode)
+    return RunElevatedSelfAndWait(nullptr, parameters, GetWorkingDirectory(), SW_SHOWNORMAL, &exitCode)
                ? static_cast<int>(exitCode)
                : 1;
 }
@@ -87,19 +88,18 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     if (const auto elevatedSaveSource = GetSwitchValue(commandLine, "/save-config"); elevatedSaveSource.has_value()) {
         const auto elevatedSaveTarget = GetSwitchValue(commandLine, "/save-config-target");
-        return RunElevatedSaveConfigMode(FilePath(WideFromUtf8(*elevatedSaveSource)),
-            elevatedSaveTarget.has_value() ? FilePath(WideFromUtf8(*elevatedSaveTarget)) : FilePath{});
+        return RunElevatedSaveConfigMode(
+            FilePath(*elevatedSaveSource), elevatedSaveTarget.has_value() ? FilePath(*elevatedSaveTarget) : FilePath{});
     }
     if (const auto configureDisplaySource = GetSwitchValue(commandLine, "/configure-display");
         configureDisplaySource.has_value()) {
         const auto configureDisplayTarget = GetSwitchValue(commandLine, "/configure-display-target");
         const auto configureDisplayDump = GetSwitchValue(commandLine, "/configure-display-dump");
         const auto configureDisplayImageTarget = GetSwitchValue(commandLine, "/configure-display-image-target");
-        return RunElevatedConfigureDisplayMode(FilePath(WideFromUtf8(*configureDisplaySource)),
-            configureDisplayDump.has_value() ? FilePath(WideFromUtf8(*configureDisplayDump)) : FilePath{},
-            configureDisplayTarget.has_value() ? FilePath(WideFromUtf8(*configureDisplayTarget)) : FilePath{},
-            configureDisplayImageTarget.has_value() ? FilePath(WideFromUtf8(*configureDisplayImageTarget))
-                                                    : FilePath{});
+        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
+            configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
+            configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
+            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{});
     }
     if (const auto autoStartSetting = GetSwitchValue(commandLine, "/set-autostart"); autoStartSetting.has_value()) {
         if (_stricmp(autoStartSetting->c_str(), "on") == 0) {
@@ -126,11 +126,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     DashboardApp app(diagnosticsOptions, HasSwitch(commandLine, "/bring-to-front"));
     if (!app.Initialize(instance)) {
-        const std::wstring& message = app.LastError();
-        MessageBoxW(nullptr,
-            message.empty() ? L"Failed to initialize the telemetry dashboard." : message.c_str(),
-            L"CaseDash",
-            MB_ICONERROR);
+        const std::string& message = app.LastError();
+        if (message.empty()) {
+            MessageBoxUtf8("Failed to initialize the telemetry dashboard.", MB_ICONERROR);
+        } else {
+            MessageBoxUtf8(message, MB_ICONERROR);
+        }
         return 1;
     }
     return app.Run();

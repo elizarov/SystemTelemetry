@@ -135,10 +135,100 @@ def strip_comments_and_strings(text: str) -> str:
     return "".join(result)
 
 
+def is_identifier_char(ch: str) -> bool:
+    return ch == "_" or ch.isalnum()
+
+
+def skip_quoted_literal(text: str, index: int, quote: str) -> int:
+    index += 1
+    while index < len(text):
+        ch = text[index]
+        if ch == "\\" and index + 1 < len(text):
+            index += 2
+            continue
+        index += 1
+        if ch == quote:
+            break
+    return index
+
+
+def skip_raw_string_literal(text: str, index: int) -> int:
+    delimiter_start = index + 2
+    paren = text.find("(", delimiter_start)
+    if paren < 0:
+        return index + 2
+    delimiter = text[delimiter_start:paren]
+    terminator = ")" + delimiter + '"'
+    end = text.find(terminator, paren + 1)
+    return len(text) if end < 0 else end + len(terminator)
+
+
+def find_wide_literal_lines(text: str) -> list[int]:
+    lines: list[int] = []
+    line = 1
+    index = 0
+    in_line_comment = False
+    in_block_comment = False
+    while index < len(text):
+        ch = text[index]
+        nxt = text[index + 1] if index + 1 < len(text) else ""
+        if ch == "\n":
+            line += 1
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+            index += 1
+            continue
+        if in_block_comment:
+            if ch == "*" and nxt == "/":
+                in_block_comment = False
+                index += 2
+            else:
+                index += 1
+            continue
+        if ch == "/" and nxt == "/":
+            in_line_comment = True
+            index += 2
+            continue
+        if ch == "/" and nxt == "*":
+            in_block_comment = True
+            index += 2
+            continue
+        if ch == "L" and (index == 0 or not is_identifier_char(text[index - 1])):
+            literal_index = index + 1
+            if literal_index < len(text) and text[literal_index] == "R":
+                literal_index += 1
+            while literal_index < len(text) and text[literal_index] in " \t\r\n":
+                literal_index += 1
+            if literal_index < len(text) and text[literal_index] in "\"'":
+                lines.append(line)
+                end = (
+                    skip_raw_string_literal(text, literal_index - 1)
+                    if text[literal_index - 1 : literal_index + 1] == 'R"'
+                    else skip_quoted_literal(text, literal_index, text[literal_index])
+                )
+                line += text[index:end].count("\n")
+                index = end
+                continue
+        if ch == "R" and nxt == '"':
+            end = skip_raw_string_literal(text, index)
+            line += text[index:end].count("\n")
+            index = end
+            continue
+        if ch in "\"'":
+            end = skip_quoted_literal(text, index, ch)
+            line += text[index:end].count("\n")
+            index = end
+            continue
+        index += 1
+    return lines
+
+
 def collect_violations(files: list[Path]) -> list[Violation]:
     violations: list[Violation] = []
     for path in files:
-        stripped = strip_comments_and_strings(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        stripped = strip_comments_and_strings(text)
         file_rel = relpath(path)
         for line_number, line in enumerate(stripped.splitlines(), start=1):
             if STD_FUNCTION_RE.search(line):
@@ -163,6 +253,18 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         ),
                     )
                 )
+        for line_number in find_wide_literal_lines(text):
+            violations.append(
+                Violation(
+                    relpath=file_rel,
+                    line=line_number,
+                    message=(
+                        "wide literals are not allowed in maintained source; keep constants UTF-8 and "
+                        "materialize UTF-16 only at Win32 or managed interop boundaries with WideFromUtf8 "
+                        "or Utf8FromWide."
+                    ),
+                )
+            )
     return violations
 
 

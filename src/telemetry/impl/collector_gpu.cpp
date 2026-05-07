@@ -46,13 +46,14 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
         return totals;
     }
 
+    const std::wstring gpu3dMarker = WideFromUtf8("engtype_3D");
     for (DWORD i = 0; i < itemCount; ++i) {
         const wchar_t* instance = items[i].szName;
         if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !IsFiniteDouble(items[i].FmtValue.doubleValue)) {
             continue;
         }
         totals.total += items[i].FmtValue.doubleValue;
-        if (instance != nullptr && wcsstr(instance, L"engtype_3D") != nullptr) {
+        if (instance != nullptr && wcsstr(instance, gpu3dMarker.c_str()) != nullptr) {
             totals.total3d += items[i].FmtValue.doubleValue;
         }
     }
@@ -195,7 +196,7 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.Write(
         TracePrefix::Telemetry, ("pdh_open gpu_query status=" + PdhStatusCodeString(queryStatus)).c_str());
     const PDH_STATUS loadStatus =
-        AddCounterCompat(state.gpu_.query, L"\\GPU Engine(*)\\Utilization Percentage", &state.gpu_.loadCounter);
+        AddCounterCompat(state.gpu_.query, "\\GPU Engine(*)\\Utilization Percentage", &state.gpu_.loadCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" status=" +
             PdhStatusCodeString(loadStatus))
@@ -208,7 +209,7 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.Write(
         TracePrefix::Telemetry, ("pdh_open gpu_memory_query status=" + PdhStatusCodeString(memoryQueryStatus)).c_str());
     const PDH_STATUS memoryCounterStatus = AddCounterCompat(
-        state.gpu_.memoryQuery, L"\\GPU Adapter Memory(*)\\Dedicated Usage", &state.gpu_.dedicatedCounter);
+        state.gpu_.memoryQuery, "\\GPU Adapter Memory(*)\\Dedicated Usage", &state.gpu_.dedicatedCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" status=" +
             PdhStatusCodeString(memoryCounterStatus))

@@ -9,7 +9,6 @@
 #include "layout_model/dashboard_overlay_state.h"
 #include "util/localization_catalog.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -99,7 +98,7 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     LayoutGuideSheetPipelineStats collectedStats;
     LayoutGuideSheetPipelineStats* outputStats = stats != nullptr ? stats : &collectedStats;
     *outputStats = {};
-    const std::string imagePathText = Utf8FromWide(imagePath.wstring());
+    const std::string imagePathText = imagePath.string();
     trace.Write(TracePrefix::Diagnostics,
         "layout_guide_sheet start path=\"" + imagePathText + "\" layout=\"" + config.display.layout + "\"");
 

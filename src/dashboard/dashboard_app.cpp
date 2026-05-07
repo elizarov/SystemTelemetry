@@ -13,8 +13,10 @@
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "resource.h"
+#include "util/app_strings.h"
 #include "util/lightweight_mutex.h"
 #include "util/localization_catalog.h"
+#include "util/message_box.h"
 #include "util/paths.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -188,12 +190,13 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES | ICC_TAB_CLASSES};
     InitCommonControlsEx(&icc);
 
+    const std::wstring windowClassName = WideFromUtf8(kWindowClassName);
     WNDCLASSEXW wc{};
     wc.cbSize = sizeof(wc);
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
-    wc.lpszClassName = kWindowClassName;
+    wc.lpszClassName = windowClassName.c_str();
     wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
     if (appIconLarge_ == nullptr) {
@@ -224,9 +227,10 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
 
+    const std::wstring appTitle = WideFromUtf8(kAppTitleUtf8);
     hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
         wc.lpszClassName,
-        L"CaseDash",
+        appTitle.c_str(),
         WS_POPUP,
         placement.left,
         placement.top,
@@ -242,7 +246,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     return CreateLayoutEditTooltip();
 }
 
-const std::wstring& DashboardApp::LastError() const {
+const std::string& DashboardApp::LastError() const {
     return lastError_;
 }
 
@@ -445,7 +449,7 @@ bool DashboardApp::WriteDiagnosticsOutputs() {
 }
 
 std::optional<FilePath> DashboardApp::PromptDiagnosticsSavePath(
-    const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const {
+    std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const {
     return PromptSavePath(hwnd_, GetWorkingDirectory(), defaultFileName, filter, defaultExtension);
 }
 
@@ -512,7 +516,8 @@ bool DashboardApp::CreateTrayIcon() {
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     trayIcon_.uCallbackMessage = kTrayMessage;
     trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconW(nullptr, IDI_APPLICATION);
-    wcscpy_s(trayIcon_.szTip, L"CaseDash");
+    const std::wstring appTitle = WideFromUtf8(kAppTitleUtf8);
+    wcscpy_s(trayIcon_.szTip, appTitle.c_str());
     return Shell_NotifyIconW(NIM_ADD, &trayIcon_) == TRUE;
 }
 
@@ -664,8 +669,8 @@ MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
                             : movePlacementInfo_;
 }
 
-void DashboardApp::ShowError(const std::wstring& message) const {
-    MessageBoxW(hwnd_, message.c_str(), L"CaseDash", MB_ICONERROR);
+void DashboardApp::ShowError(std::string_view message) const {
+    MessageBoxUtf8(hwnd_, message, MB_ICONERROR);
 }
 
 bool DashboardApp::CreateLayoutEditTooltip() {
@@ -697,7 +702,8 @@ bool DashboardApp::CreateLayoutEditTooltip() {
     toolInfo.hwnd = hwnd_;
     toolInfo.uId = 1;
     toolInfo.rect = clientRect;
-    toolInfo.lpszText = const_cast<LPWSTR>(L"");
+    layoutEditTooltipWideText_ = WideFromUtf8("");
+    toolInfo.lpszText = layoutEditTooltipWideText_.data();
     const LRESULT addToolResult =
         SendMessageW(layoutEditTooltipHwnd_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     const LRESULT activateResult = SendMessageW(layoutEditTooltipHwnd_, TTM_ACTIVATE, TRUE, 0);
@@ -716,6 +722,7 @@ void DashboardApp::DestroyLayoutEditTooltip() {
         layoutEditTooltipHwnd_ = nullptr;
     }
     layoutEditTooltipText_.clear();
+    layoutEditTooltipWideText_.clear();
     layoutEditTooltipVisible_ = false;
 }
 
@@ -869,7 +876,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     }
 
     const bool wasVisible = layoutEditTooltipVisible_;
-    const std::wstring previousText = layoutEditTooltipText_;
+    const std::string previousText = layoutEditTooltipText_;
     const RECT previousRect = layoutEditTooltipRect_;
     const bool previousRectValid = layoutEditTooltipRectValid_;
     LayoutEditController::TooltipTarget target;
@@ -882,7 +889,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     const RenderPoint clientPoint = target.clientPoint;
     std::string tooltipError;
-    std::wstring tooltipText;
+    std::string tooltipText;
     if (!BuildLayoutEditTooltipTextForPayload(controller_.State().config, target.payload, tooltipText, &tooltipError)) {
         TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip,
             "update_abort",
@@ -904,8 +911,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.uId = 1;
     toolInfo.rect = layoutEditTooltipRect_;
-    toolInfo.lpszText =
-        layoutEditTooltipText_.empty() ? const_cast<LPWSTR>(L"") : const_cast<LPWSTR>(layoutEditTooltipText_.c_str());
+    layoutEditTooltipWideText_ = WideFromUtf8(layoutEditTooltipText_);
+    toolInfo.lpszText = layoutEditTooltipWideText_.data();
     SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
     SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
@@ -930,7 +937,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
             "show",
             "payload=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload)) +
                 " client_point=" + Trace::QuoteText(Trace::FormatPoint(clientPoint.x, clientPoint.y)) +
-                " text=" + Trace::QuoteText(Utf8FromWide(layoutEditTooltipText_)));
+                " text=" + Trace::QuoteText(layoutEditTooltipText_));
     }
 }
 

@@ -257,7 +257,7 @@ void RebuildLayoutEditTree(
     const DialogDescendantRedrawScope redrawScope(hwnd);
     state->dialog->Host().TraceLayoutEditDialogEvent("tree_rebuild_begin",
         "preferred_focus=" + QuoteTraceText(preferredFocus.has_value() ? "set" : "none") +
-            " filter=" + QuoteTraceText(Utf8FromWide(state->currentFilter)));
+            " filter=" + QuoteTraceText(state->currentFilter));
     TraceTreeViewport(state, tree, "tree_rebuild_before");
 
     std::string preferredLocation;
@@ -278,8 +278,7 @@ void RebuildLayoutEditTree(
     HTREEITEM selectedItem = nullptr;
     {
         const DialogRedrawScope redrawSuspension(tree, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
-        LayoutEditTreeModel visibleTreeModel =
-            FilterLayoutEditTreeModel(state->treeModel, Utf8FromWide(state->currentFilter));
+        LayoutEditTreeModel visibleTreeModel = FilterLayoutEditTreeModel(state->treeModel, state->currentFilter);
         state->treeItems.clear();
         TraceTreeViewport(state, tree, "tree_delete_all_before");
         const bool wasSuppressingSelection = state->suppressTreeSelectionNotification;

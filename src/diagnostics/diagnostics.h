@@ -58,8 +58,8 @@ public:
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
-    void ReportError(const std::string& traceText, const std::wstring& message);
-    void ReportError(TracePrefix prefix, const std::string& traceText, const std::wstring& message);
+    void ReportError(const std::string& traceText, std::string_view message);
+    void ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message);
     bool ReportSaveError(const char* traceEvent,
         const char* messageAction,
         const FilePath& path,
@@ -89,14 +89,14 @@ bool ApplyDiagnosticsLayoutOverride(
 bool ApplyDiagnosticsThemeOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 FilePath ResolveDiagnosticsOutputPath(
-    const FilePath& workingDirectory, const FilePath& configuredPath, const wchar_t* defaultFileName);
+    const FilePath& workingDirectory, const FilePath& configuredPath, std::string_view defaultFileName);
 std::optional<FilePath> PromptSavePath(HWND owner,
     const FilePath& initialDirectory,
-    const wchar_t* defaultFileName,
-    const wchar_t* filter,
-    const wchar_t* defaultExtension);
+    std::string_view defaultFileName,
+    std::string_view filter,
+    std::string_view defaultExtension);
 int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
-std::wstring FormatTelemetryInitializeError(std::string_view errorText);
+std::string FormatTelemetryInitializeError(std::string_view errorText);
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,

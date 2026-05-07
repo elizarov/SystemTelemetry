@@ -226,9 +226,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FILTER_EDIT && HIWORD(wParam) == EN_CHANGE) {
-                wchar_t filterBuffer[256] = {};
-                GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, filterBuffer, ARRAYSIZE(filterBuffer));
-                state->currentFilter = filterBuffer;
+                state->currentFilter = ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT);
                 RebuildLayoutEditTree(state, hwnd);
                 return handled(TRUE);
             }

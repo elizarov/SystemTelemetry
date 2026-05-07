@@ -27,13 +27,13 @@ std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
         return candidates;
     }
 
-    std::vector<wchar_t> buffer(bufferLength + 1, L'\0');
+    std::vector<wchar_t> buffer(bufferLength + 1, wchar_t{});
     const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
     if (copied == 0 || copied >= buffer.size()) {
         return {};
     }
 
-    for (const wchar_t* current = buffer.data(); *current != L'\0'; current += wcslen(current) + 1) {
+    for (const wchar_t* current = buffer.data(); *current != wchar_t{}; current += wcslen(current) + 1) {
         const std::wstring root(current);
         if (root.size() < 2 || !iswalpha(root[0])) {
             continue;
@@ -74,7 +74,7 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         auto& drive = state.snapshot_.drives[i];
         DriveCounterState* counters =
             i < state.storage_.driveCounters.size() ? &state.storage_.driveCounters[i] : nullptr;
-        const std::wstring root = counters != nullptr ? counters->rootPath : WideFromUtf8(drive.label + "\\");
+        const std::wstring root = WideFromUtf8(counters != nullptr ? counters->rootPath : drive.label + "\\");
         const UINT driveType = GetDriveTypeW(root.c_str());
         drive.driveType = driveType;
         if (!IsSelectableStorageDriveType(driveType)) {
@@ -188,14 +188,14 @@ void InitializeStorageCollector(RealTelemetryCollectorState& state) {
     state.trace_.Write(
         TracePrefix::Telemetry, ("pdh_open storage_query status=" + PdhStatusCodeString(queryStatus)).c_str());
     const PDH_STATUS readStatus = AddCounterCompat(
-        state.storage_.query, L"\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &state.storage_.readCounter);
+        state.storage_.query, "\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &state.storage_.readCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" "
          "status=" +
             PdhStatusCodeString(readStatus))
             .c_str());
     const PDH_STATUS writeStatus = AddCounterCompat(
-        state.storage_.query, L"\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &state.storage_.writeCounter);
+        state.storage_.query, "\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &state.storage_.writeCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" "
          "status=" +
@@ -223,28 +223,25 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
         state.trace_.Write(TracePrefix::Telemetry, ("drive_config label=" + label).c_str());
 
         if (state.storage_.query != nullptr) {
-            const std::wstring logicalDisk = WideFromUtf8(label);
             DriveCounterState counters;
             counters.label = label;
             std::string rootLabel = label;
             rootLabel += "\\";
-            counters.rootPath = WideFromUtf8(rootLabel);
-            std::wstring readPath = L"\\LogicalDisk(";
-            readPath += logicalDisk;
-            readPath += L")\\Disk Read Bytes/sec";
-            std::wstring writePath = L"\\LogicalDisk(";
-            writePath += logicalDisk;
-            writePath += L")\\Disk Write Bytes/sec";
-            const PDH_STATUS readStatus =
-                AddCounterCompat(state.storage_.query, readPath.c_str(), &counters.readCounter);
-            const PDH_STATUS writeStatus =
-                AddCounterCompat(state.storage_.query, writePath.c_str(), &counters.writeCounter);
+            counters.rootPath = rootLabel;
+            std::string readPath = "\\LogicalDisk(";
+            readPath += label;
+            readPath += ")\\Disk Read Bytes/sec";
+            std::string writePath = "\\LogicalDisk(";
+            writePath += label;
+            writePath += ")\\Disk Write Bytes/sec";
+            const PDH_STATUS readStatus = AddCounterCompat(state.storage_.query, readPath, &counters.readCounter);
+            const PDH_STATUS writeStatus = AddCounterCompat(state.storage_.query, writePath, &counters.writeCounter);
             state.trace_.Write(TracePrefix::Telemetry,
-                ("pdh_add drive_read label=" + label + " path=\"" + Utf8FromWide(readPath) +
+                ("pdh_add drive_read label=" + label + " path=\"" + readPath +
                     "\" status=" + PdhStatusCodeString(readStatus))
                     .c_str());
             state.trace_.Write(TracePrefix::Telemetry,
-                ("pdh_add drive_write label=" + label + " path=\"" + Utf8FromWide(writePath) +
+                ("pdh_add drive_write label=" + label + " path=\"" + writePath +
                     "\" status=" + PdhStatusCodeString(writeStatus))
                     .c_str());
             state.storage_.driveCounters.push_back(std::move(counters));

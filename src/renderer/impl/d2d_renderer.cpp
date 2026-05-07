@@ -42,6 +42,7 @@ DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& opt
 }
 
 constexpr int kPanelIconAtlasCellSize = 64;
+constexpr char kLocaleName[] = "en-us";
 
 int GetPanelIconAtlasSlot(std::string_view iconName) {
     if (iconName == "cpu")
@@ -92,7 +93,8 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceMask(IWICImagingFactory*
         return bitmapSource;
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), L"PNG");
+    const std::wstring pngResourceType = WideFromUtf8("PNG");
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), pngResourceType.c_str());
     if (resource == nullptr) {
         return bitmapSource;
     }
@@ -989,6 +991,7 @@ bool D2DRenderer::CreateDWriteTextFormats() {
         return true;
     }
 
+    const std::wstring localeName = WideFromUtf8(kLocaleName);
     const auto createFormat = [&](TextStyleId style) {
         UiFontConfig fontConfig = FontConfigForStyle(style_.fonts, style);
         fontConfig.size = ScaleLogical(fontConfig.size);
@@ -1000,7 +1003,7 @@ bool D2DRenderer::CreateDWriteTextFormats() {
             DWRITE_FONT_STYLE_NORMAL,
             DWRITE_FONT_STRETCH_NORMAL,
             static_cast<FLOAT>(fontConfig.size),
-            L"en-us",
+            localeName.c_str(),
             format.GetAddressOf());
         if (FAILED(hr) || format == nullptr) {
             return false;
@@ -1117,9 +1120,9 @@ bool D2DRenderer::RebuildTextFormatsAndMetrics() {
             return 0;
         }
         Microsoft::WRL::ComPtr<IDWriteTextLayout> layout;
-        const wchar_t sample[] = L"Ag";
+        const std::wstring sample = WideFromUtf8("Ag");
         if (FAILED(dwriteFactory_->CreateTextLayout(
-                sample, static_cast<UINT32>(std::size(sample) - 1), format, 1024.0f, 1024.0f, &layout)) ||
+                sample.c_str(), static_cast<UINT32>(sample.size()), format, 1024.0f, 1024.0f, &layout)) ||
             layout == nullptr) {
             return 0;
         }

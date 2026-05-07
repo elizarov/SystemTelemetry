@@ -81,15 +81,15 @@ bool IsPermissionDenied(ULONG status) {
 }
 
 std::wstring BuildSessionName() {
-    wchar_t buffer[64] = {};
-    swprintf_s(buffer, L"CaseDashPresentedFps-%lu", static_cast<unsigned long>(GetCurrentProcessId()));
-    return buffer;
+    char buffer[64] = {};
+    sprintf_s(buffer, "CaseDashPresentedFps-%lu", static_cast<unsigned long>(GetCurrentProcessId()));
+    return WideFromUtf8(buffer);
 }
 
 void LowerAsciiInPlace(wchar_t* value, size_t length) {
     for (size_t i = 0; i < length; ++i) {
-        if (value[i] >= L'A' && value[i] <= L'Z') {
-            value[i] = static_cast<wchar_t>(value[i] - L'A' + L'a');
+        if (value[i] >= static_cast<wchar_t>('A') && value[i] <= static_cast<wchar_t>('Z')) {
+            value[i] = static_cast<wchar_t>(value[i] - static_cast<wchar_t>('A') + static_cast<wchar_t>('a'));
         }
     }
 }
@@ -97,13 +97,13 @@ void LowerAsciiInPlace(wchar_t* value, size_t length) {
 std::string CleanProcessDisplayNameUtf8(wchar_t* path, size_t pathLength) {
     size_t nameStart = 0;
     for (size_t i = 0; i < pathLength; ++i) {
-        if (path[i] == L'\\' || path[i] == L'/') {
+        if (path[i] == static_cast<wchar_t>('\\') || path[i] == static_cast<wchar_t>('/')) {
             nameStart = i + 1;
         }
     }
     size_t nameEnd = pathLength;
     for (size_t i = nameStart; i < pathLength; ++i) {
-        if (path[i] == L'.') {
+        if (path[i] == static_cast<wchar_t>('.')) {
             nameEnd = i;
         }
     }
@@ -136,7 +136,8 @@ DWORD ExtractProcessIdFromGpuEngineInstance(const wchar_t* instance) {
     if (instance == nullptr) {
         return 0;
     }
-    const wchar_t* marker = wcsstr(instance, L"pid_");
+    const std::wstring markerText = WideFromUtf8("pid_");
+    const wchar_t* marker = wcsstr(instance, markerText.c_str());
     if (marker == nullptr) {
         return 0;
     }
@@ -147,7 +148,8 @@ DWORD ExtractProcessIdFromGpuEngineInstance(const wchar_t* instance) {
 }
 
 bool IsGpu3dEngineInstance(const wchar_t* instance) {
-    return instance != nullptr && wcsstr(instance, L"engtype_3D") != nullptr;
+    const std::wstring marker = WideFromUtf8("engtype_3D");
+    return instance != nullptr && wcsstr(instance, marker.c_str()) != nullptr;
 }
 
 class PresentedFpsEtwProvider final : public FpsTelemetryProvider {
@@ -567,7 +569,7 @@ private:
         }
 
         const PDH_STATUS addStatus =
-            AddCounterCompat(gpuQuery_, L"\\GPU Engine(*)\\Utilization Percentage", &gpu3dCounter_);
+            AddCounterCompat(gpuQuery_, "\\GPU Engine(*)\\Utilization Percentage", &gpu3dCounter_);
         if (addStatus != ERROR_SUCCESS || gpu3dCounter_ == nullptr) {
             gpuUsageDiagnostics_ = " gpu3d_add=" + PdhStatusCodeString(addStatus);
             PdhCloseQuery(gpuQuery_);

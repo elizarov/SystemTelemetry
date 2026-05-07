@@ -29,7 +29,8 @@ UINT GetMonitorDpi(HMONITOR monitor) {
     }
 
     static GetDpiForMonitorFn getDpiForMonitor = []() -> GetDpiForMonitorFn {
-        HMODULE module = LoadLibraryW(L"Shcore.dll");
+        const std::wstring shcoreDll = WideFromUtf8("Shcore.dll");
+        HMODULE module = LoadLibraryW(shcoreDll.c_str());
         if (module == nullptr) {
             return nullptr;
         }

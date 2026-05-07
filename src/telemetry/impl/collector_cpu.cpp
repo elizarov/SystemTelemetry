@@ -39,14 +39,14 @@ void InitializeCpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.Write(
         TracePrefix::Telemetry, ("pdh_open cpu_query status=" + PdhStatusCodeString(queryStatus)).c_str());
     const PDH_STATUS loadStatus = AddCounterCompat(
-        state.cpu_.query, L"\\Processor Information(_Total)\\% Processor Utility", &state.cpu_.loadCounter);
+        state.cpu_.query, "\\Processor Information(_Total)\\% Processor Utility", &state.cpu_.loadCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add cpu_load path=\"\\\\Processor Information(_Total)\\\\% Processor Utility\" status=" +
             PdhStatusCodeString(loadStatus))
             .c_str());
     if (state.cpu_.loadCounter == nullptr) {
         const PDH_STATUS fallbackStatus =
-            AddCounterCompat(state.cpu_.query, L"\\Processor(_Total)\\% Processor Time", &state.cpu_.loadCounter);
+            AddCounterCompat(state.cpu_.query, "\\Processor(_Total)\\% Processor Time", &state.cpu_.loadCounter);
         state.trace_.Write(TracePrefix::Telemetry,
             ("pdh_add cpu_load_fallback path=\"\\\\Processor(_Total)\\\\% Processor Time\" "
              "status=" +
@@ -54,7 +54,7 @@ void InitializeCpuCollector(RealTelemetryCollectorState& state) {
                 .c_str());
     }
     const PDH_STATUS frequencyStatus = AddCounterCompat(
-        state.cpu_.query, L"\\Processor Information(_Total)\\Processor Frequency", &state.cpu_.frequencyCounter);
+        state.cpu_.query, "\\Processor Information(_Total)\\Processor Frequency", &state.cpu_.frequencyCounter);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_add cpu_frequency path=\"\\\\Processor Information(_Total)\\\\Processor Frequency\" status=" +
             PdhStatusCodeString(frequencyStatus))

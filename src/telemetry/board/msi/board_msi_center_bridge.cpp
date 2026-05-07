@@ -3,6 +3,8 @@
 #include <msclr\gcroot.h>
 #include <vcclr.h>
 
+#include "util/utf8.h"
+
 #using < mscorlib.dll>
 #using < System.dll>
 
@@ -12,7 +14,7 @@ using namespace System::Reflection;
 
 namespace {
 
-constexpr wchar_t kCommonApiDll[] = L"CS_CommonAPI.dll";
+constexpr char kCommonApiDll[] = "CS_CommonAPI.dll";
 constexpr int kMsiCenterServicePort = 9999;
 
 array<unsigned char> ^
@@ -20,8 +22,19 @@ array<unsigned char> ^
 
     String
     ^
+    ManagedStringFromUtf8(std::string_view text) {
+        const std::wstring wide = WideFromUtf8(text);
+        return gcnew String(wide.c_str());
+    }
+
+    void SetDiagnosticsUtf8(MsiCenterCaptureSink& sink, std::string_view text) {
+    const std::wstring wide = WideFromUtf8(text);
+    sink.SetDiagnostics(wide.c_str());
+}
+
+String ^
     CombinePath(
-        String ^ directory, const wchar_t* fileName) { return Path::Combine(directory, gcnew String(fileName)); }
+        String ^ directory, const char* fileName) { return Path::Combine(directory, ManagedStringFromUtf8(fileName)); }
 
     String
     ^
@@ -102,7 +115,7 @@ array<unsigned char> ^
                 if (length > 0) {
                     String ^ name = Text::Encoding::ASCII->GetString(bytes, 0, length)->Trim();
                     if (!String::IsNullOrWhiteSpace(name)) {
-                        return name->TrimEnd(gcnew array<wchar_t>{L'\0', L' '});
+                        return name->TrimEnd(gcnew array<wchar_t>{wchar_t{}, static_cast<wchar_t>(' ')});
                     }
                 }
             }
@@ -158,7 +171,7 @@ bool InitializeMsiCenterRuntime(
     context->msiCenterDirectory = gcnew String(msiCenterDirectory);
     context->commonAssemblyPath = CombinePath(context->msiCenterDirectory, kCommonApiDll);
     if (!File::Exists(context->commonAssemblyPath)) {
-        sink.SetDiagnostics(L"MSI Center CS_CommonAPI.dll was not found.");
+        SetDiagnosticsUtf8(sink, "MSI Center CS_CommonAPI.dll was not found.");
         return false;
     }
 
@@ -192,14 +205,14 @@ bool InitializeMsiCenterRuntime(
             context->fanNameBytesField == nullptr || context->fanNameLengthField == nullptr ||
             context->temperatureCountsField == nullptr || context->curTempIdField == nullptr ||
             context->temperatureValueField == nullptr) {
-            sink.SetDiagnostics(L"MSI Center hardware-monitor reflection members were not found.");
+            SetDiagnosticsUtf8(sink, "MSI Center hardware-monitor reflection members were not found.");
             return false;
         }
 
         pin_ptr<const wchar_t> pinnedAssemblyPath = PtrToStringChars(context->commonAssemblyPath);
         sink.TraceAssemblyLoaded(pinnedAssemblyPath);
         context->loaded = true;
-        sink.SetDiagnostics(L"MSI Center hardware-monitor runtime initialized.");
+        SetDiagnosticsUtf8(sink, "MSI Center hardware-monitor runtime initialized.");
         return true;
     } catch (Exception ^ ex) {
         String ^ exceptionText = ex->ToString();
@@ -229,14 +242,14 @@ bool CaptureMsiCenterSnapshot(
         array<unsigned char> ^ bytes = safe_cast<array<unsigned char> ^>(context->sendDataMethod->Invoke(
             nullptr, gcnew array<Object ^>{kMsiCenterServicePort, MsiCenterCurrentDataCommand()}));
         if (bytes == nullptr || bytes->Length <= 1) {
-            sink.SetDiagnostics(L"MSI Center hardware-monitor query returned no data.");
+            SetDiagnosticsUtf8(sink, "MSI Center hardware-monitor query returned no data.");
             return false;
         }
 
         String ^ json = Text::Encoding::UTF8->GetString(bytes);
         Object ^ ccEngine = context->jsonDeserializerMethod->Invoke(nullptr, gcnew array<Object ^>{json});
         if (ccEngine == nullptr) {
-            sink.SetDiagnostics(L"MSI Center hardware-monitor JSON did not deserialize.");
+            SetDiagnosticsUtf8(sink, "MSI Center hardware-monitor JSON did not deserialize.");
             return false;
         }
 
@@ -272,7 +285,7 @@ bool CaptureMsiCenterSnapshot(
         }
 
         sink.TraceQuerySuccess(availableFans, availableTemperatures);
-        sink.SetDiagnostics(L"MSI Center hardware-monitor query completed.");
+        SetDiagnosticsUtf8(sink, "MSI Center hardware-monitor query completed.");
         return true;
     } catch (Exception ^ ex) {
         String ^ exceptionText = ex->ToString();

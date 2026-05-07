@@ -8,39 +8,41 @@
 
 namespace {
 
-constexpr wchar_t kAutoStartRunSubKey[] = L"SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
-constexpr wchar_t kAutoStartValueName[] = L"CaseDash";
+constexpr char kAutoStartRunSubKey[] = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
+constexpr char kAutoStartValueName[] = "CaseDash";
 
 }  // namespace
 
-std::optional<std::wstring> ReadAutoStartCommand() {
+std::optional<std::string> ReadAutoStartCommand() {
+    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
+    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
-    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, kAutoStartRunSubKey, 0, KEY_QUERY_VALUE, &key);
+    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, runSubKey.c_str(), 0, KEY_QUERY_VALUE, &key);
     if (openStatus != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
     DWORD type = 0;
     DWORD size = 0;
-    const LSTATUS queryStatus = RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, nullptr, &size);
+    const LSTATUS queryStatus = RegQueryValueExW(key, valueName.c_str(), nullptr, &type, nullptr, &size);
     if (queryStatus != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) || size < sizeof(wchar_t)) {
         RegCloseKey(key);
         return std::nullopt;
     }
 
-    std::wstring value(size / sizeof(wchar_t), L'\0');
+    std::wstring value(size / sizeof(wchar_t), wchar_t{});
     const LSTATUS readStatus =
-        RegQueryValueExW(key, kAutoStartValueName, nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
+        RegQueryValueExW(key, valueName.c_str(), nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
     RegCloseKey(key);
     if (readStatus != ERROR_SUCCESS || value.empty()) {
         return std::nullopt;
     }
 
-    const size_t terminator = value.find(L'\0');
+    const size_t terminator = value.find(wchar_t{});
     if (terminator != std::wstring::npos) {
         value.resize(terminator);
     }
-    return value;
+    return Utf8FromWide(value);
 }
 
 bool IsAutoStartEnabledForCurrentExecutable() {
@@ -49,16 +51,17 @@ bool IsAutoStartEnabledForCurrentExecutable() {
     if (!executablePath.has_value() || !registeredCommand.has_value()) {
         return false;
     }
-    return NormalizeCommandPath(Utf8FromWide(*registeredCommand)) ==
-               NormalizeCommandPath(Utf8FromWide(*executablePath)) &&
+    return NormalizeCommandPath(*registeredCommand) == NormalizeCommandPath(executablePath->string()) &&
            IsFpsServiceRunningForCurrentExecutable();
 }
 
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
+    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
+    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
     DWORD disposition = 0;
     const LSTATUS createStatus = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-        kAutoStartRunSubKey,
+        runSubKey.c_str(),
         0,
         nullptr,
         REG_OPTION_NON_VOLATILE,
@@ -77,15 +80,15 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             RegCloseKey(key);
             return ERROR_FILE_NOT_FOUND;
         }
-        const std::wstring command = WideFromUtf8(QuoteCommandLineArgument(Utf8FromWide(*executablePath)));
+        const std::wstring command = WideFromUtf8(QuoteCommandLineArgument(executablePath->string()));
         result = RegSetValueExW(key,
-            kAutoStartValueName,
+            valueName.c_str(),
             0,
             REG_SZ,
             reinterpret_cast<const BYTE*>(command.c_str()),
             static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
     } else {
-        result = RegDeleteValueW(key, kAutoStartValueName);
+        result = RegDeleteValueW(key, valueName.c_str());
         if (result == ERROR_FILE_NOT_FOUND) {
             result = ERROR_SUCCESS;
         }
@@ -106,9 +109,10 @@ int RunElevatedAutoStartMode(bool enabled) {
 }
 
 bool UpdateAutoStartElevated(bool enabled, HWND owner) {
-    const std::wstring parameters = WideFromUtf8(enabled ? "/set-autostart on" : "/set-autostart off");
     DWORD exitCode = 1;
-    return RunElevatedSelfAndWait(owner, parameters.c_str(), nullptr, SW_HIDE, &exitCode) && exitCode == 0;
+    return RunElevatedSelfAndWait(
+               owner, enabled ? "/set-autostart on" : "/set-autostart off", {}, SW_HIDE, &exitCode) &&
+           exitCode == 0;
 }
 
 bool UpdateAutoStartRegistration(bool enabled, HWND owner) {

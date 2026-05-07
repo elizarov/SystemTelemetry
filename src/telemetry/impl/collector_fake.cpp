@@ -4,13 +4,11 @@
 #include <chrono>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 
 #include "telemetry/impl/collector_storage_selection.h"
 #include "util/file_path.h"
 #include "util/strings.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -82,21 +80,7 @@ void AssignStringList(std::vector<std::string>& target, const char* const* value
 }
 
 std::string ReadBinaryFile(const FilePath& path) {
-    std::FILE* file = nullptr;
-    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
-        return {};
-    }
-    fseek(file, 0, SEEK_END);
-    const long size = ftell(file);
-    if (size < 0) {
-        fclose(file);
-        return {};
-    }
-    fseek(file, 0, SEEK_SET);
-    std::string text(static_cast<size_t>(size), '\0');
-    const size_t read = text.empty() ? 0 : fread(text.data(), 1, text.size(), file);
-    fclose(file);
-    return read == text.size() ? text : std::string{};
+    return ReadFileBinary(path).value_or(std::string{});
 }
 
 std::vector<double> BuildSyntheticHistory(uint64_t tick, const SyntheticHistorySpec& spec) {
@@ -438,7 +422,7 @@ public:
         if (useSyntheticSource_) {
             trace_.Write(TracePrefix::Fake, "initialize_begin source=synthetic");
         } else {
-            trace_.Write(TracePrefix::Fake, "initialize_begin path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+            trace_.Write(TracePrefix::Fake, "initialize_begin path=\"" + fakePath_.string() + "\"");
         }
         if (!ReloadFakeDump(true, errorText)) {
             trace_.Write(TracePrefix::Fake, "initialize_failed");
@@ -539,10 +523,9 @@ private:
 
         const std::string input = ReadBinaryFile(fakePath_);
         if (input.empty()) {
-            trace_.Write(
-                TracePrefix::Fake, "load_failed reason=open path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+            trace_.Write(TracePrefix::Fake, "load_failed reason=open path=\"" + fakePath_.string() + "\"");
             if (required && errorText != nullptr) {
-                *errorText = "Failed to open fake telemetry file:\n" + Utf8FromWide(fakePath_.wstring());
+                *errorText = "Failed to open fake telemetry file:\n" + fakePath_.string();
             }
             return false;
         }
@@ -569,7 +552,7 @@ private:
         dump_ = sourceDump_;
         RefreshSelectionsAndSnapshot();
         lastReload_ = std::chrono::steady_clock::now();
-        trace_.Write(TracePrefix::Fake, "load_done path=\"" + Utf8FromWide(fakePath_.wstring()) + "\"");
+        trace_.Write(TracePrefix::Fake, "load_done path=\"" + fakePath_.string() + "\"");
         return true;
     }
 

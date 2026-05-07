@@ -20,9 +20,13 @@
 
 namespace {
 
-constexpr wchar_t kEngineEnvironmentControlDll[] = L"Gigabyte.Engine.EnvironmentControl.dll";
-constexpr wchar_t kSivUninstallKey[] = L"SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-constexpr wchar_t kBiosKey[] = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
+constexpr char kEngineEnvironmentControlDll[] = "Gigabyte.Engine.EnvironmentControl.dll";
+constexpr char kSivUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
+
+std::string Utf8FromNullableWide(const wchar_t* text) {
+    return text != nullptr ? Utf8FromWide(text) : std::string();
+}
 
 struct GigabyteSivSnapshot {
     bool success = false;
@@ -31,9 +35,10 @@ struct GigabyteSivSnapshot {
     std::vector<BoardSensorReading> temperatures;
 };
 
-std::optional<std::wstring> FindInstalledSivDirectory() {
+std::optional<FilePath> FindInstalledSivDirectory() {
     HKEY uninstallKey = nullptr;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, kSivUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
+    const std::wstring uninstallKeyPath = WideFromUtf8(kSivUninstallKey);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, uninstallKeyPath.c_str(), 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
@@ -44,19 +49,19 @@ std::optional<std::wstring> FindInstalledSivDirectory() {
            ERROR_SUCCESS) {
         HKEY childKey = nullptr;
         if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
-            const auto displayName = ReadRegistryString(childKey, nullptr, L"DisplayName");
+            const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
             const std::string displayNameText = displayName.value_or("");
             const bool isSiv =
                 !displayNameText.empty() && (EqualsInsensitive(displayNameText, "SIV") ||
                                                 EqualsInsensitive(displayNameText, "System Information Viewer"));
             if (isSiv) {
-                const auto installLocation = ReadRegistryWideString(childKey, nullptr, L"InstallLocation");
+                const auto installLocation = ReadRegistryWideString(childKey, nullptr, "InstallLocation");
                 if (installLocation.has_value() && !installLocation->empty()) {
                     const DWORD attributes = GetFileAttributesW(installLocation->c_str());
                     if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
                         RegCloseKey(childKey);
                         RegCloseKey(uninstallKey);
-                        return installLocation;
+                        return FilePath(*installLocation);
                     }
                 }
             }
@@ -75,25 +80,23 @@ public:
     explicit GigabyteSivCapture(Trace& trace) : trace_(trace) {}
 
     void AddFanReading(const wchar_t* title, double rpm) override {
-        snapshot_.fans.push_back(BoardSensorReading{Utf8FromWide(title != nullptr ? title : L""), rpm});
+        snapshot_.fans.push_back(BoardSensorReading{Utf8FromNullableWide(title), rpm});
     }
 
     void AddTemperatureReading(const wchar_t* title, double celsius) override {
-        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromWide(title != nullptr ? title : L""), celsius});
+        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromNullableWide(title), celsius});
     }
 
     void SetDiagnostics(const wchar_t* diagnostics) override {
-        snapshot_.diagnostics = Utf8FromWide(diagnostics != nullptr ? diagnostics : L"");
+        snapshot_.diagnostics = Utf8FromNullableWide(diagnostics);
     }
 
     void TraceAssemblyPreload(const wchar_t* path) override {
-        trace_.Write(
-            TracePrefix::GigabyteSiv, "assembly_preload path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
+        trace_.Write(TracePrefix::GigabyteSiv, "assembly_preload path=\"" + Utf8FromNullableWide(path) + "\"");
     }
 
     void TraceMonitorCreated(const wchar_t* typeName) override {
-        trace_.Write(TracePrefix::GigabyteSiv,
-            "monitor_created type=\"" + Utf8FromWide(typeName != nullptr ? typeName : L"") + "\"");
+        trace_.Write(TracePrefix::GigabyteSiv, "monitor_created type=\"" + Utf8FromNullableWide(typeName) + "\"");
     }
 
     void TraceInitializeSuccess() override {
@@ -101,13 +104,12 @@ public:
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write(TracePrefix::GigabyteSiv,
-            "initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
+        trace_.Write(TracePrefix::GigabyteSiv, "initialize_exception " + Utf8FromNullableWide(diagnostics));
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy(TracePrefix::GigabyteSiv,
-            [&] { return "snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""); });
+        trace_.WriteLazy(
+            TracePrefix::GigabyteSiv, [&] { return "snapshot_exception " + Utf8FromNullableWide(diagnostics); });
     }
 
     GigabyteSivSnapshot FinishSuccess() {
@@ -139,8 +141,8 @@ public:
         settings_ = settings;
         trace().Write(TracePrefix::GigabyteSiv, "initialize_begin");
 
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
+        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
+        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
         trace().Write(TracePrefix::GigabyteSiv,
             "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
@@ -156,7 +158,7 @@ public:
             return false;
         }
 
-        loadedLibrary_ = Utf8FromWide((FilePath(*sivDirectory_) / kEngineEnvironmentControlDll).wstring());
+        loadedLibrary_ = (*sivDirectory_ / kEngineEnvironmentControlDll).string();
         diagnostics_ = "Gigabyte SIV provider ready.";
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
@@ -203,7 +205,8 @@ public:
         }
 
         GigabyteSivCapture capture(trace());
-        const bool captured = runtime_.Capture(sivDirectory_->c_str(), capture);
+        const std::wstring sivDirectory = sivDirectory_->Wide();
+        const bool captured = runtime_.Capture(sivDirectory.c_str(), capture);
         GigabyteSivSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;
@@ -245,7 +248,7 @@ private:
     Trace& trace_;
     BoardTelemetrySettings settings_{};
     GigabyteSivRuntime runtime_;
-    std::optional<std::wstring> sivDirectory_;
+    std::optional<FilePath> sivDirectory_;
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string loadedLibrary_;

@@ -118,6 +118,7 @@ add_executable(CaseDash WIN32
     src/display/monitor.cpp
     src/util/elevated_process.cpp
     src/util/file_path.cpp
+    src/util/message_box.cpp
     src/util/numeric_format.cpp
     src/util/paths.cpp
     src/util/scale.cpp

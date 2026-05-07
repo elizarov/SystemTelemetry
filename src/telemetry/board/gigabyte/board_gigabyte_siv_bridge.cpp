@@ -3,6 +3,8 @@
 #include <msclr\gcroot.h>
 #include <vcclr.h>
 
+#include "util/utf8.h"
+
 #using < mscorlib.dll>
 #using < System.dll>
 
@@ -13,15 +15,26 @@ using namespace System::Reflection;
 
 namespace {
 
-constexpr wchar_t kEngineEnvironmentControlDll[] = L"Gigabyte.Engine.EnvironmentControl.dll";
-constexpr wchar_t kEnvironmentControlCommonDll[] = L"Gigabyte.EnvironmentControl.Common.dll";
+constexpr char kEngineEnvironmentControlDll[] = "Gigabyte.Engine.EnvironmentControl.dll";
+constexpr char kEnvironmentControlCommonDll[] = "Gigabyte.EnvironmentControl.Common.dll";
 
 bool ManagedUnitEquals(String ^ unit, String ^ expected) {
     return String::Equals(unit, expected, StringComparison::OrdinalIgnoreCase);
 }
 
-String ^ CombinePath(
-             String ^ directory, const wchar_t* fileName) { return Path::Combine(directory, gcnew String(fileName)); }
+String ^
+    ManagedStringFromUtf8(std::string_view text) {
+        const std::wstring wide = WideFromUtf8(text);
+        return gcnew String(wide.c_str());
+    }
+
+    void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
+    const std::wstring wide = WideFromUtf8(text);
+    sink.SetDiagnostics(wide.c_str());
+}
+
+String ^ CombinePath(String ^ directory,
+             const char* fileName) { return Path::Combine(directory, ManagedStringFromUtf8(fileName)); }
 
     ref class GigabyteAssemblyResolver abstract sealed {
 public:
@@ -95,11 +108,11 @@ bool InitializeGigabyteRuntime(
     context->commonAssemblyPath = CombinePath(context->sivDirectory, kEnvironmentControlCommonDll);
 
     if (!File::Exists(context->engineAssemblyPath)) {
-        sink.SetDiagnostics(L"Gigabyte.Engine.EnvironmentControl.dll was not found.");
+        SetDiagnosticsUtf8(sink, "Gigabyte.Engine.EnvironmentControl.dll was not found.");
         return false;
     }
     if (!File::Exists(context->commonAssemblyPath)) {
-        sink.SetDiagnostics(L"Gigabyte.EnvironmentControl.Common.dll was not found.");
+        SetDiagnosticsUtf8(sink, "Gigabyte.EnvironmentControl.Common.dll was not found.");
         return false;
     }
 
@@ -142,7 +155,7 @@ bool InitializeGigabyteRuntime(
             if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
                 context->titleProperty == nullptr || context->valueProperty == nullptr ||
                 context->unitProperty == nullptr) {
-                sink.SetDiagnostics(L"Gigabyte hardware-monitor reflection members were not found.");
+                SetDiagnosticsUtf8(sink, "Gigabyte hardware-monitor reflection members were not found.");
                 return false;
             }
 
@@ -152,16 +165,17 @@ bool InitializeGigabyteRuntime(
             context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
             context->fanArgs = gcnew array<Object ^>{context->sensorFan, nullptr};
             context->temperatureArgs = gcnew array<Object ^>{context->sensorTemperature, nullptr};
-            context->rpmUnit = gcnew String(L"RPM");
-            context->celsiusUnit = gcnew String(L"\u2103");
-            context->degreeCUnit = gcnew String(L"\u00B0C");
+            context->rpmUnit = ManagedStringFromUtf8("RPM");
+            context->celsiusUnit = ManagedStringFromUtf8("\xE2\x84\x83");
+            context->degreeCUnit = ManagedStringFromUtf8("\xC2\xB0"
+                                                         "C");
 
             pin_ptr<const wchar_t> pinnedTypeName = PtrToStringChars(context->monitor->GetType()->FullName);
             sink.TraceMonitorCreated(pinnedTypeName);
             context->initializeMethod->Invoke(context->monitor, gcnew array<Object ^>{context->sourceHwRegister});
             sink.TraceInitializeSuccess();
             context->loaded = true;
-            sink.SetDiagnostics(L"Gigabyte SIV hardware-monitor runtime initialized.");
+            SetDiagnosticsUtf8(sink, "Gigabyte SIV hardware-monitor runtime initialized.");
             return true;
         } finally {
             Environment::CurrentDirectory = originalDirectory;

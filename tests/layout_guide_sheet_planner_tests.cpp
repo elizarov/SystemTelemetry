@@ -28,7 +28,7 @@ ConfigParseContext TestConfigParseContext() {
 
 void LoadTestLocalizationCatalog() {
     const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
-    std::ifstream input(path, std::ios::binary);
+    std::ifstream input(path.string(), std::ios::binary);
     ASSERT_TRUE(input.good());
     std::ostringstream buffer;
     buffer << input.rdbuf();

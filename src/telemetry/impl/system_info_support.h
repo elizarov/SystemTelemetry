@@ -36,5 +36,5 @@ void ResetBoardMetricValues(std::vector<NamedScalarMetric>& metrics);
 void ApplyBoardSensorReadingsToMetrics(const std::vector<BoardSensorReading>& readings,
     const BoardMetricIndexBySourceName& indexBySourceName,
     std::vector<NamedScalarMetric>& metrics);
-std::optional<std::wstring> ReadRegistryWideString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);
-std::optional<std::string> ReadRegistryString(HKEY root, const wchar_t* subKey, const wchar_t* valueName);
+std::optional<std::wstring> ReadRegistryWideString(HKEY root, const char* subKey, const char* valueName);
+std::optional<std::string> ReadRegistryString(HKEY root, const char* subKey, const char* valueName);

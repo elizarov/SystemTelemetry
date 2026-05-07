@@ -3,9 +3,10 @@
 #include <shellapi.h>
 
 #include "util/paths.h"
+#include "util/utf8.h"
 
 bool RunElevatedSelfAndWait(
-    HWND owner, const wchar_t* parameters, const wchar_t* workingDirectory, int showCommand, DWORD* exitCode) {
+    HWND owner, std::string_view parameters, const FilePath& workingDirectory, int showCommand, DWORD* exitCode) {
     if (exitCode != nullptr) {
         *exitCode = 1;
     }
@@ -14,14 +15,19 @@ bool RunElevatedSelfAndWait(
         return false;
     }
 
+    const std::wstring wideExecutablePath = executablePath->Wide();
+    const std::wstring wideParameters = WideFromUtf8(parameters);
+    const std::wstring wideWorkingDirectory = workingDirectory.Wide();
+
     SHELLEXECUTEINFOW executeInfo{};
     executeInfo.cbSize = sizeof(executeInfo);
     executeInfo.fMask = SEE_MASK_NOCLOSEPROCESS;
     executeInfo.hwnd = owner;
-    executeInfo.lpVerb = L"runas";
-    executeInfo.lpFile = executablePath->c_str();
-    executeInfo.lpParameters = parameters != nullptr && parameters[0] != L'\0' ? parameters : nullptr;
-    executeInfo.lpDirectory = workingDirectory != nullptr && workingDirectory[0] != L'\0' ? workingDirectory : nullptr;
+    const std::wstring runAsVerb = WideFromUtf8("runas");
+    executeInfo.lpVerb = runAsVerb.c_str();
+    executeInfo.lpFile = wideExecutablePath.c_str();
+    executeInfo.lpParameters = !wideParameters.empty() ? wideParameters.c_str() : nullptr;
+    executeInfo.lpDirectory = !wideWorkingDirectory.empty() ? wideWorkingDirectory.c_str() : nullptr;
     executeInfo.nShow = showCommand;
     if (!ShellExecuteExW(&executeInfo)) {
         return false;

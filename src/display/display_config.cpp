@@ -21,21 +21,7 @@
 namespace {
 
 std::string ReadBinaryFile(const FilePath& path) {
-    std::FILE* file = nullptr;
-    if (_wfopen_s(&file, path.c_str(), L"rb") != 0 || file == nullptr) {
-        return {};
-    }
-    fseek(file, 0, SEEK_END);
-    const long size = ftell(file);
-    if (size < 0) {
-        fclose(file);
-        return {};
-    }
-    fseek(file, 0, SEEK_SET);
-    std::string text(static_cast<size_t>(size), '\0');
-    const size_t read = text.empty() ? 0 : fread(text.data(), 1, text.size(), file);
-    fclose(file);
-    return read == text.size() ? text : std::string{};
+    return ReadFileBinary(path).value_or(std::string{});
 }
 
 }  // namespace
@@ -57,7 +43,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
         return false;
     }
 
-    const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(WideFromUtf8(config.display.wallpaper)));
+    const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(config.display.wallpaper));
     if (wallpaperPath.empty()) {
         trace.Write(TracePrefix::Wallpaper, "path_empty monitor=\"" + config.display.monitorName + "\"");
         return false;
@@ -99,11 +85,12 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
             const HRESULT rectStatus = desktopWallpaper->GetMonitorRECT(monitorId, &monitorRect);
             if (SUCCEEDED(rectStatus) && RectsEqual(monitorRect, targetMonitor->rect)) {
                 targetFound = true;
-                const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wallpaperPath.c_str());
+                const std::wstring wideWallpaperPath = wallpaperPath.Wide();
+                const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
                 trace.Write(TracePrefix::Wallpaper,
                     std::string("apply_") + (applied ? "done" : "failed") + " monitor=\"" + config.display.monitorName +
-                        "\" path=\"" + Utf8FromWide(wallpaperPath.wstring()) + "\" hr=" + FormatHresult(setStatus));
+                        "\" path=\"" + wallpaperPath.string() + "\" hr=" + FormatHresult(setStatus));
                 CoTaskMemFree(monitorId);
                 break;
             }
@@ -113,8 +100,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
 
     if (!targetFound) {
         trace.Write(TracePrefix::Wallpaper,
-            "target_not_found monitor=\"" + config.display.monitorName + "\" path=\"" +
-                Utf8FromWide(wallpaperPath.wstring()) + "\"");
+            "target_not_found monitor=\"" + config.display.monitorName + "\" path=\"" + wallpaperPath.string() + "\"");
     }
 
     desktopWallpaper->Release();
@@ -147,8 +133,8 @@ bool ConfigureDisplay(
                ApplyConfiguredWallpaper(config, trace);
     }
 
-    const FilePath tempConfigPath = CreateTempFilePath(L"CaseDashConfigureDisplayConfig");
-    const FilePath tempDumpPath = CreateTempFilePath(L"CaseDashConfigureDisplayDump");
+    const FilePath tempConfigPath = CreateTempFilePath("CaseDashConfigureDisplayConfig");
+    const FilePath tempDumpPath = CreateTempFilePath("CaseDashConfigureDisplayDump");
     if (tempConfigPath.empty() || tempDumpPath.empty()) {
         return false;
     }
@@ -156,7 +142,9 @@ bool ConfigureDisplay(
     bool prepared = SaveConfig(tempConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
     if (prepared) {
         std::FILE* output = nullptr;
-        prepared = _wfopen_s(&output, tempDumpPath.c_str(), L"wb") == 0 && output != nullptr;
+        const std::wstring wideTempDumpPath = tempDumpPath.Wide();
+        const std::wstring mode = WideFromUtf8("wb");
+        prepared = _wfopen_s(&output, wideTempDumpPath.c_str(), mode.c_str()) == 0 && output != nullptr;
         if (prepared) {
             prepared = WriteTelemetryDump(output, dump);
             fclose(output);
@@ -169,17 +157,16 @@ bool ConfigureDisplay(
     }
 
     std::string parameters = "/configure-display ";
-    parameters += QuoteCommandLineArgument(Utf8FromWide(tempConfigPath.wstring()));
+    parameters += QuoteCommandLineArgument(tempConfigPath.string());
     parameters += " /configure-display-target ";
-    parameters += QuoteCommandLineArgument(Utf8FromWide(configPath.wstring()));
+    parameters += QuoteCommandLineArgument(configPath.string());
     parameters += " /configure-display-dump ";
-    parameters += QuoteCommandLineArgument(Utf8FromWide(tempDumpPath.wstring()));
+    parameters += QuoteCommandLineArgument(tempDumpPath.string());
     parameters += " /configure-display-image-target ";
-    parameters += QuoteCommandLineArgument(Utf8FromWide(imagePath.wstring()));
-    const std::wstring wideParameters = WideFromUtf8(parameters);
+    parameters += QuoteCommandLineArgument(imagePath.string());
 
     DWORD exitCode = 1;
-    const bool launched = RunElevatedSelfAndWait(owner, wideParameters.c_str(), nullptr, SW_HIDE, &exitCode);
+    const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempConfigPath);
     RemoveFileIfExists(tempDumpPath);
     return launched && exitCode == 0;

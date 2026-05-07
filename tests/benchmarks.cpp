@@ -29,6 +29,7 @@
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
     X(EditLayout, "edit-layout")                                                                                       \
@@ -329,9 +330,11 @@ public:
     }
 
     bool Initialize() {
+        const std::wstring staticClass = WideFromUtf8("STATIC");
+        const std::wstring windowTitle = WideFromUtf8("CaseDashBenchmarkHost");
         hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
-            L"STATIC",
-            L"CaseDashBenchmarkHost",
+            staticClass.c_str(),
+            windowTitle.c_str(),
             WS_POPUP,
             0,
             0,

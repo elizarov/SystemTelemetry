@@ -1,6 +1,7 @@
 #pragma once
 
 #include <optional>
+#include <string_view>
 
 #include "layout_edit_dialog/impl/state.h"
 
@@ -55,7 +56,7 @@ void RefreshLayoutEditRightPane(HWND hwnd);
 void ConfigureDialogFonts(LayoutEditDialogState* state, HWND hwnd);
 void EnsureLayoutEditDialogControls(HWND hwnd);
 void DestroyDialogFonts(LayoutEditDialogState* state);
-void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, const std::wstring& text);
+void SetLayoutEditStatus(LayoutEditDialogState* state, HWND hwnd, LayoutEditStatusKind kind, std::string_view text);
 void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int color);
 bool IsColorGradientBarControlId(int controlId);
 void DrawColorGradientBar(HWND hwnd, const DRAWITEMSTRUCT& drawItem);

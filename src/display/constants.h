@@ -4,4 +4,4 @@
 
 inline constexpr UINT kCommandConfigureDisplayBase = 2000;
 inline constexpr UINT kCommandConfigureDisplayMax = 2099;
-inline constexpr wchar_t kDefaultBlankWallpaperFileName[] = L"casedash_blank.png";
+inline constexpr char kDefaultBlankWallpaperFileName[] = "casedash_blank.png";

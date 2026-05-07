@@ -4,7 +4,7 @@
 
 ## Responsibilities
 
-- Win32-backed `FilePath` and filesystem helpers.
+- UTF-8 `FilePath` and filesystem helpers that widen only at Win32 filesystem calls.
 - Command-line text handling after one Win32-to-UTF-8 conversion at process startup.
 - String trimming, splitting, case folding, and whitespace normalization.
 - Enum string conversion.
@@ -22,4 +22,4 @@
 - `util` may depend on `util` only.
 - It does not depend on config, telemetry, renderer, widget, UI, diagnostics, or application-facing packages.
 - `strings.*` stays limited to domain-neutral string operations; config-language spelling, menu labels, telemetry labels, and UI copy live in the package that owns that contract.
-- Project filesystem operations use `src/util/file_path.*` helpers instead of `std::filesystem` so path handling stays UTF-16 Win32-backed without pulling the standard filesystem library into the executable.
+- Project filesystem operations use `src/util/file_path.*` helpers instead of `std::filesystem` so app-owned path data stays UTF-8 while filesystem calls still use the Win32 wide API.

@@ -8,7 +8,6 @@
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_model/layout_edit_hit_priority.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -31,15 +30,15 @@ std::optional<TooltipPayload> TooltipPayloadFromActiveRegion(const LayoutEditAct
     return std::nullopt;
 }
 
-std::pair<std::string, std::string> SplitTooltipLines(const std::wstring& text) {
-    const size_t crlf = text.find(L"\r\n");
-    const size_t lf = text.find(L'\n');
-    const size_t split = crlf != std::wstring::npos ? crlf : lf;
-    if (split == std::wstring::npos) {
-        return {Utf8FromWide(text), {}};
+std::pair<std::string, std::string> SplitTooltipLines(const std::string& text) {
+    const size_t crlf = text.find("\r\n");
+    const size_t lf = text.find('\n');
+    const size_t split = crlf != std::string::npos ? crlf : lf;
+    if (split == std::string::npos) {
+        return {text, {}};
     }
     const size_t descriptionStart = split + (split == crlf ? 2 : 1);
-    return {Utf8FromWide(text.substr(0, split)), Utf8FromWide(text.substr(descriptionStart))};
+    return {text.substr(0, split), text.substr(descriptionStart)};
 }
 
 bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
@@ -327,7 +326,7 @@ void BuildLayoutGuideSheetCallouts(const AppConfig& config,
             continue;
         }
         std::string tooltipError;
-        std::wstring tooltipText;
+        std::string tooltipText;
         if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }
@@ -365,7 +364,7 @@ void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
             continue;
         }
         std::string tooltipError;
-        std::wstring tooltipText;
+        std::string tooltipText;
         if (!BuildLayoutEditTooltipTextForPayload(config, *payload, tooltipText, &tooltipError)) {
             continue;
         }

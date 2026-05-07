@@ -34,7 +34,7 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
 
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
     const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
-    std::ifstream input(catalogPath, std::ios::binary);
+    std::ifstream input(catalogPath.string(), std::ios::binary);
     ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
 
     std::ostringstream buffer;

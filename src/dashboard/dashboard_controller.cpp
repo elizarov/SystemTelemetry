@@ -16,6 +16,8 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/metrics.h"
+#include "util/app_strings.h"
+#include "util/command_line.h"
 #include "util/elevated_process.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
@@ -23,6 +25,14 @@
 #include "util/utf8.h"
 
 namespace {
+
+constexpr char kTelemetryDumpFilter[] = "Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0";
+constexpr char kPngFilter[] = "PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0";
+constexpr char kIniFilter[] = "INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0";
+
+template <size_t Size> constexpr std::string_view StringViewWithTerminator(const char (&text)[Size]) {
+    return std::string_view(text, Size);
+}
 
 std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOptions& options, Trace& trace) {
     auto session = std::make_unique<DiagnosticsSession>(options, trace);
@@ -34,7 +44,7 @@ std::unique_ptr<DiagnosticsSession> CreateDiagnosticsSession(const DiagnosticsOp
 
 bool SaveConfigElevated(
     const FilePath& targetPath, const AppConfig& config, HWND owner, const ConfigParseContext& context) {
-    const FilePath tempPath = CreateTempFilePath(L"stc");
+    const FilePath tempPath = CreateTempFilePath("stc");
     if (tempPath.empty() || targetPath.empty()) {
         return false;
     }
@@ -43,14 +53,13 @@ bool SaveConfigElevated(
         return false;
     }
 
-    std::wstring parameters = L"/save-config \"";
-    parameters += tempPath.wstring();
-    parameters += L"\" /save-config-target \"";
-    parameters += targetPath.wstring();
-    parameters += L"\"";
+    std::string parameters = "/save-config ";
+    parameters += QuoteCommandLineArgument(tempPath.string());
+    parameters += " /save-config-target ";
+    parameters += QuoteCommandLineArgument(targetPath.string());
 
     DWORD exitCode = 1;
-    const bool launched = RunElevatedSelfAndWait(owner, parameters.c_str(), nullptr, SW_HIDE, &exitCode);
+    const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempPath);
     return launched && exitCode == 0;
 }
@@ -329,22 +338,24 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
     if (state_.telemetry == nullptr) {
         return;
     }
-    const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultDumpFileName, L"Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0", L"txt");
+    const auto path =
+        shell.PromptDiagnosticsSavePath(kDefaultDumpFileName, StringViewWithTerminator(kTelemetryDumpFilter), "txt");
     if (!path.has_value()) {
         return;
     }
     std::FILE* output = nullptr;
-    if (_wfopen_s(&output, path->c_str(), L"wb") != 0 || output == nullptr) {
-        const std::string pathText = Utf8FromWide(path->wstring());
-        shell.ShowError(WideFromUtf8("Failed to open dump file:\n" + pathText));
+    const std::wstring widePath = path->Wide();
+    const std::wstring mode = WideFromUtf8("wb");
+    if (_wfopen_s(&output, widePath.c_str(), mode.c_str()) != 0 || output == nullptr) {
+        const std::string pathText = path->string();
+        shell.ShowError("Failed to open dump file:\n" + pathText);
         return;
     }
     const bool written = WriteTelemetryDump(output, state_.telemetryUpdate.dump);
     fclose(output);
     if (!written) {
-        const std::string pathText = Utf8FromWide(path->wstring());
-        shell.ShowError(WideFromUtf8("Failed to write dump file:\n" + pathText));
+        const std::string pathText = path->string();
+        shell.ShowError("Failed to write dump file:\n" + pathText);
     }
 }
 
@@ -352,8 +363,8 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     if (state_.telemetry == nullptr) {
         return;
     }
-    const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultScreenshotFileName, L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0", L"png");
+    const auto path =
+        shell.PromptDiagnosticsSavePath(kDefaultScreenshotFileName, StringViewWithTerminator(kPngFilter), "png");
     if (!path.has_value()) {
         return;
     }
@@ -372,12 +383,12 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
                 ? RenderPoint{diagnosticsOptions.hoverPoint->x, diagnosticsOptions.hoverPoint->y}
                 : RenderPoint{},
             &errorText)) {
-        const std::string pathText = Utf8FromWide(path->wstring());
+        const std::string pathText = path->string();
         std::string message = "Failed to save screenshot:\n" + pathText;
         if (!errorText.empty()) {
             message += "\n\n" + errorText;
         }
-        shell.ShowError(WideFromUtf8(message));
+        shell.ShowError(message);
     }
 }
 
@@ -385,8 +396,8 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
     if (state_.telemetry == nullptr) {
         return;
     }
-    const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultLayoutGuideSheetFileName, L"PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0", L"png");
+    const auto path =
+        shell.PromptDiagnosticsSavePath(kDefaultLayoutGuideSheetFileName, StringViewWithTerminator(kPngFilter), "png");
     if (!path.has_value()) {
         return;
     }
@@ -397,24 +408,24 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
             shell.CurrentRenderScale(),
             shell.TraceLog(),
             &errorText)) {
-        const std::string pathText = Utf8FromWide(path->wstring());
+        const std::string pathText = path->string();
         std::string message = "Failed to save layout guide sheet:\n" + pathText;
         if (!errorText.empty()) {
             message += "\n\n" + errorText;
         }
-        shell.ShowError(WideFromUtf8(message));
+        shell.ShowError(message);
     }
 }
 
 void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
-    const auto path = shell.PromptDiagnosticsSavePath(
-        kDefaultSavedFullConfigFileName, L"INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0", L"ini");
+    const auto path =
+        shell.PromptDiagnosticsSavePath(kDefaultSavedFullConfigFileName, StringViewWithTerminator(kIniFilter), "ini");
     if (!path.has_value()) {
         return;
     }
     if (!SaveFullConfig(*path, BuildCurrentConfigForSaving(shell))) {
-        const std::string pathText = Utf8FromWide(path->wstring());
-        shell.ShowError(WideFromUtf8("Failed to save full config file:\n" + pathText));
+        const std::string pathText = path->string();
+        shell.ShowError("Failed to save full config file:\n" + pathText);
     }
 }
 
@@ -425,10 +436,7 @@ bool DashboardController::IsAutoStartEnabled() const {
 void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
     const bool enable = !IsAutoStartEnabled();
     if (!UpdateAutoStartRegistration(enable, shell.WindowHandle())) {
-        std::wstring message = L"Failed to ";
-        message += enable ? L"enable" : L"disable";
-        message += L" auto-start on user logon.";
-        shell.ShowError(message);
+        shell.ShowError(std::string("Failed to ") + (enable ? "enable" : "disable") + " auto-start on user logon.");
     }
 }
 
@@ -442,10 +450,10 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     updatedConfig.display.monitorName = option.configMonitorName;
     updatedConfig.display.position = {};
     updatedConfig.display.scale = option.fittedScale;
-    updatedConfig.display.wallpaper = Utf8FromWide(kDefaultBlankWallpaperFileName);
+    updatedConfig.display.wallpaper = kDefaultBlankWallpaperFileName;
     if (!::ConfigureDisplay(
             updatedConfig, state_.telemetryUpdate.dump, option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
-        shell.ShowError(L"Failed to configure the selected display.");
+        shell.ShowError("Failed to configure the selected display.");
         return false;
     }
 
@@ -799,7 +807,7 @@ bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& s
     const FilePath configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving(shell);
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
-        shell.ShowError(WideFromUtf8("Failed to save " + Utf8FromWide(configPath.wstring()) + "."));
+        shell.ShowError("Failed to save " + configPath.string() + ".");
         return false;
     }
     state_.config = std::move(config);

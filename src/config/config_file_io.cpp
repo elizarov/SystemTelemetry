@@ -14,7 +14,9 @@ bool HasValidUtf8Encoding(const std::string& text) {
 
 std::string ReadConfigFileUtf8(const FilePath& path) {
     std::FILE* input = nullptr;
-    if (_wfopen_s(&input, path.c_str(), L"rb") != 0 || input == nullptr) {
+    const std::wstring widePath = path.Wide();
+    const std::wstring mode = WideFromUtf8("rb");
+    if (_wfopen_s(&input, widePath.c_str(), mode.c_str()) != 0 || input == nullptr) {
         return {};
     }
 
@@ -50,7 +52,9 @@ bool WriteConfigFileUtf8(const FilePath& path, const std::string& text) {
     }
 
     std::FILE* output = nullptr;
-    if (_wfopen_s(&output, path.c_str(), L"wb") != 0 || output == nullptr) {
+    const std::wstring widePath = path.Wide();
+    const std::wstring mode = WideFromUtf8("wb");
+    if (_wfopen_s(&output, widePath.c_str(), mode.c_str()) != 0 || output == nullptr) {
         return false;
     }
 

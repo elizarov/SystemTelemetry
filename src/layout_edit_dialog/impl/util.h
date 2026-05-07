@@ -41,9 +41,9 @@ void SetDialogControlIntegerOrEmpty(HWND hwnd, int controlId, int value, bool ha
 void SetWindowTextUtf8(HWND hwnd, std::string_view text);
 LRESULT AddComboStringUtf8(HWND combo, std::string_view text);
 
-std::wstring FormatDialogColorHex(unsigned int color);
+std::string FormatDialogColorHex(unsigned int color);
 std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text);
-std::wstring TitleCaseWords(std::string_view text);
+std::string TitleCaseWords(std::string_view text);
 void ConfigureColorSliders(HWND hwnd);
 void ConfigureColorViewTabs(HWND hwnd, ColorEditViewMode selectedMode);
 void SetColorDialogChannel(HWND hwnd, const ColorDialogControls& channel, unsigned int value);
@@ -68,8 +68,8 @@ const ColorDialogControls* FindColorDialogControlsByEditId(int editId);
 const ColorDialogControls* FindColorDialogControlsBySliderId(int sliderId);
 
 std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd);
-void PopulateFontFaceComboBox(HWND hwnd, const std::wstring& selectedFace);
-std::wstring ReadFontDialogFaceText(HWND hwnd, UINT notificationCode);
+void PopulateFontFaceComboBox(HWND hwnd, std::string_view selectedFace);
+std::string ReadFontDialogFaceText(HWND hwnd, UINT notificationCode);
 void PopulateMetricBindingComboBox(
     HWND hwnd, const std::vector<std::string>& options, std::string_view selectedBinding, bool enableSelection);
 
@@ -77,7 +77,7 @@ std::optional<std::string> FindCardTitleValue(const AppConfig& config, const Lay
 std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config, const LayoutWeightEditKey& key);
 std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config);
 bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style);
-std::wstring BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first);
-std::wstring BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node);
-std::wstring BuildLayoutEditSummaryText(const LayoutEditTreeNode* node);
-std::wstring BuildLayoutEditHintText(const LayoutEditTreeNode* node);
+std::string BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first);
+std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node);
+std::string BuildLayoutEditSummaryText(const LayoutEditTreeNode* node);
+std::string BuildLayoutEditHintText(const LayoutEditTreeNode* node);

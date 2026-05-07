@@ -14,6 +14,7 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "util/scale.h"
+#include "util/utf8.h"
 
 LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
 
@@ -361,7 +362,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
     if (message == WM_INITDIALOG) {
         auto* state = reinterpret_cast<LayoutEditDialogState*>(lParam);
         SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
-        SetWindowTextW(hwnd, L"Edit Configuration");
+        SetWindowTextUtf8(hwnd, "Edit Configuration");
         SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
         state->dialog->UpdateSelectionHighlight(std::nullopt);
         state->dialog->Host().ApplyLayoutEditDialogIcons(hwnd);
@@ -372,8 +373,9 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         if (HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE); tree != nullptr) {
             TreeView_SetExtendedStyle(tree, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
         }
+        const std::wstring cueText = WideFromUtf8("Filter settings");
         SendDlgItemMessageW(
-            hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(L"Filter settings"));
+            hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(cueText.c_str()));
         RebuildLayoutEditTree(state, hwnd, state->initialFocus);
         state->dialog->PositionWindow(hwnd);
         ShowWindow(hwnd, SW_SHOWNORMAL);

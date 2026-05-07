@@ -7,6 +7,7 @@
 #include <optional>
 #include <shellapi.h>
 #include <string>
+#include <string_view>
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
@@ -25,7 +26,7 @@ public:
     explicit DashboardApp(const DiagnosticsOptions& diagnosticsOptions = {}, bool bringToFrontOnRun = false);
     ~DashboardApp();
     bool Initialize(HINSTANCE instance);
-    const std::wstring& LastError() const;
+    const std::string& LastError() const;
     int Run();
     bool InitializeFonts() override;
     void SetRenderConfig(const AppConfig& config);
@@ -49,8 +50,8 @@ public:
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
     std::optional<FilePath> PromptDiagnosticsSavePath(
-        const wchar_t* defaultFileName, const wchar_t* filter, const wchar_t* defaultExtension) const override;
-    void ShowError(const std::wstring& message) const override;
+        std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const override;
+    void ShowError(std::string_view message) const override;
 
 private:
     friend class DashboardShellUi;
@@ -140,8 +141,9 @@ private:
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
-    std::wstring layoutEditTooltipText_;
-    std::wstring lastError_;
+    std::string layoutEditTooltipText_;
+    std::wstring layoutEditTooltipWideText_;
+    std::string lastError_;
     bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;
     RECT layoutEditTooltipRect_{};

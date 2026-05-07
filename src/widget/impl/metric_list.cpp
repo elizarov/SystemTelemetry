@@ -7,7 +7,6 @@
 
 #include "telemetry/metrics.h"
 #include "util/strings.h"
-#include "util/utf8.h"
 #include "widget/impl/pill_bar.h"
 #include "widget/widget_host.h"
 
@@ -26,6 +25,31 @@ RenderRect OffsetRect(RenderRect rect, int dy) {
     return rect;
 }
 
+bool IsUtf8ContinuationByte(char ch) {
+    return (static_cast<unsigned char>(ch) & 0xC0u) == 0x80u;
+}
+
+size_t PreviousUtf8CodePointStart(std::string_view text, size_t end) {
+    if (end == 0) {
+        return 0;
+    }
+    size_t index = end - 1;
+    while (index > 0 && IsUtf8ContinuationByte(text[index])) {
+        --index;
+    }
+    return index;
+}
+
+size_t Utf8CodePointCount(std::string_view text) {
+    size_t count = 0;
+    for (size_t index = 0; index < text.size(); ++index) {
+        if (!IsUtf8ContinuationByte(text[index])) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 std::string FitMiddleEllipsis(const Renderer& renderer, TextStyleId style, std::string_view text, int maxWidth) {
     if (text.empty() || maxWidth <= 0) {
         return {};
@@ -40,18 +64,18 @@ std::string FitMiddleEllipsis(const Renderer& renderer, TextStyleId style, std::
     if (renderer.MeasureTextWidth(style, kEllipsis) > maxWidth) {
         return {};
     }
-    const std::wstring wide = WideFromUtf8(original);
-    if (wide.empty()) {
+
+    if (Utf8CodePointCount(original) <= kEllipsis.size() + 2) {
         return std::string(kEllipsis);
     }
 
-    if (wide.size() <= kEllipsis.size() + 2) {
-        return std::string(kEllipsis);
-    }
-
-    const std::wstring lastLetter = wide.substr(wide.size() - 1);
-    for (size_t prefixLength = wide.size() - 2; prefixLength > 0; --prefixLength) {
-        std::string candidate = Utf8FromWide(wide.substr(0, prefixLength) + L"..." + lastLetter);
+    const size_t lastStart = PreviousUtf8CodePointStart(original, original.size());
+    const std::string_view lastLetter(original.data() + lastStart, original.size() - lastStart);
+    for (size_t prefixEnd = PreviousUtf8CodePointStart(original, lastStart); prefixEnd > 0;
+        prefixEnd = PreviousUtf8CodePointStart(original, prefixEnd)) {
+        std::string candidate = original.substr(0, prefixEnd);
+        candidate += kEllipsis;
+        candidate += lastLetter;
         if (renderer.MeasureTextWidth(style, candidate) <= maxWidth) {
             return candidate;
         }

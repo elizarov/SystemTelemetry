@@ -19,8 +19,12 @@
 
 namespace {
 
-constexpr wchar_t kMsiUninstallKey[] = L"SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-constexpr wchar_t kBiosKey[] = L"HARDWARE\\DESCRIPTION\\System\\BIOS";
+constexpr char kMsiUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
+constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
+
+std::string Utf8FromNullableWide(const wchar_t* text) {
+    return text != nullptr ? Utf8FromWide(text) : std::string();
+}
 
 struct MsiCenterSnapshot {
     bool success = false;
@@ -29,9 +33,10 @@ struct MsiCenterSnapshot {
     std::vector<BoardSensorReading> temperatures;
 };
 
-std::optional<std::wstring> FindInstalledMsiCenterDirectory() {
+std::optional<FilePath> FindInstalledMsiCenterDirectory() {
     HKEY uninstallKey = nullptr;
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, kMsiUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
+    const std::wstring uninstallKeyPath = WideFromUtf8(kMsiUninstallKey);
+    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, uninstallKeyPath.c_str(), 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
@@ -42,16 +47,16 @@ std::optional<std::wstring> FindInstalledMsiCenterDirectory() {
            ERROR_SUCCESS) {
         HKEY childKey = nullptr;
         if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
-            const auto displayName = ReadRegistryString(childKey, nullptr, L"DisplayName");
+            const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
             const bool isMsiCenterSdk = displayName.has_value() && ContainsInsensitive(*displayName, "MSI Center SDK");
             if (isMsiCenterSdk) {
-                const auto installLocation = ReadRegistryWideString(childKey, nullptr, L"InstallLocation");
+                const auto installLocation = ReadRegistryWideString(childKey, nullptr, "InstallLocation");
                 if (installLocation.has_value() && !installLocation->empty()) {
                     const DWORD attributes = GetFileAttributesW(installLocation->c_str());
                     if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
                         RegCloseKey(childKey);
                         RegCloseKey(uninstallKey);
-                        return installLocation;
+                        return FilePath(*installLocation);
                     }
                 }
             }
@@ -70,20 +75,19 @@ public:
     explicit MsiCenterCapture(Trace& trace) : trace_(trace) {}
 
     void AddFanReading(const wchar_t* title, double rpm) override {
-        snapshot_.fans.push_back(BoardSensorReading{Utf8FromWide(title != nullptr ? title : L""), rpm});
+        snapshot_.fans.push_back(BoardSensorReading{Utf8FromNullableWide(title), rpm});
     }
 
     void AddTemperatureReading(const wchar_t* title, double celsius) override {
-        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromWide(title != nullptr ? title : L""), celsius});
+        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromNullableWide(title), celsius});
     }
 
     void SetDiagnostics(const wchar_t* diagnostics) override {
-        snapshot_.diagnostics = Utf8FromWide(diagnostics != nullptr ? diagnostics : L"");
+        snapshot_.diagnostics = Utf8FromNullableWide(diagnostics);
     }
 
     void TraceAssemblyLoaded(const wchar_t* path) override {
-        trace_.Write(
-            TracePrefix::MsiCenter, "assembly_loaded path=\"" + Utf8FromWide(path != nullptr ? path : L"") + "\"");
+        trace_.Write(TracePrefix::MsiCenter, "assembly_loaded path=\"" + Utf8FromNullableWide(path) + "\"");
     }
 
     void TraceQuerySuccess(int fanCount, int temperatureCount) override {
@@ -94,13 +98,12 @@ public:
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write(
-            TracePrefix::MsiCenter, "initialize_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""));
+        trace_.Write(TracePrefix::MsiCenter, "initialize_exception " + Utf8FromNullableWide(diagnostics));
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy(TracePrefix::MsiCenter,
-            [&] { return "snapshot_exception " + Utf8FromWide(diagnostics != nullptr ? diagnostics : L""); });
+        trace_.WriteLazy(
+            TracePrefix::MsiCenter, [&] { return "snapshot_exception " + Utf8FromNullableWide(diagnostics); });
     }
 
     MsiCenterSnapshot FinishSuccess() {
@@ -128,8 +131,8 @@ public:
         settings_ = settings;
         trace().Write(TracePrefix::MsiCenter, "initialize_begin");
 
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, L"BaseBoardProduct").value_or("");
+        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
+        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
         trace().Write(TracePrefix::MsiCenter,
             "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
@@ -144,7 +147,7 @@ public:
             return false;
         }
 
-        loadedLibrary_ = Utf8FromWide((FilePath(*msiCenterDirectory_) / L"CS_CommonAPI.dll").wstring());
+        loadedLibrary_ = (*msiCenterDirectory_ / "CS_CommonAPI.dll").string();
         diagnostics_ = "MSI Center provider ready.";
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
@@ -191,7 +194,7 @@ public:
         }
 
         MsiCenterCapture capture(trace());
-        const std::wstring& msiCenterDirectory = *msiCenterDirectory_;
+        const std::wstring msiCenterDirectory = msiCenterDirectory_->Wide();
         const bool captured = runtime_.Capture(msiCenterDirectory.c_str(), capture);
         MsiCenterSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
@@ -234,7 +237,7 @@ private:
     Trace& trace_;
     BoardTelemetrySettings settings_{};
     MsiCenterRuntime runtime_;
-    std::optional<std::wstring> msiCenterDirectory_;
+    std::optional<FilePath> msiCenterDirectory_;
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string loadedLibrary_;

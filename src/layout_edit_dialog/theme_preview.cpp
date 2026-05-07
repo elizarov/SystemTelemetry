@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "config/color_math.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -53,9 +54,10 @@ ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect, int dpi) {
     return {side, triangleHeight, topLabelBand, bottomLabelBand, leftX, rightX, topY, bottomX, bottomY};
 }
 
-void DrawThemePreviewLabel(HDC dc, std::wstring_view text, const RECT& rect, UINT format) {
+void DrawThemePreviewLabel(HDC dc, std::string_view text, const RECT& rect, UINT format) {
+    const std::wstring wideText = WideFromUtf8(text);
     RECT labelRect = rect;
-    DrawTextW(dc, text.data(), static_cast<int>(text.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextW(dc, wideText.data(), static_cast<int>(wideText.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 int DeviceDpiY(HDC dc) {
@@ -192,8 +194,8 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
         rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + labelInset,
         rect.right,
         rect.bottom - labelInset};
-    DrawThemePreviewLabel(dc, L"background", topLeftLabel, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
-    DrawThemePreviewLabel(dc, L"foreground", topRightLabel, DT_RIGHT | DT_TOP | DT_END_ELLIPSIS);
-    DrawThemePreviewLabel(dc, L"accent", bottomLabel, DT_CENTER | DT_TOP | DT_END_ELLIPSIS);
+    DrawThemePreviewLabel(dc, "background", topLeftLabel, DT_LEFT | DT_TOP | DT_END_ELLIPSIS);
+    DrawThemePreviewLabel(dc, "foreground", topRightLabel, DT_RIGHT | DT_TOP | DT_END_ELLIPSIS);
+    DrawThemePreviewLabel(dc, "accent", bottomLabel, DT_CENTER | DT_TOP | DT_END_ELLIPSIS);
     SelectObject(dc, oldFont);
 }

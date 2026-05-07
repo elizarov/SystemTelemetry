@@ -13,8 +13,8 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "metric_list",
         "layout_edit.metric_list_reorder",
-        L"Metric List",
-        L"Choose the metric for each row, move rows up or down, remove rows, or add a new row.",
+        "Metric List",
+        "Choose the metric for each row, move rows up or down, remove rows, or add a new row.",
         "metric_list_order"},
     {WidgetClass::ClockTime,
         LayoutNodeField::Parameter,
@@ -22,8 +22,8 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "clock_time",
         "layout_edit.clock_time_format",
-        L"Time Format",
-        L"Choose a time format. Changes preview live.",
+        "Time Format",
+        "Choose a time format. Changes preview live.",
         "date_time_format"},
     {WidgetClass::ClockDate,
         LayoutNodeField::Parameter,
@@ -31,8 +31,8 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "clock_date",
         "layout_edit.clock_date_format",
-        L"Date Format",
-        L"Choose a date format. Changes preview live.",
+        "Date Format",
+        "Choose a date format. Changes preview live.",
         "date_time_format"},
 }};
 
@@ -54,17 +54,17 @@ std::optional<LayoutNodeFieldEditKey> LayoutNodeFieldEditKeyForWidgetParameter(
                                                              : std::nullopt;
 }
 
-std::wstring LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key) {
+std::string LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key) {
     const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
-    return descriptor != nullptr ? std::wstring(descriptor->title) : L"";
+    return descriptor != nullptr ? std::string(descriptor->title) : std::string{};
 }
 
-std::wstring LayoutNodeFieldEditHint(const LayoutNodeFieldEditKey& key) {
+std::string LayoutNodeFieldEditHint(const LayoutNodeFieldEditKey& key) {
     const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
-    return descriptor != nullptr ? std::wstring(descriptor->hint) : L"";
+    return descriptor != nullptr ? std::string(descriptor->hint) : std::string{};
 }
 
-std::wstring LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& key) {
+std::string LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& key) {
     return LayoutNodeFieldEditTitle(key);
 }
 

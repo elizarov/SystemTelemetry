@@ -10,7 +10,7 @@ namespace {
 
 FilePath WriteTestConfig(const std::string& text) {
     const FilePath path = TempDirectoryPath() / "casedash_config_parser_test.ini";
-    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    std::ofstream output(path.string(), std::ios::binary | std::ios::trunc);
     output << text;
     return path;
 }

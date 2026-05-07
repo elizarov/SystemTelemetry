@@ -12,6 +12,7 @@
 #include "telemetry/fps/fps_etw_provider.h"
 #include "telemetry/fps_service_protocol.h"
 #include "util/trace.h"
+#include "util/utf8.h"
 
 namespace {
 
@@ -83,13 +84,14 @@ private:
 
 std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     diagnostics.clear();
-    if (!WaitNamedPipeW(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
+    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
+    if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
         diagnostics = "CashDash service pipe is unavailable: " + Win32ErrorText(GetLastError());
         return std::nullopt;
     }
 
     Handle pipe(CreateFileW(
-        kFpsServicePipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+        pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
         diagnostics = "Failed to connect to CashDash service pipe: " + Win32ErrorText(GetLastError());
         return std::nullopt;

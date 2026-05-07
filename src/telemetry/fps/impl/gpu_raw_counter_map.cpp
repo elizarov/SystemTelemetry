@@ -9,7 +9,7 @@ std::size_t HashGpuEngineInstance(const wchar_t* value) {
     if (value == nullptr) {
         return hash;
     }
-    while (*value != L'\0') {
+    while (*value != wchar_t{}) {
         hash ^= static_cast<std::size_t>(*value);
         hash *= 1099511628211ull;
         ++value;
@@ -78,7 +78,7 @@ void GpuRawCounterMap::Insert(const wchar_t* instance, const PDH_RAW_COUNTER& ra
     for (;;) {
         Entry& entry = entries_[slot];
         if (!entry.occupied) {
-            entry.instance = instance != nullptr ? instance : L"";
+            entry.instance = instance != nullptr ? instance : std::wstring{};
             entry.raw = raw;
             entry.occupied = true;
             ++size_;

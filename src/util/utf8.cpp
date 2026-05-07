@@ -26,7 +26,7 @@ std::wstring WideFromCodePage(std::string_view text, unsigned int codePage, DWOR
         return {};
     }
 
-    std::wstring result(static_cast<size_t>(required), L'\0');
+    std::wstring result(static_cast<size_t>(required), wchar_t{});
     MultiByteToWideChar(codePage, flags, text.data(), length, result.data(), required);
     return result;
 }
@@ -66,7 +66,7 @@ std::string Utf8FromCodePage(std::string_view text, unsigned int codePage) {
         return {};
     }
 
-    std::wstring wide(static_cast<size_t>(wideLength), L'\0');
+    std::wstring wide(static_cast<size_t>(wideLength), wchar_t{});
     MultiByteToWideChar(codePage, 0, text.data(), length, wide.data(), wideLength);
     return Utf8FromWideChars(wide);
 }

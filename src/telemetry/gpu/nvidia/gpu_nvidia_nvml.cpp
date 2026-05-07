@@ -73,9 +73,11 @@ public:
     }
 
     bool Load(std::string& diagnostics) {
-        module_ = LoadLibraryW(L"nvml.dll");
+        const std::wstring nvmlLibrary = WideFromUtf8("nvml.dll");
+        module_ = LoadLibraryW(nvmlLibrary.c_str());
         if (module_ == nullptr) {
-            module_ = LoadLibraryW(L"nvidia-ml.dll");
+            const std::wstring nvidiaMlLibrary = WideFromUtf8("nvidia-ml.dll");
+            module_ = LoadLibraryW(nvidiaMlLibrary.c_str());
         }
         if (module_ == nullptr) {
             diagnostics = "NVML library not found.";
