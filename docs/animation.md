@@ -289,6 +289,11 @@ The render thread discards any update whose surface generation does not match it
 - Drops animation geometry from the old generation.
 - Keeps animation data only when the new update carries compatible data keys.
 
+The immediate renderer implementation follows the same data rule inside `DashboardAnimationTimeline`: config,
+layout, row-order, scale, and render-mode changes keep keyed scalar and throughput tracks alive. A track is removed
+only when its data key is not touched by the next live normal frame, so compatible metrics continue from their current
+interpolated value after layout edits instead of restarting from zero.
+
 The main thread always publishes a complete snapshot layer after a size, DPI, scale, or layout change. Partial updates are valid only within one surface generation.
 
 ## Dirty Rectangles

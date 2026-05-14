@@ -73,7 +73,6 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
         InvalidateMetricSourceCache();
         metricLookupCache_.Clear();
     }
-    animationTimeline_.Reset();
     config_ = config;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:reconfigure_failed" : renderer_->LastError();
@@ -87,7 +86,6 @@ void DashboardRenderer::SetRenderScale(double scale) {
         return;
     }
     renderScale_ = nextScale;
-    animationTimeline_.Reset();
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:rescale_failed" : renderer_->LastError();
     }
@@ -108,9 +106,6 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
 }
 
 void DashboardRenderer::SetRenderMode(RenderMode mode) {
-    if (renderMode_ != mode) {
-        animationTimeline_.Reset();
-    }
     renderMode_ = mode;
 }
 
