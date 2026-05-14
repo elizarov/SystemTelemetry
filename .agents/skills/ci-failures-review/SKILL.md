@@ -1,6 +1,6 @@
 ---
 name: ci-failures-review
-description: Review and fix CI or GitHub Actions workflow failures for this repository, especially requests to inspect the latest failed Validation workflow on a branch, download failed-step logs or artifacts, identify the first actionable diagnostic, patch the code narrowly, and run only the minimal local validation needed for the changed files.
+description: "Use only when explicitly invoked: investigate CaseDash CI failures."
 ---
 
 # CI Failures Review

@@ -1,6 +1,6 @@
 ---
 name: benchmark-performance-review
-description: Review CaseDash benchmark performance against docs/profile_benchmark.md baselines, run the full CaseDashBenchmarks suite, investigate repeatable regressions, fix performance problems, and record retained or rejected performance experiments. Use when asked to check benchmark health, compare current performance with baselines, run all benchmarks, profile benchmark hotspots, or repair renderer, layout-edit, layout-guide-sheet, telemetry, theme-change, layout-switch, or mouse-hover benchmark regressions.
+description: "Use only when explicitly invoked: review CaseDash benchmark performance."
 ---
 
 # Benchmark Performance Review

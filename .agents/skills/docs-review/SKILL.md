@@ -1,6 +1,6 @@
 ---
 name: docs-review
-description: Review and edit repository documentation. Use when asked to review docs, fix documentation quality, remove changelog-style wording, deduplicate docs, or normalize project documentation.
+description: "Use only when explicitly invoked: review CaseDash documentation."
 ---
 
 # Docs Review

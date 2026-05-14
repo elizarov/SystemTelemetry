@@ -1,6 +1,6 @@
 ---
 name: optimize-size
-description: Analyze and reduce the CaseDash shipped executable size. Use when asked to review executable size, continue docs/optimize_size.md experiments, shrink build\CaseDash.exe, inspect linker map summaries for large object or symbol contributors, or make size-focused code-shape and architecture changes while preserving behavior and performance.
+description: "Use only when explicitly invoked: reduce CaseDash executable size."
 ---
 
 # Optimize Size

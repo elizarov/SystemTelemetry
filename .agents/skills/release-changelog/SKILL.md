@@ -1,6 +1,6 @@
 ---
 name: release-changelog
-description: Create and refresh CaseDash release changelog entries in docs/changelog.md. Use when preparing release notes, summarizing user-visible changes since the latest Git tag, creating a top changelog chunk, or checking the machine-readable changelog format before release.
+description: "Use only when explicitly invoked: prepare CaseDash release changelog."
 ---
 
 # Release Changelog
