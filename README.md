@@ -51,7 +51,7 @@ Good areas to explore:
 
 Open an issue and write what you want to achieve.
 
-- **GPU telemetry and board sensor modules.** Do you have unsupported hardware? Open Codex or Claude, give it full access, tell it which provider software exposes fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the existing ones. Grill it to make integration as light as possible, then send a detailed PR.
+- **GPU telemetry and board sensor modules.** Do you have unsupported hardware? Open Codex or Claude, give it full access, tell it which provider software exposes fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the existing ones. Keep the vendor-selection mapping and known-machine test fixture described in [docs/hardware.md](docs/hardware.md) updated, grill the integration to keep it light, then send a detailed PR.
 
 - **Linux users:** are you interested? What hardware do you have? A Linux port would be a cool project to undertake; write up your use cases.
 

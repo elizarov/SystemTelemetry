@@ -195,9 +195,11 @@ add_executable(CaseDash WIN32
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/gpu_vendor_selection.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
@@ -293,6 +295,7 @@ set(casedash_release_speed_sources
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
@@ -301,6 +304,7 @@ set(casedash_release_speed_sources
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/gpu_vendor_selection.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -534,6 +538,7 @@ add_executable(CaseDashTests
     tests/config_parser_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
+    tests/hardware_vendor_selection_tests.cpp
     tests/system_info_support_tests.cpp
     tests/fps_service_protocol_tests.cpp
     tests/telemetry_retained_history_tests.cpp
@@ -576,6 +581,8 @@ add_executable(CaseDashTests
     src/util/numeric_safety.cpp
     src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
+    src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/gpu/gpu_vendor_selection.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
     src/telemetry/metrics.cpp
@@ -709,9 +716,11 @@ add_executable(CaseDashBenchmarks
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/gpu_vendor_selection.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp

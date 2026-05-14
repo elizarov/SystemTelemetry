@@ -22,7 +22,6 @@ namespace {
 
 constexpr char kEngineEnvironmentControlDll[] = "Gigabyte.Engine.EnvironmentControl.dll";
 constexpr char kSivUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 std::string Utf8FromNullableWide(const wchar_t* text) {
     return text != nullptr ? Utf8FromWide(text) : std::string();
@@ -135,18 +134,18 @@ private:
 
 class GigabyteSivBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit GigabyteSivBoardTelemetryProvider(Trace& trace) : trace_(trace) {}
+    GigabyteSivBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) : trace_(trace), info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
         trace().Write(TracePrefix::GigabyteSiv, "initialize_begin");
 
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
+        boardManufacturer_ = info_.manufacturer;
+        boardProduct_ = info_.product;
         trace().Write(TracePrefix::GigabyteSiv,
             "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
-        if (!ContainsInsensitive(boardManufacturer_, "gigabyte")) {
+        if (SelectBoardVendor(info_) != BoardVendor::Gigabyte) {
             diagnostics_ = "Baseboard manufacturer is not Gigabyte.";
             return false;
         }
@@ -246,6 +245,7 @@ private:
     }
 
     Trace& trace_;
+    BoardVendorInfo info_;
     BoardTelemetrySettings settings_{};
     GigabyteSivRuntime runtime_;
     std::optional<FilePath> sivDirectory_;
@@ -265,6 +265,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(Trace& trace) {
-    return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateGigabyteBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) {
+    return std::make_unique<GigabyteSivBoardTelemetryProvider>(trace, std::move(info));
 }

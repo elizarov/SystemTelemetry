@@ -6,6 +6,7 @@
 
 enum class TracePrefix : unsigned char {
     AmdAdlx,
+    BoardVendor,
     Crash,
     Diagnostics,
     Fake,

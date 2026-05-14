@@ -8,7 +8,8 @@
 - Package-private collectors perform synchronous provider work behind `TelemetryRuntime`.
 - Windows-native collection covers CPU, memory, network, storage, and clock data.
 - Hardware providers extend collection with supported GPU and board telemetry paths.
-- GPU telemetry selects one provider from the primary non-software DXGI adapter identity; unsupported GPU providers expose only presented FPS.
+- GPU telemetry extracts the primary non-software DXGI adapter identity, maps it through the pure GPU vendor-selection module, and creates one matching provider; unsupported GPU providers expose only presented FPS.
+- Board telemetry extracts baseboard registry strings, maps them through the pure board vendor-selection module, and creates one matching provider.
 - Presented-FPS collection asks `CashDashService` over `\\.\pipe\CashDashService` first, then falls back to local ETW collection when the service is absent or unreachable.
 - The FPS pipe protocol uses a generic request envelope with a stable request id and request name. The current FPS query is `PresentedFpsSample` / `presented_fps_sample`.
 - The metric catalog adapts snapshots and metric definitions into widget-facing metric values, histories, drive rows, and formatted text.
@@ -17,8 +18,8 @@
 
 ## Subpackages
 
-- `telemetry/board/` contains board-provider selection plus supported provider bridges.
-- `telemetry/gpu/` contains GPU provider bridges and unsupported-GPU fallback behavior.
+- `telemetry/board/` contains board-provider extraction, pure vendor selection, supported provider bridges, and unsupported-board fallback behavior.
+- `telemetry/gpu/` contains GPU-provider extraction, pure vendor selection, supported provider bridges, and unsupported-GPU fallback behavior.
 - `telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, with `telemetry/fps/impl/` for provider-local helpers such as the GPU raw-counter map.
 - `telemetry/impl/` contains collector submodules and system-info support.
 

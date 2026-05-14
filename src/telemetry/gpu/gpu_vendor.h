@@ -4,6 +4,7 @@
 #include <optional>
 #include <string>
 
+#include "telemetry/gpu/gpu_vendor_selection.h"
 #include "util/trace.h"
 
 struct GpuVendorTelemetrySample {
@@ -29,4 +30,5 @@ public:
     virtual GpuVendorTelemetrySample Sample() = 0;
 };
 
+std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace);
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace);

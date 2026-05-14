@@ -20,7 +20,6 @@
 namespace {
 
 constexpr char kMsiUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
-constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 std::string Utf8FromNullableWide(const wchar_t* text) {
     return text != nullptr ? Utf8FromWide(text) : std::string();
@@ -125,18 +124,18 @@ private:
 
 class MsiCenterBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit MsiCenterBoardTelemetryProvider(Trace& trace) : trace_(trace) {}
+    MsiCenterBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) : trace_(trace), info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
         trace().Write(TracePrefix::MsiCenter, "initialize_begin");
 
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
+        boardManufacturer_ = info_.manufacturer;
+        boardProduct_ = info_.product;
         trace().Write(TracePrefix::MsiCenter,
             "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
 
-        if (!ContainsInsensitive(boardManufacturer_, "micro-star") && !ContainsInsensitive(boardManufacturer_, "msi")) {
+        if (SelectBoardVendor(info_) != BoardVendor::Msi) {
             diagnostics_ = "Baseboard manufacturer is not MSI.";
             return false;
         }
@@ -236,6 +235,7 @@ private:
     }
 
     Trace& trace_;
+    BoardVendorInfo info_;
     BoardTelemetrySettings settings_{};
     MsiCenterRuntime runtime_;
     std::optional<FilePath> msiCenterDirectory_;
@@ -255,6 +255,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateMsiBoardTelemetryProvider(Trace& trace) {
-    return std::make_unique<MsiCenterBoardTelemetryProvider>(trace);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateMsiBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) {
+    return std::make_unique<MsiCenterBoardTelemetryProvider>(trace, std::move(info));
 }

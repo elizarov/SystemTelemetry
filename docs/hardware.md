@@ -10,8 +10,18 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Unsupported or unavailable hardware providers do not prevent the dashboard from running; their provider-owned values render as unavailable.
 - GPU telemetry selects the supported hardware provider from the primary non-software DXGI adapter identity.
 - Board telemetry selects the supported hardware provider from the baseboard manufacturer.
+- Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
 - Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
 - Empty CPU and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
+
+## Adding Hardware Support
+
+- Provider selection stays split into three steps: extract vendor info, map vendor info to the vendor enum, and create the matching provider.
+- GPU extraction reads the primary non-software DXGI adapter identity into `GpuVendorInfo`, including the PCI vendor id and adapter name.
+- Board extraction reads baseboard registry strings into `BoardVendorInfo`, including manufacturer and product.
+- Vendor mapping lives in `src/telemetry/gpu/gpu_vendor_selection.*` and `src/telemetry/board/board_vendor_selection.*`; provider factories instantiate modules only after that mapping returns a supported enum value.
+- Each added GPU or board hardware module extends `tests/hardware_vendor_selection_tests.cpp` with a known-machine fixture from hardware that has actually run CaseDash. Record the GPU vendor id and adapter string for GPU support, the board manufacturer and product strings for board support, and the expected vendor enum values.
+- Runtime requirements, telemetry behavior, trace markers, and troubleshooting for supported providers stay in this file. README and website hardware sections remain concise summaries that point here for details.
 
 ## Presented FPS
 

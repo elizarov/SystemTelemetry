@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "config/telemetry_settings.h"
+#include "telemetry/board/board_vendor_selection.h"
 #include "telemetry/metric_types.h"
 #include "util/trace.h"
 
@@ -30,4 +31,5 @@ public:
     virtual BoardVendorTelemetrySample Sample() = 0;
 };
 
+BoardVendorInfo ExtractBoardVendorInfo();
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace);

@@ -18,6 +18,8 @@ const char* TracePrefixText(TracePrefix prefix) {
     switch (prefix) {
         case TracePrefix::AmdAdlx:
             return "amd_adlx:";
+        case TracePrefix::BoardVendor:
+            return "board_vendor:";
         case TracePrefix::Crash:
             return "crash:";
         case TracePrefix::Diagnostics:

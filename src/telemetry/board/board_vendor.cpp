@@ -1,9 +1,10 @@
 #include "telemetry/board/board_vendor.h"
 
+#include <utility>
+
 #include "telemetry/board/gigabyte/board_gigabyte_siv.h"
 #include "telemetry/board/msi/board_msi_center.h"
 #include "telemetry/impl/system_info_support.h"
-#include "util/strings.h"
 #include "util/trace.h"
 
 namespace {
@@ -12,14 +13,12 @@ constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 class UnsupportedBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    explicit UnsupportedBoardTelemetryProvider(Trace& trace) : trace_(trace) {}
+    UnsupportedBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) : trace_(trace), info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
-        boardManufacturer_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
-        boardProduct_ = ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or("");
         sample_.providerName = "Unsupported";
-        sample_.boardManufacturer = boardManufacturer_;
-        sample_.boardProduct = boardProduct_;
+        sample_.boardManufacturer = info_.manufacturer;
+        sample_.boardProduct = info_.product;
         sample_.requestedFanNames = settings.requestedFanNames;
         sample_.requestedTemperatureNames = settings.requestedTemperatureNames;
         sample_.fans = CreateRequestedBoardMetrics(settings.requestedFanNames, ScalarMetricUnit::Rpm);
@@ -28,7 +27,7 @@ public:
         sample_.available = false;
         sample_.diagnostics = "No supported board telemetry provider matches the baseboard manufacturer.";
         trace_.Write(TracePrefix::UnsupportedBoard,
-            "initialize manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+            "initialize manufacturer=\"" + info_.manufacturer + "\" product=\"" + info_.product + "\"");
         return true;
     }
 
@@ -38,22 +37,36 @@ public:
 
 private:
     Trace& trace_;
-    std::string boardManufacturer_;
-    std::string boardProduct_;
+    BoardVendorInfo info_;
     BoardVendorTelemetrySample sample_;
 };
 
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
+    Trace& trace, BoardVendor vendor, BoardVendorInfo info) {
+    if (vendor == BoardVendor::Msi) {
+        return CreateMsiBoardTelemetryProvider(trace, std::move(info));
+    }
+    if (vendor == BoardVendor::Gigabyte) {
+        return CreateGigabyteBoardTelemetryProvider(trace, std::move(info));
+    }
+
+    return std::make_unique<UnsupportedBoardTelemetryProvider>(trace, std::move(info));
+}
+
 }  // namespace
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
-    const std::string manufacturer =
-        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or("");
-    if (ContainsInsensitive(manufacturer, "micro-star") || ContainsInsensitive(manufacturer, "msi")) {
-        return CreateMsiBoardTelemetryProvider(trace);
-    }
-    if (ContainsInsensitive(manufacturer, "gigabyte")) {
-        return CreateGigabyteBoardTelemetryProvider(trace);
-    }
+BoardVendorInfo ExtractBoardVendorInfo() {
+    return BoardVendorInfo{
+        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or(""),
+        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or(""),
+    };
+}
 
-    return std::make_unique<UnsupportedBoardTelemetryProvider>(trace);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
+    BoardVendorInfo info = ExtractBoardVendorInfo();
+    const BoardVendor vendor = SelectBoardVendor(info);
+    trace.Write(TracePrefix::BoardVendor,
+        std::string("create vendor=") + BoardVendorName(vendor) + " manufacturer=\"" + info.manufacturer +
+            "\" product=\"" + info.product + "\"");
+    return CreateBoardProviderForVendor(trace, vendor, std::move(info));
 }
