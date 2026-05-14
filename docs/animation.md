@@ -1,57 +1,364 @@
-# Animation
+# Dashboard Animation
 
-The following elements of the ui are going to be animated:
-- Bars in metrics and drive usage
-- Gauge display widgets
-- Charts in throughput widget
+This document owns the target live-dashboard animation behavior and implementation architecture.
+See also: [docs/specifications.md](specifications.md) for current user-visible dashboard behavior, [docs/layout_edit.md](layout_edit.md) for layout-edit interaction, [docs/diagnostics.md](diagnostics.md) for deterministic render exports, [docs/profile_benchmark.md](profile_benchmark.md) for renderer performance baselines, and [docs/architecture.md](architecture.md) for package boundaries.
 
-The goal is to have those visual displays animates so that it feels smooth in between 500 ms metrics updates, not jittery, but keep the CPU consumption very low. Thus we don't animate any text changes which are expensive to paint. The text is still going to be updated every 500 ms on metrics update. After text updated, 
-the actual visual value change is animated from the old the new value over the 
-course of the next 500 ms.
+## Purpose
 
-The drawing of the up is split into three layers:
-- Snapshot layer contains backgrounds, card chrome, all the text and background for animated elements (bar and gauge tracks, chart background). It updates on all metrics updates and on all layout changes.
-- Animation layer contains animated elements. It is redrawn on each animation frame. 
-- Overlay layer (optional) contains all overlays that are drawn on top of animaitons. This includes layout edit guides and anchors, edit dialog highlihghts, and move overlay. It is redrawn on all edit layout changes, including mouse drags. The overlay layer is used and crated only when there are overlays to show. In the normal operation it is not even allocated. 
+The live dashboard animates visual metric indicators between telemetry snapshots so values feel continuous across the 0.5 second telemetry cadence while keeping idle CPU usage low.
 
-Threading architecture:
-- Metrics update thread is responsible for updaing metrics every 500 ms and ships updates the main thread.
-- Main thread is processing all mouse events and metrics update. Redraws snapshot layer and overlay layer into in-memory bitmaps and ships them to the render thread. Note that snapshot is not transparent, while overlay is rendered with transparensy.
-- Render is responsible for actually presenting the frame to device. It uses DXGI flip-model swap chain to sync the actual frame to vsync, takes pre-rendered snapshot layout, draws the current state of animaion on top of it, then blts the overlay on top, and presents the frame.
+Animation is scoped to data-driven visuals:
 
-## Code architecture
+- Metric-list pill-bar fill and recent-peak marker.
+- Drive-usage pill-bar fill and read/write stacked activity fill.
+- Gauge value fill and recent-peak indicator.
+- Throughput chart plot, leader position, time-marker phase, and vertical scale.
 
-- The widget module ecapsulates the geometry of the shapes and animation. The actuall paint code of the widgets is split. The widget's draw paints the snasphost layer and produces a list of animations. Note, that this call is happening in the main thread.
-- The animations are represented by the interface which encapsulates the actualy draw logaic. Which there are 4 widgets that do animations (drive_usage, metric_list, gauage, throughput), there are only 3 actual animation implementations for animations: pill bar, gauge, and chart. 
-- The animation contains the snapshot of all the geometry -- the bounding box of the animation and all the other geometric parameters that are needed for it to be drawn. It does not keep the reference to the widget nor to configuration object, so that it can be safelly shipped to the render thread, while the main thread is free to concurrently modify anything.
-- The animation object keep the actual values to be draw separately, under a separate type-erased interface. There are actually only two kinds of data objects:   
-   - one for keeping bar and gaguage data which consists of two fractions: for value and for max ghost. Name TBD.
-   - one for keeping char bars data.
-- The render thread own and remember the previous data it was provided with. When new animation objects arrive it now has old and new copy of data, which it uses to linearly interpolate animation between old and new data points for 500 ms and draw the interpolated data on each frame.
-- If metric updates arrive to the render thread before 500 ms of animation has elapsed, the render thread that the currently interpolated value between old pair of old+new data as the old data, so that animation still continues in a smooth way.
-- In order to identify the data, the key consisting of widget type and metrics name is used. Widgets may idependently produce the same data inside different animation objects. Render thread may (but does not have to) depulicate this animated data by key in order to compute interpolated values for drawing. 
+The implementation does not animate text, card chrome, widget labels, layout geometry, or edit affordance strokes. Text continues to update only when a new telemetry snapshot is accepted.
 
-## Animation interpolation details
+## Current Architecture Fit
 
-- Bar and gauge data are linearly interpolated. The care shall only be take for NaN that might happen in place of missing values. 
-- Chart data contains the horizontal phase shift and the computed max value for chart. The goal is that all of the following is smoothly animated: horizontal shift of the chart on new data arriving to the right, change of vertical scale when chart maximum changes, and leader up/down movement to the last value. The actual data design for chart data is TBD.
+The current code already provides several pieces the animation design depends on:
 
-## Interaction with layout edit drag
+- `TelemetryRuntime` owns the 500 ms worker cadence and publishes copied `TelemetryUpdate` objects to `DashboardApp`.
+- `DashboardApp::EnqueueTelemetryUpdate()` already uses an overwrite-style main-thread handoff: a newer pending update replaces the older one before the UI thread drains it.
+- `DashboardRenderer` owns dashboard layout resolution, widget traversal, renderer style selection, metric-source caching, and layout-edit artifact collection.
+- Widget implementations already separate geometry resolution from drawing through `ResolveLayoutState()` and `Draw()`.
+- Animated visuals are concentrated in a small set of widget helpers: `DrawWidgetPillBar()` in `widget/impl/pill_bar.*`, gauge arc drawing in `widget/impl/gauge.*`, drive activity and usage drawing in `widget/impl/drive_usage_list.*`, and throughput graph drawing in `widget/impl/throughput.*`.
+- `MetricSource` already exposes normalized scalar ratios, recent-peak ratios, smoothed throughput histories, shared throughput graph maxima, and time-marker offsets.
+- The live renderer and screenshot renderer use the same Direct2D and DirectWrite scene, so deterministic diagnostics rendering can keep reusing the existing immediate draw path.
 
-During layout edit rows in metrics list can be dragged up/down and the whole widgets or layout contrainers can be dragged up/down or left/right with mouse. This whole interaction is orhestrated by the main thread, which draws the updates snapshot layer and shipts update the resulting bitmaps of snapshot and overlay layers to the render thread, inlucindg updated animations geometry. However, this may create a situation where a rectangle is being dragged over underling widgets and on top of animations displayed there. It is the task of the main tread to check for intersections between underlying animation's rectanged and dragged-over-object and clip the bounding boxes of the underlying animation. It is the responsibility of the render thread to respect the clipping rectangles when drawing the animation. 
+The current code is missing the pieces that make live animation possible:
 
-Note, that render thread also uses those animation clipping rectangles to efficiently present animation to DXGI flip chain, notify which areas need to change on animation and avoid repaining of the whole dashboard window on animation.
+- The live window draw path is immediate-mode and UI-thread-owned: `DashboardApp::Paint()` calls `DashboardRenderer::DrawWindow()`, which draws the full frame into `D2DRenderer` synchronously.
+- `D2DRenderer` currently owns a single-threaded Direct2D factory and an `ID2D1HwndRenderTarget`; it does not expose a render-thread presenter, shared layer bitmaps, bitmap blits, DXGI flip-model presentation, or dirty-rectangle presentation.
+- Widgets currently draw static text, tracks, fills, peak markers, edit regions, and overlay-affecting dynamic artifacts in one `Draw()` call.
+- There is no renderer-safe animation scene contract, animation data key, interpolation state, render-thread mailbox, bitmap pool, or resize-generation synchronization.
+- Layout-edit dragged-child replay currently happens by re-entering widget draw code in the normal frame rather than by composing independent static and animated layers.
 
-## Other architectural considerations
+## Target Behavior
 
-- Direct2D engine has to be created in multithreaded mode, as multiple threads (main and render) will use it.
-- Cached palette will have to have a separate instance for main and render threads, since main thread might be modifying palette while render thread is still redering with the old one.
-- The render thread owners HWND and the actual device. The API to set HWND shall not be publically exposed outside of dashboard_renderer module, only the API of the render thread.
-- The main thread post updates to the reder thread, but does not queue them. The most recent update overwrites the previous one if it was not picked up by render thread yet (it may happen on fast mouse-drags during layout edits, for example)
-- In order for render thread to know what changed, the main thread provides separate versions to its updates: version of snapshot bitmap, version of the metrics, version of the palette. The render thread compares with the last known version to know what to update. The important case is when layout is changing (due to edit), so snapshot update and new animations geometry is being delivered, but metrics did not change, the render thread continues to animate metrics on its current animation time, keeping the old data values from the previous metrics update.
-- Bitmaps are not allocated/freed at will, but use a shared pool. Main thread takes from the pool the fresh one to paint (it gets created only when there not bitmap in the pool), publishes rendered bitmaps of snapshot/overlay layers for render thread (if old published object gets replace its bitmaps go back to pool), then render thread returns bitmaps to pool when it finished with the frame.
-- A care needs to be take to syncrhonize structural changes (windows size) between the main thread and render thread. Design TBD.
+On every accepted telemetry snapshot, the main thread updates static text immediately and publishes new animation target values. The first presented frame after that snapshot shows the new text with the animated visuals still at the previous visual value. The visuals interpolate to the new target over the next 500 ms.
 
-## Detailed module ownership
+If a newer telemetry snapshot arrives before the previous 500 ms interpolation finishes, the render thread samples the current interpolated value at the arrival time and uses that sampled value as the start value for the new interpolation. Visual motion stays continuous.
 
-TBD
+When an animation key appears without previous render-thread data, the render thread creates a zero-initialized start value. This applies on application startup and when a metric first appears after a layout, binding, row-order, or drive-selection change.
+
+When a metric target becomes unavailable, permission-gated, or otherwise not drawable, the text updates immediately while the visual animates from its current value to zero. The visual disappears after the zero-value animation completes.
+
+Animation runs only while at least one active animation is in progress or while the main thread publishes layer updates. After all animations reach their targets, the render thread presents the final frame and waits without running a frame loop.
+
+The animation duration is the telemetry refresh cadence. Production code exposes one shared 500 ms cadence constant and uses it for both telemetry collection scheduling and dashboard animation duration.
+
+Blank render mode, screenshot exports, layout-guide-sheet exports, app-icon exports, unit tests, and other deterministic offscreen renders do not use live interpolation. They render the target snapshot values directly through the deterministic draw path. UI-attached diagnostics screenshots also render target values rather than the currently interpolated live frame.
+
+## Layer Model
+
+The live dashboard frame is composed from three layer classes.
+
+### Snapshot Layer
+
+The snapshot layer is opaque. It contains:
+
+- Dashboard background, card chrome, headers, static labels, and all text.
+- Animated-widget static backgrounds, including pill-bar tracks, gauge track segments, chart background, chart axes, and non-animated chart labels.
+- Static content for the current layout-edit drag state when that content belongs below animated fills.
+
+The main thread repaints the snapshot layer when telemetry text changes, layout or scale changes, theme/style changes, render mode changes, or layout-edit drag state changes.
+
+### Animation Layer
+
+The animation layer is not stored as a bitmap. It is a list of immutable animation primitives plus a render-thread data timeline. The render thread redraws only the current animation primitives on each animation frame.
+
+Animation primitives contain only renderer-safe geometry and render color ids. They do not retain widget objects, config references, metric-source references, string views, or main-thread-owned containers.
+
+Each animation primitive also carries a composition plane:
+
+- `AboveSnapshot` draws the primitive after the snapshot layer and before the overlay layer.
+- `AboveOverlay` draws the primitive after the overlay layer.
+
+Normal dashboard visuals use `AboveSnapshot`. Animated values that belong to a dragged child use `AboveOverlay` so the dragged child can keep animating while its static overlay representation tracks the pointer above the dashboard.
+
+### Overlay Layer
+
+The overlay layer is transparent and optional. It contains layout-edit affordances, selected-tree highlights, drag outlines, dragged-child static replay that must appear above underlying animations, and the move overlay. It is allocated only when an overlay is visible.
+
+The main thread repaints the overlay layer on layout-edit hover changes, drag changes, move-mode changes, and editor selection changes. Normal dashboard operation keeps no overlay bitmap alive.
+
+## Threading Model
+
+### Telemetry Worker
+
+The telemetry worker keeps its current responsibility: collect telemetry on a 500 ms cadence, skip missed intervals after stalls or sleep, and publish copied updates through the existing sink contract.
+
+### Main Thread
+
+The main thread owns Win32 input, menu flow, layout-edit interaction, config mutation, layout resolution, deterministic offscreen rendering, and layer construction.
+
+For the live dashboard, the main thread:
+
+- Accepts telemetry updates from the existing pending-update handoff.
+- Resolves the latest `MetricSource`.
+- Builds an immutable `DashboardAnimationScene` from the resolved layout and metric data.
+- Paints the opaque snapshot bitmap and optional transparent overlay bitmap.
+- Publishes the most recent layer update to the render thread through an overwrite-only mailbox.
+
+The main thread does not queue stale layer updates. If a new drag frame or telemetry snapshot is ready before the render thread consumes the previous update, the previous unpublished bitmap references return to the bitmap pool.
+
+### Render Thread
+
+The render thread owns the HWND presenter, the live render-target device state, animation timelines, target-local bitmap uploads, and frame presentation.
+
+The render thread:
+
+- Consumes only the latest mailbox update.
+- Keeps previous animation data by key.
+- Computes interpolated animation values for the current frame time.
+- Composes snapshot, `AboveSnapshot` animation primitives, overlay, and `AboveOverlay` animation primitives in that order.
+- Presents the frame through a DXGI flip-model swap chain with vsync pacing while animations are active.
+- Sleeps when no animation and no new layer update is pending.
+
+The render-thread HWND/device API remains package-private inside `dashboard_renderer`; shell code initializes the dashboard renderer with an HWND but does not receive direct render-thread controls.
+
+## Animation Scene Contracts
+
+### Data Keys
+
+Animation data is keyed independently from draw geometry so multiple primitives can share the same interpolated data.
+
+`AnimationDataKey` contains:
+
+- `AnimationDataKind kind`.
+- `std::string subject`.
+- Optional `std::string lane`.
+
+Stable subjects use metric refs where possible:
+
+- Metric-list rows and gauges use the metric ref, such as `cpu.load` or `gpu.vram`.
+- Throughput charts use the throughput metric ref, such as `network.upload`.
+- Drive usage uses the stable drive label or letter plus `used`.
+- Drive activity uses the stable drive label or letter plus `read` or `write`.
+
+The key follows the logical data source rather than the visual slot. Reordering metric rows or moving widgets preserves interpolation continuity when the same metric remains visible.
+
+### Scalar Samples
+
+`ScalarFillSample` is the shared data object for pill bars, gauge values, drive usage, and drive activity.
+
+Fields:
+
+- `std::optional<double> valueRatio` - normalized value in `[0, 1]`; `std::nullopt` means unavailable and draws no value fill.
+- `std::optional<double> peakRatio` - normalized recent-peak or recent-max indicator in `[0, 1]`; `std::nullopt` means no peak indicator.
+
+The main thread clamps finite values before publishing. It publishes `std::nullopt` instead of NaN or infinity. The render thread clamps again before drawing so stale or malformed data cannot escape into geometry.
+
+### Throughput Samples
+
+`ThroughputChartSample` is the shared data object for throughput chart animation.
+
+Fields:
+
+- `std::vector<double> samples` - smoothed retained-history samples in display order.
+- `double maxGraph` - shared vertical graph maximum for the chart group.
+- `double timeMarkerOffsetSamples` - horizontal time-marker phase in sample units.
+- `double guideStepMbps` - guide spacing selected from the target max.
+
+The sample vector uses the same smoothed adjacent-pair history that `MetricSource::ResolveThroughput()` exposes today. The render thread treats non-finite sample values as `0`.
+
+### Animation Primitives
+
+`DashboardAnimationPrimitive` is a value type with:
+
+- `AnimationPrimitiveKind kind`.
+- `AnimationCompositionPlane plane`.
+- `AnimationDataKey dataKey`.
+- `RenderRect bounds`.
+- One geometry payload for the primitive kind.
+
+Primitive kinds:
+
+- `PillBar` - draws the animated fill and optional peak marker inside a prepainted track.
+- `Gauge` - draws the animated gauge value and optional peak marker over prepainted track segments.
+- `ThroughputChart` - draws animated chart grid elements that depend on scale or phase, plot polyline, and leader over the prepainted chart background.
+- `StackedActivity` - draws the animated filled portions of drive read/write activity indicators over prepainted empty segments.
+
+The main thread tags each primitive with the plane matching its static content. A dragged child publishes its own animated primitives as `AboveOverlay`; underlying widgets keep their ordinary `AboveSnapshot` primitives. No main-thread visibility subtraction is needed for drag overlap.
+
+## Interpolation
+
+### Scalar Interpolation
+
+Scalar fill values and peak values use linear interpolation:
+
+```text
+value = start + (target - start) * progress
+```
+
+`progress` is clamped to `[0, 1]` across the 500 ms animation duration.
+
+First-seen and unavailable values behave as follows:
+
+- Missing previous value to available: the render thread synthesizes a zero start value and animates from zero to the target.
+- Available to unavailable: the target becomes zero; the value fill animates down to zero, then disappears.
+- Unavailable to available: the render thread synthesizes a zero start value and animates from zero to the target.
+- Missing peak to present peak: the peak marker appears at the target position.
+- Present peak to missing peak: the peak marker animates to zero with the value and then disappears.
+
+### Gauge Interpolation
+
+Gauge animation uses `ScalarFillSample`. The gauge value interpolates as a continuous normalized value, then renders as whole filled segments for the current interpolated value. Segment gaps remain empty, and the draw path does not render partial segment sweeps.
+
+The peak indicator uses the interpolated `peakRatio` and snaps to the whole segment representation chosen for gauge peak drawing.
+
+### Activity Interpolation
+
+Drive read/write activity animation uses `ScalarFillSample`. The value interpolates continuously, then renders as whole filled stacked segments for the current interpolated value. Segment gaps remain empty, and partial segment fill is not drawn.
+
+### Throughput Interpolation
+
+Throughput chart animation interpolates the visible chart shape rather than only the newest point:
+
+- `maxGraph` interpolates linearly so vertical rescaling is smooth.
+- `timeMarkerOffsetSamples` interpolates forward in sample units so time markers drift smoothly between telemetry samples.
+- The leader y-position interpolates from the previous displayed latest value to the new displayed latest value.
+- Plot samples interpolate by visual x-position, not by vector index alone, so the new rightmost sample enters smoothly while older samples slide left.
+
+When the previous and target sample vectors have different lengths, the render thread aligns both vectors by the newest sample. Missing older samples use `0`.
+
+The max-value text label belongs to the snapshot layer and updates only on telemetry snapshots. Guide lines whose position depends on `maxGraph` belong to the animation layer so graph rescaling does not jump while the label changes.
+
+## Layout Edit And Drag Interaction
+
+Layout-edit interaction stays orchestrated by the main thread. The render thread never performs hit testing or config mutation.
+
+Dynamic edit artifacts are collected from the snapshot build using the target telemetry snapshot and target layout geometry. Hit testing does not follow per-frame interpolated animation geometry.
+
+During a metric-list row reorder drag, the main thread publishes animation geometry for the row's current drag position. The vacated row slot does not publish a duplicate animation primitive for that row.
+
+During a container-child reorder drag, the dragged child keeps animating while it tracks the pointer above underlying dashboard content. The main thread draws the dragged child's static content into the overlay layer and tags that child's animation primitives as `AboveOverlay`. Underlying widgets keep ordinary `AboveSnapshot` primitives. The main thread does not compute drag-overlap visibility subtraction for animation primitives.
+
+Move mode uses the overlay layer for monitor name, scale, and relative-coordinate text. The dashboard content underneath continues to animate unless move-mode throttling is explicitly enabled later.
+
+## Renderer And Bitmap Ownership
+
+The implementation keeps widget semantics outside `renderer` and backend details inside `renderer`.
+
+Renderer-facing additions are generic:
+
+- Opaque and transparent layer bitmap allocation.
+- Drawing into a caller-provided layer bitmap.
+- Uploading or binding a layer bitmap for composition.
+- Drawing a bitmap at a render-space origin.
+- Presenting a composed live frame with optional dirty rectangles.
+- Presenting the live frame through a DXGI flip-model swap chain.
+
+`renderer` does not know about metrics, widgets, animation keys, gauges, charts, or layout-edit drag rules.
+
+Each thread owns its renderer caches:
+
+- The main thread owns the offscreen layer painter and its palette/text/icon caches.
+- The render thread owns the live presenter and its palette/text/icon/bitmap caches.
+- Palette and renderer style updates are copied by value into each thread. No thread mutates a palette that another thread can read.
+
+If Direct2D resources are shared across threads, the Direct2D factory is created in multithreaded mode and access follows the Direct2D multithread locking contract. If layer bitmaps are CPU/WIC-backed and uploaded per update, each renderer instance may keep thread-local Direct2D factories instead.
+
+## Window Size And DPI Synchronization
+
+Window size, render scale, and DPI changes use a monotonically increasing `surfaceGeneration`.
+
+Each layer update carries:
+
+- `surfaceGeneration`.
+- Pixel width and height.
+- Render scale.
+- Snapshot version.
+- Overlay version.
+- Animation geometry version.
+- Metric version.
+- Style version.
+
+The render thread discards any update whose surface generation does not match its current live target. When the generation changes, it:
+
+- Finishes the current frame if one is in progress.
+- Releases target-local layer bitmaps for the old size.
+- Recreates or resizes the live presentation target.
+- Drops animation geometry from the old generation.
+- Keeps animation data only when the new update carries compatible data keys.
+
+The main thread always publishes a complete snapshot layer after a size, DPI, scale, or layout change. Partial updates are valid only within one surface generation.
+
+## Dirty Rectangles
+
+Telemetry snapshot updates and layout/style changes present the full window because they update the snapshot layer or animation geometry.
+
+Animation geometry changes only when the snapshot version or overlay version changes. If neither version changed, animation geometry is unchanged and animation-only frames may mark the current animation primitive bounds dirty without merging old and new boxes.
+
+When the snapshot version or overlay version changes, the render thread treats the whole live surface as dirty. Config edits, layout edits, and active drags redraw at least one of those layers on the main thread, so the render thread does not try to infer smaller dirty regions from old and new animation geometry. During active drags, the overlay bitmap version changes on each drag frame, and the render thread cannot inspect the overlay's internal delta.
+
+## Module Ownership
+
+The first implementation should avoid a new top-level source package unless the source dependency rules are updated in the same change. The target ownership is:
+
+- `src/widget/animation_types.h`
+  - Owns D2D-free animation DTOs: data keys, sample types, primitive kinds, geometry payloads, and scene containers.
+  - Depends only on `renderer/render_types.h`, standard library types, and lower-level utility helpers when needed.
+- `src/widget/impl/pill_bar.*`
+  - Keeps pill-bar geometry helpers.
+  - Adds helpers that produce `PillBar` animation primitives and draw pill-bar snapshot tracks.
+- `src/widget/impl/gauge.*`
+  - Keeps gauge layout-state resolution.
+  - Adds helpers that produce `Gauge` animation primitives and draw gauge snapshot tracks/text.
+- `src/widget/impl/drive_usage_list.*`
+  - Adds `PillBar` primitives for usage bars and `StackedActivity` primitives for read/write indicators.
+- `src/widget/impl/metric_list.*`
+  - Adds `PillBar` primitives for each visible metric row and keeps row text in the snapshot layer.
+- `src/widget/impl/throughput.*`
+  - Adds `ThroughputChart` primitives and keeps chart label text in the snapshot layer.
+- `src/widget/widget_host.h`
+  - Adds a widget-host method for registering animation primitives with the current scene build.
+- `src/dashboard_renderer/dashboard_renderer.*`
+  - Owns live scene building, deterministic draw fallback, layer build orchestration, and render-thread handoff.
+  - Keeps the existing immediate draw path for deterministic offscreen rendering.
+- `src/dashboard_renderer/impl/animation_scene_builder.*`
+  - Owns conversion from widget-registered primitives plus `MetricSource` values into immutable `DashboardAnimationScene` updates.
+- `src/dashboard_renderer/impl/animation_timeline.*`
+  - Owns render-thread interpolation state, data-key maps, interruption handling, and value sampling.
+  - Creates zero-initialized start samples for first-seen animation keys.
+- `src/dashboard_renderer/impl/layer_bitmap_pool.*`
+  - Owns reusable layer bitmap allocation and recycling.
+- `src/dashboard_renderer/impl/render_thread.*`
+  - Owns the live render thread, mailbox, surface generation, presentation loop, and renderer/presenter instance.
+- `src/renderer/*`
+  - Owns generic bitmap, composition, and presentation primitives only.
+  - Keeps Direct2D, DirectWrite, WIC, Direct3D, and DXGI implementation details inside `src/renderer/impl/`.
+- `src/telemetry/telemetry.h`
+  - Exposes the shared 500 ms telemetry refresh cadence constant consumed by both `TelemetryRuntime` and dashboard animation.
+- `src/dashboard/dashboard_app.*`
+  - Keeps shell input, invalidation, telemetry update draining, and layout-edit interaction.
+  - Calls dashboard-renderer APIs instead of owning render-thread details.
+- `tests/*`
+  - Adds focused tests for scalar interpolation, interrupted animations, throughput vector alignment, surface-generation discard behavior, and animation composition-plane tagging.
+- `tests/benchmarks.cpp`
+  - Keeps deterministic paint benchmarks and adds a live-animation frame benchmark only after the live render thread exists.
+
+## Validation
+
+Implementation validation should use staged checks:
+
+- Unit-test interpolation and composition-plane tagging without creating a window.
+- Keep existing screenshot, active-region, layout-guide-sheet, and widget tests deterministic by rendering target values directly.
+- Run `build.cmd` and `test.cmd` after implementation changes.
+- Run `build.cmd /benchmarks` and compare `edit-layout`, `mouse-hover`, `layout-switch`, `theme-change`, and `update-telemetry` against [docs/profile_benchmark.md](profile_benchmark.md) baselines when live draw-path behavior changes.
+- Add focused diagnostics screenshot validation for blank mode, layout-edit hover, metric-list row drag, container-child drag, and throughput chart rendering.
+
+## Resolved Design Choices
+
+- Drive read/write stacked activity indicators animate in the first implementation.
+- Gauge and drive-activity visuals render whole filled segments during animation.
+- The live presenter uses a DXGI flip-model swap chain from the first implementation.
+- Dragged widgets and container children keep animating while dragged; dragged-child animation primitives render above the overlay layer.
+- First-seen animation keys animate from zero, including application startup.
+- Unavailable targets animate down to zero before disappearing.
+- Animation duration is the shared 500 ms telemetry cadence constant.
+- Diagnostics screenshots render target values, including UI-attached diagnostics screenshots.
+- Throughput max text updates on telemetry snapshots with the rest of the text; only drawn chart geometry animates.

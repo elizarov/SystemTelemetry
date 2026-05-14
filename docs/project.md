@@ -6,6 +6,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Documentation Ownership
 
 - `docs/specifications.md` owns general user-visible runtime behavior.
+- `docs/animation.md` owns planned live-dashboard animation behavior, animation render-thread architecture, and animation-specific implementation contracts.
 - `docs/hardware.md` owns supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
 - `docs/layout_edit.md` owns layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
