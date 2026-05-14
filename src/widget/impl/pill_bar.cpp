@@ -25,11 +25,15 @@ void FillPill(Renderer& renderer, const RenderRect& rect, RenderColorId color) {
 
 class WidgetPillBarAnimation final : public WidgetAnimation {
 public:
-    WidgetPillBarAnimation(AnimationDataKey key, RenderRect rect, ScalarFillSample target)
-        : key_(std::move(key)), rect_(rect), target_(std::move(target)) {}
+    WidgetPillBarAnimation(WidgetAnimationLayer layer, AnimationDataKey key, RenderRect rect, ScalarFillSample target)
+        : layer_(layer), key_(std::move(key)), rect_(rect), target_(std::move(target)) {}
 
     const AnimationDataKey& Key() const override {
         return key_;
+    }
+
+    WidgetAnimationLayer Layer() const override {
+        return layer_;
     }
 
     WidgetAnimationStatePtr TargetState() const override {
@@ -41,6 +45,7 @@ public:
     }
 
 private:
+    WidgetAnimationLayer layer_ = WidgetAnimationLayer::Snapshot;
     AnimationDataKey key_;
     RenderRect rect_{};
     ScalarFillSample target_;
@@ -110,6 +115,7 @@ std::optional<RenderRect> DrawWidgetPillBar(
     return DrawWidgetPillBarAnimated(renderer.Renderer(), rect, sample);
 }
 
-WidgetAnimationPtr MakeWidgetPillBarAnimation(AnimationDataKey key, RenderRect rect, ScalarFillSample target) {
-    return std::make_unique<WidgetPillBarAnimation>(std::move(key), rect, std::move(target));
+WidgetAnimationPtr MakeWidgetPillBarAnimation(
+    WidgetAnimationLayer layer, AnimationDataKey key, RenderRect rect, ScalarFillSample target) {
+    return std::make_unique<WidgetPillBarAnimation>(layer, std::move(key), rect, std::move(target));
 }

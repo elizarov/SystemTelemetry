@@ -20,6 +20,8 @@ public:
     virtual int PreferredHeight(const WidgetHost& renderer) const = 0;
     virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
     virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
+    virtual void DrawOverlay(
+        WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
     virtual void BuildEditGuides(WidgetHost& renderer, const struct WidgetLayout& widget) const;
     virtual void BuildStaticAnchors(WidgetHost& renderer, const struct WidgetLayout& widget) const;
 };

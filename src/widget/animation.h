@@ -11,6 +11,11 @@ class WidgetAnimationTransition;
 using WidgetAnimationStatePtr = std::unique_ptr<WidgetAnimationState>;
 using WidgetAnimationTransitionPtr = std::unique_ptr<WidgetAnimationTransition>;
 
+enum class WidgetAnimationLayer {
+    Snapshot,
+    Overlay,
+};
+
 class WidgetAnimationTransition {
 public:
     virtual ~WidgetAnimationTransition() = default;
@@ -36,6 +41,7 @@ public:
     virtual ~WidgetAnimation() = default;
 
     virtual const AnimationDataKey& Key() const = 0;
+    virtual WidgetAnimationLayer Layer() const = 0;
     virtual WidgetAnimationStatePtr TargetState() const = 0;
     virtual void Draw(::Renderer& renderer, const WidgetAnimationState& state) const = 0;
 };

@@ -19,4 +19,5 @@ std::optional<RenderRect> DrawWidgetPillBar(
     WidgetHost& renderer, const RenderRect& rect, const ScalarFillSample& sample);
 std::optional<RenderRect> WidgetPillBarPeakMarkerRect(
     const Renderer& renderer, const RenderRect& rect, const ScalarFillSample& sample);
-WidgetAnimationPtr MakeWidgetPillBarAnimation(AnimationDataKey key, RenderRect rect, ScalarFillSample target);
+WidgetAnimationPtr MakeWidgetPillBarAnimation(
+    WidgetAnimationLayer layer, AnimationDataKey key, RenderRect rect, ScalarFillSample target);

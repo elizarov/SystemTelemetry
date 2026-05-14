@@ -9,6 +9,8 @@
 - Own the registered artifact storage, shared affordance presets, and low-level anchor-region construction used by layout editing.
 - Own the fixed-slot metric definition and sample-text lookup cache in `impl/metric_lookup_cache.*`.
 - Own the live dashboard animation timeline in `impl/animation_timeline.*`; widgets publish stable animation keys and opaque target states through `WidgetHost`, while deterministic offscreen rendering bypasses interpolation.
+- Draw the dashboard in an ordered snapshot pass and optional overlay pass. `DashboardOverlayState::ShouldDrawOverlayLayer()` is the renderer gate that skips overlay traversal and overlay animation flushing when no overlay content is visible.
+- Keep snapshot and overlay widget animation lists separate while resolving both lists through the same keyed timeline, so layout edits can move widget content between layers without restarting data animation.
 - Keep widget animation sample types, transition details, and render geometry payloads out of the dashboard-renderer boundary; those details stay package-private under `widget`.
 - Render selected and hovered layout-edit highlights, layout and widget guides, gap anchors, size-similarity indicators, dotted outlines, and dragged container-child replay.
 - Produce copied `LayoutEditActiveRegions` snapshots for live layout editing and diagnostics screenshot validation.

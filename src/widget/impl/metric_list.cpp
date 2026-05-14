@@ -155,7 +155,8 @@ void DrawMetricListRow(WidgetHost& renderer,
     }
     const std::string subject = rowIndex < static_cast<int>(metricRefs.size()) ? metricRefs[rowIndex] : std::string{};
     DrawWidgetPillBarTrack(renderer.Renderer(), barRect);
-    renderer.AddWidgetAnimation(MakeWidgetPillBarAnimation(AnimationDataKey{subject, {}}, barRect, targetSample));
+    renderer.AddWidgetAnimation(MakeWidgetPillBarAnimation(
+        renderer.CurrentWidgetAnimationLayer(), AnimationDataKey{subject, {}}, barRect, targetSample));
     const std::optional<RenderRect> peakMarkerRect =
         WidgetPillBarPeakMarkerRect(renderer.Renderer(), barRect, targetSample);
     if (!registerEditRegions) {
@@ -265,7 +266,6 @@ void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
     const auto dragState = renderer.ActiveMetricListReorderDrag(
         LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
     const int draggedIndex = dragState.has_value() ? dragState->currentIndex : -1;
-    const std::string* draggedMetricRef = nullptr;
     int rowIndex = 0;
     for (const auto& metricRef : metricRefs_) {
         if (rowIndex >= static_cast<int>(layoutState_.rowRects.size())) {
@@ -277,31 +277,34 @@ void MetricListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
         }
         if (rowIndex != draggedIndex) {
             DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, rowIndex, *row, 0, true);
-        } else {
-            draggedMetricRef = &metricRef;
         }
 
         ++rowIndex;
     }
+    renderer.Renderer().PopClipRect();
+}
 
-    if (dragState.has_value() && draggedIndex >= 0 && draggedIndex < rowIndex && draggedMetricRef != nullptr &&
-        draggedIndex < static_cast<int>(layoutState_.rowRects.size())) {
-        const MetricValue* draggedRow = metrics.FindMetric(*draggedMetricRef);
-        if (draggedRow == nullptr) {
-            renderer.Renderer().PopClipRect();
-            return;
-        }
-        const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
-        const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
-        DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, false);
-        const RenderRect outlineRect = OffsetRect(layoutState_.rowRects[draggedIndex], yOffset);
-        const bool hoverEquivalent = renderer.CurrentRenderMode() == WidgetHost::RenderMode::LayoutGuideSheet;
-        const RenderColorId outlineColor = hoverEquivalent ? RenderColorId::LayoutGuide : RenderColorId::ActiveEdit;
-        const int outlineWidth = hoverEquivalent ? (std::max)(1, renderer.Renderer().ScaleLogical(1))
-                                                 : (std::max)(2, renderer.Renderer().ScaleLogical(2));
-        renderer.Renderer().DrawSolidRect(
-            outlineRect, RenderStroke::Dotted(outlineColor, static_cast<float>(outlineWidth)));
+void MetricListWidget::DrawOverlay(
+    WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
+    const auto dragState = renderer.ActiveMetricListReorderDrag(
+        LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath});
+    if (!dragState.has_value()) {
+        return;
     }
+    const int draggedIndex = dragState->currentIndex;
+    if (draggedIndex < 0 || draggedIndex >= static_cast<int>(metricRefs_.size()) ||
+        draggedIndex >= static_cast<int>(layoutState_.rowRects.size())) {
+        return;
+    }
+    const MetricValue* draggedRow = metrics.FindMetric(metricRefs_[draggedIndex]);
+    if (draggedRow == nullptr) {
+        return;
+    }
+
+    renderer.Renderer().PushClipRect(widget.rect);
+    const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
+    const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
+    DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, false);
     renderer.Renderer().PopClipRect();
 }
 

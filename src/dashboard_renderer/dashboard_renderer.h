@@ -101,6 +101,7 @@ public:
     int ScaleLogical(int value) const;
     std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const override;
+    WidgetAnimationLayer CurrentWidgetAnimationLayer() const override;
     void AddWidgetAnimation(WidgetAnimationPtr animation) override;
 
 private:
@@ -110,6 +111,7 @@ private:
 
     void DrawMoveOverlay(const DashboardMoveOverlayState& overlayState);
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
+    void DrawResolvedWidgetOverlay(const WidgetLayout& widget, const MetricSource& metrics);
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
     void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -130,9 +132,13 @@ private:
     void BuildStaticEditableAnchors();
     void DrawFrameWithAnimations(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
+    void DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
+    void DrawOverlayLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
     void BeginWidgetAnimationCollection();
-    void FlushWidgetAnimations();
+    void BeginWidgetAnimationLayer(WidgetAnimationLayer layer);
+    void FlushWidgetAnimations(WidgetAnimationLayer layer);
     void EndWidgetAnimationCollection();
+    std::vector<WidgetAnimationPtr>& WidgetAnimationsForLayer(WidgetAnimationLayer layer);
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -182,7 +188,9 @@ private:
     bool interactiveDragTraceActive_ = false;
     bool liveAnimationEnabled_ = false;
     bool widgetAnimationCollectionActive_ = false;
+    WidgetAnimationLayer currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
     const DashboardOverlayState* activeOverlayState_ = nullptr;
     DashboardAnimationTimeline animationTimeline_;
-    std::vector<WidgetAnimationPtr> widgetAnimations_;
+    std::vector<WidgetAnimationPtr> snapshotWidgetAnimations_;
+    std::vector<WidgetAnimationPtr> overlayWidgetAnimations_;
 };

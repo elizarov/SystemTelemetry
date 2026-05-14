@@ -277,17 +277,22 @@ void DrawGraphAnimated(Renderer& renderer,
 
 class ThroughputChartAnimation final : public WidgetAnimation {
 public:
-    ThroughputChartAnimation(AnimationDataKey key,
+    ThroughputChartAnimation(WidgetAnimationLayer layer,
+        AnimationDataKey key,
         RenderRect rect,
         ThroughputGraphLayout layout,
         ThroughputChartSample target,
         double timeMarkerIntervalSamples,
         bool drawValues)
-        : key_(std::move(key)), rect_(rect), layout_(layout), target_(std::move(target)),
+        : layer_(layer), key_(std::move(key)), rect_(rect), layout_(layout), target_(std::move(target)),
           timeMarkerIntervalSamples_(timeMarkerIntervalSamples), drawValues_(drawValues) {}
 
     const AnimationDataKey& Key() const override {
         return key_;
+    }
+
+    WidgetAnimationLayer Layer() const override {
+        return layer_;
     }
 
     WidgetAnimationStatePtr TargetState() const override {
@@ -310,6 +315,7 @@ public:
     }
 
 private:
+    WidgetAnimationLayer layer_ = WidgetAnimationLayer::Snapshot;
     AnimationDataKey key_;
     RenderRect rect_{};
     ThroughputGraphLayout layout_{};
@@ -406,7 +412,8 @@ void ThroughputWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
         targetSample.maxGraph,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontSmall, 2, renderer.Config().layout.fonts.smallText.size));
-    renderer.AddWidgetAnimation(std::make_unique<ThroughputChartAnimation>(AnimationDataKey{metric_, {}},
+    renderer.AddWidgetAnimation(std::make_unique<ThroughputChartAnimation>(renderer.CurrentWidgetAnimationLayer(),
+        AnimationDataKey{metric_, {}},
         layout.graphRect,
         layout,
         targetSample,

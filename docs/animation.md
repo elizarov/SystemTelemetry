@@ -28,13 +28,14 @@ The current code already provides several pieces the animation design depends on
 - `MetricSource` already exposes normalized scalar ratios, recent-peak ratios, smoothed throughput histories, shared throughput graph maxima, and time-marker offsets.
 - The live renderer and screenshot renderer use the same Direct2D and DirectWrite scene, so deterministic diagnostics rendering can keep reusing the existing immediate draw path.
 
-The current implementation adds the shared animation cadence, public animation identity and opaque state interfaces, widget-private animation state implementations, renderer-owned keyed interpolation state, widget-host animation submission, live repaint scheduling, and deterministic offscreen bypass. It still does not include the target renderer split described below:
+The current implementation adds the shared animation cadence, public animation identity and opaque state interfaces, widget-private animation state implementations, renderer-owned keyed interpolation state, widget-host animation submission, live repaint scheduling, deterministic offscreen bypass, and an immediate-mode snapshot/overlay layer split. The render-thread presenter described below remains future work:
 
 - The live window draw path is immediate-mode and UI-thread-owned: `DashboardApp::Paint()` calls `DashboardRenderer::DrawWindow()`, which draws the full frame into `D2DRenderer` synchronously.
 - `D2DRenderer` currently owns a single-threaded Direct2D factory and an `ID2D1HwndRenderTarget`; it does not expose a render-thread presenter, shared layer bitmaps, bitmap blits, DXGI flip-model presentation, or dirty-rectangle presentation.
-- Widgets draw snapshot text, tracks, and edit artifacts before submitting widget-owned animation objects, but the snapshot, animations, and overlay still render during one UI-thread frame rather than through independent render-thread layers.
+- `DashboardRenderer` draws the snapshot layer, flushes snapshot-tagged widget animations, resolves dynamic edit-artifact collisions, checks `DashboardOverlayState::ShouldDrawOverlayLayer()`, and draws the overlay layer only when that predicate reports visible overlay content.
+- Widgets draw snapshot text and tracks while submitting widget-owned animation objects tagged with the current dashboard layer. Widget overlay hooks submit overlay-tagged animations for content that moves above the base dashboard during layout editing.
 - There is no render-thread mailbox, bitmap pool, or resize-generation synchronization.
-- Layout-edit dragged-child replay currently happens by re-entering widget draw code in the normal frame rather than by composing independent static and animated layers.
+- Layout-edit dragged-child replay currently happens by re-entering widget draw code in the overlay pass under the drag translation. Its widget animations use the overlay tag and the same keyed timeline as snapshot animations.
 
 ## Target Behavior
 
@@ -43,6 +44,8 @@ On every accepted telemetry snapshot, the main thread updates static text immedi
 If a newer telemetry snapshot arrives before the previous 500 ms interpolation finishes, the render thread samples the current interpolated value at the arrival time and uses that sampled value as the start value for the new interpolation. Visual motion stays continuous.
 
 When an animation key appears without previous render-thread data, the render thread creates a zero-initialized start value. This applies on application startup and when a metric first appears after a layout, binding, row-order, or drive-selection change.
+
+When a layout edit changes widget geometry or row order but keeps the same logical metric key visible, the previous interpolated state remains stored by key and the next animation target reuses it. Geometry belongs to the widget animation draw object, not to the stored animation state, so layout edits move the drawn animation without restarting its value interpolation.
 
 When a metric target becomes unavailable, permission-gated, or otherwise not drawable, the text updates immediately while the visual animates from its current value to zero. The visual disappears after the zero-value animation completes.
 
@@ -54,7 +57,7 @@ Blank render mode, screenshot exports, layout-guide-sheet exports, app-icon expo
 
 ## Layer Model
 
-The live dashboard frame is composed from three layer classes.
+The dashboard frame is drawn in two ordered layers. Each layer has its own immutable widget animation draw list, and both animation lists share the same keyed timeline.
 
 ### Snapshot Layer
 
@@ -64,26 +67,23 @@ The snapshot layer is opaque. It contains:
 - Animated-widget static backgrounds, including pill-bar tracks, gauge track segments, chart background, chart axes, and non-animated chart labels.
 - Static content for the current layout-edit drag state when that content belongs below animated fills.
 
-The main thread repaints the snapshot layer when telemetry text changes, layout or scale changes, theme/style changes, render mode changes, or layout-edit drag state changes.
-
-### Animation Layer
-
-The animation layer is not stored as a bitmap. It is a list of immutable widget animation draw objects plus a render-thread data timeline. The render thread redraws only the current widget animation objects on each animation frame.
-
-Widget animation objects contain renderer-safe geometry and widget-packaged target data. They do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
-
-In the target render-thread split, widget animation objects can also carry a widget-private composition plane:
-
-- `AboveSnapshot` draws the animation after the snapshot layer and before the overlay layer.
-- `AboveOverlay` draws the animation after the overlay layer.
-
-Normal dashboard visuals use `AboveSnapshot`. Animated values that belong to a dragged child use `AboveOverlay` so the dragged child can keep animating while its static overlay representation tracks the pointer above the dashboard. The current immediate implementation preserves this ordering by flushing base widget animations before overlay drawing and overlay-submitted animations after overlay drawing.
+Widgets draw snapshot content through `Widget::Draw()` and submit `WidgetAnimationLayer::Snapshot` animations through `WidgetHost::AddWidgetAnimation()`. The dashboard renderer flushes snapshot animations before resolving dynamic edit-artifact collisions and before drawing any overlay content.
 
 ### Overlay Layer
 
-The overlay layer is transparent and optional. It contains layout-edit affordances, selected-tree highlights, drag outlines, dragged-child static replay that must appear above underlying animations, and the move overlay. It is allocated only when an overlay is visible.
+The overlay layer is transparent and optional. It contains layout-edit affordances, selected-tree highlights, drag outlines, dragged-child static replay that must appear above underlying animations, metric-list dragged-row replay, and the move overlay.
 
-The main thread repaints the overlay layer on layout-edit hover changes, drag changes, move-mode changes, and editor selection changes. Normal dashboard operation keeps no overlay bitmap alive.
+The renderer calls `DashboardOverlayState::ShouldDrawOverlayLayer()` before entering the overlay pass. Normal dashboard operation keeps that predicate false, so the overlay pass and overlay animation flush are skipped completely.
+
+Widgets draw overlay-owned content through `Widget::DrawOverlay()` and submit `WidgetAnimationLayer::Overlay` animations. Container-child drag replay also draws widgets in the overlay layer under the active drag translation. Snapshot and overlay animations resolve through the same `DashboardAnimationTimeline`, so moving a widget or row from the snapshot layer to the overlay layer during drag does not reset ongoing data interpolation.
+
+### Animation Draw Lists
+
+Animation draw lists are not stored as bitmaps. Each list contains immutable widget animation draw objects plus the dashboard-owned keyed data timeline. The render thread redraws the current widget animation objects for the active layer on each animation frame.
+
+Widget animation objects contain renderer-safe geometry and widget-packaged target data. They do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
+
+In the target render-thread split, the main thread repaints the opaque snapshot bitmap when telemetry text changes, layout or scale changes, theme/style changes, render mode changes, or layout-edit drag state changes. It repaints the optional transparent overlay bitmap on layout-edit hover changes, drag changes, move-mode changes, and editor selection changes. Normal dashboard operation keeps no overlay bitmap alive.
 
 ## Threading Model
 
@@ -99,8 +99,8 @@ For the live dashboard, the main thread:
 
 - Accepts telemetry updates from the existing pending-update handoff.
 - Resolves the latest `MetricSource`.
-- Builds an immutable widget animation scene from the resolved layout and metric data.
-- Paints the opaque snapshot bitmap and optional transparent overlay bitmap.
+- Builds immutable snapshot and overlay widget animation scenes from the resolved layout and metric data.
+- Paints the opaque snapshot bitmap and optional transparent overlay bitmap, skipping the overlay work when no overlay content is visible.
 - Publishes the most recent layer update to the render thread through an overwrite-only mailbox.
 
 The main thread does not queue stale layer updates. If a new drag frame or telemetry snapshot is ready before the render thread consumes the previous update, the previous unpublished bitmap references return to the bitmap pool.
@@ -114,7 +114,7 @@ The render thread:
 - Consumes only the latest mailbox update.
 - Keeps previous animation data by key.
 - Computes interpolated animation values for the current frame time.
-- Composes snapshot, `AboveSnapshot` animation primitives, overlay, and `AboveOverlay` animation primitives in that order.
+- Composes snapshot, snapshot animations, optional overlay, and overlay animations in that order.
 - Presents the frame through a DXGI flip-model swap chain with vsync pacing while animations are active.
 - Sleeps when no animation and no new layer update is pending.
 
@@ -149,6 +149,7 @@ Widgets resolve metric data while they still have access to `MetricSource`. Each
 The public animation interface exposes:
 
 - `AnimationDataKey` for stable logical identity.
+- `WidgetAnimationLayer`, which identifies whether the animation belongs to the snapshot layer or overlay layer.
 - `WidgetAnimation`, which can return a target state and draw a sampled state on a regular `Renderer`.
 - `WidgetAnimationState`, which can clone itself, create first-seen and retarget starts, compare compatible targets, and create transitions.
 - `WidgetAnimationTransition`, which samples an opaque state at a normalized progress value.

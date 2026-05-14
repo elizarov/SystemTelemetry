@@ -16,6 +16,8 @@ void Widget::ResolveLayoutState(const WidgetHost&, const RenderRect&) {}
 
 void Widget::Draw(WidgetHost&, const WidgetLayout&, const MetricSource&) const {}
 
+void Widget::DrawOverlay(WidgetHost&, const WidgetLayout&, const MetricSource&) const {}
+
 void Widget::BuildEditGuides(WidgetHost&, const WidgetLayout&) const {}
 
 void Widget::BuildStaticAnchors(WidgetHost&, const WidgetLayout&) const {}

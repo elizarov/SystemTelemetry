@@ -221,16 +221,21 @@ void DrawGaugeFill(Renderer& renderer,
 
 class GaugeFillAnimation final : public WidgetAnimation {
 public:
-    GaugeFillAnimation(AnimationDataKey key,
+    GaugeFillAnimation(WidgetAnimationLayer layer,
+        AnimationDataKey key,
         GaugeSegmentLayout gaugeLayout,
         std::vector<RenderArc> ringSegments,
         int ringThickness,
         ScalarFillSample target)
-        : key_(std::move(key)), gaugeLayout_(gaugeLayout), ringSegments_(std::move(ringSegments)),
+        : layer_(layer), key_(std::move(key)), gaugeLayout_(gaugeLayout), ringSegments_(std::move(ringSegments)),
           ringThickness_(ringThickness), target_(std::move(target)) {}
 
     const AnimationDataKey& Key() const override {
         return key_;
+    }
+
+    WidgetAnimationLayer Layer() const override {
+        return layer_;
     }
 
     WidgetAnimationStatePtr TargetState() const override {
@@ -242,6 +247,7 @@ public:
     }
 
 private:
+    WidgetAnimationLayer layer_ = WidgetAnimationLayer::Snapshot;
     AnimationDataKey key_;
     GaugeSegmentLayout gaugeLayout_{};
     std::vector<RenderArc> ringSegments_;
@@ -334,7 +340,8 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
     const RenderStroke trackStroke =
         RenderStroke::Solid(RenderColorId::Track, static_cast<float>(layoutState_.ringThickness));
     renderer.Renderer().DrawArcs(layoutState_.ringSegments, trackStroke);
-    renderer.AddWidgetAnimation(std::make_unique<GaugeFillAnimation>(AnimationDataKey{metric_, {}},
+    renderer.AddWidgetAnimation(std::make_unique<GaugeFillAnimation>(renderer.CurrentWidgetAnimationLayer(),
+        AnimationDataKey{metric_, {}},
         gaugeLayout,
         layoutState_.ringSegments,
         layoutState_.ringThickness,

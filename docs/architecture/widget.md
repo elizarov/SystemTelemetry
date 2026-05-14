@@ -13,7 +13,8 @@
 - `card_chrome_layout.*` owns shared card-chrome geometry used by layout resolution and the special card-chrome widget.
 - `app_icon_geometry.*` draws the shared CaseDash icon mark from resolved theme colors for live shell icons and diagnostics PNG export.
 - Widgets call drawing and text operations through the renderer reference exposed by `WidgetHost`.
-- Widgets call animation through `WidgetHost::AddWidgetAnimation()` after resolving metric data into widget-private target state.
+- Widgets call animation through `WidgetHost::AddWidgetAnimation()` after resolving metric data into widget-private target state. `WidgetHost::CurrentWidgetAnimationLayer()` tells widgets whether the current draw belongs to the snapshot layer or overlay layer, and the submitted `WidgetAnimation` carries that layer tag.
+- Widgets draw base dashboard content through `Widget::Draw()` and overlay-only content through `Widget::DrawOverlay()`. Metric-list row drag replay uses the overlay hook so its static row content and animations move together above the snapshot layer.
 - Widget draw modules refer to colors by render color id; renderer owns resolved RGBA values.
 
 ## Boundaries

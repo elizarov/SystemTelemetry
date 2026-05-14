@@ -75,5 +75,6 @@ public:
     virtual const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const = 0;
     virtual std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const = 0;
+    virtual WidgetAnimationLayer CurrentWidgetAnimationLayer() const;
     virtual void AddWidgetAnimation(WidgetAnimationPtr animation);
 };
