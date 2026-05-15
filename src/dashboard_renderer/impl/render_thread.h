@@ -82,7 +82,7 @@ public:
     bool PublishFrame(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(Renderer& renderer, DashboardPresentationFrame frame);
-    // Designed only for single-threaded benchmarks that repeatedly present a stored frame.
+    // Designed only for benchmark harnesses that repeatedly present a stored frame.
     bool PresentStoredFrameSynchronously();
     bool RenderFrameOffscreen(Renderer& renderer, DashboardPresentationFrame frame);
     void DrawFrameForCurrentTarget(Renderer& renderer, const DashboardPresentationFrame& frame) const;

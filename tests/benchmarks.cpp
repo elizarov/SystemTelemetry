@@ -2,13 +2,16 @@
 #include <array>
 #include <chrono>
 #include <cmath>
+#include <condition_variable>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
+#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "config/color_resolver.h"
@@ -638,6 +641,141 @@ struct AnimationBenchTotals {
     bool succeeded = true;
 };
 
+class AnimationBenchmarkRenderWorker {
+public:
+    explicit AnimationBenchmarkRenderWorker(HWND hwnd) : hwnd_(hwnd) {}
+
+    ~AnimationBenchmarkRenderWorker() {
+        Shutdown();
+    }
+
+    bool Start(DashboardPresentationFrame frame) {
+        if (thread_.joinable()) {
+            return false;
+        }
+        thread_ = std::thread(&AnimationBenchmarkRenderWorker::ThreadMain, this);
+        return Send(RequestKind::Initialize, std::move(frame));
+    }
+
+    bool ResetTimeline() {
+        return Send(RequestKind::ResetTimeline);
+    }
+
+    bool PresentStoredFrame() {
+        return Send(RequestKind::PresentStoredFrame);
+    }
+
+    void Shutdown() {
+        if (!thread_.joinable()) {
+            return;
+        }
+        Send(RequestKind::Shutdown);
+        thread_.join();
+    }
+
+    const std::string& LastError() const {
+        return lastError_;
+    }
+
+private:
+    enum class RequestKind {
+        Initialize,
+        ResetTimeline,
+        PresentStoredFrame,
+        Shutdown,
+    };
+
+    bool Send(RequestKind kind) {
+        return Send(kind, std::nullopt);
+    }
+
+    bool Send(RequestKind kind, std::optional<DashboardPresentationFrame> frame) {
+        {
+            std::unique_lock lock(mutex_);
+            requestReady_.wait(lock, [&] { return !requestPending_; });
+            requestKind_ = kind;
+            requestFrame_ = std::move(frame);
+            requestPending_ = true;
+            responseReady_ = false;
+        }
+        requestReady_.notify_one();
+
+        std::unique_lock lock(mutex_);
+        responseReadyCondition_.wait(lock, [&] { return responseReady_; });
+        const bool ok = responseOk_;
+        lastError_ = responseError_;
+        requestPending_ = false;
+        lock.unlock();
+        requestReady_.notify_one();
+        return ok;
+    }
+
+    void CompleteRequest(bool ok, std::string error) {
+        {
+            std::lock_guard lock(mutex_);
+            responseOk_ = ok;
+            responseError_ = std::move(error);
+            responseReady_ = true;
+        }
+        responseReadyCondition_.notify_one();
+    }
+
+    void ThreadMain() {
+        DashboardRenderThread presenter;
+        presenter.Configure(hwnd_, false, true);
+
+        for (;;) {
+            RequestKind kind = RequestKind::Shutdown;
+            std::optional<DashboardPresentationFrame> frame;
+            {
+                std::unique_lock lock(mutex_);
+                requestReady_.wait(lock, [&] { return requestPending_ && !responseReady_; });
+                kind = requestKind_;
+                frame = std::move(requestFrame_);
+            }
+
+            bool ok = true;
+            std::string error;
+            switch (kind) {
+                case RequestKind::Initialize:
+                    if (!frame.has_value()) {
+                        ok = false;
+                        error = "animation benchmark worker missing initial frame";
+                    } else {
+                        ok = presenter.PresentFrameSynchronously(std::move(*frame));
+                        error = presenter.LastError();
+                    }
+                    break;
+                case RequestKind::ResetTimeline:
+                    presenter.ResetTimeline();
+                    break;
+                case RequestKind::PresentStoredFrame:
+                    ok = presenter.PresentStoredFrameSynchronously();
+                    error = presenter.LastError();
+                    break;
+                case RequestKind::Shutdown:
+                    presenter.Shutdown();
+                    CompleteRequest(true, {});
+                    return;
+            }
+            CompleteRequest(ok, std::move(error));
+        }
+    }
+
+    HWND hwnd_ = nullptr;
+    std::thread thread_;
+    mutable std::mutex mutex_;
+    std::condition_variable requestReady_;
+    std::condition_variable responseReadyCondition_;
+    RequestKind requestKind_ = RequestKind::Shutdown;
+    std::optional<DashboardPresentationFrame> requestFrame_;
+    bool requestPending_ = false;
+    bool responseReady_ = false;
+    bool responseOk_ = false;
+    std::string responseError_;
+    std::string lastError_;
+};
+
 void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
     stats.total += elapsed;
     ++stats.samples;
@@ -692,19 +830,16 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
         return totals;
     }
 
-    DashboardRenderThread presenter;
-    presenter.Configure(hwnd, false, true);
-    if (!presenter.PresentFrameSynchronously(std::move(frame))) {
+    AnimationBenchmarkRenderWorker presenter(hwnd);
+    if (!presenter.Start(std::move(frame))) {
         totals.succeeded = false;
         totals.errorText = "initial animation frame present failed: " + presenter.LastError();
-        presenter.Shutdown();
         return totals;
     }
 
     size_t remainingFrames = iterations;
     while (remainingFrames > 0) {
-        presenter.ResetTimeline();
-        if (!presenter.PresentStoredFrameSynchronously()) {
+        if (!presenter.ResetTimeline() || !presenter.PresentStoredFrame()) {
             totals.succeeded = false;
             totals.errorText = "animation frame seed failed: " + presenter.LastError();
             break;
@@ -713,7 +848,7 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
         const size_t chunkFrames = std::min(kAnimationBenchmarkActiveTransitionChunkFrames, remainingFrames);
         for (size_t iteration = 0; iteration < chunkFrames; ++iteration) {
             const auto frameStart = Clock::now();
-            if (!presenter.PresentStoredFrameSynchronously()) {
+            if (!presenter.PresentStoredFrame()) {
                 totals.succeeded = false;
                 totals.errorText = "animation frame present failed: " + presenter.LastError();
                 break;
@@ -729,7 +864,6 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
     if (totals.frame.samples > 0) {
         totals.animationLoop.perIteration = totals.animationLoop.total / static_cast<double>(totals.frame.samples);
     }
-    presenter.Shutdown();
     return totals;
 }
 

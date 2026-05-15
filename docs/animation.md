@@ -355,7 +355,7 @@ The first implementation should avoid a new top-level source package unless the 
   - Owns render-thread interpolation state, opaque data-key maps, interruption handling, and state sampling.
   - Asks widget-private state objects to create zero-initialized starts, retarget starts, and transitions.
 - `src/dashboard_renderer/impl/render_thread.*`
-  - Owns the live render thread, single-thread benchmark presentation path, mailbox, surface version, presentation loop, renderer instance, and render-thread animation timeline.
+  - Owns the live render thread, benchmark presentation entrypoints, mailbox, surface version, presentation loop, renderer instance, and render-thread animation timeline.
 - `src/renderer/*`
   - Owns generic bitmap, composition, and presentation primitives only.
   - Keeps Direct2D, DirectWrite, WIC, Direct3D, and DXGI implementation details inside `src/renderer/impl/`.
@@ -368,7 +368,7 @@ The first implementation should avoid a new top-level source package unless the 
   - Adds focused tests for scalar interpolation, interrupted animations, throughput vector alignment, surface-version target recreation, and animation composition-plane assignment.
 - `tests/benchmarks.cpp`
   - Keeps deterministic paint benchmarks single-threaded while forcing the same layer-bitmap build and final composition steps as the live pipeline.
-  - Owns the `animation` benchmark, which builds one fake-metric, no-overlay live presentation frame and repeatedly presents the stored frame through the render-thread animation timeline and composition path while keeping each measured frame inside the active transition window.
+  - Owns the `animation` benchmark, which builds one fake-metric, no-overlay live presentation frame, hands it to a benchmark render worker, and repeatedly requests stored-frame presentation through the render-thread animation timeline and composition path while keeping each measured frame inside the active transition window. The measured loop includes main-to-render-thread request handoff but uses immediate non-vsynced presentation so monitor cadence is not part of the result.
 
 ## Validation
 
