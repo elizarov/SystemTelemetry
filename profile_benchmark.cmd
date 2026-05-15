@@ -10,7 +10,7 @@ set "RENDER_SCALE="
 set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
 set "ARGUMENT_ERROR="
-set "SUPPORTED_BENCHMARKS=edit-layout, layout-guide-sheet, layout-switch, mouse-hover, theme-change, update-telemetry"
+set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, mouse-hover, theme-change, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_ELEVATION=0"
 set "IS_ELEVATED_RELAUNCH=0"
@@ -59,6 +59,11 @@ if /i "%~1"=="/elevated" (
 )
 if not defined BENCHMARK_NAME if /i "%~1"=="edit-layout" (
     set "BENCHMARK_NAME=edit-layout"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="animation" (
+    set "BENCHMARK_NAME=animation"
     shift
     goto parse_args
 )
@@ -478,6 +483,7 @@ set "BENCHMARK_STEM=%BENCHMARK_NAME:-=_%"
 exit /b 0
 
 :validate_benchmark_name
+if /i "%BENCHMARK_NAME%"=="animation" exit /b 0
 if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-guide-sheet" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0

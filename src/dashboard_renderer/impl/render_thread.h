@@ -63,6 +63,9 @@ public:
     bool PublishFrame(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(Renderer& renderer, DashboardPresentationFrame frame);
+#ifdef CASEDASH_BENCHMARK_TARGET
+    bool PresentStoredFrameSynchronously();
+#endif
     bool RenderFrameOffscreen(Renderer& renderer, DashboardPresentationFrame frame);
     void DrawFrameForCurrentTarget(Renderer& renderer, const DashboardPresentationFrame& frame) const;
     void ResetTimeline();

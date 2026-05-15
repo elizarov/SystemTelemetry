@@ -746,6 +746,20 @@ bool DashboardRenderer::SaveSnapshotPng(
     return saved;
 }
 
+#ifdef CASEDASH_BENCHMARK_TARGET
+bool DashboardRenderer::BuildAnimationBenchmarkFrame(
+    const SystemSnapshot& snapshot, DashboardPresentationFrame& frame) {
+    lastError_.clear();
+    DashboardOverlayState overlayState;
+    const bool built = BuildPresentationFrame(snapshot, overlayState, frame);
+    if (!built) {
+        return false;
+    }
+    frame.animate = true;
+    return true;
+}
+#endif
+
 std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSheetCardSummaries() const {
     std::vector<LayoutGuideSheetCardSummary> summaries;
     summaries.reserve(layoutResolver_->resolvedLayout_.cards.size());

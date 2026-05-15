@@ -357,6 +357,7 @@ The first implementation should avoid a new top-level source package unless the 
   - Adds focused tests for scalar interpolation, interrupted animations, throughput vector alignment, surface-version target recreation, and animation composition-plane tagging.
 - `tests/benchmarks.cpp`
   - Keeps deterministic paint benchmarks single-threaded while forcing the same layer-bitmap build and final composition steps as the live pipeline.
+  - Owns the `animation` benchmark, which builds one fake-metric, no-overlay live presentation frame and repeatedly presents the stored frame through the render-thread animation timeline and composition path.
 
 ## Validation
 
@@ -365,7 +366,7 @@ Implementation validation should use staged checks:
 - Unit-test interpolation and composition-plane tagging without creating a window.
 - Keep existing screenshot, active-region, layout-guide-sheet, and widget tests deterministic by rendering target values directly.
 - Run `build.cmd` and `test.cmd` after implementation changes.
-- Run `build.cmd /benchmarks` and compare `edit-layout`, `mouse-hover`, `layout-switch`, `theme-change`, and `update-telemetry` against [docs/profile_benchmark.md](profile_benchmark.md) baselines when live draw-path behavior changes.
+- Run `build.cmd /benchmarks` and compare `animation`, `edit-layout`, `mouse-hover`, `layout-switch`, `theme-change`, and `update-telemetry` against [docs/profile_benchmark.md](profile_benchmark.md) baselines when live draw-path behavior changes.
 - Add focused diagnostics screenshot validation for blank mode, layout-edit hover, metric-list row drag, container-child drag, and throughput chart rendering.
 
 ## Resolved Design Choices

@@ -828,6 +828,7 @@ target_compile_definitions(CaseDashBenchmarks PRIVATE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
+    CASEDASH_BENCHMARK_TARGET
     CASEDASH_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
 )
 target_compile_options(CaseDashBenchmarks PRIVATE

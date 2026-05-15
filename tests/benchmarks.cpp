@@ -32,6 +32,7 @@
 #include "util/utf8.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
+    X(Animation, "animation")                                                                                          \
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
@@ -312,6 +313,23 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
     return path;
 }
 
+HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
+    const std::wstring staticClass = WideFromUtf8("STATIC");
+    const std::wstring windowTitle = WideFromUtf8(title);
+    return CreateWindowExW(WS_EX_TOOLWINDOW,
+        staticClass.c_str(),
+        windowTitle.c_str(),
+        WS_POPUP,
+        0,
+        0,
+        width,
+        height,
+        nullptr,
+        nullptr,
+        GetModuleHandleW(nullptr),
+        nullptr);
+}
+
 class BenchmarkHost : private LayoutEditHost {
 public:
     BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
@@ -330,20 +348,7 @@ public:
     }
 
     bool Initialize() {
-        const std::wstring staticClass = WideFromUtf8("STATIC");
-        const std::wstring windowTitle = WideFromUtf8("CaseDashBenchmarkHost");
-        hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
-            staticClass.c_str(),
-            windowTitle.c_str(),
-            WS_POPUP,
-            0,
-            0,
-            renderer_.WindowWidth(),
-            renderer_.WindowHeight(),
-            nullptr,
-            nullptr,
-            GetModuleHandleW(nullptr),
-            nullptr);
+        hwnd_ = CreateBenchmarkWindow(renderer_.WindowWidth(), renderer_.WindowHeight(), "CaseDashBenchmarkHost");
         if (hwnd_ == nullptr) {
             return false;
         }
@@ -622,6 +627,15 @@ struct LayoutGuideSheetBenchTotals {
     bool succeeded = true;
 };
 
+struct AnimationBenchTotals {
+    BenchResult animationLoop;
+    PhaseStats frame;
+    std::string errorText;
+    size_t snapshotAnimations = 0;
+    size_t overlayAnimations = 0;
+    bool succeeded = true;
+};
+
 void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
     stats.total += elapsed;
     ++stats.samples;
@@ -665,6 +679,41 @@ LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
     }
     totals.switchLoop.total = Clock::now() - switchLoopStart;
     totals.switchLoop.perIteration = totals.switchLoop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame, HWND hwnd, size_t iterations) {
+    AnimationBenchTotals totals{};
+    totals.snapshotAnimations = frame.snapshotAnimations.size();
+    totals.overlayAnimations = frame.overlayAnimations.size();
+    if (iterations == 0) {
+        return totals;
+    }
+
+    DashboardRenderThread presenter;
+    presenter.Configure(hwnd, false, true);
+    if (!presenter.PresentFrameSynchronously(std::move(frame))) {
+        totals.succeeded = false;
+        totals.errorText = "initial animation frame present failed: " + presenter.LastError();
+        presenter.Shutdown();
+        return totals;
+    }
+
+    const auto loopStart = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const auto frameStart = Clock::now();
+        if (!presenter.PresentStoredFrameSynchronously()) {
+            totals.succeeded = false;
+            totals.errorText = "animation frame present failed: " + presenter.LastError();
+            break;
+        }
+        RecordPhase(totals.frame, Clock::now() - frameStart);
+    }
+    totals.animationLoop.total = Clock::now() - loopStart;
+    if (totals.frame.samples > 0) {
+        totals.animationLoop.perIteration = totals.animationLoop.total / static_cast<double>(totals.frame.samples);
+    }
+    presenter.Shutdown();
     return totals;
 }
 
@@ -920,6 +969,56 @@ int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& 
     return 0;
 }
 
+int RunAnimationBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(runtimeConfig);
+    renderer.SetRenderScale(renderScale);
+    renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
+    renderer.SetLiveAnimationEnabled(true);
+    if (!renderer.Initialize()) {
+        std::cerr << "renderer init failed: " << renderer.LastError() << "\n";
+        return 1;
+    }
+
+    DashboardPresentationFrame frame;
+    if (!renderer.BuildAnimationBenchmarkFrame(telemetry->Snapshot(), frame)) {
+        std::cerr << "animation frame build failed: " << renderer.LastError() << "\n";
+        renderer.Shutdown();
+        return 1;
+    }
+
+    HWND hwnd = CreateBenchmarkWindow(frame.width, frame.height, "CaseDashAnimationBenchmark");
+    if (hwnd == nullptr) {
+        std::cerr << "benchmark window creation failed\n";
+        renderer.Shutdown();
+        return 1;
+    }
+
+    std::cout << "animation_benchmark iterations=" << iterations << " render_scale=" << renderScale
+              << " window=" << frame.width << "x" << frame.height
+              << " snapshot_animations=" << frame.snapshotAnimations.size()
+              << " overlay_animations=" << frame.overlayAnimations.size() << "\n";
+    const AnimationBenchTotals totals = RunAnimationFrameBenchmark(std::move(frame), hwnd, iterations);
+    DestroyWindow(hwnd);
+    renderer.Shutdown();
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+
+    PrintBenchLoopResult("animation_loop", totals.animationLoop);
+    PrintPhaseResult("animation_frame", totals.frame);
+    return 0;
+}
+
 int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
@@ -1091,6 +1190,8 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
 
 int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
     switch (commandLine.benchmark) {
+        case Benchmark::Animation:
+            return RunAnimationBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::EditLayout:
             return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LayoutGuideSheet:
