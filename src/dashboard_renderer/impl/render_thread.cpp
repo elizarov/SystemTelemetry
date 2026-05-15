@@ -83,7 +83,7 @@ DashboardRenderThread::~DashboardRenderThread() {
 
 void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePresent) {
     if (threaded_ != threaded) {
-        WriteTrace("renderer:render_thread_shutdown_request reason=configure_threading_change old_threaded=" +
+        WriteTrace("render_thread_shutdown_request reason=configure_threading_change old_threaded=" +
                    std::string(BoolText(threaded_)) + " new_threaded=" + BoolText(threaded));
         Shutdown();
     }
@@ -134,8 +134,8 @@ void DashboardRenderThread::Shutdown() {
     if (syncRenderer_ != nullptr) {
         syncRenderer_->Shutdown();
     }
-    WriteTrace("renderer:animation_timeline_reset owner=sync reason=shutdown tracks=" +
-               std::to_string(syncTimeline_.TrackCount()));
+    WriteTrace(
+        "animation_timeline_reset owner=sync reason=shutdown tracks=" + std::to_string(syncTimeline_.TrackCount()));
     syncTimeline_.Reset();
     if (syncFrame_.has_value()) {
         ReleaseFrameLayers(std::move(*syncFrame_));
@@ -217,7 +217,7 @@ void DashboardRenderThread::DrawFrameForCurrentTarget(
 }
 
 void DashboardRenderThread::ResetTimeline() {
-    WriteTrace("renderer:animation_timeline_reset owner=sync reason=explicit_request tracks=" +
+    WriteTrace("animation_timeline_reset owner=sync reason=explicit_request tracks=" +
                std::to_string(syncTimeline_.TrackCount()));
     syncTimeline_.Reset();
     activeAnimations_.store(false);
@@ -226,7 +226,7 @@ void DashboardRenderThread::ResetTimeline() {
             std::lock_guard lock(mutex_);
             resetTimelineRequested_ = true;
         }
-        WriteTrace("renderer:animation_timeline_reset_request owner=thread reason=explicit_request");
+        WriteTrace("animation_timeline_reset_request owner=thread reason=explicit_request");
         wake_.notify_one();
     }
 }
@@ -337,9 +337,9 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
         const std::size_t prunedCount = activeTimeline->EndFrame(retention);
         const std::size_t trackCountAfterEndFrame = activeTimeline->TrackCount();
         if (prunedCount > 0) {
-            WriteTrace("renderer:animation_timeline_prune retention=" + std::string(TrackRetentionText(retention)) +
-                       " pruned=" + std::to_string(prunedCount) + " before=" +
-                       std::to_string(trackCountBeforeEndFrame) + " after=" + std::to_string(trackCountAfterEndFrame) +
+            WriteTrace("animation_timeline_prune retention=" + std::string(TrackRetentionText(retention)) + " pruned=" +
+                       std::to_string(prunedCount) + " before=" + std::to_string(trackCountBeforeEndFrame) +
+                       " after=" + std::to_string(trackCountAfterEndFrame) +
                        " metric_version=" + std::to_string(frame.versions.metricVersion) +
                        " previous_metric_version=" + std::to_string(presentedState.versions.metricVersion) +
                        " had_previous_metric=" + BoolText(presentedState.hasMetricVersion) +
@@ -542,7 +542,7 @@ void DashboardRenderThread::ThreadMain() {
                 break;
             }
             if (resetTimelineRequested_) {
-                WriteTrace("renderer:animation_timeline_reset owner=thread reason=explicit_request tracks=" +
+                WriteTrace("animation_timeline_reset owner=thread reason=explicit_request tracks=" +
                            std::to_string(timeline.TrackCount()));
                 timeline.Reset();
                 activeAnimations_.store(false);
@@ -597,17 +597,17 @@ void DashboardRenderThread::ThreadMain() {
         ReleaseFrameLayers(std::move(*activeFrame));
         activeFrame.reset();
     }
-    WriteTrace("renderer:animation_timeline_reset owner=thread reason=shutdown tracks=" +
-               std::to_string(timeline.TrackCount()));
+    WriteTrace("animation_timeline_reset owner=thread reason=shutdown tracks=" + std::to_string(timeline.TrackCount()));
     timeline.Reset();
     renderer->Shutdown();
 }
 
 void DashboardRenderThread::WriteTrace(std::string text) const {
     const Trace* trace = trace_.load();
-    if (trace != nullptr) {
-        trace->Write(text);
+    if (trace == nullptr || !trace->Enabled(TracePrefix::Renderer)) {
+        return;
     }
+    trace->Write(TracePrefix::Renderer, text);
 }
 
 void DashboardRenderThread::SetLastError(std::string error) {

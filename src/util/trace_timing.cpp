@@ -51,14 +51,14 @@ void TraceTimingScope::Reset() {
 TraceTimingCollector::TraceTimingCollector(std::chrono::seconds flushInterval) : flushInterval_(flushInterval) {}
 
 TraceTimingScope TraceTimingCollector::Measure(const Trace& trace, const char* operation) {
-    if (!trace.Enabled() || operation == nullptr) {
+    if (!trace.Enabled(TracePrefix::Profile) || operation == nullptr) {
         return {};
     }
     return TraceTimingScope(*this, trace, operation);
 }
 
 void TraceTimingCollector::Record(const Trace& trace, std::string_view operation, std::chrono::nanoseconds elapsed) {
-    if (!trace.Enabled() || operation.empty() || elapsed.count() <= 0) {
+    if (!trace.Enabled(TracePrefix::Profile) || operation.empty() || elapsed.count() <= 0) {
         return;
     }
 
@@ -97,7 +97,7 @@ void TraceTimingCollector::Record(const Trace& trace, std::string_view operation
 }
 
 void TraceTimingCollector::Flush(const Trace& trace) {
-    if (!trace.Enabled()) {
+    if (!trace.Enabled(TracePrefix::Profile)) {
         return;
     }
 

@@ -3,6 +3,7 @@
 #include <cctype>
 #include <chrono>
 #include <cmath>
+#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <limits>
@@ -275,6 +276,26 @@ void AssignTrimmedColonSwitchValue(const CommandLineArguments& commandLine, cons
     }
 }
 
+bool TryParseTracePrefixFilter(std::string_view text, std::uint64_t& mask, std::string& invalidName) {
+    const std::vector<std::string> names = SplitTrimmed(text, ',');
+    if (names.empty()) {
+        invalidName.clear();
+        return false;
+    }
+
+    mask = 0;
+    for (const std::string& name : names) {
+        const std::optional<TracePrefix> prefix = Trace::ParsePrefixName(name);
+        if (!prefix.has_value()) {
+            invalidName = name;
+            return false;
+        }
+        mask |= Trace::PrefixMask(*prefix);
+    }
+    invalidName.clear();
+    return true;
+}
+
 void WriteValidationFailureTrace(
     const DiagnosticsOptions& options, const std::string& reason, const std::string& message) {
     if (!options.trace) {
@@ -340,6 +361,22 @@ void ApplyDiagnosticsPathSwitches(DiagnosticsOptions& options, const CommandLine
             options.*entry.enabled = HasSwitch(commandLine, entry.name);
         }
     }
+
+    if (const auto value = GetColonSwitchValue(commandLine, "/trace-prefixes"); value.has_value()) {
+        options.trace = true;
+        std::uint64_t prefixFilter = 0;
+        std::string invalidName;
+        if (TryParseTracePrefixFilter(*value, prefixFilter, invalidName)) {
+            options.hasTracePrefixFilter = true;
+            options.tracePrefixFilter = prefixFilter;
+        } else {
+            options.hasInvalidTracePrefixFilter = true;
+            options.invalidTracePrefixFilterName = invalidName;
+        }
+    } else if (HasSwitch(commandLine, "/trace-prefixes")) {
+        options.trace = true;
+        options.hasInvalidTracePrefixFilter = true;
+    }
 }
 
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options) {
@@ -399,6 +436,18 @@ DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine
 }
 
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
+    if (options.hasInvalidTracePrefixFilter) {
+        std::string message =
+            "/trace-prefixes must contain a comma-separated list of trace prefixes: " + Trace::PrefixNamesText() + ".";
+        if (!options.invalidTracePrefixFilterName.empty()) {
+            message += " Unknown prefix: " + options.invalidTracePrefixFilterName + ".";
+        }
+        if (!options.trace) {
+            MessageBoxUtf8(message, MB_ICONERROR);
+        }
+        WriteValidationFailureTrace(options, "trace_prefixes", message);
+        return false;
+    }
     if (options.blank && options.fake) {
         if (!options.trace) {
             MessageBoxUtf8("/blank cannot be used together with /fake.", MB_ICONERROR);
@@ -484,6 +533,7 @@ DiagnosticsSession::DiagnosticsSession(const DiagnosticsOptions& options, Trace&
 DiagnosticsSession::~DiagnosticsSession() {
     if (traceFile_ != nullptr) {
         trace_.SetOutput(nullptr);
+        trace_.SetEnabledPrefixes(Trace::AllPrefixesMask());
         fclose(traceFile_);
     }
 }
@@ -541,6 +591,8 @@ bool DiagnosticsSession::Initialize() {
             ShowFileOpenError("trace file", tracePath_);
             return false;
         }
+        trace_.SetEnabledPrefixes(
+            options_.hasTracePrefixFilter ? options_.tracePrefixFilter : Trace::AllPrefixesMask());
         trace_.SetOutput(traceFile_);
     }
     return true;
@@ -550,27 +602,12 @@ bool DiagnosticsSession::ShouldShowDialogs() const {
     return !options_.trace;
 }
 
-void DiagnosticsSession::WriteTraceMarker(const char* text) {
-    trace_.Write(text);
-}
-
-void DiagnosticsSession::WriteTraceMarker(const std::string& text) {
-    trace_.Write(text);
-}
-
 void DiagnosticsSession::WriteTraceMarker(TracePrefix prefix, const char* text) {
     trace_.Write(prefix, text);
 }
 
 void DiagnosticsSession::WriteTraceMarker(TracePrefix prefix, const std::string& text) {
     trace_.Write(prefix, text);
-}
-
-void DiagnosticsSession::ReportError(const std::string& traceText, std::string_view message) {
-    WriteTraceMarker(traceText);
-    if (ShouldShowDialogs()) {
-        MessageBoxUtf8(message, MB_ICONERROR);
-    }
 }
 
 void DiagnosticsSession::ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message) {

@@ -51,14 +51,11 @@ public:
 
     bool Initialize();
     bool ShouldShowDialogs() const;
-    void WriteTraceMarker(const char* text);
-    void WriteTraceMarker(const std::string& text);
     void WriteTraceMarker(TracePrefix prefix, const char* text);
     void WriteTraceMarker(TracePrefix prefix, const std::string& text);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
-    void ReportError(const std::string& traceText, std::string_view message);
     void ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message);
     bool ReportSaveError(const char* traceEvent,
         const char* messageAction,

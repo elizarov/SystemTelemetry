@@ -118,7 +118,7 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
     }
     liveAnimationEnabled_ = enabled;
     if (!liveAnimationEnabled_) {
-        WriteTrace("renderer:animation_timeline_reset_request reason=live_animation_disabled");
+        WriteTrace("animation_timeline_reset_request reason=live_animation_disabled");
         presentation_.ResetTimeline();
     }
 }
@@ -1342,14 +1342,14 @@ void DashboardRenderer::InvalidateMetricSourceCache() {
 }
 
 bool DashboardRenderer::ShouldWriteRendererTrace() const {
-    return !interactiveDragTraceActive_;
+    return !interactiveDragTraceActive_ && trace_.Enabled(TracePrefix::Renderer);
 }
 
 void DashboardRenderer::WriteTrace(const std::string& text) const {
-    if (!ShouldWriteRendererTrace() && text.rfind("renderer:", 0) == 0) {
+    if (!ShouldWriteRendererTrace()) {
         return;
     }
-    trace_.Write(text);
+    trace_.Write(TracePrefix::Renderer, text);
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const {

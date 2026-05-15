@@ -1007,7 +1007,7 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             visible->exactTypeOrdinal = nextOrdinal++;
             // Perf: interactive drag traces intentionally drop renderer details, so avoid formatting them every paint.
             if (!renderer_.interactiveDragTraceActive_) {
-                renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
+                renderer_.WriteTrace("layout_similarity_group axis=\"" + std::string(axisLabel) +
                                      "\" class=" + std::to_string(static_cast<int>(visible->type.widgetClass)) +
                                      " extent=" + std::to_string(visible->type.extent) +
                                      " ordinal=" + std::to_string(visible->exactTypeOrdinal));

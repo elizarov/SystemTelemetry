@@ -228,7 +228,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - Do not extract the right-pane single-labeled-control layout rows into a shared helper by itself; that trial grew the retained build by `512` bytes.
 - Do not replace the fake storage selected-drive `std::find` calls with a concrete string-list helper by itself. The trial stayed executable-neutral but increased section slack, so keep the existing call sites unless a broader storage pass deletes more code.
 - Do not rewrite diagnostics error-message builders from `operator+` chains to incremental `std::string` appends by itself. That trial regressed the retained wide-helper build from `910,848` to `911,360` bytes.
-- Do not replace `TracePrefixText` with a compact table. It was neutral before this pass and regressed the retained trace-formatting build from `905,728` to `906,240` bytes.
+- Do not replace the trace prefix switch with a compact table. It was neutral before this pass and regressed the retained trace-formatting build from `905,728` to `906,240` bytes.
 - Do not replace the layout-edit dialog trace field labels with full `" prefix="` strings. That trial regressed the retained dialog trace field loop from `905,728` to `906,240` bytes.
 - Rewriting `BuildTraceFocusKeyText` around one append-built string and rewriting `Trace::QuoteText` around reserve/append loops were executable-neutral in this pass; keep the clearer existing string shapes.
 - Do not broaden crash-report `AppendLine` value parameters to `std::string_view`. That trial regressed the retained literal-key pass from `905,216` to `905,728` bytes; the extra `const char*` value overload was executable-neutral and was reverted.
