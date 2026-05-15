@@ -87,6 +87,7 @@ public:
     bool RenderFrameOffscreen(Renderer& renderer, DashboardPresentationFrame frame);
     void DrawFrameForCurrentTarget(Renderer& renderer, const DashboardPresentationFrame& frame) const;
     void ResetTimeline();
+    void SetAnimationPresentationSuspended(bool suspended);
     void DiscardWindowTarget(std::string_view reason);
     bool HasActiveAnimations() const;
     std::string LastError() const;
@@ -164,4 +165,5 @@ private:
     std::string discardReason_;
     std::string lastError_;
     std::atomic_bool activeAnimations_{false};
+    std::atomic_bool animationPresentationSuspended_{false};
 };

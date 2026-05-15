@@ -245,6 +245,13 @@ void DashboardRenderThread::ResetTimeline() {
     }
 }
 
+void DashboardRenderThread::SetAnimationPresentationSuspended(bool suspended) {
+    animationPresentationSuspended_.store(suspended);
+    if (!suspended) {
+        wake_.notify_all();
+    }
+}
+
 void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
     if (syncRenderer_ != nullptr) {
         syncRenderer_->DiscardWindowTarget(reason);
@@ -568,6 +575,13 @@ void DashboardRenderThread::ThreadMain() {
             if (!activeFrame.has_value() && !pendingFrame_.has_value() && !stopRequested_ && !resetTimelineRequested_ &&
                 !discardTargetRequested_) {
                 wake_.wait(lock);
+            }
+            if (animationPresentationSuspended_.load() && activeFrame.has_value() && !pendingFrame_.has_value() &&
+                !stopRequested_ && !resetTimelineRequested_ && !discardTargetRequested_) {
+                wake_.wait(lock, [&] {
+                    return stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ ||
+                           discardTargetRequested_ || !animationPresentationSuspended_.load();
+                });
             }
             if (stopRequested_) {
                 break;

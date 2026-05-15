@@ -68,6 +68,29 @@ long long RectArea(const RenderRect& rect) {
     return width * height;
 }
 
+class ScopedAnimationPresentationSuspension {
+public:
+    ScopedAnimationPresentationSuspension(DashboardRenderThread& presentation, bool active)
+        : presentation_(&presentation), active_(active) {
+        if (active_) {
+            presentation_->SetAnimationPresentationSuspended(true);
+        }
+    }
+
+    ScopedAnimationPresentationSuspension(const ScopedAnimationPresentationSuspension&) = delete;
+    ScopedAnimationPresentationSuspension& operator=(const ScopedAnimationPresentationSuspension&) = delete;
+
+    ~ScopedAnimationPresentationSuspension() {
+        if (active_) {
+            presentation_->SetAnimationPresentationSuspended(false);
+        }
+    }
+
+private:
+    DashboardRenderThread* presentation_ = nullptr;
+    bool active_ = false;
+};
+
 }  // namespace
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
@@ -438,6 +461,12 @@ bool DashboardRenderer::BuildPresentationFrame(
     frame.animate = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
     frame.snapshotLayerUpdated = updateSnapshot;
     frame.overlayLayerUpdated = updateOverlay;
+
+    // Keep old animation-only frames off the shared D2D device while changed layer bitmaps are rebuilt.
+    const bool rebuildsLayerBitmap = updateSnapshot || overlayVisible;
+    const bool suspendAnimationPresentation =
+        frame.animate && presentationHwnd_ != nullptr && !immediatePresent_ && rebuildsLayerBitmap;
+    ScopedAnimationPresentationSuspension animationPresentationSuspension(presentation_, suspendAnimationPresentation);
 
     const MetricSource* metrics = nullptr;
     {
