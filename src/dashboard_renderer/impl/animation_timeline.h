@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstdint>
 #include <unordered_map>
 
 #include "telemetry/telemetry.h"
@@ -13,7 +14,8 @@ public:
     explicit DashboardAnimationTimeline(std::chrono::milliseconds duration = kTelemetryRefreshInterval);
 
     void BeginFrame(Clock::time_point now);
-    WidgetAnimationStatePtr Resolve(const AnimationDataKey& key, const WidgetAnimationState& target);
+    WidgetAnimationStatePtr Resolve(
+        const AnimationDataKey& key, const WidgetAnimationState& target, std::uint64_t targetVersion);
     void EndFrame();
     void Reset();
     bool HasActiveAnimations(Clock::time_point now) const;
@@ -23,6 +25,8 @@ private:
         WidgetAnimationStatePtr start;
         WidgetAnimationStatePtr target;
         WidgetAnimationTransitionPtr transition;
+        const WidgetAnimationState* observedTarget = nullptr;
+        std::uint64_t observedTargetVersion = 0;
         Clock::time_point startTime{};
         bool touched = false;
     };

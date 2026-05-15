@@ -1,4 +1,5 @@
 #include <chrono>
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <string>
 #include <vector>
@@ -22,17 +23,21 @@ ScalarFillSample ScalarTarget(double value, double peak) {
     return ScalarFillSample{value, peak};
 }
 
-ScalarFillSample ResolveScalar(
-    DashboardAnimationTimeline& timeline, const AnimationDataKey& key, const ScalarFillSample& target) {
+ScalarFillSample ResolveScalar(DashboardAnimationTimeline& timeline,
+    const AnimationDataKey& key,
+    const ScalarFillSample& target,
+    std::uint64_t targetVersion = 1) {
     WidgetAnimationStatePtr targetState = MakeScalarFillAnimationState(target);
-    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *targetState);
+    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *targetState, targetVersion);
     return ScalarFillSampleFromState(*sampled);
 }
 
-ThroughputChartSample ResolveThroughput(
-    DashboardAnimationTimeline& timeline, const AnimationDataKey& key, const ThroughputChartSample& target) {
+ThroughputChartSample ResolveThroughput(DashboardAnimationTimeline& timeline,
+    const AnimationDataKey& key,
+    const ThroughputChartSample& target,
+    std::uint64_t targetVersion = 1) {
     WidgetAnimationStatePtr targetState = MakeThroughputChartAnimationState(target);
-    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *targetState);
+    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *targetState, targetVersion);
     return ThroughputChartSampleFromState(*sampled);
 }
 
@@ -74,7 +79,7 @@ TEST(AnimationTimeline, InterruptedScalarUsesCurrentInterpolatedValueAsNewStart)
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(250));
-    ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.2, 0.4));
+    ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.2, 0.4), 2);
     timeline.EndFrame();
 
     ASSERT_TRUE(sample.valueRatio.has_value());
@@ -83,7 +88,7 @@ TEST(AnimationTimeline, InterruptedScalarUsesCurrentInterpolatedValueAsNewStart)
     EXPECT_DOUBLE_EQ(*sample.peakRatio, 1.0);
 
     timeline.BeginFrame(start + std::chrono::milliseconds(500));
-    sample = ResolveScalar(timeline, key, ScalarTarget(0.2, 0.4));
+    sample = ResolveScalar(timeline, key, ScalarTarget(0.2, 0.4), 2);
     timeline.EndFrame();
 
     ASSERT_TRUE(sample.valueRatio.has_value());
@@ -102,7 +107,7 @@ TEST(AnimationTimeline, UnchangedScalarTargetKeepsProgressAcrossLayoutOnlyFrames
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(250));
-    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9), 2);
     timeline.EndFrame();
 
     ASSERT_TRUE(sample.valueRatio.has_value());
@@ -125,7 +130,7 @@ TEST(AnimationTimeline, UnavailableScalarAnimatesToZeroThenDisappears) {
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(600));
-    ScalarFillSample sample = ResolveScalar(timeline, key, ScalarFillSample{});
+    ScalarFillSample sample = ResolveScalar(timeline, key, ScalarFillSample{}, 2);
     timeline.EndFrame();
 
     ASSERT_TRUE(sample.valueRatio.has_value());
@@ -134,7 +139,7 @@ TEST(AnimationTimeline, UnavailableScalarAnimatesToZeroThenDisappears) {
     EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.75);
 
     timeline.BeginFrame(start + std::chrono::milliseconds(1100));
-    sample = ResolveScalar(timeline, key, ScalarFillSample{});
+    sample = ResolveScalar(timeline, key, ScalarFillSample{}, 2);
     timeline.EndFrame();
 
     EXPECT_FALSE(sample.valueRatio.has_value());
@@ -167,11 +172,11 @@ TEST(AnimationTimeline, ThroughputVectorsAlignByNewestSample) {
     next.guideStepMbps = 5.0;
 
     timeline.BeginFrame(start + std::chrono::milliseconds(600));
-    (void)ResolveThroughput(timeline, key, next);
+    (void)ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(850));
-    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next);
+    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     ASSERT_EQ(sample.samples.size(), 3u);
@@ -207,11 +212,11 @@ TEST(AnimationTimeline, ThroughputCarriesPlotShiftAndTargetTailWhenPhaseAdvances
     next.timeMarkerOffsetSamples = 9.0;
 
     timeline.BeginFrame(start + std::chrono::milliseconds(600));
-    (void)ResolveThroughput(timeline, key, next);
+    (void)ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(850));
-    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next);
+    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.5);
@@ -242,7 +247,7 @@ TEST(AnimationTimeline, InterruptedThroughputScrollContinuesFromCurrentPlotShift
     second.timeMarkerOffsetSamples = 9.0;
 
     timeline.BeginFrame(start + std::chrono::milliseconds(600));
-    (void)ResolveThroughput(timeline, key, second);
+    (void)ResolveThroughput(timeline, key, second, 2);
     timeline.EndFrame();
 
     ThroughputChartSample third;
@@ -251,14 +256,14 @@ TEST(AnimationTimeline, InterruptedThroughputScrollContinuesFromCurrentPlotShift
     third.timeMarkerOffsetSamples = 10.0;
 
     timeline.BeginFrame(start + std::chrono::milliseconds(850));
-    ThroughputChartSample sample = ResolveThroughput(timeline, key, third);
+    ThroughputChartSample sample = ResolveThroughput(timeline, key, third, 3);
     timeline.EndFrame();
 
     EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.5);
     EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
 
     timeline.BeginFrame(start + std::chrono::milliseconds(1100));
-    sample = ResolveThroughput(timeline, key, third);
+    sample = ResolveThroughput(timeline, key, third, 3);
     timeline.EndFrame();
 
     EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 1.25);
@@ -287,11 +292,11 @@ TEST(AnimationTimeline, ThroughputTimeMarkerMovesForwardAcrossWrap) {
     next.timeMarkerOffsetSamples = 1.0;
 
     timeline.BeginFrame(start + std::chrono::milliseconds(600));
-    (void)ResolveThroughput(timeline, key, next);
+    (void)ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(850));
-    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next);
+    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next, 2);
     timeline.EndFrame();
 
     EXPECT_DOUBLE_EQ(sample.timeMarkerOffsetSamples, 20.0);

@@ -15,7 +15,7 @@ void DashboardAnimationTimeline::BeginFrame(Clock::time_point now) {
 }
 
 WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
-    const AnimationDataKey& key, const WidgetAnimationState& target) {
+    const AnimationDataKey& key, const WidgetAnimationState& target, std::uint64_t targetVersion) {
     if (!frameActive_) {
         return target.Clone();
     }
@@ -26,18 +26,24 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
         track.start = target.InitialState();
         track.target = target.Clone();
         track.transition = track.target->TransitionFrom(*track.start);
+        track.observedTarget = &target;
+        track.observedTargetVersion = targetVersion;
         track.startTime = frameTime_;
         track.touched = true;
         it = tracks_.insert({key, std::move(track)}).first;
     } else {
         Track& track = it->second;
         const bool sameStateType = track.target != nullptr && track.target->TypeToken() == target.TypeToken();
-        if (!sameStateType || !track.target->Equals(target)) {
+        const bool samePackagedTarget =
+            sameStateType && track.observedTarget == &target && track.observedTargetVersion == targetVersion;
+        if (!samePackagedTarget && (!sameStateType || !track.target->Equals(target))) {
             track.start = sameStateType ? target.RetargetStart(*SampleTrack(track, frameTime_)) : target.InitialState();
             track.target = target.Clone();
             track.transition = track.target->TransitionFrom(*track.start);
             track.startTime = frameTime_;
         }
+        track.observedTarget = &target;
+        track.observedTargetVersion = targetVersion;
         track.touched = true;
     }
 

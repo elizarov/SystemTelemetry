@@ -87,7 +87,7 @@ Widgets draw overlay-owned content through `Widget::DrawOverlay()` and submit `W
 
 Animation draw lists are not stored as bitmaps. Each list contains immutable widget animation draw objects plus the render-space translation that was active when the widget submitted the animation. The keyed data timeline is owned by the render thread, which redraws the current widget animation commands for the active layer on each animation frame.
 
-Widget animation objects contain renderer-safe geometry and widget-packaged target data. Animation draw commands add only layer placement data such as drag translation; this keeps geometry changes separate from metric target changes. They do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
+Widget animation objects contain renderer-safe geometry. Animation draw commands carry the widget-packaged target state plus layer placement data such as drag translation; this keeps geometry changes separate from metric target changes. They do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
 
 The main thread repaints the opaque snapshot bitmap when telemetry text changes, layout or scale changes, theme/style changes, render mode changes, or layout-edit drag state changes. It repaints the optional transparent overlay bitmap on layout-edit hover changes, drag changes, move-mode changes, and editor selection changes. Normal dashboard operation keeps no overlay bitmap alive.
 
@@ -150,7 +150,7 @@ The key follows the logical data source rather than the visual slot. Reordering 
 
 ### Widget Animation Objects
 
-Widgets resolve metric data while they still have access to `MetricSource`. Each widget draws its snapshot content, packages the target animation data into a widget-private `WidgetAnimationState`, and submits a `WidgetAnimation` through `WidgetHost::AddWidgetAnimation()`.
+Widgets resolve metric data while they still have access to `MetricSource`. Each widget draws its snapshot content, packages the target animation data into a widget-private `WidgetAnimationState`, and submits a `WidgetAnimation` through `WidgetHost::AddWidgetAnimation()`. The dashboard renderer stores that opaque target state in the presentation command, so the render thread samples it between telemetry updates without asking widget code to resolve target data again.
 
 The public animation interface exposes:
 

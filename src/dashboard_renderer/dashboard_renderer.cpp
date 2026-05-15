@@ -214,8 +214,13 @@ void DashboardRenderer::AddWidgetAnimation(WidgetAnimationPtr animation) {
         WidgetHost::AddWidgetAnimation(std::move(animation));
         return;
     }
+    WidgetAnimationStatePtr target = animation->TargetState();
+    if (target == nullptr) {
+        return;
+    }
     WidgetAnimationsForLayer(animation->Layer())
-        .push_back(DashboardPresentationAnimation{std::move(animation), currentWidgetAnimationTranslation_});
+        .push_back(DashboardPresentationAnimation{
+            std::move(animation), std::move(target), currentWidgetAnimationTranslation_});
 }
 
 int DashboardRenderer::WindowWidth() const {
@@ -650,18 +655,15 @@ void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
     widgetAnimationCollectionActive_ = false;
     for (DashboardPresentationAnimation& command : animations) {
         const WidgetAnimationPtr& animation = command.animation;
-        if (animation == nullptr) {
+        if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
-        WidgetAnimationStatePtr target = animation->TargetState();
-        if (target != nullptr) {
-            if (command.translation.x != 0 || command.translation.y != 0) {
-                Renderer().PushTranslation(command.translation);
-            }
-            animation->Draw(Renderer(), *target);
-            if (command.translation.x != 0 || command.translation.y != 0) {
-                Renderer().PopTranslation();
-            }
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            Renderer().PushTranslation(command.translation);
+        }
+        animation->Draw(Renderer(), *command.targetState);
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            Renderer().PopTranslation();
         }
     }
     widgetAnimationCollectionActive_ = collectionWasActive;

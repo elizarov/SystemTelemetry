@@ -262,32 +262,33 @@ void DashboardRenderThread::DrawFrame(Renderer& renderer,
     const DashboardPresentationFrame& frame,
     DashboardAnimationTimeline::Clock::time_point) const {
     renderer.DrawBitmap(frame.snapshotLayer, RenderPoint{0, 0});
-    DrawAnimations(renderer, timeline, frame.snapshotAnimations);
+    DrawAnimations(renderer, timeline, frame.snapshotAnimations, frame.snapshotVersion);
     if (frame.overlayLayer.has_value()) {
         renderer.DrawBitmap(*frame.overlayLayer, RenderPoint{0, 0});
     }
-    DrawAnimations(renderer, timeline, frame.overlayAnimations);
+    DrawAnimations(renderer, timeline, frame.overlayAnimations, frame.overlayVersion);
 }
 
 void DashboardRenderThread::DrawAnimations(Renderer& renderer,
     DashboardAnimationTimeline* timeline,
-    const std::vector<DashboardPresentationAnimation>& animations) const {
+    const std::vector<DashboardPresentationAnimation>& animations,
+    std::uint64_t targetVersion) const {
     for (const DashboardPresentationAnimation& command : animations) {
         const WidgetAnimationPtr& animation = command.animation;
-        if (animation == nullptr) {
+        if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
-        WidgetAnimationStatePtr target = animation->TargetState();
-        if (target == nullptr) {
-            continue;
+        WidgetAnimationStatePtr sampled;
+        const WidgetAnimationState* drawState = command.targetState.get();
+        if (timeline != nullptr) {
+            sampled = timeline->Resolve(animation->Key(), *command.targetState, targetVersion);
+            drawState = sampled.get();
         }
-        WidgetAnimationStatePtr sampled =
-            timeline != nullptr ? timeline->Resolve(animation->Key(), *target) : target->Clone();
-        if (sampled != nullptr) {
+        if (drawState != nullptr) {
             if (command.translation.x != 0 || command.translation.y != 0) {
                 renderer.PushTranslation(command.translation);
             }
-            animation->Draw(renderer, *sampled);
+            animation->Draw(renderer, *drawState);
             if (command.translation.x != 0 || command.translation.y != 0) {
                 renderer.PopTranslation();
             }

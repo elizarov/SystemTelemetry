@@ -19,6 +19,7 @@
 
 struct DashboardPresentationAnimation {
     WidgetAnimationPtr animation;
+    WidgetAnimationStatePtr targetState;
     RenderPoint translation{};
 };
 
@@ -85,7 +86,8 @@ private:
         DashboardAnimationTimeline::Clock::time_point now) const;
     void DrawAnimations(Renderer& renderer,
         DashboardAnimationTimeline* timeline,
-        const std::vector<DashboardPresentationAnimation>& animations) const;
+        const std::vector<DashboardPresentationAnimation>& animations,
+        std::uint64_t targetVersion) const;
     void MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
     void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
     void ReleaseBitmap(RenderBitmap bitmap) const;
