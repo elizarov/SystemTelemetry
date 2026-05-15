@@ -95,13 +95,13 @@ private:
     bool EnsureWindowRenderTarget(int width, int height, bool retainContents);
     bool EnsureDxgiWindowTarget(int width, int height, bool retainContents);
     bool CreateDxgiWindowTargetBitmap();
-    bool PresentDxgiWindow(std::span<const RenderRect> dirtyRects);
+    bool PresentDxgiWindow();
     bool DrawToHardwareBitmap(
         RenderBitmap& output, int width, int height, RenderBitmapClear clear, const DrawCallback& draw);
     bool BeginDirect2DDraw(ID2D1RenderTarget* target, ActiveDrawTarget targetKind);
     void EndDirect2DDraw();
     bool BeginWindowDraw(int width, int height, bool retainContents);
-    void EndWindowDraw(std::span<const RenderRect> dirtyRects);
+    void EndWindowDraw();
     bool DrawToWicBitmap(int width,
         int height,
         const DrawCallback& draw,

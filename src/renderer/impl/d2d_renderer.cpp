@@ -483,7 +483,7 @@ bool D2DRenderer::DrawWindow(int width, int height, const DrawCallback& draw) {
     }
     d2dActiveRenderTarget_->Clear(palette_.Get(RenderColorId::Background).ToD2DColorF());
     draw();
-    EndWindowDraw({});
+    EndWindowDraw();
     if (lastError_.empty() && dxgiSwapChain_ != nullptr) {
         dxgiRetainedBuffersPrimed_ = 0;
     }
@@ -496,7 +496,7 @@ bool D2DRenderer::DrawWindowRetained(int width, int height, const DrawCallback& 
     }
     d2dActiveRenderTarget_->Clear(palette_.Get(RenderColorId::Background).ToD2DColorF());
     draw();
-    EndWindowDraw({});
+    EndWindowDraw();
     if (lastError_.empty() && dxgiSwapChain_ != nullptr) {
         dxgiRetainedBuffersPrimed_ = 1;
     }
@@ -518,7 +518,7 @@ bool D2DRenderer::DrawWindowDirty(
     const std::span<const RenderRect> redrawRects =
         primeDxgiRetainedBuffer ? std::span<const RenderRect>(&fullSurface, 1) : dirtyRects;
     draw(redrawRects);
-    EndWindowDraw(redrawRects);
+    EndWindowDraw();
     if (lastError_.empty() && primeDxgiRetainedBuffer && dxgiSwapChain_ != nullptr) {
         ++dxgiRetainedBuffersPrimed_;
     }
@@ -1115,13 +1115,10 @@ bool D2DRenderer::CreateDxgiWindowTargetBitmap() {
     return true;
 }
 
-bool D2DRenderer::PresentDxgiWindow(std::span<const RenderRect> dirtyRects) {
+bool D2DRenderer::PresentDxgiWindow() {
     if (dxgiSwapChain_ == nullptr) {
         return true;
     }
-
-    // Dirty regions are already restored inside the retained back buffer; DXGI dirty-present metadata is slower here.
-    (void)dirtyRects;
 
     // Live presentation is vsynced; benchmark immediate-present paths measure draw cost without monitor cadence.
     const HRESULT hr = dxgiSwapChain_->Present(d2dImmediatePresent_ ? 0 : 1, 0);
@@ -1198,16 +1195,15 @@ bool D2DRenderer::BeginWindowDraw(int width, int height, bool retainContents) {
     return BeginDirect2DDraw(d2dWindowRenderTarget_.Get(), ActiveDrawTarget::Window);
 }
 
-void D2DRenderer::EndWindowDraw(std::span<const RenderRect> dirtyRects) {
+void D2DRenderer::EndWindowDraw() {
     const bool presentingDxgi = d2dActiveRenderTarget_ == d2dDeviceContext_.Get() && dxgiSwapChain_ != nullptr;
     EndDirect2DDraw();
     if (presentingDxgi && lastError_.empty()) {
-        PresentDxgiWindow(dirtyRects);
+        PresentDxgiWindow();
     }
 }
 
-void D2DRenderer::DiscardWindowTarget(std::string_view reason) {
-    (void)reason;
+void D2DRenderer::DiscardWindowTarget(std::string_view) {
     d2dClipDepth_ = 0;
     if (d2dActiveDrawTarget_ == ActiveDrawTarget::Window) {
         d2dActiveRenderTarget_ = nullptr;
