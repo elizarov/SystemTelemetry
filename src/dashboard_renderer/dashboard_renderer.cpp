@@ -397,13 +397,19 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
     DashboardPresentationFrame frame;
-    if (!BuildPresentationFrame(snapshot, overlayState, frame)) {
-        return false;
+    {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_frame_build");
+        if (!BuildPresentationFrame(snapshot, overlayState, frame)) {
+            return false;
+        }
     }
-    const bool presented = immediatePresent_ && presentationHwnd_ != nullptr
-                               ? presentation_.PresentFrameSynchronously(*renderer_, std::move(frame))
-                           : presentationHwnd_ == nullptr ? presentation_.PresentFrameSynchronously(std::move(frame))
-                                                          : presentation_.PublishFrame(std::move(frame));
+    const bool presented = [&] {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_frame_publish");
+        return immediatePresent_ && presentationHwnd_ != nullptr
+                   ? presentation_.PresentFrameSynchronously(*renderer_, std::move(frame))
+               : presentationHwnd_ == nullptr ? presentation_.PresentFrameSynchronously(std::move(frame))
+                                              : presentation_.PublishFrame(std::move(frame));
+    }();
     if (!presented) {
         lastError_ = presentation_.LastError();
     }
@@ -433,7 +439,11 @@ bool DashboardRenderer::BuildPresentationFrame(
     frame.snapshotLayerUpdated = updateSnapshot;
     frame.overlayLayerUpdated = updateOverlay;
 
-    const MetricSource& metrics = ResolveMetrics(snapshot);
+    const MetricSource* metrics = nullptr;
+    {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_resolve_metrics");
+        metrics = &ResolveMetrics(snapshot);
+    }
     if (updateSnapshot) {
         layoutResolver_->ClearDynamicEditArtifacts();
         layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
@@ -441,10 +451,14 @@ bool DashboardRenderer::BuildPresentationFrame(
         if (CanReuseLayerBitmaps()) {
             frame.snapshotLayer = AcquireLayerBitmap(frame.width, frame.height);
         }
-        const bool snapshotDrawn =
-            renderer_->DrawToBitmap(frame.snapshotLayer, frame.width, frame.height, RenderBitmapClear::Background, [&] {
-                DrawSnapshotLayer(overlayState, metrics);
-            });
+        const bool snapshotDrawn = [&] {
+            auto timing = trace_.Timings().Measure(trace_, "snapshot_layer_bitmap");
+            return renderer_->DrawToBitmap(
+                frame.snapshotLayer, frame.width, frame.height, RenderBitmapClear::Background, [&] {
+                    auto contentTiming = trace_.Timings().Measure(trace_, "snapshot_layer_content");
+                    DrawSnapshotLayer(overlayState, *metrics);
+                });
+        }();
         if (!snapshotDrawn) {
             lastError_ = renderer_->LastError();
             RecycleFrameLayers(std::move(frame));
@@ -459,7 +473,10 @@ bool DashboardRenderer::BuildPresentationFrame(
         layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
     }
 
-    layoutResolver_->ResolveDynamicEditArtifactCollisions();
+    {
+        auto timing = trace_.Timings().Measure(trace_, "dynamic_edit_collisions");
+        layoutResolver_->ResolveDynamicEditArtifactCollisions();
+    }
     if (overlayVisible) {
         layoutResolver_->TagOverlayAffordanceLayers(overlayState);
         BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
@@ -467,10 +484,14 @@ bool DashboardRenderer::BuildPresentationFrame(
         if (CanReuseLayerBitmaps()) {
             overlayBitmap = AcquireLayerBitmap(frame.width, frame.height);
         }
-        const bool overlayDrawn =
-            renderer_->DrawToBitmap(overlayBitmap, frame.width, frame.height, RenderBitmapClear::Transparent, [&] {
-                DrawOverlayLayerStatic(overlayState, metrics);
-            });
+        const bool overlayDrawn = [&] {
+            auto timing = trace_.Timings().Measure(trace_, "overlay_layer_bitmap");
+            return renderer_->DrawToBitmap(
+                overlayBitmap, frame.width, frame.height, RenderBitmapClear::Transparent, [&] {
+                    auto contentTiming = trace_.Timings().Measure(trace_, "overlay_layer_content");
+                    DrawOverlayLayerStatic(overlayState, *metrics);
+                });
+        }();
         if (!overlayDrawn) {
             lastError_ = renderer_->LastError();
             if (layerBitmapPool_ != nullptr) {

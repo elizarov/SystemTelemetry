@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <utility>
 
+#include "util/high_precision_timer.h"
 #include "util/trace.h"
 
 namespace {
@@ -45,6 +46,14 @@ const char* TrackRetentionText(DashboardAnimationTimeline::TrackRetention retent
             return "keep_untouched";
     }
     return "unknown";
+}
+
+void RecordAnimationFrameTiming(const Trace* trace, HighPrecisionTimer::Tick startedAt) {
+    if (trace == nullptr || startedAt == 0) {
+        return;
+    }
+    trace->Timings().Record(
+        *trace, "animation_frame", HighPrecisionTimer::Elapsed(startedAt, HighPrecisionTimer::Now()));
 }
 
 }  // namespace
@@ -293,8 +302,6 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
     DashboardPresentationFrame& frame,
     DashboardPresentedFrameState& presentedState) {
     const Trace* trace = trace_.load();
-    TraceTimingScope timing =
-        trace != nullptr ? trace->Timings().Measure(*trace, "animation_frame") : TraceTimingScope{};
     const bool metricTargetsUpdated =
         !presentedState.hasMetricVersion || presentedState.versions.metricVersion != frame.versions.metricVersion;
     if (!PrepareRenderer(renderer, frame, presentedState)) {
@@ -313,7 +320,13 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
     bool presented = true;
     bool retainedContents = presentedState.retainedContents;
     if (fullRedraw) {
-        const auto drawFullFrame = [&] { DrawFrame(renderer, activeTimeline, frame, now); };
+        const auto drawFullFrame = [&] {
+            const HighPrecisionTimer::Tick animationStartedAt = HighPrecisionTimer::Now();
+            DrawFrame(renderer, activeTimeline, frame, now);
+            if (activeTimeline != nullptr) {
+                RecordAnimationFrameTiming(trace, animationStartedAt);
+            }
+        };
         if (frame.animate) {
             presented = renderer.DrawWindowRetained(frame.width, frame.height, drawFullFrame);
             retainedContents = true;
@@ -322,6 +335,7 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
             retainedContents = false;
         }
     } else {
+        const HighPrecisionTimer::Tick animationStartedAt = HighPrecisionTimer::Now();
         const PreparedDirtyFrame preparedFrame = PrepareDirtyFrame(activeTimeline, frame);
         if (!preparedFrame.dirtyRects.empty()) {
             const RenderRect fullSurface{0, 0, frame.width, frame.height};
@@ -331,6 +345,7 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
                     : std::span<const RenderRect>(&fullSurface, 1);
             presented = renderer.DrawWindowDirty(frame.width, frame.height, redrawRects, [&](auto dirtyRects) {
                 DrawFrameDirty(renderer, frame, dirtyRects, preparedFrame);
+                RecordAnimationFrameTiming(trace, animationStartedAt);
             });
             retainedContents = true;
         }
