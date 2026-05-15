@@ -111,7 +111,7 @@ Keys follow data, not visual slots. Reordering rows or moving widgets preserves 
 
 `ScalarFillSample` is the widget-private state used by pill bars, gauges, drive usage, and drive activity. It stores an optional normalized value ratio and optional normalized peak ratio. Missing values draw no fill or marker. State construction clamps finite values to `[0, 1]` and stores `std::nullopt` for NaN or infinity.
 
-`ThroughputChartSample` is the widget-private state used by throughput charts. It stores smoothed retained-history samples in display order, shared vertical graph maximum, time-marker offset in sample units, fractional plot shift in sample units, and guide spacing. Non-finite sample values become `0`. The retained chart history keeps 120 raw samples, which covers 30 seconds at the 250 ms cadence. Throughput smoothing uses a four-sample moving average, so each plotted sample represents one second of telemetry data.
+`ThroughputChartSample` is the widget-private state used by throughput charts. It stores compact retained-history body samples in display order, the live leader value, shared vertical graph maximum, time-marker offset in one-second sample units, fractional plot shift in one-second sample units, and guide spacing. Non-finite sample values become `0`. Throughput retained history keeps 30 ready-to-draw one-second averages plus the last four raw 250 ms samples for the live leader, so the chart still covers 30 seconds while transferring and drawing fewer points. Scalar retained histories separately keep 120 raw 250 ms samples for peak ghosts on bars and gauges.
 
 Widget-private animation primitives own their render geometry. They draw sampled private state onto `Renderer` and report conservative dirty bounds for retained composition.
 

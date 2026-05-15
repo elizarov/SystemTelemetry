@@ -328,6 +328,90 @@ TEST(AnimationTimeline, ThroughputCarriesPlotShiftAndTargetTailWhenPhaseAdvances
     EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
 }
 
+TEST(AnimationTimeline, ThroughputScrollTargetIncludesCompactTargetPhase) {
+    DashboardAnimationTimeline timeline(kTimelineDuration);
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ThroughputKey("network.download");
+
+    ThroughputChartSample first;
+    first.samples = {0.0, 10.0, 30.0, 70.0};
+    first.liveLeaderMbps = 70.0;
+    first.maxGraph = 100.0;
+    first.timeMarkerOffsetSamples = 8.0;
+    first.plotShiftSamples = 0.75;
+
+    timeline.BeginFrame(start);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + kTimelineDuration);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    ThroughputChartSample next;
+    next.samples = {10.0, 30.0, 70.0, 90.0};
+    next.liveLeaderMbps = 100.0;
+    next.maxGraph = 100.0;
+    next.timeMarkerOffsetSamples = 9.25;
+    next.plotShiftSamples = 0.25;
+
+    timeline.BeginFrame(start + kTimelineDuration + kTimelineFifth);
+    (void)ResolveThroughput(timeline, key, next, 2);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + kTimelineDuration + kTimelineFifth + kTimelineHalf);
+    const ThroughputChartSample sample = ResolveThroughput(timeline, key, next, 2);
+    timeline.EndFrame();
+
+    EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 1.0);
+    EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
+}
+
+TEST(AnimationTimeline, ThroughputInterpolatesPhaseShiftWithoutHistoryScroll) {
+    DashboardAnimationTimeline timeline(kTimelineDuration);
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ThroughputKey("network.upload");
+
+    ThroughputChartSample first;
+    first.samples = {10.0, 20.0, 30.0};
+    first.liveLeaderMbps = 30.0;
+    first.maxGraph = 100.0;
+    first.timeMarkerOffsetSamples = 2.0;
+    first.plotShiftSamples = 0.0;
+
+    timeline.BeginFrame(start);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + kTimelineDuration);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    ThroughputChartSample next = first;
+    next.liveLeaderMbps = 40.0;
+    next.timeMarkerOffsetSamples = 2.25;
+    next.plotShiftSamples = 0.25;
+
+    timeline.BeginFrame(start + kTimelineDuration + kTimelineFifth);
+    (void)ResolveThroughput(timeline, key, next, 2);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + kTimelineDuration + kTimelineFifth + kTimelineHalf);
+    ThroughputChartSample sample = ResolveThroughput(timeline, key, next, 2);
+    timeline.EndFrame();
+
+    EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.125);
+    EXPECT_DOUBLE_EQ(sample.liveLeaderMbps, 35.0);
+    EXPECT_EQ(sample.samples, first.samples);
+
+    timeline.BeginFrame(start + kTimelineDuration + kTimelineFifth + kTimelineDuration);
+    sample = ResolveThroughput(timeline, key, next, 2);
+    timeline.EndFrame();
+
+    EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.25);
+    EXPECT_DOUBLE_EQ(sample.liveLeaderMbps, 40.0);
+}
+
 TEST(AnimationTimeline, InterruptedThroughputScrollContinuesFromCurrentPlotShift) {
     DashboardAnimationTimeline timeline(kTimelineDuration);
     const Clock::time_point start = Clock::time_point{};
@@ -373,6 +457,66 @@ TEST(AnimationTimeline, InterruptedThroughputScrollContinuesFromCurrentPlotShift
 
     EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 1.25);
     EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0, 50.0}));
+}
+
+TEST(AnimationTimeline, InterruptedThroughputCommitKeepsNextPhaseMovingForward) {
+    DashboardAnimationTimeline timeline(kTimelineDuration);
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ThroughputKey("network.upload");
+
+    ThroughputChartSample first;
+    first.samples = {0.0, 10.0, 30.0, 70.0};
+    first.liveLeaderMbps = 70.0;
+    first.maxGraph = 100.0;
+    first.timeMarkerOffsetSamples = 8.75;
+    first.plotShiftSamples = 0.75;
+
+    timeline.BeginFrame(start);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + kTimelineDuration);
+    (void)ResolveThroughput(timeline, key, first);
+    timeline.EndFrame();
+
+    ThroughputChartSample committed;
+    committed.samples = {10.0, 30.0, 70.0, 90.0};
+    committed.liveLeaderMbps = 90.0;
+    committed.maxGraph = 100.0;
+    committed.timeMarkerOffsetSamples = 9.0;
+    committed.plotShiftSamples = 0.0;
+
+    const Clock::time_point commitStart = start + kTimelineDuration + kTimelineFifth;
+    timeline.BeginFrame(commitStart);
+    (void)ResolveThroughput(timeline, key, committed, 2);
+    timeline.EndFrame();
+
+    const Clock::time_point interruptedAt = commitStart + (kTimelineFifth * 4);
+    timeline.BeginFrame(interruptedAt);
+    ThroughputChartSample sample = ResolveThroughput(timeline, key, committed, 2);
+    timeline.EndFrame();
+
+    EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.95);
+    EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
+
+    ThroughputChartSample nextPhase = committed;
+    nextPhase.liveLeaderMbps = 95.0;
+    nextPhase.timeMarkerOffsetSamples = 9.25;
+    nextPhase.plotShiftSamples = 0.25;
+
+    timeline.BeginFrame(interruptedAt);
+    sample = ResolveThroughput(timeline, key, nextPhase, 3);
+    timeline.EndFrame();
+
+    EXPECT_DOUBLE_EQ(sample.plotShiftSamples, 0.95);
+    EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
+
+    timeline.BeginFrame(interruptedAt + kTimelineTwoFifths);
+    sample = ResolveThroughput(timeline, key, nextPhase, 3);
+    timeline.EndFrame();
+
+    EXPECT_NEAR(sample.plotShiftSamples, 1.07, 0.000001);
+    EXPECT_EQ(sample.samples, (std::vector<double>{0.0, 10.0, 30.0, 70.0, 90.0}));
 }
 
 TEST(AnimationTimeline, ThroughputTimeMarkerMovesForwardAcrossWrap) {

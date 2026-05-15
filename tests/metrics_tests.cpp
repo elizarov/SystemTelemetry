@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <gtest/gtest.h>
 #include <optional>
 #include <vector>
@@ -59,14 +60,26 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, co
     snapshot.retainedHistories.push_back(std::move(series));
 }
 
-std::vector<double> AlternatingThroughputSpikeHistory(size_t sampleCount, bool oldestSampleIsSpike, double spikeMbps) {
-    std::vector<double> samples;
-    samples.reserve(sampleCount);
-    for (size_t i = 0; i < sampleCount; ++i) {
-        const bool spike = (i % 2 == 0) == oldestSampleIsSpike;
-        samples.push_back(spike ? spikeMbps : 0.0);
-    }
-    return samples;
+void AddThroughputHistorySeries(SystemSnapshot& snapshot,
+    const std::string& metricRef,
+    const std::vector<double>& samples,
+    std::initializer_list<double> liveSamples = {},
+    uint8_t bucketSampleCount = 0) {
+    RetainedHistorySeries series;
+    series.seriesRef = metricRef;
+    series.samples = samples;
+    series.throughputLiveSamples.assign(liveSamples.begin(), liveSamples.end());
+    series.throughputBucketSampleCount = bucketSampleCount;
+    snapshot.retainedHistories.push_back(std::move(series));
+}
+
+void AddThroughputHistorySeries(SystemSnapshot& snapshot,
+    const std::string& metricRef,
+    std::initializer_list<double> samples,
+    std::initializer_list<double> liveSamples = {},
+    uint8_t bucketSampleCount = 0) {
+    AddThroughputHistorySeries(
+        snapshot, metricRef, std::vector<double>(samples.begin(), samples.end()), liveSamples, bucketSampleCount);
 }
 
 }  // namespace
@@ -286,13 +299,14 @@ TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     drive.writeMbps = 5.0;
     snapshot.drives.push_back(drive);
 
-    AddHistorySeries(snapshot, "network.upload", {55.0, 70.0, 78.4, 93.4});
+    AddThroughputHistorySeries(snapshot, "network.upload", {55.0, 70.0, 78.4, 93.4}, {55.0, 70.0, 78.4, 93.4});
 
     MetricSource source(snapshot, metrics);
 
     const ThroughputMetric& throughput = source.ResolveThroughput("network.upload");
     EXPECT_EQ(throughput.label, "Up");
     EXPECT_EQ(throughput.valueText, "74.2 MB/s");
+    EXPECT_DOUBLE_EQ(throughput.liveLeaderMbps, 74.2);
 
     const DriveRow* row = source.FindDriveRow(0);
     ASSERT_NE(row, nullptr);
@@ -301,7 +315,7 @@ TEST(Metrics, ResolvesThroughputAndDriveTextFromConfiguredStyles) {
     EXPECT_EQ(source.FindDriveRow(1), nullptr);
 }
 
-TEST(Metrics, ScalesThroughputGraphsFromSmoothedHistoryInsteadOfCurrentSamples) {
+TEST(Metrics, ScalesThroughputGraphsFromCompactHistoryInsteadOfCurrentSamples) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
     snapshot.network.uploadMbps = 1000.0;
@@ -309,10 +323,10 @@ TEST(Metrics, ScalesThroughputGraphsFromSmoothedHistoryInsteadOfCurrentSamples) 
     snapshot.storage.readMbps = 700.0;
     snapshot.storage.writeMbps = 600.0;
 
-    AddHistorySeries(snapshot, "network.upload", {5.0, 5.0, 5.0});
-    AddHistorySeries(snapshot, "network.download", {4.0, 4.0, 4.0});
-    AddHistorySeries(snapshot, "storage.read", {3.0, 3.0, 3.0});
-    AddHistorySeries(snapshot, "storage.write", {2.0, 2.0, 2.0});
+    AddThroughputHistorySeries(snapshot, "network.upload", {5.0, 5.0, 5.0});
+    AddThroughputHistorySeries(snapshot, "network.download", {4.0, 4.0, 4.0});
+    AddThroughputHistorySeries(snapshot, "storage.read", {3.0, 3.0, 3.0});
+    AddThroughputHistorySeries(snapshot, "storage.write", {2.0, 2.0, 2.0});
 
     MetricSource source(snapshot, metrics);
 
@@ -322,20 +336,20 @@ TEST(Metrics, ScalesThroughputGraphsFromSmoothedHistoryInsteadOfCurrentSamples) 
     EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.write").maxGraph, 10.0);
 
     SystemSnapshot spikingSnapshot;
-    AddHistorySeries(spikingSnapshot, "network.upload", {0.0, 0.0, 0.0, 1000.0});
-    AddHistorySeries(spikingSnapshot, "network.download", {0.0, 0.0, 0.0, 0.0});
+    AddThroughputHistorySeries(spikingSnapshot, "network.upload", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 1000.0});
+    AddThroughputHistorySeries(spikingSnapshot, "network.download", {0.0, 0.0, 0.0}, {0.0, 0.0, 0.0, 0.0});
 
     MetricSource spikingSource(spikingSnapshot, metrics);
 
-    EXPECT_DOUBLE_EQ(spikingSource.ResolveThroughput("network.upload").history.back(), 250.0);
+    EXPECT_DOUBLE_EQ(spikingSource.ResolveThroughput("network.upload").valueMbps, 250.0);
     EXPECT_DOUBLE_EQ(spikingSource.ResolveThroughput("network.upload").maxGraph, 250.0);
 }
 
 TEST(Metrics, KeepsSingleThroughputHistorySampleSoGraphsStartImmediately) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
-    AddHistorySeries(snapshot, "network.upload", {20.0});
-    AddHistorySeries(snapshot, "network.download", {0.0});
+    AddThroughputHistorySeries(snapshot, "network.upload", {20.0});
+    AddThroughputHistorySeries(snapshot, "network.download", {0.0});
 
     MetricSource source(snapshot, metrics);
     const ThroughputMetric& upload = source.ResolveThroughput("network.upload");
@@ -348,20 +362,27 @@ TEST(Metrics, KeepsSingleThroughputHistorySampleSoGraphsStartImmediately) {
 TEST(Metrics, KeepsThroughputGraphScaleStableAsAlternatingSpikeHistoryScrolls) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     constexpr double kSpikeMbps = 20.0;
-    constexpr double kSmoothedSpikeMbps = kSpikeMbps / 2.0;
+    constexpr double kAveragedSpikeMbps = kSpikeMbps / 2.0;
+    const std::vector<double> compactSpikeHistory(kRetainedThroughputHistorySamples, kAveragedSpikeMbps);
+    const std::vector<double> compactZeroHistory(kRetainedThroughputHistorySamples, 0.0);
 
     for (int scrollStep = 0; scrollStep < 4; ++scrollStep) {
         SystemSnapshot snapshot;
-        AddHistorySeries(snapshot,
+        AddThroughputHistorySeries(snapshot,
             "network.upload",
-            AlternatingThroughputSpikeHistory(kRetainedHistorySamples, scrollStep % 2 == 1, kSpikeMbps));
-        AddHistorySeries(snapshot, "network.download", std::vector<double>(kRetainedHistorySamples, 0.0));
+            compactSpikeHistory,
+            {kSpikeMbps, 0.0, kSpikeMbps, 0.0},
+            static_cast<uint8_t>(scrollStep));
+        AddThroughputHistorySeries(snapshot, "network.download", compactZeroHistory);
 
         MetricSource source(snapshot, metrics);
         const ThroughputMetric& upload = source.ResolveThroughput("network.upload");
 
-        EXPECT_DOUBLE_EQ(upload.history.front(), kSmoothedSpikeMbps) << "scroll step " << scrollStep;
-        EXPECT_DOUBLE_EQ(upload.maxGraph, kSmoothedSpikeMbps) << "scroll step " << scrollStep;
+        EXPECT_DOUBLE_EQ(upload.history.front(), kAveragedSpikeMbps) << "scroll step " << scrollStep;
+        EXPECT_DOUBLE_EQ(upload.maxGraph, kAveragedSpikeMbps) << "scroll step " << scrollStep;
+        EXPECT_DOUBLE_EQ(upload.plotShiftSamples,
+            static_cast<double>(scrollStep) / static_cast<double>(kThroughputHistorySmoothingSamples))
+            << "scroll step " << scrollStep;
     }
 }
 
@@ -369,16 +390,16 @@ TEST(Metrics, UsesCoarseThroughputGuideStepsForLargeNetworkAndStorageGraphs) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
 
-    AddHistorySeries(snapshot, "network.upload", {0.0, 200.0, 350.0, 650.0});
-    AddHistorySeries(snapshot, "network.download", {0.0, 0.0, 0.0, 0.0});
-    AddHistorySeries(snapshot, "storage.read", {0.0, 200.0, 350.0, 650.0});
-    AddHistorySeries(snapshot, "storage.write", {0.0, 0.0, 0.0, 0.0});
+    AddThroughputHistorySeries(snapshot, "network.upload", {0.0, 200.0, 350.0, 650.0});
+    AddThroughputHistorySeries(snapshot, "network.download", {0.0, 0.0, 0.0, 0.0});
+    AddThroughputHistorySeries(snapshot, "storage.read", {0.0, 200.0, 350.0, 650.0});
+    AddThroughputHistorySeries(snapshot, "storage.write", {0.0, 0.0, 0.0, 0.0});
 
     MetricSource source(snapshot, metrics);
 
-    EXPECT_DOUBLE_EQ(source.ResolveThroughput("network.upload").maxGraph, 300.0);
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("network.upload").maxGraph, 650.0);
     EXPECT_DOUBLE_EQ(source.ResolveThroughput("network.upload").guideStepMbps, 50.0);
-    EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.read").maxGraph, 300.0);
+    EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.read").maxGraph, 650.0);
     EXPECT_DOUBLE_EQ(source.ResolveThroughput("storage.read").guideStepMbps, 50.0);
 }
 

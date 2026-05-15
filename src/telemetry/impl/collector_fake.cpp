@@ -85,8 +85,8 @@ std::string ReadBinaryFile(const FilePath& path) {
 
 std::vector<double> BuildSyntheticHistory(uint64_t tick, const SyntheticHistorySpec& spec) {
     std::vector<double> samples;
-    samples.reserve(kRetainedHistorySamples);
-    for (size_t i = 0; i < kRetainedHistorySamples; ++i) {
+    samples.reserve(kRetainedScalarHistorySamples);
+    for (size_t i = 0; i < kRetainedScalarHistorySamples; ++i) {
         const double position = static_cast<double>(i) + static_cast<double>(tick) * 3.0;
         const double value = spec.base + std::sin(position / spec.periodA) * spec.amplitudeA +
                              std::cos((position + 7.0) / spec.periodB) * spec.amplitudeB;
@@ -121,8 +121,10 @@ double SyntheticPulse(double position, double period, double offset, double widt
 
 std::vector<double> BuildSyntheticThroughputHistory(uint64_t tick, const SyntheticThroughputSpec& spec) {
     std::vector<double> samples;
-    samples.reserve(kRetainedHistorySamples);
-    for (size_t i = 0; i < kRetainedHistorySamples; ++i) {
+    constexpr size_t kSyntheticRawThroughputSamples =
+        kRetainedThroughputHistorySamples * kThroughputHistorySmoothingSamples;
+    samples.reserve(kSyntheticRawThroughputSamples);
+    for (size_t i = 0; i < kSyntheticRawThroughputSamples; ++i) {
         const double position = static_cast<double>(i) + static_cast<double>(tick) * 2.5;
         const double drift =
             std::sin(position / spec.periodA) * spec.driftA + std::cos((position + 9.0) / spec.periodB) * spec.driftB;
@@ -139,6 +141,37 @@ std::vector<double> BuildSyntheticThroughputHistory(uint64_t tick, const Synthet
         const double dip = SyntheticPulse(position, spec.dipPeriod, spec.dipOffset, spec.dipWidth) * spec.dipAmplitude;
         const double value = spec.base + drift + fastJitter + slowJitter + burst + microBurst - dip;
         samples.push_back((std::max)(0.0, value));
+    }
+    return samples;
+}
+
+std::vector<double> CompactSyntheticThroughputHistory(const std::vector<double>& rawSamples) {
+    std::vector<double> samples;
+    samples.reserve(kRetainedThroughputHistorySamples);
+    for (size_t point = 0; point < kRetainedThroughputHistorySamples; ++point) {
+        const size_t firstRawSample = point * kThroughputHistorySmoothingSamples;
+        double total = 0.0;
+        size_t count = 0;
+        for (size_t offset = 0; offset < kThroughputHistorySmoothingSamples; ++offset) {
+            const size_t rawIndex = firstRawSample + offset;
+            if (rawIndex >= rawSamples.size()) {
+                break;
+            }
+            total += std::max(0.0, rawSamples[rawIndex]);
+            ++count;
+        }
+        samples.push_back(count > 0 ? total / static_cast<double>(count) : 0.0);
+    }
+    return samples;
+}
+
+std::vector<double> LastThroughputLiveSamples(const std::vector<double>& rawSamples) {
+    std::vector<double> samples(kThroughputHistorySmoothingSamples, 0.0);
+    const size_t copyCount = std::min(rawSamples.size(), samples.size());
+    const size_t rawStart = rawSamples.size() - copyCount;
+    const size_t outputStart = samples.size() - copyCount;
+    for (size_t i = 0; i < copyCount; ++i) {
+        samples[outputStart + i] = std::max(0.0, rawSamples[rawStart + i]);
     }
     return samples;
 }
@@ -183,6 +216,19 @@ void AddSyntheticHistory(SystemSnapshot& snapshot, RetainedHistoryKey key, std::
     RetainedHistorySeries history;
     history.seriesRef = RetainedHistorySeriesRef(key);
     history.samples = std::move(samples);
+    const size_t index = snapshot.retainedHistories.size();
+    if (index <= 0xffffu - 1u) {
+        snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)] = static_cast<uint16_t>(index + 1u);
+    }
+    snapshot.retainedHistories.push_back(std::move(history));
+}
+
+void AddSyntheticThroughputHistory(
+    SystemSnapshot& snapshot, RetainedHistoryKey key, const std::vector<double>& rawSamples) {
+    RetainedHistorySeries history;
+    history.seriesRef = RetainedHistorySeriesRef(key);
+    history.samples = CompactSyntheticThroughputHistory(rawSamples);
+    history.throughputLiveSamples = LastThroughputLiveSamples(rawSamples);
     const size_t index = snapshot.retainedHistories.size();
     if (index <= 0xffffu - 1u) {
         snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)] = static_cast<uint16_t>(index + 1u);
@@ -278,10 +324,10 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     AddSyntheticHistory(snapshot, "board.temp.cpu", std::move(boardTempCpu));
     AddSyntheticHistory(snapshot, "board.fan.cpu", std::move(boardFanCpu));
     AddSyntheticHistory(snapshot, "board.fan.system", std::move(boardFanSystem));
-    AddSyntheticHistory(snapshot, RetainedHistoryKey::NetworkUpload, std::move(networkUpload));
-    AddSyntheticHistory(snapshot, RetainedHistoryKey::NetworkDownload, std::move(networkDownload));
-    AddSyntheticHistory(snapshot, RetainedHistoryKey::StorageRead, std::move(storageRead));
-    AddSyntheticHistory(snapshot, RetainedHistoryKey::StorageWrite, std::move(storageWrite));
+    AddSyntheticThroughputHistory(snapshot, RetainedHistoryKey::NetworkUpload, networkUpload);
+    AddSyntheticThroughputHistory(snapshot, RetainedHistoryKey::NetworkDownload, networkDownload);
+    AddSyntheticThroughputHistory(snapshot, RetainedHistoryKey::StorageRead, storageRead);
+    AddSyntheticThroughputHistory(snapshot, RetainedHistoryKey::StorageWrite, storageWrite);
 
     snapshot.now = BuildSyntheticTimestamp(tick);
     snapshot.revision = 1;

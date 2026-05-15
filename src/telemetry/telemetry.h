@@ -44,6 +44,9 @@ struct StorageDriveCandidate {
 struct RetainedHistorySeries {
     std::string seriesRef;
     std::vector<double> samples;
+    std::vector<double> throughputLiveSamples;
+    double throughputBucketTotal = 0.0;
+    uint8_t throughputBucketSampleCount = 0;
 };
 
 struct SystemSnapshot;
@@ -69,6 +72,7 @@ constexpr size_t kRetainedHistoryKeyCount = static_cast<size_t>(RetainedHistoryK
 
 const char* RetainedHistorySeriesRef(RetainedHistoryKey key);
 bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key);
+bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key);
 
 struct ProcessorTelemetry {
     std::string name = "CPU";

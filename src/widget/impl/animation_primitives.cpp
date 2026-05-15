@@ -117,11 +117,15 @@ std::vector<double> SanitizeSamples(const std::vector<double>& samples) {
 
 ThroughputChartSample SanitizeThroughput(ThroughputChartSample sample) {
     sample.samples = SanitizeSamples(sample.samples);
+    sample.liveLeaderMbps = FiniteNonNegativeOr(sample.liveLeaderMbps);
     sample.maxGraph = IsFiniteDouble(sample.maxGraph) && sample.maxGraph > 0.0 ? sample.maxGraph : 10.0;
     sample.timeMarkerOffsetSamples = FiniteNonNegativeOr(sample.timeMarkerOffsetSamples);
     sample.plotShiftSamples = FiniteNonNegativeOr(sample.plotShiftSamples);
     sample.guideStepMbps =
         IsFiniteDouble(sample.guideStepMbps) && sample.guideStepMbps > 0.0 ? sample.guideStepMbps : 5.0;
+    if (sample.bodySampleCount == 0) {
+        sample.bodySampleCount = sample.samples.size();
+    }
     return sample;
 }
 
@@ -130,10 +134,11 @@ bool DoublesEqual(double left, double right) {
 }
 
 bool ThroughputEqual(const ThroughputChartSample& left, const ThroughputChartSample& right) {
-    if (!DoublesEqual(left.maxGraph, right.maxGraph) ||
+    if (!DoublesEqual(left.maxGraph, right.maxGraph) || !DoublesEqual(left.liveLeaderMbps, right.liveLeaderMbps) ||
         !DoublesEqual(left.timeMarkerOffsetSamples, right.timeMarkerOffsetSamples) ||
         !DoublesEqual(left.plotShiftSamples, right.plotShiftSamples) ||
-        !DoublesEqual(left.guideStepMbps, right.guideStepMbps) || left.samples.size() != right.samples.size()) {
+        !DoublesEqual(left.guideStepMbps, right.guideStepMbps) || left.bodySampleCount != right.bodySampleCount ||
+        left.samples.size() != right.samples.size()) {
         return false;
     }
     for (size_t index = 0; index < left.samples.size(); ++index) {
@@ -147,10 +152,12 @@ bool ThroughputEqual(const ThroughputChartSample& left, const ThroughputChartSam
 ThroughputChartSample InitialThroughputStart(const ThroughputChartSample& target) {
     ThroughputChartSample start;
     start.samples.assign(target.samples.size(), 0.0);
+    start.liveLeaderMbps = 0.0;
     start.maxGraph = 0.0;
     start.timeMarkerOffsetSamples = target.timeMarkerOffsetSamples;
     start.plotShiftSamples = 0.0;
     start.guideStepMbps = target.guideStepMbps;
+    start.bodySampleCount = target.bodySampleCount;
     return start;
 }
 
@@ -167,9 +174,10 @@ double AlignedSampleValue(const std::vector<double>& samples, size_t outputIndex
 }
 
 bool ThroughputHasActiveChange(const ThroughputChartSample& start, const ThroughputChartSample& target) {
-    if (!DoublesEqual(start.maxGraph, target.maxGraph) ||
+    if (!DoublesEqual(start.maxGraph, target.maxGraph) || !DoublesEqual(start.liveLeaderMbps, target.liveLeaderMbps) ||
         !DoublesEqual(start.timeMarkerOffsetSamples, target.timeMarkerOffsetSamples) ||
-        !DoublesEqual(start.plotShiftSamples, target.plotShiftSamples)) {
+        !DoublesEqual(start.plotShiftSamples, target.plotShiftSamples) ||
+        start.bodySampleCount != target.bodySampleCount) {
         return true;
     }
     const size_t outputCount = (std::max)(start.samples.size(), target.samples.size());
@@ -221,7 +229,7 @@ size_t SuffixPrefixOverlap(const std::vector<double>& samples, const std::vector
 }
 
 bool OverlapSupportsScroll(size_t overlap, size_t targetSampleCount) {
-    if (targetSampleCount < 2 || overlap >= targetSampleCount) {
+    if (targetSampleCount < 2 || overlap == 0) {
         return false;
     }
     return overlap + 1u >= targetSampleCount;
@@ -254,10 +262,12 @@ void ConfigureThroughputScroll(std::vector<double>& scrollSamples,
     }
 
     scrollSamples = start.samples;
-    for (size_t index = overlap; index < target.samples.size(); ++index) {
-        scrollSamples.push_back(target.samples[index]);
+    if (overlap < targetSampleCount) {
+        for (size_t index = overlap; index < target.samples.size(); ++index) {
+            scrollSamples.push_back(target.samples[index]);
+        }
     }
-    targetPlotShiftSamples = static_cast<double>(scrollSamples.size() - targetSampleCount);
+    targetPlotShiftSamples = static_cast<double>(scrollSamples.size() - targetSampleCount) + target.plotShiftSamples;
     if (targetPlotShiftSamples <= start.plotShiftSamples + kEpsilon) {
         scrollSamples.clear();
         targetPlotShiftSamples = 0.0;
@@ -295,9 +305,7 @@ public:
     WidgetAnimationStatePtr Sample(double progress) const override {
         progress = std::clamp(progress, 0.0, 1.0);
         if (progress >= 1.0) {
-            ThroughputChartSample sample = target_;
-            sample.plotShiftSamples = 0.0;
-            return MakeThroughputChartAnimationState(std::move(sample));
+            return MakeThroughputChartAnimationState(target_);
         }
 
         const size_t outputCount = (std::max)(start_.samples.size(), target_.samples.size());
@@ -312,13 +320,15 @@ public:
                     AlignedSampleValue(target_.samples, index, outputCount),
                     progress));
             }
-            sample.plotShiftSamples = 0.0;
+            sample.plotShiftSamples = Lerp(start_.plotShiftSamples, target_.plotShiftSamples, progress);
         }
 
+        sample.liveLeaderMbps = Lerp(start_.liveLeaderMbps, target_.liveLeaderMbps, progress);
         sample.maxGraph = Lerp(start_.maxGraph, target_.maxGraph, progress);
         const double markerDelta = ForwardMarkerDelta(start_.timeMarkerOffsetSamples, target_.timeMarkerOffsetSamples);
         sample.timeMarkerOffsetSamples = start_.timeMarkerOffsetSamples + (markerDelta * progress);
         sample.guideStepMbps = target_.guideStepMbps;
+        sample.bodySampleCount = target_.bodySampleCount;
         return MakeThroughputChartAnimationState(std::move(sample));
     }
 

@@ -5,7 +5,7 @@
 ## Responsibilities
 
 - `TelemetryRuntime` owns steady-state collection, snapshot publishing callbacks, provider composition, and runtime target resolution for network and storage.
-- `telemetry/timing.h` owns the shared 250 ms refresh interval, 120-sample retained-history window, four-sample throughput smoothing window, and derived throughput marker spacing used by telemetry, metrics, widgets, and live dashboard animation.
+- `telemetry/timing.h` owns the shared 250 ms refresh interval, 120-sample raw scalar retained-history window, 30-point compact throughput retained-history window, four-sample throughput live window, and derived throughput marker spacing used by telemetry, metrics, widgets, and live dashboard animation.
 - Package-private collectors perform synchronous provider work behind `TelemetryRuntime`.
 - Windows-native collection covers CPU, memory, network, storage, and clock data.
 - Hardware providers extend collection with supported GPU and board telemetry paths.

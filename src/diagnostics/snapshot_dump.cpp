@@ -11,7 +11,7 @@
 
 namespace {
 
-constexpr char kDumpFormatVersion[] = "casedash_snapshot_v11";
+constexpr char kDumpFormatVersion[] = "casedash_snapshot_v12";
 
 enum class DumpFieldKind : std::uint8_t {
     String,
@@ -273,6 +273,10 @@ void WriteRetainedHistories(
         const std::string historyPrefix = prefix + "." + std::to_string(i);
         WriteString(output, historyPrefix + ".series_ref", histories[i].seriesRef);
         WriteDoubleArray(output, historyPrefix + ".samples", histories[i].samples);
+        WriteDoubleArray(output, historyPrefix + ".throughput_live_samples", histories[i].throughputLiveSamples);
+        WriteDouble(output, historyPrefix + ".throughput_bucket_total", histories[i].throughputBucketTotal, 6);
+        WriteInteger(
+            output, historyPrefix + ".throughput_bucket_sample_count", histories[i].throughputBucketSampleCount);
     }
 }
 
@@ -538,7 +542,14 @@ bool LoadRetainedHistories(const DumpValues& values,
         RetainedHistorySeries history;
         const std::string historyPrefix = prefix + "." + std::to_string(i);
         if (!LoadString(values, historyPrefix + ".series_ref", history.seriesRef, error) ||
-            !LoadDoubleArrayField(values, historyPrefix + ".samples", history.samples, error)) {
+            !LoadDoubleArrayField(values, historyPrefix + ".samples", history.samples, error) ||
+            !LoadDoubleArrayField(
+                values, historyPrefix + ".throughput_live_samples", history.throughputLiveSamples, error) ||
+            !LoadDouble(values, historyPrefix + ".throughput_bucket_total", history.throughputBucketTotal, error) ||
+            !LoadUnsigned(values,
+                historyPrefix + ".throughput_bucket_sample_count",
+                history.throughputBucketSampleCount,
+                error)) {
             return false;
         }
         field.push_back(std::move(history));

@@ -371,6 +371,13 @@ SystemSnapshot BuildSnapshotHandoffIterationSnapshot(const SystemSnapshot& baseS
                                   23.0 + static_cast<double>(seriesIndex) + (static_cast<double>(sampleIndex) * 0.07)));
             series.samples[sampleIndex] = std::max(0.0, series.samples[sampleIndex] * scale);
         }
+        for (size_t sampleIndex = 0; sampleIndex < series.throughputLiveSamples.size(); ++sampleIndex) {
+            const double scale =
+                0.75 + (0.5 * SnapshotHandoffWave(iteration,
+                                  29.0 + static_cast<double>(seriesIndex) + (static_cast<double>(sampleIndex) * 0.11)));
+            series.throughputLiveSamples[sampleIndex] =
+                std::max(0.0, series.throughputLiveSamples[sampleIndex] * scale);
+        }
     }
     return snapshot;
 }

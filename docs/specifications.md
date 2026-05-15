@@ -38,7 +38,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Layout references may reuse another card's inner layout without duplicating its definition.
 - The storage drive list uses the resolved runtime drive selection. An empty persisted drive selection means all currently available fixed drives.
 - CPU and GPU cards each show a large segmented load gauge plus supporting metric rows.
-- Network and storage cards show retained-history throughput plots with current value headers. Each card pair shares a vertical graph maximum computed from smoothed retained-history values, not from instantaneous current values.
+- Network and storage cards show retained-history throughput plots with current value headers. Each card pair shares a vertical graph maximum computed from compact one-second retained-history values and the live leader, not from instantaneous raw samples.
 - Throughput graph guide lines use 5-unit spacing on small scales and 50-unit spacing once the shared graph maximum is above 50.
 - The storage card also shows per-drive activity and usage rows.
 - The time card shows a dominant configured-format time readout plus the configured-format local date. The shipped formats are `HH:MM` for time and `YYYY-MM-DD` for date.
@@ -90,7 +90,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - If a hardware provider is unavailable or unsupported, the dashboard stays running and shows those provider-owned values as unavailable instead of failing the app.
 - Network content shows current upload and download throughput plus a footer line with the selected adapter name and IPv4 address when available.
 - Storage throughput uses system-wide disk I/O counters, while per-drive rows use the currently selected drive set.
-- Throughput graph smoothing uses four telemetry points per displayed chart point, so each point represents a one-second moving average at the 250 ms cadence. Graph maximum selection uses smoothed values without a raw endpoint and does not depend on retained-history scroll phase.
+- Throughput graph history stores 30 one-second averaged body points plus the last four raw 250 ms samples used for the live leader. Graph maximum selection uses those phase-aware displayed values, including the live leader, and does not use instantaneous raw endpoint spikes.
 - Layout metric references are the only source of truth for which logical board metrics are requested from the board provider.
 - The board mapping section connects those logical names to provider-specific sensor names. Empty CPU and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. Supported provider details are defined in [docs/hardware.md](hardware.md).
 

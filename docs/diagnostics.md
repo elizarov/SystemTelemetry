@@ -98,7 +98,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
 - The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
 - Retained histories store raw sampled values in native runtime units.
-- The current dump format version is `casedash_snapshot_v11`.
+- The current dump format version is `casedash_snapshot_v12`.
 - Dump GPU FPS fields include the optional cleaned presenting application name as `gpu.fps.app_name`.
 - Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
 - Dump scalar issue fields use `none` or `permission_required`.

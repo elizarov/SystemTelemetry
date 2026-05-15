@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <optional>
 #include <vector>
 
@@ -13,10 +14,12 @@ struct ScalarFillSample {
 
 struct ThroughputChartSample {
     std::vector<double> samples;
+    double liveLeaderMbps = 0.0;
     double maxGraph = 10.0;
     double timeMarkerOffsetSamples = 0.0;
     double plotShiftSamples = 0.0;
     double guideStepMbps = 5.0;
+    size_t bodySampleCount = 0;
 };
 
 class ScalarFillAnimationState final : public WidgetAnimationState {

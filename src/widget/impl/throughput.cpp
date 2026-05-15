@@ -62,25 +62,20 @@ ThroughputGraphLayout ComputeGraphLayout(const WidgetHost& renderer, const Rende
     return layout;
 }
 
-size_t PlotTailCount(double plotShiftSamples, size_t sampleCount) {
-    if (plotShiftSamples <= 0.0 || sampleCount == 0) {
-        return 0;
-    }
-    const size_t tailCount = static_cast<size_t>(std::ceil(plotShiftSamples - kPlotEpsilon));
-    return (std::min)(tailCount, sampleCount - 1);
-}
-
-size_t VisibleSampleCount(size_t sampleCount, double plotShiftSamples) {
-    const size_t tailCount = PlotTailCount(plotShiftSamples, sampleCount);
-    return (std::max<size_t>)(1, sampleCount - tailCount);
-}
-
 double NormalizeMarkerOffsetSamples(double timeMarkerOffsetSamples, double timeMarkerIntervalSamples) {
     const double normalized = std::fmod(FiniteNonNegativeOr(timeMarkerOffsetSamples), timeMarkerIntervalSamples);
     if (normalized + kPlotEpsilon >= timeMarkerIntervalSamples) {
         return 0.0;
     }
     return normalized;
+}
+
+size_t PlotIntervalCount(size_t bodySampleCount) {
+    if (bodySampleCount < 2) {
+        return 1;
+    }
+    // A full one-sample commit scroll must be pixel-equivalent to the shifted compact target body.
+    return bodySampleCount - 1u;
 }
 
 void AddRenderPoint(std::vector<RenderPoint>& points, double x, double y) {
@@ -146,6 +141,18 @@ std::optional<double> PlotYAtX(const std::vector<PlotPoint>& points, int x) {
     return std::nullopt;
 }
 
+void AppendLeaderPoint(std::vector<PlotPoint>& points, int graphRight, double leaderY) {
+    while (!points.empty() && points.back().x > static_cast<double>(graphRight)) {
+        points.pop_back();
+    }
+    const PlotPoint leaderPoint{static_cast<double>(graphRight), leaderY};
+    if (!points.empty() && std::abs(points.back().x - leaderPoint.x) <= kPlotEpsilon &&
+        std::abs(points.back().y - leaderPoint.y) <= kPlotEpsilon) {
+        return;
+    }
+    points.push_back(leaderPoint);
+}
+
 void DrawGraphSnapshot(WidgetHost& renderer,
     const RenderRect& rect,
     const ThroughputGraphLayout& layout,
@@ -176,11 +183,13 @@ void DrawGraphAnimated(Renderer& renderer,
     const RenderRect& rect,
     const ThroughputGraphLayout& layout,
     const std::vector<double>& history,
+    double liveLeaderMbps,
     double maxValue,
     double guideStepMbps,
     double timeMarkerOffsetSamples,
     double plotShiftSamples,
     double timeMarkerIntervalSamples,
+    size_t bodySampleCount,
     bool drawValues) {
     maxValue = FiniteNonNegativeOr(maxValue, 10.0);
     if (maxValue <= 0.0) {
@@ -191,8 +200,7 @@ void DrawGraphAnimated(Renderer& renderer,
                                       ? timeMarkerIntervalSamples
                                       : kThroughputTimeMarkerIntervalSamples;
     const double plotShift = FiniteNonNegativeOr(plotShiftSamples);
-    const size_t visibleSampleCount = VisibleSampleCount(history.size(), plotShift);
-    const size_t historyDenominator = std::max<size_t>(1, visibleSampleCount - 1);
+    const size_t historyDenominator = PlotIntervalCount(bodySampleCount);
     const double markerOffset = NormalizeMarkerOffsetSamples(timeMarkerOffsetSamples, markerInterval);
     const RenderColorId markerColor = RenderColorId::GraphMarker;
     for (double tick = guideStep; tick < maxValue; tick += guideStep) {
@@ -239,7 +247,7 @@ void DrawGraphAnimated(Renderer& renderer,
 
     const RenderColorId plotColor = RenderColorId::Accent;
     std::vector<PlotPoint> plotPoints;
-    plotPoints.reserve(history.size());
+    plotPoints.reserve(history.size() + 1u);
     for (size_t i = 0; i < history.size(); ++i) {
         const double valueRatio = ClampFinite(FiniteNonNegativeOr(history[i]) / maxValue, 0.0, 1.0);
         const double sampleX = static_cast<double>(i) - plotShift;
@@ -248,6 +256,12 @@ void DrawGraphAnimated(Renderer& renderer,
         const double y =
             static_cast<double>(layout.graphBottom) - std::round(valueRatio * static_cast<double>(layout.plotHeight));
         plotPoints.push_back(PlotPoint{x, y});
+    }
+    if (!history.empty()) {
+        const double leaderRatio = ClampFinite(FiniteNonNegativeOr(liveLeaderMbps) / maxValue, 0.0, 1.0);
+        const double leaderY =
+            static_cast<double>(layout.graphBottom) - std::round(leaderRatio * static_cast<double>(layout.plotHeight));
+        AppendLeaderPoint(plotPoints, layout.graphRight, leaderY);
     }
     const std::vector<RenderPoint> clippedPlotPoints =
         ClipPlotPointsToGraph(plotPoints, layout.graphLeft, layout.graphRight);
@@ -293,11 +307,13 @@ public:
             rect_,
             layout_,
             sample.samples,
+            sample.liveLeaderMbps,
             sample.maxGraph,
             sample.guideStepMbps,
             sample.timeMarkerOffsetSamples,
             sample.plotShiftSamples,
             timeMarkerIntervalSamples_,
+            sample.bodySampleCount,
             drawValues_);
     }
 
@@ -387,9 +403,12 @@ void ThroughputWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, co
     const ThroughputGraphLayout& layout = layoutState_;
     ThroughputChartSample targetSample;
     targetSample.samples = metric.history;
+    targetSample.liveLeaderMbps = metric.liveLeaderMbps;
     targetSample.maxGraph = metric.maxGraph;
     targetSample.timeMarkerOffsetSamples = metric.timeMarkerOffsetSamples;
+    targetSample.plotShiftSamples = metric.plotShiftSamples;
     targetSample.guideStepMbps = metric.guideStepMbps;
+    targetSample.bodySampleCount = metric.history.size();
     const bool drawValues = renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank;
     DrawGraphSnapshot(renderer,
         layout.graphRect,

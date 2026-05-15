@@ -205,6 +205,18 @@ bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key) 
     return false;
 }
 
+bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key) {
+    switch (key) {
+        case RetainedHistoryKey::NetworkUpload:
+        case RetainedHistoryKey::NetworkDownload:
+        case RetainedHistoryKey::StorageRead:
+        case RetainedHistoryKey::StorageWrite:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,

@@ -33,9 +33,11 @@ struct ThroughputMetric {
     std::string valueText;
     double valueMbps = 0.0;
     std::vector<double> history;
+    double liveLeaderMbps = 0.0;
     double maxGraph = 10.0;
     double guideStepMbps = 5.0;
     double timeMarkerOffsetSamples = 0.0;
+    double plotShiftSamples = 0.0;
     double timeMarkerIntervalSamples = kThroughputTimeMarkerIntervalSamples;
 };
 
@@ -62,6 +64,8 @@ public:
         struct HistoryEntry {
             const char* metricRef = nullptr;
             std::vector<double> samples;
+            double liveLeaderMbps = 0.0;
+            double plotShiftSamples = 0.0;
         };
 
         HistoryEntry histories[4];
