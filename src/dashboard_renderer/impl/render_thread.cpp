@@ -1,13 +1,46 @@
 #include "dashboard_renderer/impl/render_thread.h"
 
+#include <algorithm>
 #include <chrono>
 #include <utility>
 
 namespace {
 
 constexpr auto kAnimationFrameInterval = std::chrono::milliseconds(16);
+constexpr std::size_t kMaxLayerBitmapPoolEntries = 8;
 
 }  // namespace
+
+RenderBitmap DashboardLayerBitmapPool::Acquire(int width, int height) {
+    std::lock_guard lock(mutex_);
+    const auto matches = [&](const RenderBitmap& bitmap) {
+        return bitmap.width == width && bitmap.height == height && !bitmap.Empty();
+    };
+    const auto it = std::find_if(available_.begin(), available_.end(), matches);
+    if (it == available_.end()) {
+        return {};
+    }
+    RenderBitmap bitmap = std::move(*it);
+    available_.erase(it);
+    return bitmap;
+}
+
+void DashboardLayerBitmapPool::Release(RenderBitmap bitmap) {
+    if (bitmap.Empty()) {
+        return;
+    }
+
+    std::lock_guard lock(mutex_);
+    if (available_.size() >= kMaxLayerBitmapPoolEntries) {
+        return;
+    }
+    available_.push_back(std::move(bitmap));
+}
+
+void DashboardLayerBitmapPool::Clear() {
+    std::lock_guard lock(mutex_);
+    available_.clear();
+}
 
 DashboardRenderThread::DashboardRenderThread() = default;
 
@@ -38,11 +71,19 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
     syncRenderer_->SetImmediatePresent(immediatePresent_.load());
 }
 
+void DashboardRenderThread::SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool) {
+    std::lock_guard lock(mutex_);
+    bitmapPool_ = std::move(pool);
+}
+
 void DashboardRenderThread::Shutdown() {
     {
         std::lock_guard lock(mutex_);
         stopRequested_ = true;
-        pendingFrame_.reset();
+        if (pendingFrame_.has_value()) {
+            ReleaseFrameLayers(std::move(*pendingFrame_));
+            pendingFrame_.reset();
+        }
     }
     wake_.notify_all();
     if (thread_.joinable()) {
@@ -55,6 +96,9 @@ void DashboardRenderThread::Shutdown() {
         syncRenderer_->Shutdown();
     }
     syncTimeline_.Reset();
+    if (syncFrame_.has_value()) {
+        ReleaseFrameLayers(std::move(*syncFrame_));
+    }
     syncFrame_.reset();
 }
 
@@ -66,7 +110,11 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
         std::lock_guard lock(mutex_);
         if (stopRequested_ || !thread_.joinable()) {
             lastError_ = "renderer:render_thread_not_running";
+            ReleaseFrameLayers(std::move(frame));
             return false;
+        }
+        if (pendingFrame_.has_value()) {
+            ReleaseFrameLayers(std::move(*pendingFrame_));
         }
         pendingFrame_ = std::move(frame);
     }
@@ -129,6 +177,9 @@ void DashboardRenderThread::ResetTimeline() {
 void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
     if (syncRenderer_ != nullptr) {
         syncRenderer_->DiscardWindowTarget(reason);
+    }
+    if (syncFrame_.has_value()) {
+        ReleaseFrameLayers(std::move(*syncFrame_));
     }
     syncFrame_.reset();
     if (threaded_) {
@@ -240,11 +291,15 @@ void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, Dashb
     target.animate = update.animate;
 
     if (update.snapshotLayerUpdated) {
+        ReleaseBitmap(std::move(target.snapshotLayer));
         target.snapshotLayer = std::move(update.snapshotLayer);
         target.snapshotAnimations = std::move(update.snapshotAnimations);
         target.snapshotVersion = update.snapshotVersion;
     }
     if (update.overlayLayerUpdated) {
+        if (target.overlayLayer.has_value()) {
+            ReleaseBitmap(std::move(*target.overlayLayer));
+        }
         target.overlayLayer = std::move(update.overlayLayer);
         target.overlayAnimations = std::move(update.overlayAnimations);
         target.overlayVersion = update.overlayVersion;
@@ -254,6 +309,19 @@ void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, Dashb
     }
     target.snapshotLayerUpdated = true;
     target.overlayLayerUpdated = true;
+}
+
+void DashboardRenderThread::ReleaseFrameLayers(DashboardPresentationFrame frame) const {
+    ReleaseBitmap(std::move(frame.snapshotLayer));
+    if (frame.overlayLayer.has_value()) {
+        ReleaseBitmap(std::move(*frame.overlayLayer));
+    }
+}
+
+void DashboardRenderThread::ReleaseBitmap(RenderBitmap bitmap) const {
+    if (bitmapPool_ != nullptr) {
+        bitmapPool_->Release(std::move(bitmap));
+    }
 }
 
 void DashboardRenderThread::ThreadMain() {
@@ -298,6 +366,7 @@ void DashboardRenderThread::ThreadMain() {
 
         const bool presented = PresentFrame(*renderer, timeline, *activeFrame, surfaceVersion);
         if (!presented) {
+            ReleaseFrameLayers(std::move(*activeFrame));
             activeFrame.reset();
             continue;
         }
@@ -316,6 +385,10 @@ void DashboardRenderThread::ThreadMain() {
         });
     }
 
+    if (activeFrame.has_value()) {
+        ReleaseFrameLayers(std::move(*activeFrame));
+        activeFrame.reset();
+    }
     renderer->Shutdown();
 }
 

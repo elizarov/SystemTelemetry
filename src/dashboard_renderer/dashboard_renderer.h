@@ -151,6 +151,8 @@ private:
         const SystemSnapshot& snapshot, const std::string& overlaySignature, std::uint64_t surfaceVersion);
     bool CanReuseLayerBitmaps() const;
     void ClearReusableLayerBitmaps();
+    RenderBitmap AcquireLayerBitmap(int width, int height) const;
+    void RecycleFrameLayers(DashboardPresentationFrame frame) const;
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -203,6 +205,7 @@ private:
     bool widgetAnimationCollectionActive_ = false;
     WidgetAnimationLayer currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
     const DashboardOverlayState* activeOverlayState_ = nullptr;
+    std::shared_ptr<DashboardLayerBitmapPool> layerBitmapPool_;
     DashboardRenderThread presentation_;
     HWND presentationHwnd_ = nullptr;
     int presentedWidth_ = 0;
@@ -222,8 +225,6 @@ private:
     std::uint64_t snapshotLayerStyleVersion_ = 0;
     RenderMode snapshotLayerRenderMode_ = RenderMode::Normal;
     std::string snapshotLayerOverlaySignature_;
-    RenderBitmap reusableSnapshotLayer_;
-    RenderBitmap reusableOverlayLayer_;
     RenderPoint currentWidgetAnimationTranslation_{};
     std::vector<RenderPoint> widgetAnimationTranslationStack_;
     std::vector<DashboardPresentationAnimation> snapshotWidgetAnimations_;

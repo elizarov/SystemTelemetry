@@ -32,7 +32,7 @@ The current implementation adds the shared animation cadence, public animation i
 
 - The live window draw path is split: `DashboardApp::Paint()` calls `DashboardRenderer::DrawWindow()`, the main thread paints snapshot and optional overlay layers into renderer-owned bitmap resources, collects immutable widget animation objects, and publishes the newest complete frame to `DashboardRenderThread`.
 - `DashboardRenderThread` owns the HWND presenter renderer, the keyed `DashboardAnimationTimeline`, an overwrite-only mailbox, surface-version handling, and the animation frame loop. It composes snapshot bitmap, snapshot animations, optional overlay bitmap, and overlay animations on the presenter thread.
-- The benchmark immediate-present path stays single-threaded but still builds layer bitmaps and then performs the final bitmap/animation composition step, so paint benchmarks measure the new pipeline without scheduler noise. That path keeps compatible Direct2D layer bitmaps on the active device and reuses layer targets across frames.
+- Snapshot and overlay layer bitmaps are acquired from a dashboard-renderer pool and returned after the render thread replaces or discards the frame that owns them. The benchmark immediate-present path uses the same acquire/release rule while staying single-threaded, so paint benchmarks measure layer bitmap construction and final composition without scheduler noise.
 - `D2DRenderer` exposes generic layer bitmap drawing and bitmap composition. The live presenter currently uses the existing Direct2D HWND render target behind the render-thread boundary; replacing that target with the planned DXGI flip-model swap chain remains a renderer-backend step.
 - Widgets draw snapshot text and tracks while submitting widget-owned animation objects tagged with the current dashboard layer. Widget overlay hooks submit overlay-tagged animations for content that moves above the base dashboard during layout editing.
 - Layout-edit dragged-child replay happens by re-entering widget draw code in the overlay pass under the drag translation. Its widget animations use the overlay tag and the render-thread timeline.
@@ -265,7 +265,8 @@ Renderer-facing additions are generic:
 Each thread owns its renderer caches:
 
 - The main thread owns the offscreen layer painter and its palette/text/icon caches.
-- The render thread owns the live presenter and its palette/text/icon/bitmap caches.
+- The dashboard renderer owns the cross-thread layer bitmap pool. The main thread acquires writable layer bitmaps from it, and the render thread returns superseded frame-owned bitmaps after presentation handoff.
+- The render thread owns the live presenter and its palette/text/icon/target-local bitmap caches.
 - Palette and renderer style updates are copied by value into each thread. No thread mutates a palette that another thread can read.
 
 If Direct2D resources are shared across threads, the Direct2D factory is created in multithreaded mode and access follows the Direct2D multithread locking contract. If layer bitmaps are CPU/WIC-backed and uploaded per update, each renderer instance may keep thread-local Direct2D factories instead.

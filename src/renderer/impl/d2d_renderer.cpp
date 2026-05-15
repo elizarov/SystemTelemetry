@@ -56,6 +56,9 @@ class D2DRenderBitmapResource final : public RenderBitmapResource {
 public:
     explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<IWICBitmap> bitmap) : wicBitmap_(std::move(bitmap)) {}
 
+    D2DRenderBitmapResource(Microsoft::WRL::ComPtr<IWICBitmap> bitmap, Microsoft::WRL::ComPtr<ID2D1RenderTarget> target)
+        : wicBitmap_(std::move(bitmap)), wicRenderTarget_(std::move(target)) {}
+
     explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap) : d2dBitmap_(std::move(bitmap)) {}
 
     D2DRenderBitmapResource(
@@ -70,6 +73,10 @@ public:
         return wicBitmap_.Get();
     }
 
+    ID2D1RenderTarget* WicRenderTarget() const {
+        return wicRenderTarget_.Get();
+    }
+
     ID2D1Bitmap* D2DBitmap() const {
         return d2dBitmap_.Get();
     }
@@ -78,10 +85,27 @@ public:
         return compatibleTarget_.Get();
     }
 
+    ID2D1Bitmap* CachedD2DBitmap(ID2D1RenderTarget* target) const {
+        return cachedD2DBitmapTarget_ == target ? cachedD2DBitmap_.Get() : nullptr;
+    }
+
+    void CacheD2DBitmap(ID2D1RenderTarget* target, Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap) const {
+        cachedD2DBitmapTarget_ = target;
+        cachedD2DBitmap_ = std::move(bitmap);
+    }
+
+    void InvalidateCachedD2DBitmap() const {
+        cachedD2DBitmapTarget_ = nullptr;
+        cachedD2DBitmap_.Reset();
+    }
+
 private:
     Microsoft::WRL::ComPtr<IWICBitmap> wicBitmap_;
+    Microsoft::WRL::ComPtr<ID2D1RenderTarget> wicRenderTarget_;
     Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> compatibleTarget_;
     Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap_;
+    mutable ID2D1RenderTarget* cachedD2DBitmapTarget_ = nullptr;
+    mutable Microsoft::WRL::ComPtr<ID2D1Bitmap> cachedD2DBitmap_;
 };
 
 int GetPanelIconAtlasSlot(std::string_view iconName) {
@@ -377,23 +401,37 @@ bool D2DRenderer::DrawToBitmap(
     }
 
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
-    HRESULT hr = wicFactory_->CreateBitmap(
-        bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
-    if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = "renderer:layer_wic_bitmap_failed hr=" + FormatHresult(hr);
-        return false;
-    }
-
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
-    hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
-        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
-            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
-            96.0f,
-            96.0f),
-        bitmapRenderTarget.GetAddressOf());
-    if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = "renderer:layer_d2d_target_failed hr=" + FormatHresult(hr);
-        return false;
+    if (output.width == static_cast<int>(bitmapWidth) && output.height == static_cast<int>(bitmapHeight) &&
+        output.resource != nullptr && output.resource->TypeToken() == D2DRenderBitmapResourceTypeToken()) {
+        const auto* resource = static_cast<const D2DRenderBitmapResource*>(output.resource.get());
+        if (resource->WicBitmap() != nullptr && resource->WicRenderTarget() != nullptr) {
+            bitmap = resource->WicBitmap();
+            bitmapRenderTarget = resource->WicRenderTarget();
+            resource->InvalidateCachedD2DBitmap();
+        }
+    }
+    HRESULT hr = S_OK;
+    if (bitmap == nullptr || bitmapRenderTarget == nullptr) {
+        bitmap.Reset();
+        bitmapRenderTarget.Reset();
+        hr = wicFactory_->CreateBitmap(
+            bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
+        if (FAILED(hr) || bitmap == nullptr) {
+            lastError_ = "renderer:layer_wic_bitmap_failed hr=" + FormatHresult(hr);
+            return false;
+        }
+
+        hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
+            D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+                96.0f,
+                96.0f),
+            bitmapRenderTarget.GetAddressOf());
+        if (FAILED(hr) || bitmapRenderTarget == nullptr) {
+            lastError_ = "renderer:layer_d2d_target_failed hr=" + FormatHresult(hr);
+            return false;
+        }
     }
 
     if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
@@ -410,7 +448,7 @@ bool D2DRenderer::DrawToBitmap(
     output.height = static_cast<int>(bitmapHeight);
     output.stride = output.width * 4;
     output.bgra.clear();
-    output.resource = std::make_shared<D2DRenderBitmapResource>(std::move(bitmap));
+    output.resource = std::make_shared<D2DRenderBitmapResource>(std::move(bitmap), std::move(bitmapRenderTarget));
     return true;
 }
 
@@ -822,12 +860,21 @@ bool D2DRenderer::DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) {
             d2dBitmap = resource->D2DBitmap();
             hr = S_OK;
         } else if (resource->WicBitmap() != nullptr) {
-            hr = d2dActiveRenderTarget_->CreateSharedBitmap(
-                __uuidof(IWICBitmap), resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
-            if (FAILED(hr) || d2dBitmap == nullptr) {
-                d2dBitmap.Reset();
-                hr = d2dActiveRenderTarget_->CreateBitmapFromWicBitmap(
-                    resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
+            if (ID2D1Bitmap* cachedBitmap = resource->CachedD2DBitmap(d2dActiveRenderTarget_);
+                cachedBitmap != nullptr) {
+                d2dBitmap = cachedBitmap;
+                hr = S_OK;
+            } else {
+                hr = d2dActiveRenderTarget_->CreateSharedBitmap(
+                    __uuidof(IWICBitmap), resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
+                if (FAILED(hr) || d2dBitmap == nullptr) {
+                    d2dBitmap.Reset();
+                    hr = d2dActiveRenderTarget_->CreateBitmapFromWicBitmap(
+                        resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
+                }
+                if (SUCCEEDED(hr) && d2dBitmap != nullptr) {
+                    resource->CacheD2DBitmap(d2dActiveRenderTarget_, d2dBitmap);
+                }
             }
         }
     } else {

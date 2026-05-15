@@ -20,7 +20,10 @@
 
 DashboardRenderer::DashboardRenderer(Trace& trace)
     : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
-      layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)) {}
+      layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
+      layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()) {
+    presentation_.SetBitmapPool(layerBitmapPool_);
+}
 
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
@@ -112,10 +115,10 @@ void DashboardRenderer::SetImmediatePresent(bool enabled) {
     immediatePresent_ = enabled;
     snapshotLayerValid_ = false;
     overlayLayerVisible_ = false;
-    ClearReusableLayerBitmaps();
     renderer_->AttachWindow(immediatePresent_ ? presentationHwnd_ : nullptr);
     renderer_->SetImmediatePresent(enabled);
     presentation_.Configure(presentationHwnd_, presentationHwnd_ != nullptr && !immediatePresent_, immediatePresent_);
+    ClearReusableLayerBitmaps();
 }
 
 void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
@@ -448,7 +451,7 @@ bool DashboardRenderer::BuildPresentationFrame(
         layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
         BeginWidgetAnimationLayer(WidgetAnimationLayer::Snapshot);
         if (CanReuseLayerBitmaps()) {
-            frame.snapshotLayer = reusableSnapshotLayer_;
+            frame.snapshotLayer = AcquireLayerBitmap(frame.width, frame.height);
         }
         const bool snapshotDrawn =
             renderer_->DrawToBitmap(frame.snapshotLayer, frame.width, frame.height, RenderBitmapClear::Background, [&] {
@@ -456,13 +459,11 @@ bool DashboardRenderer::BuildPresentationFrame(
             });
         if (!snapshotDrawn) {
             lastError_ = renderer_->LastError();
+            RecycleFrameLayers(std::move(frame));
             EndWidgetAnimationCollection();
             layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
             activeOverlayState_ = nullptr;
             return false;
-        }
-        if (CanReuseLayerBitmaps()) {
-            reusableSnapshotLayer_ = frame.snapshotLayer;
         }
         frame.snapshotVersion = ++snapshotVersion_;
         frame.snapshotAnimations = std::move(snapshotWidgetAnimations_);
@@ -476,7 +477,7 @@ bool DashboardRenderer::BuildPresentationFrame(
         BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
         RenderBitmap overlayBitmap;
         if (CanReuseLayerBitmaps()) {
-            overlayBitmap = reusableOverlayLayer_;
+            overlayBitmap = AcquireLayerBitmap(frame.width, frame.height);
         }
         const bool overlayDrawn =
             renderer_->DrawToBitmap(overlayBitmap, frame.width, frame.height, RenderBitmapClear::Transparent, [&] {
@@ -484,13 +485,14 @@ bool DashboardRenderer::BuildPresentationFrame(
             });
         if (!overlayDrawn) {
             lastError_ = renderer_->LastError();
+            if (layerBitmapPool_ != nullptr) {
+                layerBitmapPool_->Release(std::move(overlayBitmap));
+            }
+            RecycleFrameLayers(std::move(frame));
             EndWidgetAnimationCollection();
             layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
             activeOverlayState_ = nullptr;
             return false;
-        }
-        if (CanReuseLayerBitmaps()) {
-            reusableOverlayLayer_ = overlayBitmap;
         }
         frame.overlayLayer = std::move(overlayBitmap);
         frame.overlayVersion = ++overlayVersion_;
@@ -596,12 +598,27 @@ void DashboardRenderer::MarkSnapshotLayerUpdated(
 }
 
 bool DashboardRenderer::CanReuseLayerBitmaps() const {
-    return immediatePresent_ && presentationHwnd_ != nullptr;
+    return presentationHwnd_ != nullptr && layerBitmapPool_ != nullptr;
 }
 
 void DashboardRenderer::ClearReusableLayerBitmaps() {
-    reusableSnapshotLayer_ = {};
-    reusableOverlayLayer_ = {};
+    if (layerBitmapPool_ != nullptr) {
+        layerBitmapPool_->Clear();
+    }
+}
+
+RenderBitmap DashboardRenderer::AcquireLayerBitmap(int width, int height) const {
+    return layerBitmapPool_ != nullptr ? layerBitmapPool_->Acquire(width, height) : RenderBitmap{};
+}
+
+void DashboardRenderer::RecycleFrameLayers(DashboardPresentationFrame frame) const {
+    if (layerBitmapPool_ == nullptr) {
+        return;
+    }
+    layerBitmapPool_->Release(std::move(frame.snapshotLayer));
+    if (frame.overlayLayer.has_value()) {
+        layerBitmapPool_->Release(std::move(*frame.overlayLayer));
+    }
 }
 
 void DashboardRenderer::PushWidgetAnimationTranslation(RenderPoint offset) {
@@ -725,6 +742,7 @@ bool DashboardRenderer::SaveSnapshotPng(
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
+    RecycleFrameLayers(std::move(frame));
     return saved;
 }
 
@@ -875,7 +893,9 @@ bool DashboardRenderer::RenderSnapshotOffscreen(
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
-    return lastError_.empty();
+    const bool rendered = lastError_.empty();
+    RecycleFrameLayers(std::move(frame));
+    return rendered;
 }
 
 bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
@@ -1282,8 +1302,8 @@ void DashboardRenderer::Shutdown() {
 void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
     snapshotLayerValid_ = false;
     overlayLayerVisible_ = false;
-    ClearReusableLayerBitmaps();
     presentation_.DiscardWindowTarget(reason);
+    ClearReusableLayerBitmaps();
 }
 
 RendererStyle DashboardRenderer::BuildRendererStyle() const {

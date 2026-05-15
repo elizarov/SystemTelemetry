@@ -41,12 +41,24 @@ struct DashboardPresentationFrame {
     bool overlayLayerUpdated = true;
 };
 
+class DashboardLayerBitmapPool {
+public:
+    RenderBitmap Acquire(int width, int height);
+    void Release(RenderBitmap bitmap);
+    void Clear();
+
+private:
+    mutable std::mutex mutex_;
+    std::vector<RenderBitmap> available_;
+};
+
 class DashboardRenderThread {
 public:
     DashboardRenderThread();
     ~DashboardRenderThread();
 
     void Configure(HWND hwnd, bool threaded, bool immediatePresent);
+    void SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool);
     void Shutdown();
     bool PublishFrame(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(DashboardPresentationFrame frame);
@@ -72,6 +84,8 @@ private:
         DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations) const;
     void MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
+    void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
+    void ReleaseBitmap(RenderBitmap bitmap) const;
     void ThreadMain();
     void SetLastError(std::string error);
 
@@ -82,6 +96,7 @@ private:
     DashboardAnimationTimeline syncTimeline_;
     std::uint64_t syncSurfaceVersion_ = 0;
     std::optional<DashboardPresentationFrame> syncFrame_;
+    std::shared_ptr<DashboardLayerBitmapPool> bitmapPool_;
 
     mutable std::mutex mutex_;
     std::condition_variable wake_;
