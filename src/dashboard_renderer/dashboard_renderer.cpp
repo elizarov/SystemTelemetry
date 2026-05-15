@@ -105,7 +105,7 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
     const RendererStyle nextStyle = BuildRendererStyle();
     if (!renderer_->SetStyle(nextStyle) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:reconfigure_failed" : renderer_->LastError();
+        lastError_ = renderer_->LastError().empty() ? "reconfigure_failed" : renderer_->LastError();
     }
 }
 
@@ -118,7 +118,7 @@ void DashboardRenderer::SetRenderScale(double scale) {
     renderScale_ = nextScale;
     ++configVersion_;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:rescale_failed" : renderer_->LastError();
+        lastError_ = renderer_->LastError().empty() ? "rescale_failed" : renderer_->LastError();
     }
 }
 
@@ -1369,7 +1369,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     renderer_->SetImmediatePresent(immediatePresent_);
     presentation_->Configure(hwnd, hwnd != nullptr && !immediatePresent_, immediatePresent_);
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:initialize_failed" : renderer_->LastError();
+        lastError_ = renderer_->LastError().empty() ? "initialize_failed" : renderer_->LastError();
         return false;
     }
     return true;

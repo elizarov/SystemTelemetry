@@ -35,7 +35,7 @@ bool SaveBgraPngWithInitializedCom(
     HRESULT hr =
         CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()));
     if (FAILED(hr) || factory == nullptr) {
-        return SetError(errorText, "renderer:png_wic_factory_failed hr=" + FormatHresult(hr));
+        return SetError(errorText, "png_wic_factory_failed hr=" + FormatHresult(hr));
     }
 
     Microsoft::WRL::ComPtr<IWICBitmap> source;
@@ -51,11 +51,11 @@ bool SaveBgraPngWithInitializedCom(
         const_cast<BYTE*>(bgra.data()),
         source.GetAddressOf());
     if (FAILED(hr) || source == nullptr) {
-        return SetError(errorText, "renderer:png_wic_bitmap_failed hr=" + FormatHresult(hr));
+        return SetError(errorText, "png_wic_bitmap_failed hr=" + FormatHresult(hr));
     }
 
     return SaveWicBitmapSourcePng(
-        factory.Get(), source.Get(), imagePath, PngPixelFormat::BgraWithAlpha, "renderer:png", errorText);
+        factory.Get(), source.Get(), imagePath, PngPixelFormat::BgraWithAlpha, "png", errorText);
 }
 
 }  // namespace
@@ -153,16 +153,16 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
 bool SaveBgraPng(
     const FilePath& imagePath, int width, int height, const std::vector<std::uint8_t>& bgra, std::string* errorText) {
     if (width <= 0 || height <= 0) {
-        return SetError(errorText, "renderer:png_invalid_size");
+        return SetError(errorText, "png_invalid_size");
     }
     const std::size_t expectedBytes = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
     if (bgra.size() != expectedBytes || expectedBytes > static_cast<std::size_t>((std::numeric_limits<UINT>::max)())) {
-        return SetError(errorText, "renderer:png_invalid_bitmap");
+        return SetError(errorText, "png_invalid_bitmap");
     }
 
     const HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(initHr) && initHr != RPC_E_CHANGED_MODE) {
-        return SetError(errorText, "renderer:png_com_init_failed hr=" + FormatHresult(initHr));
+        return SetError(errorText, "png_com_init_failed hr=" + FormatHresult(initHr));
     }
     const bool shouldUninitialize = initHr == S_OK || initHr == S_FALSE;
     const bool ok = SaveBgraPngWithInitializedCom(imagePath, width, height, bgra, errorText);

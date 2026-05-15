@@ -889,17 +889,21 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
     renderer.SetConfig(config);
     renderer.SetRenderMode(renderMode);
     if (!renderer.Initialize()) {
+        const std::string error = renderer.LastError();
         if (errorText != nullptr) {
-            *errorText = renderer.LastError();
+            *errorText = error;
         }
+        WriteRendererErrorTrace(trace, "screenshot_initialize", error);
         return false;
     }
     if (!editLayoutWidgetName.empty()) {
         const auto widget = renderer.FindFirstLayoutEditPreviewWidget(editLayoutWidgetName);
         if (!widget.has_value()) {
+            const std::string error = "edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
             if (errorText != nullptr) {
-                *errorText = "renderer:edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
+                *errorText = error;
             }
+            WriteRendererErrorTrace(trace, "screenshot_edit_layout_widget", error);
             return false;
         }
         overlayState.SetPreviewWidget(*widget);
@@ -907,9 +911,11 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
     }
     if (hasHoverPoint) {
         if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
+            const std::string error = renderer.LastError();
             if (errorText != nullptr) {
-                *errorText = renderer.LastError();
+                *errorText = error;
             }
+            WriteRendererErrorTrace(trace, "screenshot_hover_regions", error);
             return false;
         }
 
@@ -938,8 +944,12 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
         }
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);
-    if (!saved && errorText != nullptr) {
-        *errorText = renderer.LastError();
+    if (!saved) {
+        const std::string error = renderer.LastError();
+        if (errorText != nullptr) {
+            *errorText = error;
+        }
+        WriteRendererErrorTrace(trace, "screenshot_save", error);
     }
     if (saved) {
         WriteLayoutEditActiveRegionTrace(

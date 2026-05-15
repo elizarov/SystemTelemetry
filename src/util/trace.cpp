@@ -226,3 +226,10 @@ std::string Trace::EscapeText(std::string_view text) {
 std::string Trace::QuoteText(std::string_view text) {
     return "\"" + EscapeText(text) + "\"";
 }
+
+void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::string& error) {
+    if (error.empty()) {
+        return;
+    }
+    trace.Write(TracePrefix::Renderer, "error stage=" + Trace::QuoteText(stage) + " detail=" + Trace::QuoteText(error));
+}

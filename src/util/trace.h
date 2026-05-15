@@ -75,3 +75,5 @@ private:
     std::uint64_t enabledPrefixes_ = AllPrefixesMask();
     mutable TraceTimingCollector timings_;
 };
+
+void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::string& error);

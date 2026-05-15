@@ -1019,7 +1019,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
 
     if (renderer.config_.layout.structure.cardsLayout.name.empty()) {
-        renderer.lastError_ = "renderer:layout_missing_cards_root";
+        renderer.lastError_ = "layout_missing_cards_root";
         return false;
     }
 
@@ -1161,8 +1161,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {}, overlayOwners);
 
     if (resolvedLayout_.cards.empty()) {
-        renderer.lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" +
-                              renderer.config_.layout.structure.cardsLayout.name + "\"";
+        renderer.lastError_ =
+            "layout_resolve_failed cards=0 root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"";
         return false;
     }
 

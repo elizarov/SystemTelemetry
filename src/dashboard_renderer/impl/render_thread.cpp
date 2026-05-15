@@ -1,6 +1,7 @@
 #include "dashboard_renderer/impl/render_thread.h"
 
 #include <algorithm>
+#include <string_view>
 #include <utility>
 
 #include "util/high_precision_timer.h"
@@ -54,6 +55,14 @@ void RecordAnimationFrameTiming(const Trace* trace, HighPrecisionTimer::Tick sta
     }
     trace->Timings().Record(
         *trace, "animation_frame", HighPrecisionTimer::Elapsed(startedAt, HighPrecisionTimer::Now()));
+}
+
+std::string_view StripRendererPrefix(std::string_view error) {
+    constexpr std::string_view prefix = "renderer:";
+    if (error.size() >= prefix.size() && error.substr(0, prefix.size()) == prefix) {
+        error.remove_prefix(prefix.size());
+    }
+    return error;
 }
 
 }  // namespace
@@ -137,7 +146,7 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
     immediatePresent_.store(immediatePresent);
     if (threaded_) {
         if (!EventsReady()) {
-            SetLastError("renderer:render_thread_event_create_failed");
+            SetLastError("render_thread_event_create_failed");
             threaded_ = false;
             return;
         }
@@ -145,7 +154,7 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
             stopRequested_ = false;
             thread_ = CreateThread(nullptr, 0, &DashboardRenderThread::ThreadProc, this, 0, nullptr);
             if (thread_ == nullptr) {
-                SetLastError("renderer:render_thread_create_failed");
+                SetLastError("render_thread_create_failed");
                 threaded_ = false;
             }
         }
@@ -219,7 +228,7 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
     {
         const LightweightMutexLock lock(mutex_);
         if (stopRequested_ || thread_ == nullptr) {
-            lastError_ = "renderer:render_thread_not_running";
+            lastError_ = "render_thread_not_running";
             ReleaseFrameLayers(std::move(frame));
             return false;
         }
@@ -242,7 +251,7 @@ bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame
     {
         const LightweightMutexLock lock(mutex_);
         if (stopRequested_ || thread_ == nullptr) {
-            lastError_ = "renderer:render_thread_not_running";
+            lastError_ = "render_thread_not_running";
             ReleaseFrameLayers(std::move(frame));
             return false;
         }
@@ -293,7 +302,7 @@ bool DashboardRenderThread::PresentFrameSynchronously(Renderer& renderer, Dashbo
 
 bool DashboardRenderThread::PresentStoredFrameSynchronously() {
     if (syncRenderer_ == nullptr || !syncFrame_.has_value()) {
-        SetLastError("renderer:no_stored_frame");
+        SetLastError("no_stored_frame");
         return false;
     }
     const bool presented = PresentFrame(*syncRenderer_, syncTimeline_, *syncFrame_, syncPresentedState_);
@@ -857,6 +866,7 @@ void DashboardRenderThread::SetLastError(std::string error) {
     if (error.empty()) {
         return;
     }
+    error = std::string(StripRendererPrefix(error));
     const LightweightMutexLock lock(mutex_);
     lastError_ = std::move(error);
 }

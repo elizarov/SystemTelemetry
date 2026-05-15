@@ -107,16 +107,22 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     renderer.SetConfig(config);
     renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
     if (!renderer.Initialize()) {
+        const std::string error = renderer.LastError();
         if (errorText != nullptr) {
-            *errorText = renderer.LastError();
+            *errorText = error;
         }
+        WriteRendererErrorTrace(trace, "layout_guide_sheet_initialize", error);
         trace.Write(TracePrefix::Diagnostics, "layout_guide_sheet failed stage=\"initialize\"");
         return false;
     }
 
     std::vector<LayoutGuideSheetCalloutRequest> callouts;
     std::vector<std::string> selectedCardIds;
-    if (!BuildLayoutGuideSheetPipelineInputs(renderer, snapshot, callouts, selectedCardIds, errorText, outputStats)) {
+    std::string localError;
+    std::string* outputErrorText = errorText != nullptr ? errorText : &localError;
+    if (!BuildLayoutGuideSheetPipelineInputs(
+            renderer, snapshot, callouts, selectedCardIds, outputErrorText, outputStats)) {
+        WriteRendererErrorTrace(trace, "layout_guide_sheet_active_regions", *outputErrorText);
         trace.Write(TracePrefix::Diagnostics, "layout_guide_sheet failed stage=\"active_regions\"");
         return false;
     }
@@ -124,10 +130,11 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     std::vector<std::string> traceDetails;
     LayoutGuideSheetRenderStats renderStats;
     LayoutGuideSheetRenderer sheetRenderer(renderer);
-    const bool saved =
-        sheetRenderer.SavePng(imagePath, snapshot, callouts, selectedCardIds, &traceDetails, errorText, &renderStats);
+    const bool saved = sheetRenderer.SavePng(
+        imagePath, snapshot, callouts, selectedCardIds, &traceDetails, outputErrorText, &renderStats);
     RecordRenderStats(renderStats, outputStats);
     if (!saved) {
+        WriteRendererErrorTrace(trace, "layout_guide_sheet_save", *outputErrorText);
         trace.Write(TracePrefix::Diagnostics, "layout_guide_sheet failed stage=\"save\"");
         return false;
     }
