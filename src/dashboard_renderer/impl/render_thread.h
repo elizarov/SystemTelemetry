@@ -37,6 +37,8 @@ struct DashboardPresentationFrame {
     int width = 0;
     int height = 0;
     bool animate = false;
+    bool snapshotLayerUpdated = true;
+    bool overlayLayerUpdated = true;
 };
 
 class DashboardRenderThread {
@@ -48,6 +50,7 @@ public:
     void Shutdown();
     bool PublishFrame(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(DashboardPresentationFrame frame);
+    bool PresentFrameSynchronously(Renderer& renderer, DashboardPresentationFrame frame);
     bool RenderFrameOffscreen(Renderer& renderer, DashboardPresentationFrame frame);
     void DrawFrameForCurrentTarget(Renderer& renderer, const DashboardPresentationFrame& frame) const;
     void ResetTimeline();
@@ -68,6 +71,7 @@ private:
     void DrawAnimations(Renderer& renderer,
         DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations) const;
+    void MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
     void ThreadMain();
     void SetLastError(std::string error);
 
@@ -77,6 +81,7 @@ private:
     std::unique_ptr<Renderer> syncRenderer_;
     DashboardAnimationTimeline syncTimeline_;
     std::uint64_t syncSurfaceVersion_ = 0;
+    std::optional<DashboardPresentationFrame> syncFrame_;
 
     mutable std::mutex mutex_;
     std::condition_variable wake_;

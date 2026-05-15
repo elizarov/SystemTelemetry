@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstring>
+#include <memory>
 #include <utility>
 
 #include "renderer/impl/d2d_render_conversions.h"
@@ -45,6 +46,43 @@ constexpr int kPanelIconAtlasCellSize = 64;
 constexpr char kLocaleName[] = "en-us";
 constexpr wchar_t kPngResourceType[] = L"PNG";   // FindResourceW requires a UTF-16 resource type.
 constexpr wchar_t kTextMeasureSample[] = L"Ag";  // DWrite text layout measures UTF-16 sample text.
+
+const void* D2DRenderBitmapResourceTypeToken() {
+    static const int token = 0;
+    return &token;
+}
+
+class D2DRenderBitmapResource final : public RenderBitmapResource {
+public:
+    explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<IWICBitmap> bitmap) : wicBitmap_(std::move(bitmap)) {}
+
+    explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap) : d2dBitmap_(std::move(bitmap)) {}
+
+    D2DRenderBitmapResource(
+        Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> target, Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap)
+        : compatibleTarget_(std::move(target)), d2dBitmap_(std::move(bitmap)) {}
+
+    const void* TypeToken() const override {
+        return D2DRenderBitmapResourceTypeToken();
+    }
+
+    IWICBitmap* WicBitmap() const {
+        return wicBitmap_.Get();
+    }
+
+    ID2D1Bitmap* D2DBitmap() const {
+        return d2dBitmap_.Get();
+    }
+
+    ID2D1BitmapRenderTarget* CompatibleTarget() const {
+        return compatibleTarget_.Get();
+    }
+
+private:
+    Microsoft::WRL::ComPtr<IWICBitmap> wicBitmap_;
+    Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> compatibleTarget_;
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap_;
+};
 
 int GetPanelIconAtlasSlot(std::string_view iconName) {
     if (iconName == "cpu")
@@ -284,9 +322,61 @@ bool D2DRenderer::DrawToBitmap(
         return false;
     }
 
-    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     const UINT bitmapWidth = static_cast<UINT>(std::max(1, width));
     const UINT bitmapHeight = static_cast<UINT>(std::max(1, height));
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent
+                                        ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)
+                                        : palette_.Get(RenderColorId::Background).ToD2DColorF();
+    if (hwnd_ != nullptr && EnsureWindowRenderTarget(width, height) && d2dWindowRenderTarget_ != nullptr) {
+        Microsoft::WRL::ComPtr<ID2D1BitmapRenderTarget> bitmapRenderTarget;
+        if (output.width == static_cast<int>(bitmapWidth) && output.height == static_cast<int>(bitmapHeight) &&
+            output.resource != nullptr && output.resource->TypeToken() == D2DRenderBitmapResourceTypeToken()) {
+            const auto* resource = static_cast<const D2DRenderBitmapResource*>(output.resource.get());
+            bitmapRenderTarget = resource->CompatibleTarget();
+        }
+        if (bitmapRenderTarget == nullptr) {
+            const D2D1_SIZE_F desiredSize =
+                D2D1::SizeF(static_cast<float>(bitmapWidth), static_cast<float>(bitmapHeight));
+            const D2D1_SIZE_U desiredPixelSize = D2D1::SizeU(bitmapWidth, bitmapHeight);
+            const D2D1_PIXEL_FORMAT desiredFormat =
+                D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED);
+            const HRESULT compatibleHr = d2dWindowRenderTarget_->CreateCompatibleRenderTarget(&desiredSize,
+                &desiredPixelSize,
+                &desiredFormat,
+                D2D1_COMPATIBLE_RENDER_TARGET_OPTIONS_NONE,
+                bitmapRenderTarget.GetAddressOf());
+            if (FAILED(compatibleHr) || bitmapRenderTarget == nullptr) {
+                bitmapRenderTarget.Reset();
+            }
+        }
+        if (bitmapRenderTarget != nullptr) {
+            if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
+                return false;
+            }
+            d2dActiveRenderTarget_->Clear(clearColor);
+            draw();
+            EndDirect2DDraw();
+            if (!lastError_.empty()) {
+                return false;
+            }
+
+            Microsoft::WRL::ComPtr<ID2D1Bitmap> bitmap;
+            const HRESULT bitmapHr = bitmapRenderTarget->GetBitmap(bitmap.GetAddressOf());
+            if (FAILED(bitmapHr) || bitmap == nullptr) {
+                lastError_ = "renderer:layer_compatible_bitmap_failed hr=" + FormatHresult(bitmapHr);
+                return false;
+            }
+            output.width = static_cast<int>(bitmapWidth);
+            output.height = static_cast<int>(bitmapHeight);
+            output.stride = output.width * 4;
+            output.bgra.clear();
+            output.resource =
+                std::make_shared<D2DRenderBitmapResource>(std::move(bitmapRenderTarget), std::move(bitmap));
+            return true;
+        }
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     HRESULT hr = wicFactory_->CreateBitmap(
         bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
@@ -309,9 +399,6 @@ bool D2DRenderer::DrawToBitmap(
     if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
         return false;
     }
-    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent
-                                        ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)
-                                        : palette_.Get(RenderColorId::Background).ToD2DColorF();
     d2dActiveRenderTarget_->Clear(clearColor);
     draw();
     EndDirect2DDraw();
@@ -322,14 +409,8 @@ bool D2DRenderer::DrawToBitmap(
     output.width = static_cast<int>(bitmapWidth);
     output.height = static_cast<int>(bitmapHeight);
     output.stride = output.width * 4;
-    output.bgra.resize(static_cast<size_t>(output.stride) * static_cast<size_t>(output.height));
-    hr = bitmap->CopyPixels(
-        nullptr, static_cast<UINT>(output.stride), static_cast<UINT>(output.bgra.size()), output.bgra.data());
-    if (FAILED(hr)) {
-        lastError_ = "renderer:layer_copy_pixels_failed hr=" + FormatHresult(hr);
-        output = {};
-        return false;
-    }
+    output.bgra.clear();
+    output.resource = std::make_shared<D2DRenderBitmapResource>(std::move(bitmap));
     return true;
 }
 
@@ -734,12 +815,29 @@ bool D2DRenderer::DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) {
     Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap;
     const D2D1_BITMAP_PROPERTIES properties =
         D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
-    const HRESULT hr = d2dActiveRenderTarget_->CreateBitmap(
-        D2D1::SizeU(static_cast<UINT>(bitmap.width), static_cast<UINT>(bitmap.height)),
-        bitmap.bgra.data(),
-        static_cast<UINT>(bitmap.stride),
-        properties,
-        d2dBitmap.GetAddressOf());
+    HRESULT hr = E_FAIL;
+    if (bitmap.resource != nullptr && bitmap.resource->TypeToken() == D2DRenderBitmapResourceTypeToken()) {
+        const auto* resource = static_cast<const D2DRenderBitmapResource*>(bitmap.resource.get());
+        if (resource->D2DBitmap() != nullptr) {
+            d2dBitmap = resource->D2DBitmap();
+            hr = S_OK;
+        } else if (resource->WicBitmap() != nullptr) {
+            hr = d2dActiveRenderTarget_->CreateSharedBitmap(
+                __uuidof(IWICBitmap), resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
+            if (FAILED(hr) || d2dBitmap == nullptr) {
+                d2dBitmap.Reset();
+                hr = d2dActiveRenderTarget_->CreateBitmapFromWicBitmap(
+                    resource->WicBitmap(), &properties, d2dBitmap.GetAddressOf());
+            }
+        }
+    } else {
+        hr = d2dActiveRenderTarget_->CreateBitmap(
+            D2D1::SizeU(static_cast<UINT>(bitmap.width), static_cast<UINT>(bitmap.height)),
+            bitmap.bgra.data(),
+            static_cast<UINT>(bitmap.stride),
+            properties,
+            d2dBitmap.GetAddressOf());
+    }
     if (FAILED(hr) || d2dBitmap == nullptr) {
         lastError_ = "renderer:draw_bitmap_create_failed hr=" + FormatHresult(hr);
         return false;

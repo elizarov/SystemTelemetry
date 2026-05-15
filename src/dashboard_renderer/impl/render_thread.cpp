@@ -55,6 +55,7 @@ void DashboardRenderThread::Shutdown() {
         syncRenderer_->Shutdown();
     }
     syncTimeline_.Reset();
+    syncFrame_.reset();
 }
 
 bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
@@ -79,9 +80,18 @@ bool DashboardRenderThread::PresentFrameSynchronously(DashboardPresentationFrame
         syncRenderer_->AttachWindow(hwnd_.load());
         syncRenderer_->SetImmediatePresent(immediatePresent_.load());
     }
-    const bool presented = PresentFrame(*syncRenderer_, syncTimeline_, frame, syncSurfaceVersion_);
+    return PresentFrameSynchronously(*syncRenderer_, std::move(frame));
+}
+
+bool DashboardRenderThread::PresentFrameSynchronously(Renderer& renderer, DashboardPresentationFrame frame) {
+    if (syncFrame_.has_value()) {
+        MergeFrame(*syncFrame_, std::move(frame));
+    } else {
+        syncFrame_ = std::move(frame);
+    }
+    const bool presented = PresentFrame(renderer, syncTimeline_, *syncFrame_, syncSurfaceVersion_);
     if (!presented) {
-        SetLastError(syncRenderer_->LastError());
+        SetLastError(renderer.LastError());
     }
     return presented;
 }
@@ -120,6 +130,7 @@ void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
     if (syncRenderer_ != nullptr) {
         syncRenderer_->DiscardWindowTarget(reason);
     }
+    syncFrame_.reset();
     if (threaded_) {
         {
             std::lock_guard lock(mutex_);
@@ -219,6 +230,32 @@ void DashboardRenderThread::DrawAnimations(Renderer& renderer,
     }
 }
 
+void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const {
+    target.style = std::move(update.style);
+    target.surfaceVersion = update.surfaceVersion;
+    target.metricVersion = update.metricVersion;
+    target.styleVersion = update.styleVersion;
+    target.width = update.width;
+    target.height = update.height;
+    target.animate = update.animate;
+
+    if (update.snapshotLayerUpdated) {
+        target.snapshotLayer = std::move(update.snapshotLayer);
+        target.snapshotAnimations = std::move(update.snapshotAnimations);
+        target.snapshotVersion = update.snapshotVersion;
+    }
+    if (update.overlayLayerUpdated) {
+        target.overlayLayer = std::move(update.overlayLayer);
+        target.overlayAnimations = std::move(update.overlayAnimations);
+        target.overlayVersion = update.overlayVersion;
+    }
+    if (update.snapshotLayerUpdated || update.overlayLayerUpdated) {
+        target.animationGeometryVersion = update.animationGeometryVersion;
+    }
+    target.snapshotLayerUpdated = true;
+    target.overlayLayerUpdated = true;
+}
+
 void DashboardRenderThread::ThreadMain() {
     std::unique_ptr<Renderer> renderer = CreateRenderer();
     DashboardAnimationTimeline timeline;
@@ -246,7 +283,11 @@ void DashboardRenderThread::ThreadMain() {
                 discardReason_.clear();
             }
             if (pendingFrame_.has_value()) {
-                activeFrame = std::move(*pendingFrame_);
+                if (activeFrame.has_value()) {
+                    MergeFrame(*activeFrame, std::move(*pendingFrame_));
+                } else {
+                    activeFrame = std::move(*pendingFrame_);
+                }
                 pendingFrame_.reset();
             }
         }
@@ -261,7 +302,11 @@ void DashboardRenderThread::ThreadMain() {
             continue;
         }
         if (!activeAnimations_.load()) {
-            activeFrame.reset();
+            std::unique_lock lock(mutex_);
+            wake_.wait(lock, [&] {
+                return stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ ||
+                       discardTargetRequested_;
+            });
             continue;
         }
 

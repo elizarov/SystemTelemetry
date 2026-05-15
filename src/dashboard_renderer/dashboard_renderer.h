@@ -144,6 +144,13 @@ private:
     void EndWidgetAnimationCollection();
     std::vector<DashboardPresentationAnimation>& WidgetAnimationsForLayer(WidgetAnimationLayer layer);
     std::uint64_t ResolveSurfaceVersion();
+    std::string SnapshotOverlaySignature(const DashboardOverlayState& overlayState) const;
+    bool ShouldUpdateSnapshotLayer(
+        const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, std::uint64_t surfaceVersion) const;
+    void MarkSnapshotLayerUpdated(
+        const SystemSnapshot& snapshot, const std::string& overlaySignature, std::uint64_t surfaceVersion);
+    bool CanReuseLayerBitmaps() const;
+    void ClearReusableLayerBitmaps();
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -202,10 +209,21 @@ private:
     int presentedHeight_ = 0;
     double presentedScale_ = 0.0;
     std::uint64_t surfaceVersion_ = 1;
+    std::uint64_t configVersion_ = 1;
     std::uint64_t snapshotVersion_ = 0;
     std::uint64_t overlayVersion_ = 0;
     std::uint64_t animationGeometryVersion_ = 0;
     std::uint64_t styleVersion_ = 1;
+    bool snapshotLayerValid_ = false;
+    bool overlayLayerVisible_ = false;
+    std::uint64_t snapshotLayerMetricVersion_ = 0;
+    std::uint64_t snapshotLayerConfigVersion_ = 0;
+    std::uint64_t snapshotLayerSurfaceVersion_ = 0;
+    std::uint64_t snapshotLayerStyleVersion_ = 0;
+    RenderMode snapshotLayerRenderMode_ = RenderMode::Normal;
+    std::string snapshotLayerOverlaySignature_;
+    RenderBitmap reusableSnapshotLayer_;
+    RenderBitmap reusableOverlayLayer_;
     RenderPoint currentWidgetAnimationTranslation_{};
     std::vector<RenderPoint> widgetAnimationTranslationStack_;
     std::vector<DashboardPresentationAnimation> snapshotWidgetAnimations_;
