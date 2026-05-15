@@ -26,10 +26,6 @@ RenderRect ClipRectToSurface(RenderRect rect, int width, int height) {
     return rect;
 }
 
-bool RectsOverlap(const RenderRect& left, const RenderRect& right) {
-    return left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
-}
-
 }  // namespace
 
 RenderBitmap DashboardLayerBitmapPool::Acquire(int width, int height) {
@@ -283,14 +279,15 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
             retainedContents = false;
         }
     } else {
-        const std::vector<RenderRect> dirtyRects = AnimationDirtyRects(frame);
-        if (!dirtyRects.empty()) {
+        const PreparedDirtyFrame preparedFrame = PrepareDirtyFrame(activeTimeline, frame);
+        if (!preparedFrame.dirtyRects.empty()) {
             const RenderRect fullSurface{0, 0, frame.width, frame.height};
             const std::span<const RenderRect> redrawRects =
-                retainedContents ? std::span<const RenderRect>(dirtyRects.data(), dirtyRects.size())
-                                 : std::span<const RenderRect>(&fullSurface, 1);
-            presented = renderer.DrawWindowDirty(frame.width, frame.height, redrawRects, [&](const RenderRect& dirty) {
-                DrawFrameDirty(renderer, activeTimeline, frame, dirty, now);
+                retainedContents
+                    ? std::span<const RenderRect>(preparedFrame.dirtyRects.data(), preparedFrame.dirtyRects.size())
+                    : std::span<const RenderRect>(&fullSurface, 1);
+            presented = renderer.DrawWindowDirty(frame.width, frame.height, redrawRects, [&](auto dirtyRects) {
+                DrawFrameDirty(renderer, frame, dirtyRects, preparedFrame);
             });
             retainedContents = true;
         }
@@ -327,16 +324,15 @@ void DashboardRenderThread::DrawFrame(Renderer& renderer,
 }
 
 void DashboardRenderThread::DrawFrameDirty(Renderer& renderer,
-    DashboardAnimationTimeline* timeline,
     const DashboardPresentationFrame& frame,
-    const RenderRect& dirtyRect,
-    DashboardAnimationTimeline::Clock::time_point) const {
-    renderer.DrawBitmapRegion(frame.snapshotLayer, dirtyRect, RenderPoint{dirtyRect.left, dirtyRect.top});
-    DrawAnimationsDirty(renderer, timeline, frame.snapshotAnimations, frame.snapshotVersion, dirtyRect);
+    std::span<const RenderRect> dirtyRects,
+    const PreparedDirtyFrame& preparedFrame) const {
+    renderer.DrawBitmapRegions(frame.snapshotLayer, dirtyRects);
+    DrawPreparedDirtyAnimations(renderer, preparedFrame.snapshotAnimations);
     if (frame.overlayLayer.has_value()) {
-        renderer.DrawBitmapRegion(*frame.overlayLayer, dirtyRect, RenderPoint{dirtyRect.left, dirtyRect.top});
+        renderer.DrawBitmapRegions(*frame.overlayLayer, dirtyRects);
     }
-    DrawAnimationsDirty(renderer, timeline, frame.overlayAnimations, frame.overlayVersion, dirtyRect);
+    DrawPreparedDirtyAnimations(renderer, preparedFrame.overlayAnimations);
 }
 
 void DashboardRenderThread::DrawAnimations(Renderer& renderer,
@@ -366,58 +362,73 @@ void DashboardRenderThread::DrawAnimations(Renderer& renderer,
     }
 }
 
-void DashboardRenderThread::DrawAnimationsDirty(Renderer& renderer,
-    DashboardAnimationTimeline* timeline,
+DashboardRenderThread::PreparedDirtyFrame DashboardRenderThread::PrepareDirtyFrame(
+    DashboardAnimationTimeline* timeline, const DashboardPresentationFrame& frame) const {
+    PreparedDirtyFrame preparedFrame;
+    preparedFrame.snapshotAnimations.reserve(frame.snapshotAnimations.size());
+    preparedFrame.overlayAnimations.reserve(frame.overlayAnimations.size());
+    preparedFrame.dirtyRects.reserve(frame.snapshotAnimations.size() + frame.overlayAnimations.size());
+    AppendPreparedDirtyAnimations(timeline,
+        frame.snapshotAnimations,
+        frame.snapshotVersion,
+        frame.width,
+        frame.height,
+        preparedFrame.snapshotAnimations,
+        preparedFrame.dirtyRects);
+    AppendPreparedDirtyAnimations(timeline,
+        frame.overlayAnimations,
+        frame.overlayVersion,
+        frame.width,
+        frame.height,
+        preparedFrame.overlayAnimations,
+        preparedFrame.dirtyRects);
+    return preparedFrame;
+}
+
+void DashboardRenderThread::AppendPreparedDirtyAnimations(DashboardAnimationTimeline* timeline,
     const std::vector<DashboardPresentationAnimation>& animations,
     std::uint64_t targetVersion,
-    const RenderRect& dirtyRect) const {
+    int width,
+    int height,
+    std::vector<PreparedDirtyAnimation>& prepared,
+    std::vector<RenderRect>& dirtyRects) const {
     for (const DashboardPresentationAnimation& command : animations) {
         const WidgetAnimationPtr& animation = command.animation;
         if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
-        RenderRect bounds = animation->DirtyBounds();
-        bounds = OffsetRect(bounds, command.translation).Inflate(kAnimationDirtyPadding, kAnimationDirtyPadding);
-        if (!RectsOverlap(bounds, dirtyRect)) {
+        RenderRect bounds = OffsetRect(animation->DirtyBounds(), command.translation)
+                                .Inflate(kAnimationDirtyPadding, kAnimationDirtyPadding);
+        bounds = ClipRectToSurface(bounds, width, height);
+        if (bounds.IsEmpty()) {
             continue;
         }
-        WidgetAnimationStatePtr sampled;
-        const WidgetAnimationState* drawState = command.targetState.get();
+        PreparedDirtyAnimation item;
+        item.command = &command;
+        item.drawState = command.targetState.get();
         if (timeline != nullptr) {
-            sampled = timeline->Resolve(animation->Key(), *command.targetState, targetVersion);
-            drawState = sampled.get();
+            item.sampledState = timeline->Resolve(animation->Key(), *command.targetState, targetVersion);
+            item.drawState = item.sampledState.get();
         }
-        if (drawState == nullptr) {
-            continue;
-        }
-        if (command.translation.x != 0 || command.translation.y != 0) {
-            renderer.PushTranslation(command.translation);
-        }
-        animation->Draw(renderer, *drawState);
-        if (command.translation.x != 0 || command.translation.y != 0) {
-            renderer.PopTranslation();
+        if (item.drawState != nullptr) {
+            dirtyRects.push_back(bounds);
+            prepared.push_back(std::move(item));
         }
     }
 }
 
-std::vector<RenderRect> DashboardRenderThread::AnimationDirtyRects(const DashboardPresentationFrame& frame) const {
-    std::vector<RenderRect> dirtyRects;
-    const auto addAnimationRects = [&](const std::vector<DashboardPresentationAnimation>& animations) {
-        for (const DashboardPresentationAnimation& command : animations) {
-            if (command.animation == nullptr) {
-                continue;
-            }
-            RenderRect bounds = command.animation->DirtyBounds();
-            bounds = OffsetRect(bounds, command.translation).Inflate(kAnimationDirtyPadding, kAnimationDirtyPadding);
-            bounds = ClipRectToSurface(bounds, frame.width, frame.height);
-            if (!bounds.IsEmpty()) {
-                dirtyRects.push_back(bounds);
-            }
+void DashboardRenderThread::DrawPreparedDirtyAnimations(
+    Renderer& renderer, const std::vector<PreparedDirtyAnimation>& animations) const {
+    for (const PreparedDirtyAnimation& item : animations) {
+        const DashboardPresentationAnimation& command = *item.command;
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            renderer.PushTranslation(command.translation);
         }
-    };
-    addAnimationRects(frame.snapshotAnimations);
-    addAnimationRects(frame.overlayAnimations);
-    return dirtyRects;
+        command.animation->Draw(renderer, *item.drawState);
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            renderer.PopTranslation();
+        }
+    }
 }
 
 void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const {

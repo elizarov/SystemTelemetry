@@ -94,21 +94,38 @@ private:
         DashboardAnimationTimeline* timeline,
         const DashboardPresentationFrame& frame,
         DashboardAnimationTimeline::Clock::time_point now) const;
+
+    struct PreparedDirtyAnimation {
+        const DashboardPresentationAnimation* command = nullptr;
+        WidgetAnimationStatePtr sampledState;
+        const WidgetAnimationState* drawState = nullptr;
+    };
+
+    struct PreparedDirtyFrame {
+        std::vector<PreparedDirtyAnimation> snapshotAnimations;
+        std::vector<PreparedDirtyAnimation> overlayAnimations;
+        std::vector<RenderRect> dirtyRects;
+    };
+
     void DrawFrameDirty(Renderer& renderer,
-        DashboardAnimationTimeline* timeline,
         const DashboardPresentationFrame& frame,
-        const RenderRect& dirtyRect,
-        DashboardAnimationTimeline::Clock::time_point now) const;
+        std::span<const RenderRect> dirtyRects,
+        const PreparedDirtyFrame& preparedFrame) const;
+
     void DrawAnimations(Renderer& renderer,
         DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations,
         std::uint64_t targetVersion) const;
-    void DrawAnimationsDirty(Renderer& renderer,
-        DashboardAnimationTimeline* timeline,
+    PreparedDirtyFrame PrepareDirtyFrame(
+        DashboardAnimationTimeline* timeline, const DashboardPresentationFrame& frame) const;
+    void AppendPreparedDirtyAnimations(DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations,
         std::uint64_t targetVersion,
-        const RenderRect& dirtyRect) const;
-    std::vector<RenderRect> AnimationDirtyRects(const DashboardPresentationFrame& frame) const;
+        int width,
+        int height,
+        std::vector<PreparedDirtyAnimation>& prepared,
+        std::vector<RenderRect>& dirtyRects) const;
+    void DrawPreparedDirtyAnimations(Renderer& renderer, const std::vector<PreparedDirtyAnimation>& animations) const;
     void MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
     void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
     void ReleaseBitmap(RenderBitmap bitmap) const;

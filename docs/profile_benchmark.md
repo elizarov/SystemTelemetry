@@ -46,13 +46,13 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.57`
-  - `snap avg_ms=0.09`
+  - `drag_loop per_iter_ms=2.21`
+  - `snap avg_ms=0.08`
   - `apply avg_ms=0.06`
-  - `paint_draw avg_ms=2.40`
+  - `paint_draw avg_ms=2.06`
 - Current repeatable `animation` result on the current tree:
-  - `animation_loop per_iter_ms=0.57`
-  - `animation_frame avg_ms=0.57`
+  - `animation_loop per_iter_ms=0.36`
+  - `animation_frame avg_ms=0.36`
   - `snapshot_animations=28`
   - `overlay_animations=0`
   - `active_chunk_frames=120`
@@ -91,9 +91,9 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 Current useful benchmark and hotspot signals from the latest direct runs and daemon-backed WPR captures on the full-D2D tree:
 
-- The snapshot/overlay animation pipeline now builds layer bitmaps through a dashboard-renderer pool. The main thread acquires writable snapshot and overlay bitmaps by size, and the render thread returns superseded active or pending frame layers to that pool. `D2DRenderer` reuses compatible Direct2D targets in immediate-present mode, reuses pooled WIC render targets in threaded mode, caches target-local Direct2D uploads for repeated animation-frame composition until the pooled WIC bitmap is redrawn, and keeps animation-capable full redraws plus dirty animation frames on the same retained HWND target.
-- The direct `animation` benchmark builds one fake-metric, no-overlay dashboard frame with `28` snapshot animations and repeatedly presents the stored frame through the render-thread presenter path. Current direct reruns land at `animation_frame avg_ms=0.57`, isolating per-frame bitmap-region composition, active `WidgetAnimationTransition::Sample()` work against the fixed shipped target state, `DashboardAnimationTimeline` lookup, and widget animation drawing from telemetry, layout, and layer painting.
-- The daemon-backed `animation` capture under `build\profile_benchmark_daemon\requests\12685_31185_30062\` used `2400` frames and reported `animation_frame avg_ms=0.50` with `active_chunk_frames=120`. The hotspot shape is still dominated by Direct2D present work: `D2DRenderer::DrawWindowDirty` is `78.91%` inclusive, `D2DRenderer::EndDirect2DDraw` is `59.41%` inclusive, followed by `DashboardRenderThread::DrawFrameDirty`, `DashboardRenderThread::DrawAnimationsDirty`, and throughput chart animation drawing through `ThroughputChartAnimation::Draw` and `DrawGraphAnimated`. Dirty animation presentation uses a retained HWND target and per-animation dirty bitmap-region blits; per-frame target-state rebuild remains out of the render-thread loop, and `DashboardAnimationTimeline::Resolve` still samples active transitions each frame.
+- The snapshot/overlay animation pipeline now builds layer bitmaps through a dashboard-renderer pool. The main thread acquires writable snapshot and overlay bitmaps by size, and the render thread returns superseded active or pending frame layers to that pool. `D2DRenderer` reuses compatible Direct2D targets in immediate-present mode, reuses pooled WIC render targets in threaded mode, caches target-local Direct2D uploads and bitmap brushes for repeated animation-frame composition until the pooled bitmap is redrawn, and keeps animation-capable full redraws plus dirty animation frames on the same retained HWND target.
+- The direct `animation` benchmark builds one fake-metric, no-overlay dashboard frame with `28` snapshot animations and repeatedly presents the stored frame through the render-thread presenter path. Current direct reruns land at `animation_frame avg_ms=0.36` to `0.37`, isolating per-frame bitmap-region composition, active `WidgetAnimationTransition::Sample()` work against the fixed shipped target state, `DashboardAnimationTimeline` lookup, and widget animation drawing from telemetry, layout, and layer painting.
+- The daemon-backed `animation` capture under `build\profile_benchmark_daemon\requests\16104_12574_23322\` used `2400` frames and reported `animation_frame avg_ms=0.36` with `active_chunk_frames=120`. The hotspot shape is now almost entirely Direct2D present work: `D2DRenderer::DrawWindowDirty` is `73.78%` inclusive and `D2DRenderer::EndDirect2DDraw` is `63.99%` inclusive. App-side work dropped to `DashboardRenderThread::DrawFrameDirty` at `9.79%`, `DashboardRenderThread::DrawPreparedDirtyAnimations` at `8.30%`, and throughput chart drawing at `5.07%`. Dirty animation presentation keeps non-coalesced dirty regions, batches bitmap-region restores, prepares dirty bounds and sampled states in one pass per frame, and draws each prepared animation once.
 - A pre-pool daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21261_462_9464\` reported `drag_loop per_iter_ms=7.51`, `paint_draw avg_ms=7.30`, `D2DRenderer::DrawToBitmap` at `35.25%` inclusive hits, and heavy `D3D10Warp.dll` plus `WindowsCodecs.dll` module weight from CPU/WIC-backed layer bitmap churn.
 - The daemon-backed `edit-layout` capture after the layer bitmap pool under `build\profile_benchmark_daemon\requests\25725_13470_17626\` reports `drag_loop per_iter_ms=2.37`, `snap avg_ms=0.08`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; remaining app-inclusive weight sits in `DashboardRenderer::BuildPresentationFrame`, `D2DRenderer::DrawToBitmap`, `DashboardRenderer::DrawSnapshotLayer`, and Direct2D/DirectWrite text drawing. Layout drags still redraw snapshot and overlay layers by design, so this benchmark carries the intentional layer-build plus final-composition cost.
 - The final direct benchmark refresh after the layer bitmap pool lands at `edit-layout drag_loop per_iter_ms=2.36`, `update-telemetry update_loop per_iter_ms=4.89`, `layout-switch switch_loop per_iter_ms=3.52`, `theme-change theme_loop per_iter_ms=4.15`, `mouse-hover hover_loop per_iter_ms=1.32`, and `layout-guide-sheet sheet_loop per_iter_ms=114.00`. The overlay-only hover path is faster than the old direct-paint baseline because the retained snapshot layer is reused and only overlay plus composition work runs per hover step.
@@ -152,6 +152,8 @@ These changes produced real wins and remain in the codebase:
 - Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or the panel-icon mask atlas during edit-layout drag apply and layout switching.
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
 - Keep snapshot and overlay layers behind the dashboard layer bitmap pool. The main thread reuses returned layer bitmaps instead of allocating from scratch, and the render thread returns superseded frame-owned layers when active and pending frames are replaced.
+- Keep dirty animation frames non-coalesced while batching snapshot and overlay region restores, preparing dirty bounds and sampled animation states together once per frame, and drawing each prepared animation once within its conservative dirty bounds.
+- Keep throughput graph max labels in the snapshot layer only; per-frame throughput chart animation draws guides, axes, plot, and leader without repeating DirectWrite label drawing.
 
 ## Tested Hypotheses
 

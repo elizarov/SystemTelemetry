@@ -180,7 +180,6 @@ void DrawGraphAnimated(Renderer& renderer,
     double timeMarkerOffsetSamples,
     double plotShiftSamples,
     double timeMarkerIntervalSamples,
-    double labelMaxValue,
     bool drawValues) {
     maxValue = FiniteNonNegativeOr(maxValue, 10.0);
     if (maxValue <= 0.0) {
@@ -235,18 +234,6 @@ void DrawGraphAnimated(Renderer& renderer,
     if (!drawValues) {
         return;
     }
-
-    labelMaxValue = FiniteNonNegativeOr(labelMaxValue, 10.0);
-    if (labelMaxValue <= 0.0) {
-        labelMaxValue = 10.0;
-    }
-    char maxLabel[32];
-    sprintf_s(maxLabel, "%.0f", labelMaxValue);
-    renderer.DrawTextBlock(RenderRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop},
-        maxLabel,
-        TextStyleId::Small,
-        RenderColorId::MutedText,
-        TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
 
     const RenderColorId plotColor = RenderColorId::Accent;
     std::vector<PlotPoint> plotPoints;
@@ -314,7 +301,6 @@ public:
             sample.timeMarkerOffsetSamples,
             sample.plotShiftSamples,
             timeMarkerIntervalSamples_,
-            target_.maxGraph,
             drawValues_);
     }
 

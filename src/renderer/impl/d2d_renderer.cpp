@@ -94,9 +94,20 @@ public:
         cachedD2DBitmap_ = std::move(bitmap);
     }
 
+    ID2D1BitmapBrush* CachedD2DBitmapBrush(ID2D1RenderTarget* target) const {
+        return cachedD2DBitmapBrushTarget_ == target ? cachedD2DBitmapBrush_.Get() : nullptr;
+    }
+
+    void CacheD2DBitmapBrush(ID2D1RenderTarget* target, Microsoft::WRL::ComPtr<ID2D1BitmapBrush> brush) const {
+        cachedD2DBitmapBrushTarget_ = target;
+        cachedD2DBitmapBrush_ = std::move(brush);
+    }
+
     void InvalidateCachedD2DBitmap() const {
         cachedD2DBitmapTarget_ = nullptr;
         cachedD2DBitmap_.Reset();
+        cachedD2DBitmapBrushTarget_ = nullptr;
+        cachedD2DBitmapBrush_.Reset();
     }
 
 private:
@@ -106,6 +117,8 @@ private:
     Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap_;
     mutable ID2D1RenderTarget* cachedD2DBitmapTarget_ = nullptr;
     mutable Microsoft::WRL::ComPtr<ID2D1Bitmap> cachedD2DBitmap_;
+    mutable ID2D1RenderTarget* cachedD2DBitmapBrushTarget_ = nullptr;
+    mutable Microsoft::WRL::ComPtr<ID2D1BitmapBrush> cachedD2DBitmapBrush_;
 };
 
 int GetPanelIconAtlasSlot(std::string_view iconName) {
@@ -354,16 +367,7 @@ bool D2DRenderer::DrawWindowDirty(
     if (!BeginWindowDraw(width, height, true)) {
         return false;
     }
-
-    for (const RenderRect& dirtyRect : dirtyRects) {
-        if (dirtyRect.IsEmpty()) {
-            continue;
-        }
-        PushClipRect(dirtyRect);
-        draw(dirtyRect);
-        PopClipRect();
-    }
-
+    draw(dirtyRects);
     EndWindowDraw();
     return lastError_.empty();
 }
@@ -962,6 +966,54 @@ bool D2DRenderer::DrawBitmapRegion(const RenderBitmap& bitmap, const RenderRect&
     const D2D1_RECT_F sourceD2DRect = D2DRectFromRenderRect(clippedSource);
     d2dActiveRenderTarget_->DrawBitmap(
         d2dBitmap.Get(), destinationRect, 1.0f, D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR, &sourceD2DRect);
+    return true;
+}
+
+bool D2DRenderer::DrawBitmapRegions(const RenderBitmap& bitmap, std::span<const RenderRect> sourceRects) {
+    if (sourceRects.empty()) {
+        return true;
+    }
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap = D2DBitmapForRenderBitmap(bitmap);
+    if (d2dBitmap == nullptr) {
+        return false;
+    }
+    const D2DRenderBitmapResource* resource = nullptr;
+    if (bitmap.resource != nullptr && bitmap.resource->TypeToken() == D2DRenderBitmapResourceTypeToken()) {
+        resource = static_cast<const D2DRenderBitmapResource*>(bitmap.resource.get());
+    }
+    ID2D1BitmapBrush* bitmapBrush =
+        resource != nullptr ? resource->CachedD2DBitmapBrush(d2dActiveRenderTarget_) : nullptr;
+    if (bitmapBrush == nullptr) {
+        Microsoft::WRL::ComPtr<ID2D1BitmapBrush> createdBrush;
+        const HRESULT brushHr = d2dActiveRenderTarget_->CreateBitmapBrush(d2dBitmap.Get(),
+            D2D1::BitmapBrushProperties(
+                D2D1_EXTEND_MODE_CLAMP, D2D1_EXTEND_MODE_CLAMP, D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR),
+            D2D1::BrushProperties(),
+            createdBrush.GetAddressOf());
+        if (FAILED(brushHr) || createdBrush == nullptr) {
+            lastError_ = "renderer:draw_bitmap_regions_brush_failed hr=" + FormatHresult(brushHr);
+            return false;
+        }
+        bitmapBrush = createdBrush.Get();
+        if (resource != nullptr) {
+            resource->CacheD2DBitmapBrush(d2dActiveRenderTarget_, std::move(createdBrush));
+        }
+    }
+    for (const RenderRect& sourceRect : sourceRects) {
+        if (sourceRect.IsEmpty()) {
+            continue;
+        }
+        RenderRect clippedSource = sourceRect;
+        clippedSource.left = std::clamp(clippedSource.left, 0, bitmap.width);
+        clippedSource.top = std::clamp(clippedSource.top, 0, bitmap.height);
+        clippedSource.right = std::clamp(clippedSource.right, 0, bitmap.width);
+        clippedSource.bottom = std::clamp(clippedSource.bottom, 0, bitmap.height);
+        if (clippedSource.IsEmpty()) {
+            continue;
+        }
+        const D2D1_RECT_F rect = D2DRectFromRenderRect(clippedSource);
+        d2dActiveRenderTarget_->FillRectangle(rect, bitmapBrush);
+    }
     return true;
 }
 

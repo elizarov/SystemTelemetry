@@ -59,6 +59,7 @@ public:
     void PopTranslation() override;
     bool DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) override;
     bool DrawBitmapRegion(const RenderBitmap& bitmap, const RenderRect& sourceRect, RenderPoint targetOrigin) override;
+    bool DrawBitmapRegions(const RenderBitmap& bitmap, std::span<const RenderRect> sourceRects) override;
     bool DrawIcon(std::string_view iconName, const RenderRect& rect) override;
     bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
     bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) override;

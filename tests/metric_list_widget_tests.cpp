@@ -134,9 +134,7 @@ public:
     }
 
     bool DrawWindowDirty(int, int, std::span<const RenderRect> dirtyRects, const DirtyDrawCallback& draw) override {
-        for (const RenderRect& dirtyRect : dirtyRects) {
-            draw(dirtyRect);
-        }
+        draw(dirtyRects);
         return true;
     }
 
@@ -218,6 +216,10 @@ public:
     }
 
     bool DrawBitmapRegion(const RenderBitmap&, const RenderRect&, RenderPoint) override {
+        return true;
+    }
+
+    bool DrawBitmapRegions(const RenderBitmap&, std::span<const RenderRect>) override {
         return true;
     }
 
