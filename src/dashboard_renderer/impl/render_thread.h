@@ -61,6 +61,7 @@ struct DashboardPresentedFrameState {
 
 class DashboardLayerBitmapPool {
 public:
+    void SetLiveLayerSize(int width, int height);
     RenderBitmap AcquireLiveLayerBitmap(int width, int height);
     void ReleaseLiveLayerBitmap(RenderBitmap bitmap);
     void Clear();
@@ -68,6 +69,8 @@ public:
 private:
     mutable std::mutex mutex_;
     std::vector<RenderBitmap> available_;
+    int liveLayerWidth_ = 0;
+    int liveLayerHeight_ = 0;
 };
 
 class DashboardRenderThread {
@@ -80,6 +83,7 @@ public:
     void SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool);
     void Shutdown();
     bool PublishFrame(DashboardPresentationFrame frame);
+    bool PublishFrameAndWait(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(DashboardPresentationFrame frame);
     bool PresentFrameSynchronously(Renderer& renderer, DashboardPresentationFrame frame);
     // Designed only for benchmark harnesses that repeatedly present a stored frame.
@@ -158,10 +162,18 @@ private:
     mutable std::mutex mutex_;
     std::condition_variable wake_;
     std::optional<DashboardPresentationFrame> pendingFrame_;
+    std::uint64_t nextFrameRequestId_ = 0;
+    std::uint64_t pendingFrameRequestId_ = 0;
+    std::uint64_t completedFrameRequestId_ = 0;
+    bool completedFrameRequestSucceeded_ = false;
+    std::condition_variable framePresented_;
     std::thread thread_;
     bool stopRequested_ = false;
     bool resetTimelineRequested_ = false;
     bool discardTargetRequested_ = false;
+    std::uint64_t discardRequestId_ = 0;
+    std::uint64_t completedDiscardRequestId_ = 0;
+    std::condition_variable discardCompleted_;
     std::string discardReason_;
     std::string lastError_;
     std::atomic_bool activeAnimations_{false};

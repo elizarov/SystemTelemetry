@@ -303,6 +303,10 @@ only on a live frame that carries a new metric version and no longer touches tha
 from their current interpolated value after layout edits instead of restarting from zero.
 DPI and scale application updates renderer style and layout in place; it does not shut down the render thread, because
 the render thread owns the animation timeline and `surfaceVersion` already handles target recreation.
+Before the HWND size changes, the UI thread synchronously asks the render thread to discard its current target and frame.
+The size change uses no-redraw window positioning, then publishes and waits for one frame for the new surface so the window
+manager never stretches the old swap-chain image into the new shape. Surface changes also retarget the live-layer bitmap
+pool to the new size; returned old-size layer bitmaps are rejected instead of being retained.
 
 Renderer trace output reports every animation timeline reset and any frame that prunes animation tracks. Reset lines use
 `renderer:animation_timeline_reset`; prune lines use `renderer:animation_timeline_prune` and include track counts, metric

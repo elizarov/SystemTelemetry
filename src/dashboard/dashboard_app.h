@@ -63,6 +63,8 @@ private:
     void BringOnTop();
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
+    void SetDashboardWindowGeometry(int left, int top, int width, int height, UINT flags, std::string_view reason);
+    void RedrawDashboardSurfaceSynchronously();
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
     bool IsLayoutEditMode() const;

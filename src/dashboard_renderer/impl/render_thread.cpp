@@ -58,8 +58,23 @@ void RecordAnimationFrameTiming(const Trace* trace, HighPrecisionTimer::Tick sta
 
 }  // namespace
 
+void DashboardLayerBitmapPool::SetLiveLayerSize(int width, int height) {
+    std::lock_guard lock(mutex_);
+    width = std::max(0, width);
+    height = std::max(0, height);
+    if (liveLayerWidth_ == width && liveLayerHeight_ == height) {
+        return;
+    }
+    liveLayerWidth_ = width;
+    liveLayerHeight_ = height;
+    available_.clear();
+}
+
 RenderBitmap DashboardLayerBitmapPool::AcquireLiveLayerBitmap(int width, int height) {
     std::lock_guard lock(mutex_);
+    if (width != liveLayerWidth_ || height != liveLayerHeight_) {
+        return {};
+    }
     const auto matches = [&](const RenderBitmap& bitmap) {
         return bitmap.width == width && bitmap.height == height && bitmap.IsLiveLayer();
     };
@@ -78,6 +93,9 @@ void DashboardLayerBitmapPool::ReleaseLiveLayerBitmap(RenderBitmap bitmap) {
     }
 
     std::lock_guard lock(mutex_);
+    if (bitmap.width != liveLayerWidth_ || bitmap.height != liveLayerHeight_) {
+        return;
+    }
     if (available_.size() >= kMaxLayerBitmapPoolEntries) {
         return;
     }
@@ -137,8 +155,15 @@ void DashboardRenderThread::Shutdown() {
             ReleaseFrameLayers(std::move(*pendingFrame_));
             pendingFrame_.reset();
         }
+        if (pendingFrameRequestId_ != 0) {
+            completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
+            completedFrameRequestSucceeded_ = false;
+            pendingFrameRequestId_ = 0;
+        }
     }
     wake_.notify_all();
+    framePresented_.notify_all();
+    discardCompleted_.notify_all();
     if (thread_.joinable()) {
         thread_.join();
     }
@@ -171,11 +196,49 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
         }
         if (pendingFrame_.has_value()) {
             ReleaseFrameLayers(std::move(*pendingFrame_));
+            if (pendingFrameRequestId_ != 0) {
+                completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
+                completedFrameRequestSucceeded_ = false;
+                pendingFrameRequestId_ = 0;
+                framePresented_.notify_all();
+            }
         }
         pendingFrame_ = std::move(frame);
+        pendingFrameRequestId_ = 0;
     }
     wake_.notify_one();
     return true;
+}
+
+bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame) {
+    if (!threaded_) {
+        return PresentFrameSynchronously(std::move(frame));
+    }
+
+    std::uint64_t requestId = 0;
+    {
+        std::lock_guard lock(mutex_);
+        if (stopRequested_ || !thread_.joinable()) {
+            lastError_ = "renderer:render_thread_not_running";
+            ReleaseFrameLayers(std::move(frame));
+            return false;
+        }
+        if (pendingFrame_.has_value()) {
+            ReleaseFrameLayers(std::move(*pendingFrame_));
+            if (pendingFrameRequestId_ != 0) {
+                completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
+                completedFrameRequestSucceeded_ = false;
+            }
+        }
+        requestId = ++nextFrameRequestId_;
+        pendingFrame_ = std::move(frame);
+        pendingFrameRequestId_ = requestId;
+    }
+    wake_.notify_one();
+
+    std::unique_lock lock(mutex_);
+    framePresented_.wait(lock, [&] { return stopRequested_ || completedFrameRequestId_ >= requestId; });
+    return completedFrameRequestId_ >= requestId && completedFrameRequestSucceeded_;
 }
 
 bool DashboardRenderThread::PresentFrameSynchronously(DashboardPresentationFrame frame) {
@@ -266,12 +329,26 @@ void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
     syncPresentedState_.versions.metricVersion = metricVersion;
     syncPresentedState_.hasMetricVersion = hasMetricVersion;
     if (threaded_) {
+        std::uint64_t requestId = 0;
         {
             std::lock_guard lock(mutex_);
+            if (pendingFrame_.has_value()) {
+                ReleaseFrameLayers(std::move(*pendingFrame_));
+                pendingFrame_.reset();
+            }
+            if (pendingFrameRequestId_ != 0) {
+                completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
+                completedFrameRequestSucceeded_ = false;
+                pendingFrameRequestId_ = 0;
+                framePresented_.notify_all();
+            }
             discardTargetRequested_ = true;
             discardReason_ = std::string(reason);
+            requestId = ++discardRequestId_;
         }
         wake_.notify_one();
+        std::unique_lock lock(mutex_);
+        discardCompleted_.wait(lock, [&] { return stopRequested_ || completedDiscardRequestId_ >= requestId; });
     }
 }
 
@@ -568,6 +645,7 @@ void DashboardRenderThread::ThreadMain() {
     DashboardAnimationTimeline timeline;
     DashboardPresentedFrameState presentedState;
     std::optional<DashboardPresentationFrame> activeFrame;
+    std::uint64_t activeFrameRequestId = 0;
 
     for (;;) {
         {
@@ -595,6 +673,16 @@ void DashboardRenderThread::ThreadMain() {
             }
             if (discardTargetRequested_) {
                 renderer->DiscardWindowTarget(discardReason_);
+                if (activeFrame.has_value()) {
+                    ReleaseFrameLayers(std::move(*activeFrame));
+                    activeFrame.reset();
+                }
+                if (activeFrameRequestId != 0) {
+                    completedFrameRequestId_ = std::max(completedFrameRequestId_, activeFrameRequestId);
+                    completedFrameRequestSucceeded_ = false;
+                    framePresented_.notify_all();
+                }
+                activeFrameRequestId = 0;
                 const std::uint64_t metricVersion = presentedState.versions.metricVersion;
                 const bool hasMetricVersion = presentedState.hasMetricVersion;
                 presentedState = {};
@@ -602,6 +690,8 @@ void DashboardRenderThread::ThreadMain() {
                 presentedState.hasMetricVersion = hasMetricVersion;
                 discardTargetRequested_ = false;
                 discardReason_.clear();
+                completedDiscardRequestId_ = discardRequestId_;
+                discardCompleted_.notify_all();
             }
             if (pendingFrame_.has_value()) {
                 if (activeFrame.has_value()) {
@@ -609,7 +699,9 @@ void DashboardRenderThread::ThreadMain() {
                 } else {
                     activeFrame = std::move(*pendingFrame_);
                 }
+                activeFrameRequestId = std::max(activeFrameRequestId, pendingFrameRequestId_);
                 pendingFrame_.reset();
+                pendingFrameRequestId_ = 0;
             }
         }
 
@@ -618,6 +710,15 @@ void DashboardRenderThread::ThreadMain() {
         }
 
         const bool presented = PresentFrame(*renderer, timeline, *activeFrame, presentedState);
+        if (activeFrameRequestId != 0) {
+            {
+                std::lock_guard lock(mutex_);
+                completedFrameRequestId_ = std::max(completedFrameRequestId_, activeFrameRequestId);
+                completedFrameRequestSucceeded_ = presented;
+            }
+            framePresented_.notify_all();
+            activeFrameRequestId = 0;
+        }
         if (!presented) {
             ReleaseFrameLayers(std::move(*activeFrame));
             activeFrame.reset();

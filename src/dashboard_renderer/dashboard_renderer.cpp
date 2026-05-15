@@ -417,6 +417,16 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    return DrawWindowInternal(snapshot, overlayState, false);
+}
+
+bool DashboardRenderer::DrawWindowSynchronously(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    return DrawWindowInternal(snapshot, overlayState, true);
+}
+
+bool DashboardRenderer::DrawWindowInternal(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, bool waitForPresentation) {
     lastError_.clear();
     DashboardPresentationFrame frame;
     {
@@ -431,10 +441,14 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const Dashboa
     }
     const bool presented = [&] {
         auto timing = trace_.Timings().Measure(trace_, "presentation_frame_publish");
-        return immediatePresent_ && presentationHwnd_ != nullptr
-                   ? presentation_.PresentFrameSynchronously(*renderer_, std::move(frame))
-               : presentationHwnd_ == nullptr ? presentation_.PresentFrameSynchronously(std::move(frame))
-                                              : presentation_.PublishFrame(std::move(frame));
+        if (immediatePresent_ && presentationHwnd_ != nullptr) {
+            return presentation_.PresentFrameSynchronously(*renderer_, std::move(frame));
+        }
+        if (presentationHwnd_ == nullptr) {
+            return presentation_.PresentFrameSynchronously(std::move(frame));
+        }
+        return waitForPresentation ? presentation_.PublishFrameAndWait(std::move(frame))
+                                   : presentation_.PublishFrame(std::move(frame));
     }();
     if (!presented) {
         lastError_ = presentation_.LastError();
@@ -594,6 +608,9 @@ std::uint64_t DashboardRenderer::ResolveSurfaceVersion() {
         presentedWidth_ = width;
         presentedHeight_ = height;
         presentedScale_ = renderScale_;
+        if (layerBitmapPool_ != nullptr) {
+            layerBitmapPool_->SetLiveLayerSize(width, height);
+        }
         ++surfaceVersion_;
     }
     return surfaceVersion_;

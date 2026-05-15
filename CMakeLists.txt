@@ -554,6 +554,7 @@ add_executable(CaseDashTests
     tests/telemetry_retained_history_tests.cpp
     tests/telemetry_runtime_tests.cpp
     tests/animation_timeline_tests.cpp
+    tests/render_thread_tests.cpp
     src/config/config.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp

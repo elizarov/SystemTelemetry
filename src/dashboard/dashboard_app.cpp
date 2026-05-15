@@ -297,7 +297,49 @@ void DashboardApp::ApplyConfigPlacement() {
         !ApplyWindowDpi(targetDpi)) {
         return;
     }
-    SetWindowPos(hwnd_, nullptr, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE | SWP_NOZORDER);
+    SetDashboardWindowGeometry(
+        left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE | SWP_NOZORDER, "config_placement");
+}
+
+void DashboardApp::SetDashboardWindowGeometry(
+    int left, int top, int width, int height, UINT flags, std::string_view reason) {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    RECT windowRect{};
+    GetWindowRect(hwnd_, &windowRect);
+    const bool sizeChanged =
+        (windowRect.right - windowRect.left) != width || (windowRect.bottom - windowRect.top) != height;
+    if (sizeChanged) {
+        renderer_.DiscardWindowRenderTarget(reason);
+        flags |= SWP_NOREDRAW;
+    }
+
+    SetWindowPos(hwnd_, nullptr, left, top, width, height, flags);
+    if (sizeChanged) {
+        RedrawDashboardSurfaceSynchronously();
+    }
+}
+
+void DashboardApp::RedrawDashboardSurfaceSynchronously() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    const auto paintStart = std::chrono::steady_clock::now();
+    const SystemSnapshot& snapshot = controller_.State().telemetryUpdate.dump.snapshot;
+    const auto drawStart = std::chrono::steady_clock::now();
+    SyncDashboardMoveOverlayState();
+    if (!renderer_.DrawWindowSynchronously(snapshot, rendererDashboardOverlayState_)) {
+        lastError_ = renderer_.LastError();
+    }
+    const auto drawEnd = std::chrono::steady_clock::now();
+    ValidateRect(hwnd_, nullptr);
+    KillTimer(hwnd_, kAnimationFrameTimerId);
+    const auto paintEnd = std::chrono::steady_clock::now();
+    RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
+    RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
 }
 
 bool DashboardApp::HandleRenderEnvironmentChange(const char* reason) {
@@ -456,8 +498,8 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
         const int height = HasExplicitDisplayScale(controller_.State().config.display.scale)
                                ? WindowHeight()
                                : suggestedRect->bottom - suggestedRect->top;
-        SetWindowPos(
-            hwnd_, nullptr, suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetDashboardWindowGeometry(
+            suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE, "dpi_change");
     }
     return true;
 }

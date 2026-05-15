@@ -80,6 +80,7 @@ public:
 
     bool DrawWindow(const SystemSnapshot& snapshot);
     bool DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
+    bool DrawWindowSynchronously(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
@@ -145,6 +146,8 @@ private:
         const DashboardOverlayState& overlayState,
         DashboardPresentationFrame& frame,
         PresentationBuildOptions options);
+    bool DrawWindowInternal(
+        const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, bool waitForPresentation);
     void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
     void DrawOverlayLayerStatic(const DashboardOverlayState& overlayState, const MetricSource& metrics);
