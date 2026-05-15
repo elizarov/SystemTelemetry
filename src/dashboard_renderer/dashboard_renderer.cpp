@@ -12,6 +12,7 @@
 
 #include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
+#include "dashboard_renderer/impl/render_thread.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_service.h"
@@ -21,9 +22,10 @@
 DashboardRenderer::DashboardRenderer(Trace& trace)
     : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
       layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
-      layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()) {
-    presentation_.SetTrace(&trace_);
-    presentation_.SetBitmapPool(layerBitmapPool_);
+      layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()),
+      presentation_(std::make_unique<DashboardRenderThread>()) {
+    presentation_->SetTrace(&trace_);
+    presentation_->SetBitmapPool(layerBitmapPool_);
 }
 
 DashboardRenderer::~DashboardRenderer() {
@@ -130,7 +132,7 @@ void DashboardRenderer::SetImmediatePresent(bool enabled) {
     overlayLayerVisible_ = false;
     renderer_->AttachWindow(immediatePresent_ ? presentationHwnd_ : nullptr);
     renderer_->SetImmediatePresent(enabled);
-    presentation_.Configure(presentationHwnd_, presentationHwnd_ != nullptr && !immediatePresent_, immediatePresent_);
+    presentation_->Configure(presentationHwnd_, presentationHwnd_ != nullptr && !immediatePresent_, immediatePresent_);
     ClearReusableLayerBitmaps();
 }
 
@@ -141,7 +143,7 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
     liveAnimationEnabled_ = enabled;
     if (!liveAnimationEnabled_) {
         WriteTrace("animation_timeline_reset_request reason=live_animation_disabled");
-        presentation_.ResetTimeline();
+        presentation_->ResetTimeline();
     }
 }
 
@@ -174,7 +176,7 @@ const std::string& DashboardRenderer::LastError() const {
     if (!lastError_.empty()) {
         return lastError_;
     }
-    const std::string presentationError = presentation_.LastError();
+    const std::string presentationError = presentation_->LastError();
     if (!presentationError.empty()) {
         lastError_ = presentationError;
         return lastError_;
@@ -442,16 +444,16 @@ bool DashboardRenderer::DrawWindowInternal(
     const bool presented = [&] {
         auto timing = trace_.Timings().Measure(trace_, "presentation_frame_publish");
         if (immediatePresent_ && presentationHwnd_ != nullptr) {
-            return presentation_.PresentFrameSynchronously(*renderer_, std::move(frame));
+            return presentation_->PresentFrameSynchronously(*renderer_, std::move(frame));
         }
         if (presentationHwnd_ == nullptr) {
-            return presentation_.PresentFrameSynchronously(std::move(frame));
+            return presentation_->PresentFrameSynchronously(std::move(frame));
         }
-        return waitForPresentation ? presentation_.PublishFrameAndWait(std::move(frame))
-                                   : presentation_.PublishFrame(std::move(frame));
+        return waitForPresentation ? presentation_->PublishFrameAndWait(std::move(frame))
+                                   : presentation_->PublishFrame(std::move(frame));
     }();
     if (!presented) {
-        lastError_ = presentation_.LastError();
+        lastError_ = presentation_->LastError();
     }
     return presented && lastError_.empty();
 }
@@ -486,7 +488,7 @@ bool DashboardRenderer::BuildPresentationFrame(const SystemSnapshot& snapshot,
     const bool rebuildsLayerBitmap = updateSnapshot || overlayVisible;
     const bool suspendAnimationPresentation =
         frame.animate && presentationHwnd_ != nullptr && !immediatePresent_ && rebuildsLayerBitmap;
-    ScopedAnimationPresentationSuspension animationPresentationSuspension(presentation_, suspendAnimationPresentation);
+    ScopedAnimationPresentationSuspension animationPresentationSuspension(*presentation_, suspendAnimationPresentation);
 
     const MetricSource* metrics = nullptr;
     {
@@ -821,53 +823,12 @@ bool DashboardRenderer::SaveSnapshotPng(
     }
     frame.animate = false;
     const bool saved = renderer_->SavePng(
-        imagePath, frame.width, frame.height, [&] { presentation_.DrawFrameForCurrentTarget(*renderer_, frame); });
+        imagePath, frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
     RecycleFrameLayers(std::move(frame));
     return saved;
-}
-
-bool DashboardRenderer::BuildAnimationBenchmarkFrame(
-    const SystemSnapshot& snapshot, DashboardPresentationFrame& frame) {
-    lastError_.clear();
-    DashboardOverlayState overlayState;
-    const PresentationBuildOptions options{
-        true,
-        true,
-    };
-    const bool built = BuildPresentationFrame(snapshot, overlayState, frame, options);
-    if (!built) {
-        return false;
-    }
-    frame.animate = true;
-    return true;
-}
-
-bool DashboardRenderer::BuildSnapshotHandoffBenchmarkFrame(
-    const SystemSnapshot& snapshot, DashboardPresentationFrame& frame) {
-    lastError_.clear();
-    DashboardOverlayState overlayState;
-    const PresentationBuildOptions options{
-        presentationHwnd_ != nullptr,
-        false,
-    };
-    const bool built = BuildPresentationFrame(snapshot, overlayState, frame, options);
-    if (!built) {
-        return false;
-    }
-    return true;
-}
-
-bool DashboardRenderer::PublishSnapshotHandoffBenchmarkFrame(DashboardPresentationFrame frame) {
-    lastError_.clear();
-    const bool published = presentationHwnd_ == nullptr ? presentation_.PresentFrameSynchronously(std::move(frame))
-                                                        : presentation_.PublishFrame(std::move(frame));
-    if (!published) {
-        lastError_ = presentation_.LastError();
-    }
-    return published && lastError_.empty();
 }
 
 std::vector<LayoutGuideSheetCardSummary> DashboardRenderer::CollectLayoutGuideSheetCardSummaries() const {
@@ -1017,7 +978,7 @@ bool DashboardRenderer::RenderSnapshotOffscreen(
     }
     frame.animate = false;
     renderer_->DrawOffscreen(
-        frame.width, frame.height, [&] { presentation_.DrawFrameForCurrentTarget(*renderer_, frame); });
+        frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
@@ -1032,7 +993,7 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
 }
 
 bool DashboardRenderer::HasActiveDashboardAnimation() const {
-    return liveAnimationEnabled_ && renderMode_ == RenderMode::Normal && presentation_.HasActiveAnimations();
+    return liveAnimationEnabled_ && renderMode_ == RenderMode::Normal && presentation_->HasActiveAnimations();
 }
 
 LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
@@ -1407,7 +1368,7 @@ bool DashboardRenderer::Initialize(HWND hwnd) {
     ClearReusableLayerBitmaps();
     renderer_->AttachWindow(immediatePresent_ ? hwnd : nullptr);
     renderer_->SetImmediatePresent(immediatePresent_);
-    presentation_.Configure(hwnd, hwnd != nullptr && !immediatePresent_, immediatePresent_);
+    presentation_->Configure(hwnd, hwnd != nullptr && !immediatePresent_, immediatePresent_);
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:initialize_failed" : renderer_->LastError();
         return false;
@@ -1419,7 +1380,7 @@ void DashboardRenderer::Shutdown() {
     InvalidateMetricSourceCache();
     layoutResolver_->Clear();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
-    presentation_.Shutdown();
+    presentation_->Shutdown();
     presentationHwnd_ = nullptr;
     snapshotLayerValid_ = false;
     overlayLayerVisible_ = false;
@@ -1430,7 +1391,7 @@ void DashboardRenderer::Shutdown() {
 void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
     snapshotLayerValid_ = false;
     overlayLayerVisible_ = false;
-    presentation_.DiscardWindowTarget(reason);
+    presentation_->DiscardWindowTarget(reason);
     ClearReusableLayerBitmaps();
 }
 

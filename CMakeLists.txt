@@ -801,6 +801,7 @@ add_executable(CaseDashBenchmarks
     src/layout_guide_sheet/layout_guide_sheet.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
+    src/dashboard_renderer/impl/dashboard_renderer_benchmark.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp

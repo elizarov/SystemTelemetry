@@ -18,6 +18,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/impl/dashboard_renderer_benchmark.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
@@ -957,8 +958,8 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
 
     DashboardPresentationFrame warmupFrame;
     const SystemSnapshot warmupSnapshot = BuildSnapshotHandoffIterationSnapshot(baseSnapshot, 0);
-    if (!renderer.BuildSnapshotHandoffBenchmarkFrame(warmupSnapshot, warmupFrame) ||
-        !renderer.PublishSnapshotHandoffBenchmarkFrame(std::move(warmupFrame))) {
+    if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, warmupSnapshot, warmupFrame) ||
+        !DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(warmupFrame))) {
         totals.succeeded = false;
         totals.errorText = "snapshot handoff warmup failed: " + renderer.LastError();
         return totals;
@@ -971,7 +972,7 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
 
         DashboardPresentationFrame frame;
         const auto buildStart = Clock::now();
-        if (!renderer.BuildSnapshotHandoffBenchmarkFrame(snapshot, frame)) {
+        if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, snapshot, frame)) {
             totals.succeeded = false;
             totals.errorText = "snapshot frame build failed: " + renderer.LastError();
             return totals;
@@ -979,7 +980,7 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
         RecordPhase(totals.frameBuild, Clock::now() - buildStart);
 
         const auto publishStart = Clock::now();
-        if (!renderer.PublishSnapshotHandoffBenchmarkFrame(std::move(frame))) {
+        if (!DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(frame))) {
             totals.succeeded = false;
             totals.errorText = "snapshot frame publish failed: " + renderer.LastError();
             return totals;
@@ -1264,7 +1265,7 @@ int RunAnimationBenchmarkCommand(size_t iterations, double renderScale, Trace& t
     }
 
     DashboardPresentationFrame frame;
-    if (!renderer.BuildAnimationBenchmarkFrame(telemetry->Snapshot(), frame)) {
+    if (!DashboardRendererBenchmarkAccess::BuildAnimationFrame(renderer, telemetry->Snapshot(), frame)) {
         std::cerr << "animation frame build failed: " << renderer.LastError() << "\n";
         renderer.Shutdown();
         return 1;

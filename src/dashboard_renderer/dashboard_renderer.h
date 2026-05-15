@@ -13,7 +13,6 @@
 #include "config/config.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "dashboard_renderer/impl/metric_lookup_cache.h"
-#include "dashboard_renderer/impl/render_thread.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_active_region.h"
 #include "renderer/renderer.h"
@@ -25,7 +24,12 @@
 #include "widget/widget_host.h"
 
 class DashboardLayoutEditOverlayRenderer;
+class DashboardLayerBitmapPool;
 class LayoutGuideSheetRenderer;
+class DashboardRendererBenchmarkAccess;
+class DashboardRenderThread;
+struct DashboardPresentationAnimation;
+struct DashboardPresentationFrame;
 
 struct LayoutGuideSheetCardSummary {
     std::string id;
@@ -84,12 +88,6 @@ public:
     bool SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
-    // Designed only for single-threaded benchmarks that need a reusable animated presentation frame.
-    bool BuildAnimationBenchmarkFrame(const SystemSnapshot& snapshot, DashboardPresentationFrame& frame);
-    // Designed only for benchmarks that measure snapshot layer construction before threaded handoff.
-    bool BuildSnapshotHandoffBenchmarkFrame(const SystemSnapshot& snapshot, DashboardPresentationFrame& frame);
-    // Designed only for benchmarks that publish through the live render-thread handoff.
-    bool PublishSnapshotHandoffBenchmarkFrame(DashboardPresentationFrame frame);
     std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries() const;
     bool RenderSnapshotOffscreen(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
@@ -113,6 +111,7 @@ public:
 private:
     friend class DashboardLayoutResolver;
     friend class DashboardLayoutEditOverlayRenderer;
+    friend class DashboardRendererBenchmarkAccess;
     friend class LayoutGuideSheetRenderer;
 
     struct PresentationBuildOptions {
@@ -227,7 +226,7 @@ private:
     WidgetAnimationLayer currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
     const DashboardOverlayState* activeOverlayState_ = nullptr;
     std::shared_ptr<DashboardLayerBitmapPool> layerBitmapPool_;
-    DashboardRenderThread presentation_;
+    std::unique_ptr<DashboardRenderThread> presentation_;
     HWND presentationHwnd_ = nullptr;
     int presentedWidth_ = 0;
     int presentedHeight_ = 0;
