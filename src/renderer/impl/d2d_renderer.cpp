@@ -6,12 +6,12 @@
 #include <cstring>
 #include <d3d11.h>
 #include <memory>
-#include <mutex>
 #include <utility>
 
 #include "renderer/impl/d2d_render_conversions.h"
 #include "renderer/png_export.h"
 #include "resource.h"
+#include "util/lightweight_mutex.h"
 #include "util/utf8.h"
 #include "util/win32_format.h"
 
@@ -59,7 +59,7 @@ const void* D2DRenderBitmapResourceTypeToken() {
 class D2DSharedDevice final {
 public:
     bool Ensure(std::string& errorText) {
-        std::lock_guard lock(mutex_);
+        const LightweightMutexLock lock(mutex_);
         if (d2dFactory_ != nullptr && d2dDevice_ != nullptr && d3dDevice_ != nullptr && dxgiFactory_ != nullptr) {
             return true;
         }
@@ -162,7 +162,7 @@ public:
     }
 
 private:
-    std::mutex mutex_;
+    LightweightMutex mutex_;
     Microsoft::WRL::ComPtr<ID2D1Factory1> d2dFactory_;
     Microsoft::WRL::ComPtr<ID3D11Device> d3dDevice_;
     Microsoft::WRL::ComPtr<ID3D11DeviceContext> d3dContext_;

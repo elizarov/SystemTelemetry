@@ -59,7 +59,7 @@ void RecordAnimationFrameTiming(const Trace* trace, HighPrecisionTimer::Tick sta
 }  // namespace
 
 void DashboardLayerBitmapPool::SetLiveLayerSize(int width, int height) {
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     width = std::max(0, width);
     height = std::max(0, height);
     if (liveLayerWidth_ == width && liveLayerHeight_ == height) {
@@ -71,7 +71,7 @@ void DashboardLayerBitmapPool::SetLiveLayerSize(int width, int height) {
 }
 
 RenderBitmap DashboardLayerBitmapPool::AcquireLiveLayerBitmap(int width, int height) {
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     if (width != liveLayerWidth_ || height != liveLayerHeight_) {
         return {};
     }
@@ -92,7 +92,7 @@ void DashboardLayerBitmapPool::ReleaseLiveLayerBitmap(RenderBitmap bitmap) {
         return;
     }
 
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     if (bitmap.width != liveLayerWidth_ || bitmap.height != liveLayerHeight_) {
         return;
     }
@@ -103,14 +103,26 @@ void DashboardLayerBitmapPool::ReleaseLiveLayerBitmap(RenderBitmap bitmap) {
 }
 
 void DashboardLayerBitmapPool::Clear() {
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     available_.clear();
 }
 
-DashboardRenderThread::DashboardRenderThread() = default;
+DashboardRenderThread::DashboardRenderThread()
+    : wakeEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
+      framePresentedEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
+      discardCompletedEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {}
 
 DashboardRenderThread::~DashboardRenderThread() {
     Shutdown();
+    if (wakeEvent_ != nullptr) {
+        CloseHandle(wakeEvent_);
+    }
+    if (framePresentedEvent_ != nullptr) {
+        CloseHandle(framePresentedEvent_);
+    }
+    if (discardCompletedEvent_ != nullptr) {
+        CloseHandle(discardCompletedEvent_);
+    }
 }
 
 void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePresent) {
@@ -124,9 +136,18 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
     threaded_ = threaded;
     immediatePresent_.store(immediatePresent);
     if (threaded_) {
-        if (!thread_.joinable()) {
+        if (!EventsReady()) {
+            SetLastError("renderer:render_thread_event_create_failed");
+            threaded_ = false;
+            return;
+        }
+        if (thread_ == nullptr) {
             stopRequested_ = false;
-            thread_ = std::thread(&DashboardRenderThread::ThreadMain, this);
+            thread_ = CreateThread(nullptr, 0, &DashboardRenderThread::ThreadProc, this, 0, nullptr);
+            if (thread_ == nullptr) {
+                SetLastError("renderer:render_thread_create_failed");
+                threaded_ = false;
+            }
         }
         return;
     }
@@ -143,13 +164,13 @@ void DashboardRenderThread::SetTrace(const Trace* trace) {
 }
 
 void DashboardRenderThread::SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool) {
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     bitmapPool_ = std::move(pool);
 }
 
 void DashboardRenderThread::Shutdown() {
     {
-        std::lock_guard lock(mutex_);
+        const LightweightMutexLock lock(mutex_);
         stopRequested_ = true;
         if (pendingFrame_.has_value()) {
             ReleaseFrameLayers(std::move(*pendingFrame_));
@@ -161,11 +182,19 @@ void DashboardRenderThread::Shutdown() {
             pendingFrameRequestId_ = 0;
         }
     }
-    wake_.notify_all();
-    framePresented_.notify_all();
-    discardCompleted_.notify_all();
-    if (thread_.joinable()) {
-        thread_.join();
+    if (wakeEvent_ != nullptr) {
+        SetEvent(wakeEvent_);
+    }
+    if (framePresentedEvent_ != nullptr) {
+        SetEvent(framePresentedEvent_);
+    }
+    if (discardCompletedEvent_ != nullptr) {
+        SetEvent(discardCompletedEvent_);
+    }
+    if (thread_ != nullptr) {
+        WaitForSingleObject(thread_, INFINITE);
+        CloseHandle(thread_);
+        thread_ = nullptr;
     }
     stopRequested_ = false;
     threaded_ = false;
@@ -188,8 +217,8 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
         return PresentFrameSynchronously(std::move(frame));
     }
     {
-        std::lock_guard lock(mutex_);
-        if (stopRequested_ || !thread_.joinable()) {
+        const LightweightMutexLock lock(mutex_);
+        if (stopRequested_ || thread_ == nullptr) {
             lastError_ = "renderer:render_thread_not_running";
             ReleaseFrameLayers(std::move(frame));
             return false;
@@ -200,7 +229,7 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
             pendingFrame_ = std::move(frame);
         }
     }
-    wake_.notify_one();
+    SetEvent(wakeEvent_);
     return true;
 }
 
@@ -211,8 +240,8 @@ bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame
 
     std::uint64_t requestId = 0;
     {
-        std::lock_guard lock(mutex_);
-        if (stopRequested_ || !thread_.joinable()) {
+        const LightweightMutexLock lock(mutex_);
+        if (stopRequested_ || thread_ == nullptr) {
             lastError_ = "renderer:render_thread_not_running";
             ReleaseFrameLayers(std::move(frame));
             return false;
@@ -224,12 +253,20 @@ bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame
             pendingFrame_ = std::move(frame);
         }
         pendingFrameRequestId_ = std::max(pendingFrameRequestId_, requestId);
+        ResetEvent(framePresentedEvent_);
     }
-    wake_.notify_one();
+    SetEvent(wakeEvent_);
 
-    std::unique_lock lock(mutex_);
-    framePresented_.wait(lock, [&] { return stopRequested_ || completedFrameRequestId_ >= requestId; });
-    return completedFrameRequestId_ >= requestId && completedFrameRequestSucceeded_;
+    for (;;) {
+        {
+            const LightweightMutexLock lock(mutex_);
+            if (stopRequested_ || completedFrameRequestId_ >= requestId) {
+                return completedFrameRequestId_ >= requestId && completedFrameRequestSucceeded_;
+            }
+            ResetEvent(framePresentedEvent_);
+        }
+        WaitForSingleObject(framePresentedEvent_, INFINITE);
+    }
 }
 
 bool DashboardRenderThread::PresentFrameSynchronously(DashboardPresentationFrame frame) {
@@ -291,18 +328,18 @@ void DashboardRenderThread::ResetTimeline() {
     activeAnimations_.store(false);
     if (threaded_) {
         {
-            std::lock_guard lock(mutex_);
+            const LightweightMutexLock lock(mutex_);
             resetTimelineRequested_ = true;
         }
         WriteTrace("animation_timeline_reset_request owner=thread reason=explicit_request");
-        wake_.notify_one();
+        SetEvent(wakeEvent_);
     }
 }
 
 void DashboardRenderThread::SetAnimationPresentationSuspended(bool suspended) {
     animationPresentationSuspended_.store(suspended);
     if (!suspended) {
-        wake_.notify_all();
+        SetEvent(wakeEvent_);
     }
 }
 
@@ -322,7 +359,7 @@ void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
     if (threaded_) {
         std::uint64_t requestId = 0;
         {
-            std::lock_guard lock(mutex_);
+            const LightweightMutexLock lock(mutex_);
             if (pendingFrame_.has_value()) {
                 ReleaseFrameLayers(std::move(*pendingFrame_));
                 pendingFrame_.reset();
@@ -331,15 +368,24 @@ void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
                 completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
                 completedFrameRequestSucceeded_ = false;
                 pendingFrameRequestId_ = 0;
-                framePresented_.notify_all();
+                SetEvent(framePresentedEvent_);
             }
             discardTargetRequested_ = true;
             discardReason_ = std::string(reason);
             requestId = ++discardRequestId_;
+            ResetEvent(discardCompletedEvent_);
         }
-        wake_.notify_one();
-        std::unique_lock lock(mutex_);
-        discardCompleted_.wait(lock, [&] { return stopRequested_ || completedDiscardRequestId_ >= requestId; });
+        SetEvent(wakeEvent_);
+        for (;;) {
+            {
+                const LightweightMutexLock lock(mutex_);
+                if (stopRequested_ || completedDiscardRequestId_ >= requestId) {
+                    break;
+                }
+                ResetEvent(discardCompletedEvent_);
+            }
+            WaitForSingleObject(discardCompletedEvent_, INFINITE);
+        }
     }
 }
 
@@ -348,7 +394,7 @@ bool DashboardRenderThread::HasActiveAnimations() const {
 }
 
 std::string DashboardRenderThread::LastError() const {
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     return lastError_;
 }
 
@@ -671,61 +717,73 @@ void DashboardRenderThread::ThreadMain() {
     std::uint64_t activeFrameRequestId = 0;
 
     for (;;) {
-        {
-            std::unique_lock lock(mutex_);
-            if (!activeFrame.has_value() && !pendingFrame_.has_value() && !stopRequested_ && !resetTimelineRequested_ &&
-                !discardTargetRequested_) {
-                wake_.wait(lock);
+        bool shouldStop = false;
+        for (;;) {
+            bool shouldWait = false;
+            {
+                const LightweightMutexLock lock(mutex_);
+                const bool hasControlWork =
+                    pendingFrame_.has_value() || stopRequested_ || resetTimelineRequested_ || discardTargetRequested_;
+                const bool waitingForFirstFrame = !activeFrame.has_value() && !hasControlWork;
+                const bool waitingWhileSuspended = animationPresentationSuspended_.load() && activeFrame.has_value() &&
+                                                   !pendingFrame_.has_value() && !stopRequested_ &&
+                                                   !resetTimelineRequested_ && !discardTargetRequested_;
+                if (waitingForFirstFrame || waitingWhileSuspended) {
+                    ResetEvent(wakeEvent_);
+                    shouldWait = true;
+                } else {
+                    if (stopRequested_) {
+                        shouldStop = true;
+                    }
+                    if (!shouldStop && resetTimelineRequested_) {
+                        WriteTrace("animation_timeline_reset owner=thread reason=explicit_request tracks=" +
+                                   std::to_string(timeline.TrackCount()));
+                        timeline.Reset();
+                        activeAnimations_.store(false);
+                        resetTimelineRequested_ = false;
+                    }
+                    if (!shouldStop && discardTargetRequested_) {
+                        renderer->DiscardWindowTarget(discardReason_);
+                        if (activeFrame.has_value()) {
+                            ReleaseFrameLayers(std::move(*activeFrame));
+                            activeFrame.reset();
+                        }
+                        if (activeFrameRequestId != 0) {
+                            completedFrameRequestId_ = std::max(completedFrameRequestId_, activeFrameRequestId);
+                            completedFrameRequestSucceeded_ = false;
+                            SetEvent(framePresentedEvent_);
+                        }
+                        activeFrameRequestId = 0;
+                        const std::uint64_t metricVersion = presentedState.versions.metricVersion;
+                        const bool hasMetricVersion = presentedState.hasMetricVersion;
+                        presentedState = {};
+                        presentedState.versions.metricVersion = metricVersion;
+                        presentedState.hasMetricVersion = hasMetricVersion;
+                        discardTargetRequested_ = false;
+                        discardReason_.clear();
+                        completedDiscardRequestId_ = discardRequestId_;
+                        SetEvent(discardCompletedEvent_);
+                    }
+                    if (!shouldStop && pendingFrame_.has_value()) {
+                        if (activeFrame.has_value()) {
+                            MergeFrame(*activeFrame, std::move(*pendingFrame_));
+                        } else {
+                            activeFrame = std::move(*pendingFrame_);
+                        }
+                        activeFrameRequestId = std::max(activeFrameRequestId, pendingFrameRequestId_);
+                        pendingFrame_.reset();
+                        pendingFrameRequestId_ = 0;
+                    }
+                }
             }
-            if (animationPresentationSuspended_.load() && activeFrame.has_value() && !pendingFrame_.has_value() &&
-                !stopRequested_ && !resetTimelineRequested_ && !discardTargetRequested_) {
-                wake_.wait(lock, [&] {
-                    return stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ ||
-                           discardTargetRequested_ || !animationPresentationSuspended_.load();
-                });
-            }
-            if (stopRequested_) {
+            if (!shouldWait) {
                 break;
             }
-            if (resetTimelineRequested_) {
-                WriteTrace("animation_timeline_reset owner=thread reason=explicit_request tracks=" +
-                           std::to_string(timeline.TrackCount()));
-                timeline.Reset();
-                activeAnimations_.store(false);
-                resetTimelineRequested_ = false;
-            }
-            if (discardTargetRequested_) {
-                renderer->DiscardWindowTarget(discardReason_);
-                if (activeFrame.has_value()) {
-                    ReleaseFrameLayers(std::move(*activeFrame));
-                    activeFrame.reset();
-                }
-                if (activeFrameRequestId != 0) {
-                    completedFrameRequestId_ = std::max(completedFrameRequestId_, activeFrameRequestId);
-                    completedFrameRequestSucceeded_ = false;
-                    framePresented_.notify_all();
-                }
-                activeFrameRequestId = 0;
-                const std::uint64_t metricVersion = presentedState.versions.metricVersion;
-                const bool hasMetricVersion = presentedState.hasMetricVersion;
-                presentedState = {};
-                presentedState.versions.metricVersion = metricVersion;
-                presentedState.hasMetricVersion = hasMetricVersion;
-                discardTargetRequested_ = false;
-                discardReason_.clear();
-                completedDiscardRequestId_ = discardRequestId_;
-                discardCompleted_.notify_all();
-            }
-            if (pendingFrame_.has_value()) {
-                if (activeFrame.has_value()) {
-                    MergeFrame(*activeFrame, std::move(*pendingFrame_));
-                } else {
-                    activeFrame = std::move(*pendingFrame_);
-                }
-                activeFrameRequestId = std::max(activeFrameRequestId, pendingFrameRequestId_);
-                pendingFrame_.reset();
-                pendingFrameRequestId_ = 0;
-            }
+            WaitForSingleObject(wakeEvent_, INFINITE);
+        }
+
+        if (shouldStop) {
+            break;
         }
 
         if (!activeFrame.has_value()) {
@@ -735,11 +793,11 @@ void DashboardRenderThread::ThreadMain() {
         const bool presented = PresentFrame(*renderer, timeline, *activeFrame, presentedState);
         if (activeFrameRequestId != 0) {
             {
-                std::lock_guard lock(mutex_);
+                const LightweightMutexLock lock(mutex_);
                 completedFrameRequestId_ = std::max(completedFrameRequestId_, activeFrameRequestId);
                 completedFrameRequestSucceeded_ = presented;
             }
-            framePresented_.notify_all();
+            SetEvent(framePresentedEvent_);
             activeFrameRequestId = 0;
         }
         if (!presented) {
@@ -748,11 +806,22 @@ void DashboardRenderThread::ThreadMain() {
             continue;
         }
         if (!activeAnimations_.load()) {
-            std::unique_lock lock(mutex_);
-            wake_.wait(lock, [&] {
-                return stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ ||
-                       discardTargetRequested_;
-            });
+            for (;;) {
+                bool shouldWait = false;
+                {
+                    const LightweightMutexLock lock(mutex_);
+                    if (stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ ||
+                        discardTargetRequested_) {
+                        break;
+                    }
+                    ResetEvent(wakeEvent_);
+                    shouldWait = true;
+                }
+                if (!shouldWait) {
+                    break;
+                }
+                WaitForSingleObject(wakeEvent_, INFINITE);
+            }
             continue;
         }
         // Animation cadence comes from the vsynced presentation backend; the render thread must not add a timer.
@@ -767,6 +836,15 @@ void DashboardRenderThread::ThreadMain() {
     renderer->Shutdown();
 }
 
+DWORD WINAPI DashboardRenderThread::ThreadProc(void* context) {
+    static_cast<DashboardRenderThread*>(context)->ThreadMain();
+    return 0;
+}
+
+bool DashboardRenderThread::EventsReady() const {
+    return wakeEvent_ != nullptr && framePresentedEvent_ != nullptr && discardCompletedEvent_ != nullptr;
+}
+
 void DashboardRenderThread::WriteTrace(std::string text) const {
     const Trace* trace = trace_.load();
     if (trace == nullptr || !trace->Enabled(TracePrefix::Renderer)) {
@@ -779,6 +857,6 @@ void DashboardRenderThread::SetLastError(std::string error) {
     if (error.empty()) {
         return;
     }
-    std::lock_guard lock(mutex_);
+    const LightweightMutexLock lock(mutex_);
     lastError_ = std::move(error);
 }

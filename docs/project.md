@@ -13,6 +13,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
+- `docs/source_policy_guardrails.md` owns short explanations for hard lint-enforced source-policy lessons.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and performance experiment history.

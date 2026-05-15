@@ -14,11 +14,11 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `895,488` bytes.
+- Current measured `build\CaseDash.exe`: `977,408` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `711.1 KiB`, `.rdata` about `83.7 KiB`, `.pdata` about `34.3 KiB`, `.xdata` about `14.5 KiB`, and `.rsrc$02` about `11.1 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `editors.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_app.cpp.obj`, `d2d_renderer.cpp.obj`, `dashboard_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `fps_etw_provider.cpp.obj`, `metrics.cpp.obj`, `snapshot_dump.cpp.obj`, `util.cpp.obj`, `config_writer.cpp.obj`, `drive_usage_list.cpp.obj`, `CaseDash.rc.res`, and `gauge.cpp.obj`.
-- Last validation: `format.cmd fix changed`, `format.cmd changed`, `lint.cmd tidy changed`, `build.cmd`, `build_maps.cmd`, `test.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`, `build.cmd Release /benchmarks`, `build\CaseDashBenchmarks.exe theme-change 240 2`, and `build\CaseDashBenchmarks.exe edit-layout 240 2`.
+- Current largest sections: `.text$mn` about `782.8 KiB`, `.rdata` about `86.5 KiB`, `.pdata` about `37.3 KiB`, `.xdata` about `15.8 KiB`, and `.rsrc$02` about `11.1 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `layout_resolver.cpp.obj`, `editors.cpp.obj`, `dashboard_renderer.cpp.obj`, `d2d_renderer.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_app.cpp.obj`, `pane.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `render_thread.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `fps_etw_provider.cpp.obj`, `metrics.cpp.obj`, `snapshot_dump.cpp.obj`, `util.cpp.obj`, `drive_usage_list.cpp.obj`, `config_writer.cpp.obj`, and `gauge.cpp.obj`.
+- Last validation: `format.cmd fix changed`, `format.cmd changed`, `lint.cmd tidy changed`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`, `build.cmd Release /benchmarks`, `build\CaseDashBenchmarks.exe animation 240 2`, and `build\CaseDashBenchmarks.exe snapshot-handoff 20 2`.
 
 ## Workflow
 
@@ -29,6 +29,10 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 - For ad hoc map inspection, run `python tools\analyze_link_map.py build\CaseDash.map --top 25`.
 - For local-versus-remote symbol comparison, run `python tools\compare_link_maps.py build\CaseDash.map path\to\other\CaseDash.map --top 10`; deltas are reported as first map minus second map.
 - When a size change can affect hot code, build benchmarks with `build.cmd Release /benchmarks` and use [docs/profile_benchmark.md](profile_benchmark.md) for timing validation.
+
+## Source Policy Guardrails
+
+Hard size lessons enforced by `lint.cmd` live in [docs/source_policy_guardrails.md](source_policy_guardrails.md). Keep that short summary in sync when source-policy checks are added, removed, or materially changed.
 
 ## Kept Decisions
 
@@ -119,6 +123,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 | Layout-edit tree variant construction | Build tree leaf, highlight, and dialog focus optionals with reset/emplace; collapse single-child tree containers with a narrow move helper instead of whole-node assignment. | `945,664` to `939,520` bytes; `layout_edit_tree.cpp.obj` dropped to about `22.9 KiB`, and `.text$mn` dropped to about `740.8 KiB`. |
 | FPS process-name boundary | Keep FPS ETW process names UTF-8 in the cache and convert from the Win32 wide buffer at the query boundary. | Saved `1,024` bytes in the measured pass; `PresentedFpsEtwProvider::Sample` dropped to about `5.2 KiB`. |
 | Lightweight mutex wrapper | Use a small platform-backed RAII mutex wrapper for the app telemetry handoff, telemetry runtime, trace, and FPS ETW provider locks instead of `std::mutex`. | File-alignment neutral in isolation, but removed `_Mtx`/`std::mutex` symbols and kept section bytes lower in the retained pass. |
+| Animation render-thread size guardrails | Keep the animation render-thread handoff on direct Win32 thread/event handles and `LightweightMutex`, keep animation timeline tracks in a flat vector, and keep fixed renderer caches on concrete project-owned hashing instead of `std::thread`, `std::condition_variable`, `std::mutex`, `std::unordered_map`, or `std::hash`. | `979,456` to `977,408` bytes; `.text$mn` dropped from about `784.9 KiB` to `782.8 KiB`, and `render_thread.cpp.obj` dropped from about `18.5 KiB` to `18.0 KiB`. |
 | Network selection staging | Stream visible network candidates directly into retained telemetry state, track the selected candidate in place, and leave `collector_network.cpp` on the normal `/Os` path. | Executable-alignment neutral in isolation, but reduced `collector_network.cpp.obj` while preserving preferred-adapter trace behavior. |
 | Telemetry metric row storage | Keep metric binding metadata as compact enum/flag descriptors, keep throughput histories on four fixed slots, and let metric-list and drive-usage widgets consume borrowed fixed-slot row lookups instead of materialized row vectors. | `939,520` to `928,768` bytes; `metrics.cpp.obj` dropped from about `25.2 KiB` to `14.8 KiB`, and `.text$mn` dropped to about `731.4 KiB`. |
 | Context-menu payload storage | Build layout, theme, network, storage, scale, and display menu choices directly from current config and telemetry state. Keep dense command ranges indexable and keep display choices in a fixed stack buffer instead of session-owned option vectors. | `928,768` to `922,624` bytes; `dashboard_shell_ui.cpp.obj` stays on the maintained speed-source list. |
@@ -143,6 +148,8 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Rejected Or Neutral Experiments
 
+- Do not replace the render-thread `std::optional<DashboardPresentationFrame>` slots with explicit bool-plus-storage by itself. That trial regressed the retained build from `977,408` to `984,064` bytes because the manual storage shape grew code more than it removed optional machinery.
+- Replacing the fixed renderer cache `std::hash` calls with `StableStringHash` was executable-neutral at `977,408` bytes; keep it because it lets source-policy block broad STL hashing in future fixed caches.
 - Do not retry replacing the layout-guide-sheet placement preferred-order/card-placement `std::find` sites with direct helper scans by themselves. The trial stayed executable-neutral at `898,560` bytes and grew the placement object/metadata slightly before being reverted.
 - Do not retry isolated direct loops for the dashboard storage-drive toggle, layout-edit hit-test duplicate scan, or layout-guide-sheet planner card/callout lookups. That batch stayed executable-neutral at `896,000` bytes and was reverted.
 - Byte-packing `LayoutGuideSheetExitSide` stayed executable-neutral at `896,000` bytes and was reverted; leave that guide-sheet enum shape unchanged unless a broader packing pass crosses a file-alignment boundary.

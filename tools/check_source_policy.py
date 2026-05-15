@@ -13,9 +13,15 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 SCANNED_ROOTS = ("src", "tests")
 CHECKED_SUFFIXES = {".h", ".cpp"}
 EXCLUDED_PREFIXES = ("src/vendor/",)
+GUARDRAILS_DOC = "docs/source_policy_guardrails.md"
 STD_FUNCTION_RE = re.compile(r"\bstd\s*::\s*function\b")
 STD_FILESYSTEM_RE = re.compile(r"\bstd\s*::\s*filesystem\b")
+STD_HASH_RE = re.compile(r"\bstd\s*::\s*hash\b")
 FILESYSTEM_INCLUDE_RE = re.compile(r"^\s*#\s*include\s*<\s*filesystem\s*>")
+STD_THREADING_RE = re.compile(
+    r"\bstd\s*::\s*(?:condition_variable(?:_any)?|jthread|mutex|recursive_mutex|shared_mutex|thread|timed_mutex)\b"
+)
+STD_THREADING_INCLUDE_RE = re.compile(r"^\s*#\s*include\s*<\s*(?:condition_variable|mutex|shared_mutex|thread)\s*>")
 CONDITIONAL_COMPILATION_RE = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef|elif|else|endif)\b")
 CONST_WIDE_STRING_DECL_RE = re.compile(
     r"^\s*(?:(?:static|inline)\s+)*(?:constexpr|const)\b(?=[^=;\n]*\bwchar_t\b)[^=;\n]*=\s*$"
@@ -263,7 +269,8 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         line=line_number,
                         message=(
                             "std::function is not allowed in maintained source; use FunctionRef for synchronous "
-                            "borrowed callbacks or a purpose-built interface when ownership must escape the call."
+                            "borrowed callbacks or a purpose-built interface when ownership must escape the call. "
+                            f"See {GUARDRAILS_DOC}."
                         ),
                     )
                 )
@@ -274,7 +281,33 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         line=line_number,
                         message=(
                             "std::filesystem is not allowed in maintained source; use src/util/file_path.* helpers "
-                            "so path handling stays Win32-backed without pulling filesystem machinery into the app."
+                            "so path handling stays Win32-backed without pulling filesystem machinery into the app. "
+                            f"See {GUARDRAILS_DOC}."
+                        ),
+                    )
+                )
+            if STD_HASH_RE.search(line):
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            "std::hash is not allowed in maintained source; use a concrete project-owned hash helper "
+                            "for fixed lookup tables so small caches do not grow broad STL hashing machinery. "
+                            f"See {GUARDRAILS_DOC}."
+                        ),
+                    )
+                )
+            if STD_THREADING_RE.search(line) or STD_THREADING_INCLUDE_RE.search(line):
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            "STL threading primitives are not allowed in maintained source; use LightweightMutex for "
+                            "small locks and direct Win32 thread or event handles for worker wakeups so prior "
+                            "size-optimization wins stay enforced. "
+                            f"See {GUARDRAILS_DOC}."
                         ),
                     )
                 )
@@ -285,7 +318,8 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         line=line_number,
                         message=(
                             "conditional compilation guards are not allowed in maintained source; keep code compiled "
-                            "for every native target and let the linker remove unreferenced target-specific helpers."
+                            "for every native target and let the linker remove unreferenced target-specific helpers. "
+                            f"See {GUARDRAILS_DOC}."
                         ),
                     )
                 )
@@ -297,7 +331,8 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                     message=(
                         'wide literals must stay narrow UTF-8 by default; only const wchar_t string constants '
                         'initialized with L"..." and an end-of-line reason comment are allowed for fixed Win32 '
-                        "or managed interop boundary text."
+                        "or managed interop boundary text. "
+                        f"See {GUARDRAILS_DOC}."
                     ),
                 )
             )

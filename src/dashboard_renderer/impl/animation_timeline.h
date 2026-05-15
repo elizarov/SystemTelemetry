@@ -3,9 +3,9 @@
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
-#include <unordered_map>
+#include <vector>
 
-#include "telemetry/telemetry.h"
+#include "telemetry/timing.h"
 #include "widget/animation.h"
 
 class DashboardAnimationTimeline {
@@ -37,10 +37,16 @@ private:
         bool touched = false;
     };
 
+    struct TrackEntry {
+        AnimationDataKey key;
+        Track track;
+    };
+
     double ProgressSince(Clock::time_point startTime, Clock::time_point now) const;
     WidgetAnimationStatePtr SampleTrack(const Track& track, Clock::time_point now) const;
 
-    std::unordered_map<AnimationDataKey, Track, AnimationDataKeyHash> tracks_;
+    // Size: active animation sets are tiny; flat scans avoid unordered_map machinery in the shipped app.
+    std::vector<TrackEntry> tracks_;
     std::chrono::milliseconds duration_;
     Clock::time_point frameTime_{};
     bool frameActive_ = false;

@@ -1,6 +1,7 @@
 #include "dashboard_renderer/impl/animation_timeline.h"
 
 #include <algorithm>
+#include <iterator>
 #include <utility>
 
 DashboardAnimationTimeline::DashboardAnimationTimeline(std::chrono::milliseconds duration)
@@ -9,8 +10,8 @@ DashboardAnimationTimeline::DashboardAnimationTimeline(std::chrono::milliseconds
 void DashboardAnimationTimeline::BeginFrame(Clock::time_point now) {
     frameTime_ = now;
     frameActive_ = true;
-    for (auto& entry : tracks_) {
-        entry.second.touched = false;
+    for (TrackEntry& entry : tracks_) {
+        entry.track.touched = false;
     }
 }
 
@@ -20,7 +21,7 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
         return target.Clone();
     }
 
-    auto it = tracks_.find(key);
+    auto it = std::find_if(tracks_.begin(), tracks_.end(), [&](const TrackEntry& entry) { return entry.key == key; });
     if (it == tracks_.end()) {
         Track track;
         track.start = target.InitialState();
@@ -29,9 +30,10 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
         track.observedTargetVersion = targetVersion;
         track.startTime = frameTime_;
         track.touched = true;
-        it = tracks_.insert({key, std::move(track)}).first;
+        tracks_.push_back(TrackEntry{key, std::move(track)});
+        it = std::prev(tracks_.end());
     } else {
-        Track& track = it->second;
+        Track& track = it->track;
         const bool sameStateType = track.target != nullptr && track.target->TypeToken() == target.TypeToken();
         const bool sameVersionTarget = sameStateType && track.observedTargetVersion == targetVersion;
         if (!sameVersionTarget && (!sameStateType || !track.target->Equals(target))) {
@@ -44,14 +46,14 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
         track.touched = true;
     }
 
-    return SampleTrack(it->second, frameTime_);
+    return SampleTrack(it->track, frameTime_);
 }
 
 std::size_t DashboardAnimationTimeline::EndFrame(TrackRetention retention) {
     std::size_t prunedCount = 0;
     if (retention == TrackRetention::PruneUntouched) {
         for (auto it = tracks_.begin(); it != tracks_.end();) {
-            if (!it->second.touched) {
+            if (!it->track.touched) {
                 it = tracks_.erase(it);
                 ++prunedCount;
             } else {
@@ -73,8 +75,8 @@ std::size_t DashboardAnimationTimeline::TrackCount() const {
 }
 
 bool DashboardAnimationTimeline::HasActiveAnimations(Clock::time_point now) const {
-    for (const auto& entry : tracks_) {
-        const Track& track = entry.second;
+    for (const TrackEntry& entry : tracks_) {
+        const Track& track = entry.track;
         if (track.transition != nullptr && track.transition->HasActiveChange() &&
             ProgressSince(track.startTime, now) < 1.0) {
             return true;

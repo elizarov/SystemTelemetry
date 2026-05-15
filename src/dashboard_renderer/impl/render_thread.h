@@ -1,20 +1,16 @@
 #pragma once
 
-#include <windows.h>
-
 #include <atomic>
-#include <condition_variable>
 #include <cstdint>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "dashboard_renderer/impl/animation_timeline.h"
 #include "renderer/renderer.h"
+#include "util/lightweight_mutex.h"
 #include "widget/animation.h"
 
 class Trace;
@@ -67,7 +63,7 @@ public:
     void Clear();
 
 private:
-    mutable std::mutex mutex_;
+    mutable LightweightMutex mutex_;
     std::vector<RenderBitmap> available_;
     int liveLayerWidth_ = 0;
     int liveLayerHeight_ = 0;
@@ -147,8 +143,10 @@ private:
     void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
     void ReleaseBitmap(RenderBitmap bitmap) const;
     void ThreadMain();
+    static DWORD WINAPI ThreadProc(void* context);
     void WriteTrace(std::string text) const;
     void SetLastError(std::string error);
+    bool EventsReady() const;
 
     std::atomic<HWND> hwnd_{nullptr};
     std::atomic<const Trace*> trace_{nullptr};
@@ -160,21 +158,21 @@ private:
     std::optional<DashboardPresentationFrame> syncFrame_;
     std::shared_ptr<DashboardLayerBitmapPool> bitmapPool_;
 
-    mutable std::mutex mutex_;
-    std::condition_variable wake_;
+    mutable LightweightMutex mutex_;
     std::optional<DashboardPresentationFrame> pendingFrame_;
     std::uint64_t nextFrameRequestId_ = 0;
     std::uint64_t pendingFrameRequestId_ = 0;
     std::uint64_t completedFrameRequestId_ = 0;
     bool completedFrameRequestSucceeded_ = false;
-    std::condition_variable framePresented_;
-    std::thread thread_;
+    HANDLE wakeEvent_ = nullptr;
+    HANDLE framePresentedEvent_ = nullptr;
+    HANDLE thread_ = nullptr;
     bool stopRequested_ = false;
     bool resetTimelineRequested_ = false;
     bool discardTargetRequested_ = false;
     std::uint64_t discardRequestId_ = 0;
     std::uint64_t completedDiscardRequestId_ = 0;
-    std::condition_variable discardCompleted_;
+    HANDLE discardCompletedEvent_ = nullptr;
     std::string discardReason_;
     std::string lastError_;
     std::atomic_bool activeAnimations_{false};

@@ -1,11 +1,11 @@
 #include "renderer/impl/text_width_cache.h"
 
-#include <functional>
+#include "util/strings.h"
 
 namespace {
 
 size_t TextWidthSlot(TextStyleId style, std::string_view text) {
-    return (std::hash<int>{}(static_cast<int>(style)) * 1315423911u) ^ std::hash<std::string_view>{}(text);
+    return (static_cast<size_t>(style) * 1315423911u) ^ StableStringHash(text);
 }
 
 }  // namespace

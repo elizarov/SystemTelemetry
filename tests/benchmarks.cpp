@@ -2,16 +2,13 @@
 #include <array>
 #include <chrono>
 #include <cmath>
-#include <condition_variable>
 #include <cstdlib>
 #include <iomanip>
 #include <iostream>
-#include <mutex>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "config/color_resolver.h"
@@ -32,6 +29,7 @@
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
+#include "util/lightweight_mutex.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -394,8 +392,10 @@ void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
             break;
         }
         const auto remaining = deadline - now;
-        constexpr auto maxSleep = std::chrono::duration_cast<Clock::duration>(std::chrono::milliseconds(5));
-        std::this_thread::sleep_for(remaining < maxSleep ? remaining : maxSleep);
+        const auto maxSleep = std::chrono::milliseconds(5);
+        const auto sleepDuration = remaining < maxSleep ? remaining : maxSleep;
+        const auto sleepMs = std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count();
+        Sleep(sleepMs > 0 ? static_cast<DWORD>(sleepMs) : 1);
     }
 }
 
@@ -732,17 +732,28 @@ struct SnapshotHandoffBenchTotals {
 
 class AnimationBenchmarkRenderWorker {
 public:
-    explicit AnimationBenchmarkRenderWorker(HWND hwnd) : hwnd_(hwnd) {}
+    explicit AnimationBenchmarkRenderWorker(HWND hwnd)
+        : hwnd_(hwnd), requestEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
+          responseEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {}
 
     ~AnimationBenchmarkRenderWorker() {
         Shutdown();
+        if (requestEvent_ != nullptr) {
+            CloseHandle(requestEvent_);
+        }
+        if (responseEvent_ != nullptr) {
+            CloseHandle(responseEvent_);
+        }
     }
 
     bool Start(DashboardPresentationFrame frame) {
-        if (thread_.joinable()) {
+        if (thread_ != nullptr || requestEvent_ == nullptr || responseEvent_ == nullptr) {
             return false;
         }
-        thread_ = std::thread(&AnimationBenchmarkRenderWorker::ThreadMain, this);
+        thread_ = CreateThread(nullptr, 0, &AnimationBenchmarkRenderWorker::ThreadProc, this, 0, nullptr);
+        if (thread_ == nullptr) {
+            return false;
+        }
         return Send(RequestKind::Initialize, std::move(frame));
     }
 
@@ -755,11 +766,13 @@ public:
     }
 
     void Shutdown() {
-        if (!thread_.joinable()) {
+        if (thread_ == nullptr) {
             return;
         }
         Send(RequestKind::Shutdown);
-        thread_.join();
+        WaitForSingleObject(thread_, INFINITE);
+        CloseHandle(thread_);
+        thread_ = nullptr;
     }
 
     const std::string& LastError() const {
@@ -780,33 +793,39 @@ private:
 
     bool Send(RequestKind kind, std::optional<DashboardPresentationFrame> frame) {
         {
-            std::unique_lock lock(mutex_);
-            requestReady_.wait(lock, [&] { return !requestPending_; });
+            const LightweightMutexLock lock(mutex_);
+            if (requestPending_ && !responseReady_) {
+                return false;
+            }
             requestKind_ = kind;
             requestFrame_ = std::move(frame);
             requestPending_ = true;
             responseReady_ = false;
+            ResetEvent(responseEvent_);
         }
-        requestReady_.notify_one();
+        SetEvent(requestEvent_);
 
-        std::unique_lock lock(mutex_);
-        responseReadyCondition_.wait(lock, [&] { return responseReady_; });
-        const bool ok = responseOk_;
-        lastError_ = responseError_;
-        requestPending_ = false;
-        lock.unlock();
-        requestReady_.notify_one();
-        return ok;
+        for (;;) {
+            WaitForSingleObject(responseEvent_, INFINITE);
+            const LightweightMutexLock lock(mutex_);
+            if (responseReady_) {
+                const bool ok = responseOk_;
+                lastError_ = responseError_;
+                requestPending_ = false;
+                ResetEvent(requestEvent_);
+                return ok;
+            }
+        }
     }
 
     void CompleteRequest(bool ok, std::string error) {
         {
-            std::lock_guard lock(mutex_);
+            const LightweightMutexLock lock(mutex_);
             responseOk_ = ok;
             responseError_ = std::move(error);
             responseReady_ = true;
         }
-        responseReadyCondition_.notify_one();
+        SetEvent(responseEvent_);
     }
 
     void ThreadMain() {
@@ -816,11 +835,17 @@ private:
         for (;;) {
             RequestKind kind = RequestKind::Shutdown;
             std::optional<DashboardPresentationFrame> frame;
-            {
-                std::unique_lock lock(mutex_);
-                requestReady_.wait(lock, [&] { return requestPending_ && !responseReady_; });
-                kind = requestKind_;
-                frame = std::move(requestFrame_);
+            for (;;) {
+                {
+                    const LightweightMutexLock lock(mutex_);
+                    if (requestPending_ && !responseReady_) {
+                        kind = requestKind_;
+                        frame = std::move(requestFrame_);
+                        ResetEvent(requestEvent_);
+                        break;
+                    }
+                }
+                WaitForSingleObject(requestEvent_, INFINITE);
             }
 
             bool ok = true;
@@ -851,11 +876,16 @@ private:
         }
     }
 
+    static DWORD WINAPI ThreadProc(void* context) {
+        static_cast<AnimationBenchmarkRenderWorker*>(context)->ThreadMain();
+        return 0;
+    }
+
     HWND hwnd_ = nullptr;
-    std::thread thread_;
-    mutable std::mutex mutex_;
-    std::condition_variable requestReady_;
-    std::condition_variable responseReadyCondition_;
+    HANDLE thread_ = nullptr;
+    HANDLE requestEvent_ = nullptr;
+    HANDLE responseEvent_ = nullptr;
+    mutable LightweightMutex mutex_;
     RequestKind requestKind_ = RequestKind::Shutdown;
     std::optional<DashboardPresentationFrame> requestFrame_;
     bool requestPending_ = false;

@@ -96,6 +96,15 @@ std::string JoinNames(const std::vector<std::string>& names) {
     return joined;
 }
 
+size_t StableStringHash(std::string_view value) {
+    size_t hash = static_cast<size_t>(14695981039346656037ull);
+    for (unsigned char ch : value) {
+        hash ^= ch;
+        hash *= static_cast<size_t>(1099511628211ull);
+    }
+    return hash;
+}
+
 void SortStrings(std::vector<std::string>& values) {
     // Size: keep string sorting in one concrete helper instead of re-instantiating std::sort at call sites.
     for (size_t i = 1; i < values.size(); ++i) {

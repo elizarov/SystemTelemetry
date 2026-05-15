@@ -1,12 +1,11 @@
 #include <chrono>
-#include <condition_variable>
 #include <gtest/gtest.h>
-#include <mutex>
 
 #include "config/config.h"
 #include "telemetry/impl/collector_real.h"
 #include "telemetry/telemetry.h"
 #include "util/file_path.h"
+#include "util/lightweight_mutex.h"
 
 std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
     (void)trace;
@@ -17,13 +16,19 @@ namespace {
 
 class TelemetryRuntimeTest : public testing::Test, public TelemetryUpdateSink {
 protected:
+    ~TelemetryRuntimeTest() override {
+        if (callbackEvent_ != nullptr) {
+            CloseHandle(callbackEvent_);
+        }
+    }
+
     void OnTelemetryUpdate(const TelemetryUpdate& update) override {
         {
-            const std::lock_guard lock(mutex_);
+            const LightweightMutexLock lock(mutex_);
             latest_ = update;
             ++callbackCount_;
         }
-        cv_.notify_all();
+        SetEvent(callbackEvent_);
     }
 
     std::unique_ptr<TelemetryRuntime> CreateRuntime() {
@@ -33,24 +38,40 @@ protected:
     }
 
     bool WaitForCallbackCount(int count) {
-        std::unique_lock lock(mutex_);
-        return cv_.wait_for(lock, std::chrono::seconds(2), [&] { return callbackCount_ >= count; });
+        const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(2);
+        for (;;) {
+            {
+                const LightweightMutexLock lock(mutex_);
+                if (callbackCount_ >= count) {
+                    return true;
+                }
+                ResetEvent(callbackEvent_);
+            }
+            const auto now = std::chrono::steady_clock::now();
+            if (now >= deadline) {
+                return false;
+            }
+            const auto waitMs = std::chrono::duration_cast<std::chrono::milliseconds>(deadline - now).count();
+            if (WaitForSingleObject(callbackEvent_, waitMs > 0 ? static_cast<DWORD>(waitMs) : 0) != WAIT_OBJECT_0) {
+                return false;
+            }
+        }
     }
 
     int CallbackCount() const {
-        const std::lock_guard lock(mutex_);
+        const LightweightMutexLock lock(mutex_);
         return callbackCount_;
     }
 
     TelemetryUpdate LatestCallbackUpdate() const {
-        const std::lock_guard lock(mutex_);
+        const LightweightMutexLock lock(mutex_);
         return latest_;
     }
 
     AppConfig config_{};
     Trace trace_;
-    mutable std::mutex mutex_;
-    std::condition_variable cv_;
+    mutable LightweightMutex mutex_;
+    HANDLE callbackEvent_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
     TelemetryUpdate latest_{};
     int callbackCount_ = 0;
 };
