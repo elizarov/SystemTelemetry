@@ -46,6 +46,7 @@ DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& opt
 }
 
 constexpr int kPanelIconAtlasCellSize = 64;
+constexpr UINT kDxgiSwapChainBufferCount = 2;
 constexpr char kLocaleName[] = "en-us";
 constexpr wchar_t kPngResourceType[] = L"PNG";   // FindResourceW requires a UTF-16 resource type.
 constexpr wchar_t kTextMeasureSample[] = L"Ag";  // DWrite text layout measures UTF-16 sample text.
@@ -483,6 +484,9 @@ bool D2DRenderer::DrawWindow(int width, int height, const DrawCallback& draw) {
     d2dActiveRenderTarget_->Clear(palette_.Get(RenderColorId::Background).ToD2DColorF());
     draw();
     EndWindowDraw({});
+    if (lastError_.empty() && dxgiSwapChain_ != nullptr) {
+        dxgiRetainedBuffersPrimed_ = 0;
+    }
     return lastError_.empty();
 }
 
@@ -493,6 +497,9 @@ bool D2DRenderer::DrawWindowRetained(int width, int height, const DrawCallback& 
     d2dActiveRenderTarget_->Clear(palette_.Get(RenderColorId::Background).ToD2DColorF());
     draw();
     EndWindowDraw({});
+    if (lastError_.empty() && dxgiSwapChain_ != nullptr) {
+        dxgiRetainedBuffersPrimed_ = 1;
+    }
     return lastError_.empty();
 }
 
@@ -504,8 +511,17 @@ bool D2DRenderer::DrawWindowDirty(
     if (!BeginWindowDraw(width, height, true)) {
         return false;
     }
-    draw(dirtyRects);
-    EndWindowDraw(dirtyRects);
+    const RenderRect fullSurface{0, 0, std::max(1, width), std::max(1, height)};
+    // Flip chains retain each physical back buffer separately; prime all buffers before dirty-only redraws.
+    const bool primeDxgiRetainedBuffer =
+        dxgiSwapChain_ != nullptr && dxgiRetainedBuffersPrimed_ < kDxgiSwapChainBufferCount;
+    const std::span<const RenderRect> redrawRects =
+        primeDxgiRetainedBuffer ? std::span<const RenderRect>(&fullSurface, 1) : dirtyRects;
+    draw(redrawRects);
+    EndWindowDraw(redrawRects);
+    if (lastError_.empty() && primeDxgiRetainedBuffer && dxgiSwapChain_ != nullptr) {
+        ++dxgiRetainedBuffersPrimed_;
+    }
     return lastError_.empty();
 }
 
@@ -1020,7 +1036,7 @@ bool D2DRenderer::EnsureDxgiWindowTarget(int width, int height, bool retainConte
         swapChainDesc.SampleDesc.Count = 1;
         swapChainDesc.SampleDesc.Quality = 0;
         swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
-        swapChainDesc.BufferCount = 2;
+        swapChainDesc.BufferCount = kDxgiSwapChainBufferCount;
         swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
         swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_SEQUENTIAL;
         swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_IGNORE;
@@ -1040,11 +1056,15 @@ bool D2DRenderer::EnsureDxgiWindowTarget(int width, int height, bool retainConte
         dxgiWindowWidth_ = targetWidth;
         dxgiWindowHeight_ = targetHeight;
         dxgiWindowRetainContents_ = retainContents;
+        dxgiRetainedBuffersPrimed_ = 0;
         return CreateDxgiWindowTargetBitmap();
     }
 
     if (dxgiWindowWidth_ == targetWidth && dxgiWindowHeight_ == targetHeight && dxgiWindowTargetBitmap_ != nullptr) {
         dxgiWindowRetainContents_ = retainContents;
+        if (!retainContents) {
+            dxgiRetainedBuffersPrimed_ = 0;
+        }
         return true;
     }
 
@@ -1060,6 +1080,7 @@ bool D2DRenderer::EnsureDxgiWindowTarget(int width, int height, bool retainConte
     dxgiWindowWidth_ = targetWidth;
     dxgiWindowHeight_ = targetHeight;
     dxgiWindowRetainContents_ = retainContents;
+    dxgiRetainedBuffersPrimed_ = 0;
     d2dCache_.Clear();
     return CreateDxgiWindowTargetBitmap();
 }
@@ -1200,6 +1221,7 @@ void D2DRenderer::DiscardWindowTarget(std::string_view reason) {
     dxgiWindowRetainContents_ = false;
     dxgiWindowWidth_ = 0;
     dxgiWindowHeight_ = 0;
+    dxgiRetainedBuffersPrimed_ = 0;
     d2dWindowRenderTarget_.Reset();
     d2dWindowRetainContents_ = false;
     d2dCache_.ResetTarget();

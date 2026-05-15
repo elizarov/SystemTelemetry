@@ -153,6 +153,7 @@ private:
     bool dxgiWindowRetainContents_ = false;
     int dxgiWindowWidth_ = 0;
     int dxgiWindowHeight_ = 0;
+    UINT dxgiRetainedBuffersPrimed_ = 0;
     bool wicComInitialized_ = false;
     int d2dClipDepth_ = 0;
     std::vector<D2D1_MATRIX_3X2_F> d2dTransformStack_;
