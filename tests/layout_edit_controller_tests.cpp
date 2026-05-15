@@ -1,7 +1,6 @@
 #include <chrono>
 #include <gtest/gtest.h>
 #include <optional>
-#include <utility>
 #include <vector>
 
 #include "layout_edit/layout_edit_controller.h"
