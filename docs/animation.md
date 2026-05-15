@@ -75,7 +75,13 @@ The overlay layer is transparent and optional. It contains layout-edit affordanc
 
 The renderer calls `DashboardOverlayState::ShouldDrawOverlayLayer()` before entering the overlay pass. Normal dashboard operation keeps that predicate false, so the overlay pass and overlay animation flush are skipped completely.
 
-Widgets draw overlay-owned content through `Widget::DrawOverlay()` and submit `WidgetAnimationLayer::Overlay` animations. Container-child drag replay also draws widgets in the overlay layer under the active drag translation. Snapshot and overlay animations resolve through the same `DashboardAnimationTimeline`, so moving a widget or row from the snapshot layer to the overlay layer during drag does not reset ongoing data interpolation.
+The overlay pass has three ordered sublayers:
+
+- Background edit affordances for fixed dashboard content.
+- Overlay-owned widget content, including metric-list dragged-row replay and container-child dragged-content replay.
+- Foreground edit affordances attached to the active dragged row or dragged child.
+
+Widgets draw overlay-owned content through `Widget::DrawOverlay()` and submit `WidgetAnimationLayer::Overlay` animations. Container-child drag replay also draws widgets in the overlay layer under the active drag translation. Edit affordances carry layout-edit owner tags and an overlay sublayer tag when they are registered; active drag state promotes affordances owned by the dragged row or child to the foreground sublayer, while fixed-content affordances stay in the background sublayer. Snapshot and overlay animations resolve through the same `DashboardAnimationTimeline`, so moving a widget or row from the snapshot layer to the overlay layer during drag does not reset ongoing data interpolation.
 
 ### Animation Draw Lists
 
@@ -237,7 +243,7 @@ Dynamic edit artifacts are collected from the snapshot build using the target te
 
 During a metric-list row reorder drag, the main thread publishes animation geometry for the row's current drag position. The vacated row slot does not publish a duplicate animation primitive for that row.
 
-During a container-child reorder drag, the dragged child keeps animating while it tracks the pointer above underlying dashboard content. The main thread draws the dragged child's static content into the overlay layer and tags that child's animation primitives as `AboveOverlay`. Underlying widgets keep ordinary `AboveSnapshot` primitives. The main thread does not compute drag-overlap visibility subtraction for animation primitives.
+During a container-child reorder drag, the dragged child keeps animating while it tracks the pointer above underlying dashboard content. The main thread draws the dragged child's static content into the overlay layer and tags that child's animation primitives as `WidgetAnimationLayer::Overlay`. Underlying widgets keep ordinary `WidgetAnimationLayer::Snapshot` primitives. The main thread identifies the dragged child by layout-edit owner tags rather than by rectangle containment and does not compute drag-overlap visibility subtraction for animation primitives.
 
 Move mode uses the overlay layer for monitor name, scale, and relative-coordinate text. The dashboard content underneath continues to animate unless move-mode throttling is explicitly enabled later.
 

@@ -15,6 +15,7 @@
 
 class DashboardRenderer;
 class DashboardLayoutEditOverlayRenderer;
+struct DashboardOverlayState;
 
 class DashboardLayoutResolver : public WidgetEditArtifactRegistrar {
 public:
@@ -68,16 +69,22 @@ public:
         int gap,
         const std::string& renderCardId,
         const std::string& editCardId,
-        const std::vector<size_t>& nodePath);
+        const std::vector<size_t>& nodePath,
+        const std::vector<LayoutEditOverlayOwner>& overlayOwners);
     void ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
+        std::vector<LayoutEditOverlayOwner>& overlayOwners,
         const std::string& renderCardId,
         const std::string& editCardId,
         const std::vector<size_t>& nodePath,
         bool instantiateWidgets);
+    void SetEditArtifactContext(
+        const std::vector<LayoutEditOverlayOwner>& overlayOwners, LayoutEditOverlayAffordanceLayer layer);
+    void ResetEditArtifactContext();
+    void TagOverlayAffordanceLayers(const DashboardOverlayState& overlayState);
     bool ResolveLayout(DashboardRenderer& renderer, bool includeWidgetState);
     int PreferredNodeHeight(const DashboardRenderer& renderer, const LayoutNodeConfig& node, int width) const;
     const ParsedWidgetInfo* FindParsedWidgetInfo(const DashboardRenderer& renderer, const LayoutNodeConfig& node) const;
@@ -130,6 +137,12 @@ private:
         const LayoutEditAnchorBinding& editable,
         LayoutEditTargetOutline targetOutline);
     void ResolveContainerAnchorCollisions();
+    bool OverlayOwnerMatchesActiveDrag(
+        const std::vector<LayoutEditOverlayOwner>& owners, const DashboardOverlayState& overlayState) const;
+    bool AnchorMatchesActiveMetricListDrag(
+        const LayoutEditAnchorRegion& region, const DashboardOverlayState& overlayState) const;
+    bool AnchorMatchesActiveContainerChildDrag(
+        const LayoutEditAnchorRegion& region, const DashboardOverlayState& overlayState) const;
 
     DashboardRenderer& renderer_;
     ResolvedDashboardLayout resolvedLayout_{};
@@ -142,6 +155,8 @@ private:
     std::vector<LayoutEditColorRegion> staticColorEditRegions_;
     std::vector<LayoutEditColorRegion> dynamicColorEditRegions_;
     bool dynamicAnchorRegistrationEnabled_ = false;
+    std::vector<LayoutEditOverlayOwner> currentOverlayOwners_;
+    LayoutEditOverlayAffordanceLayer currentOverlayAffordanceLayer_ = LayoutEditOverlayAffordanceLayer::Background;
     // Size: this per-layout cache is tiny; a flat scan measured smaller than std::unordered_map.
     // Size: keep only parsed widget facts here; storing cloneable widget prototypes kept larger per-widget virtual code.
     mutable std::vector<std::pair<const LayoutNodeConfig*, ParsedWidgetInfo>> parsedWidgetInfoCache_;

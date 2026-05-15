@@ -55,7 +55,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Container reorder handles stay near their preferred side while shifting along or inward from that side to avoid widget-level edit anchors; the rendered handle position is the source of truth for the hitbox.
 - During a child reorder drag, the dragged child tracks the pointer with the active dashed outline, the active handle tracks the pointer with its normal single-pixel glyph stroke, the container underneath keeps the dragged child's current slot empty, the child order updates as soon as the dragged child's center crosses another child's drag-start center, and the child snaps into its slot on release.
 - Layout child reorder handles expose tooltips with the edited layout expression on the first line and localized left/right or up/down reorder guidance on the second line.
-- Layout-edit title anchors, size guides, gap handles, selection outlines, and hover outlines that belong to a dragged container child follow that child's translated drag position until the drag ends.
+- Layout-edit title anchors, size guides, gap handles, selection outlines, and hover outlines that belong to a dragged row or dragged container child are tagged to that target, follow its translated drag position until the drag ends, and draw above the dragged content. Highlights tagged to fixed dashboard content stay behind the dragged target.
 
 ## Editable Targets
 

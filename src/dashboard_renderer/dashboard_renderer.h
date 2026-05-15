@@ -119,7 +119,8 @@ private:
         int gap,
         const std::string& renderCardId,
         const std::string& editCardId,
-        const std::vector<size_t>& nodePath);
+        const std::vector<size_t>& nodePath,
+        const std::vector<LayoutEditOverlayOwner>& overlayOwners);
     void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,

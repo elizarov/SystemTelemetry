@@ -210,8 +210,10 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     int gap,
     const std::string& renderCardId,
     const std::string& editCardId,
-    const std::vector<size_t>& nodePath) {
-    layoutResolver_->AddLayoutEditGuide(*this, node, rect, childRects, gap, renderCardId, editCardId, nodePath);
+    const std::vector<size_t>& nodePath,
+    const std::vector<LayoutEditOverlayOwner>& overlayOwners) {
+    layoutResolver_->AddLayoutEditGuide(
+        *this, node, rect, childRects, gap, renderCardId, editCardId, nodePath, overlayOwners);
 }
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
@@ -222,8 +224,17 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath,
     bool instantiateWidgets) {
-    layoutResolver_->ResolveNodeWidgetsInternal(
-        *this, node, rect, widgets, cardReferenceStack, renderCardId, editCardId, nodePath, instantiateWidgets);
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    layoutResolver_->ResolveNodeWidgetsInternal(*this,
+        node,
+        rect,
+        widgets,
+        cardReferenceStack,
+        overlayOwners,
+        renderCardId,
+        editCardId,
+        nodePath,
+        instantiateWidgets);
 }
 
 bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
@@ -335,14 +346,20 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
     if (widget.widget == nullptr) {
         return;
     }
+    layoutResolver_->SetEditArtifactContext(widget.overlayOwners,
+        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ? LayoutEditOverlayAffordanceLayer::Foreground
+                                                                      : LayoutEditOverlayAffordanceLayer::Background);
     widget.widget->Draw(*this, widget, metrics);
+    layoutResolver_->ResetEditArtifactContext();
 }
 
 void DashboardRenderer::DrawResolvedWidgetOverlay(const WidgetLayout& widget, const MetricSource& metrics) {
     if (widget.widget == nullptr) {
         return;
     }
+    layoutResolver_->SetEditArtifactContext(widget.overlayOwners, LayoutEditOverlayAffordanceLayer::Foreground);
     widget.widget->DrawOverlay(*this, widget, metrics);
+    layoutResolver_->ResetEditArtifactContext();
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
@@ -430,6 +447,7 @@ void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const Dashboar
     FlushWidgetAnimations(WidgetAnimationLayer::Snapshot);
     layoutResolver_->ResolveDynamicEditArtifactCollisions();
     if (overlayState.ShouldDrawOverlayLayer()) {
+        layoutResolver_->TagOverlayAffordanceLayers(overlayState);
         BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
         DrawOverlayLayer(overlayState, metrics);
         FlushWidgetAnimations(WidgetAnimationLayer::Overlay);
@@ -440,11 +458,11 @@ void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const Dashboar
 
 void DashboardRenderer::DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
-        if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, card.chrome.rect)) {
+        if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, card.chrome)) {
             DrawResolvedWidget(card.chrome, metrics);
         }
         for (const auto& widget : card.widgets) {
-            if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, widget.rect)) {
+            if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, widget)) {
                 DrawResolvedWidget(widget, metrics);
             }
         }
@@ -452,6 +470,7 @@ void DashboardRenderer::DrawSnapshotLayer(const DashboardOverlayState& overlaySt
 }
 
 void DashboardRenderer::DrawOverlayLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
+    layoutEditOverlayRenderer_->DrawBackgroundAffordances(overlayState);
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         DrawResolvedWidgetOverlay(card.chrome, metrics);
         for (const auto& widget : card.widgets) {
@@ -459,7 +478,8 @@ void DashboardRenderer::DrawOverlayLayer(const DashboardOverlayState& overlaySta
         }
     }
     FlushWidgetAnimations(WidgetAnimationLayer::Overlay);
-    layoutEditOverlayRenderer_->Draw(overlayState, metrics);
+    layoutEditOverlayRenderer_->DrawDraggedContent(metrics);
+    layoutEditOverlayRenderer_->DrawForegroundAffordances(overlayState);
     DrawMoveOverlay(overlayState.moveOverlay);
 }
 

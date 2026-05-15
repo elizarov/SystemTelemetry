@@ -8,6 +8,7 @@
 #include "config/config.h"
 #include "config/widget_class.h"
 #include "renderer/render_types.h"
+#include "widget/layout_edit_types.h"
 
 class MetricSource;
 class WidgetHost;
@@ -32,6 +33,8 @@ struct WidgetLayout {
     std::string editCardId;
     std::vector<size_t> nodePath;
     WidgetClass widgetClass = WidgetClass::Unknown;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
     std::unique_ptr<Widget> widget;
 };
 

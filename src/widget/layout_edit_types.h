@@ -119,6 +119,16 @@ struct LayoutContainerChildOrderEditKey {
     std::vector<size_t> nodePath;
 };
 
+struct LayoutEditOverlayOwner {
+    LayoutContainerChildOrderEditKey key;
+    int childIndex = 0;
+};
+
+enum class LayoutEditOverlayAffordanceLayer : std::uint8_t {
+    Background,
+    Foreground,
+};
+
 struct MetricListReorderOverlayState {
     LayoutEditWidgetIdentity widget;
     int currentIndex = 0;
@@ -154,6 +164,8 @@ struct LayoutEditGuide {
     std::vector<int> childExtents;
     std::vector<std::uint8_t> childFixedExtents;
     std::vector<RenderRect> childRects;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
 };
 
 struct LayoutEditAnchorKey {
@@ -187,6 +199,8 @@ struct LayoutEditAnchorRegion {
     bool showWhenWidgetHovered = false;
     bool drawTargetOutline = true;
     int value = 0;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
 };
 
 struct LayoutEditAnchorRegistration {
@@ -210,6 +224,8 @@ struct LayoutEditWidgetGuide : LayoutEditParameterSubject, LayoutEditLinearGeome
     double angularMin = 0.0;
     double angularMax = 0.0;
     int dragDirection = 1;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
 };
 
 struct LayoutEditGapAnchorKey : LayoutEditParameterSubject {
@@ -222,11 +238,15 @@ struct LayoutEditGapAnchor : LayoutEditLinearGeometry {
     RenderRect handleRect{};
     AnchorDragAxis dragAxis = AnchorDragAxis::Vertical;
     double value = 0.0;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
 };
 
 struct LayoutEditColorRegion {
     LayoutEditParameter parameter = LayoutEditParameter::ColorForeground;
     RenderRect targetRect{};
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
 };
 
 struct LayoutWeightEditKey {

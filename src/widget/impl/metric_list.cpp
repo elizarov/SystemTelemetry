@@ -304,7 +304,7 @@ void MetricListWidget::DrawOverlay(
     renderer.Renderer().PushClipRect(widget.rect);
     const int draggedTop = dragState->mouseY - dragState->dragOffsetY;
     const int yOffset = draggedTop - layoutState_.rowRects[draggedIndex].top;
-    DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, false);
+    DrawMetricListRow(renderer, widget, layoutState_, metricRefs_, draggedIndex, *draggedRow, yOffset, true);
     renderer.Renderer().PopClipRect();
 }
 
