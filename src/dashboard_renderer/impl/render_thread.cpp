@@ -1,14 +1,12 @@
 #include "dashboard_renderer/impl/render_thread.h"
 
 #include <algorithm>
-#include <chrono>
 #include <utility>
 
 #include "util/trace.h"
 
 namespace {
 
-constexpr auto kAnimationFrameInterval = std::chrono::milliseconds(16);
 constexpr std::size_t kMaxLayerBitmapPoolEntries = 8;
 constexpr int kAnimationDirtyPadding = 3;
 
@@ -586,11 +584,7 @@ void DashboardRenderThread::ThreadMain() {
             });
             continue;
         }
-
-        std::unique_lock lock(mutex_);
-        wake_.wait_for(lock, kAnimationFrameInterval, [&] {
-            return stopRequested_ || pendingFrame_.has_value() || resetTimelineRequested_ || discardTargetRequested_;
-        });
+        // Animation cadence comes from the vsynced presentation backend; the render thread must not add a timer.
     }
 
     if (activeFrame.has_value()) {

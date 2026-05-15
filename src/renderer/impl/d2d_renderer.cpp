@@ -1123,8 +1123,8 @@ bool D2DRenderer::PresentDxgiWindow(std::span<const RenderRect> dirtyRects) {
     // Dirty regions are already restored inside the retained back buffer; DXGI dirty-present metadata is slower here.
     (void)dirtyRects;
 
-    const UINT syncInterval = d2dImmediatePresent_ ? 0u : 1u;
-    const HRESULT hr = dxgiSwapChain_->Present(syncInterval, 0);
+    // The live flip chain is the animation frame clock, so DXGI presentation is always vsynced.
+    const HRESULT hr = dxgiSwapChain_->Present(1, 0);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
         DiscardWindowTarget("dxgi_device_lost");
         lastError_ = "renderer:dxgi_present_device_lost hr=" + FormatHresult(hr);
