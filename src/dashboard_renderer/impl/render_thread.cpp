@@ -455,6 +455,7 @@ void DashboardRenderThread::AppendPreparedDirtyAnimations(DashboardAnimationTime
         }
         PreparedDirtyAnimation item;
         item.command = &command;
+        item.dirtyRect = bounds;
         item.drawState = command.targetState.get();
         if (timeline != nullptr) {
             item.sampledState = timeline->Resolve(animation->Key(), *command.targetState, targetVersion);
@@ -471,6 +472,7 @@ void DashboardRenderThread::DrawPreparedDirtyAnimations(
     Renderer& renderer, const std::vector<PreparedDirtyAnimation>& animations) const {
     for (const PreparedDirtyAnimation& item : animations) {
         const DashboardPresentationAnimation& command = *item.command;
+        renderer.PushClipRect(item.dirtyRect);
         if (command.translation.x != 0 || command.translation.y != 0) {
             renderer.PushTranslation(command.translation);
         }
@@ -478,6 +480,7 @@ void DashboardRenderThread::DrawPreparedDirtyAnimations(
         if (command.translation.x != 0 || command.translation.y != 0) {
             renderer.PopTranslation();
         }
+        renderer.PopClipRect();
     }
 }
 

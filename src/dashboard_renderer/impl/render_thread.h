@@ -107,6 +107,7 @@ private:
         const DashboardPresentationAnimation* command = nullptr;
         WidgetAnimationStatePtr sampledState;
         const WidgetAnimationState* drawState = nullptr;
+        RenderRect dirtyRect{};
     };
 
     struct PreparedDirtyFrame {
