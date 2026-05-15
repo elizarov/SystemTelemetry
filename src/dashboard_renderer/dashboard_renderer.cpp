@@ -64,17 +64,28 @@ long long RectArea(const RenderRect& rect) {
     return width * height;
 }
 
+bool RendererStylesEqual(const RendererStyle& left, const RendererStyle& right) {
+    return left.colors == right.colors && left.layoutGuideSheet == right.layoutGuideSheet &&
+           left.fonts == right.fonts && left.iconNames == right.iconNames &&
+           std::abs(left.scale - right.scale) < 0.0001;
+}
+
 }  // namespace
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     lastError_.clear();
+    const RendererStyle previousStyle = BuildRendererStyle();
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
         InvalidateMetricSourceCache();
         metricLookupCache_.Clear();
     }
     config_ = config;
-    if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
+    const RendererStyle nextStyle = BuildRendererStyle();
+    if (!RendererStylesEqual(previousStyle, nextStyle)) {
+        ++styleVersion_;
+    }
+    if (!renderer_->SetStyle(nextStyle) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:reconfigure_failed" : renderer_->LastError();
     }
 }
@@ -86,6 +97,7 @@ void DashboardRenderer::SetRenderScale(double scale) {
         return;
     }
     renderScale_ = nextScale;
+    ++styleVersion_;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:rescale_failed" : renderer_->LastError();
     }
@@ -189,7 +201,8 @@ void DashboardRenderer::AddWidgetAnimation(WidgetAnimationPtr animation) {
         WidgetHost::AddWidgetAnimation(std::move(animation));
         return;
     }
-    WidgetAnimationsForLayer(animation->Layer()).push_back(std::move(animation));
+    WidgetAnimationsForLayer(animation->Layer())
+        .push_back(DashboardPresentationAnimation{std::move(animation), currentWidgetAnimationTranslation_});
 }
 
 int DashboardRenderer::WindowWidth() const {
@@ -405,7 +418,10 @@ bool DashboardRenderer::BuildPresentationFrame(
     frame.width = WindowWidth();
     frame.height = WindowHeight();
     frame.style = BuildRendererStyle();
-    frame.surfaceGeneration = ResolveSurfaceGeneration();
+    frame.surfaceVersion = ResolveSurfaceVersion();
+    frame.snapshotVersion = ++snapshotVersion_;
+    frame.metricVersion = snapshot.revision;
+    frame.styleVersion = styleVersion_;
     frame.animate = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
 
     const MetricSource& metrics = ResolveMetrics(snapshot);
@@ -440,8 +456,10 @@ bool DashboardRenderer::BuildPresentationFrame(
             return false;
         }
         frame.overlayLayer = std::move(overlayBitmap);
+        frame.overlayVersion = ++overlayVersion_;
         frame.overlayAnimations = std::move(overlayWidgetAnimations_);
     }
+    frame.animationGeometryVersion = ++animationGeometryVersion_;
 
     EndWidgetAnimationCollection();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
@@ -452,47 +470,73 @@ bool DashboardRenderer::BuildPresentationFrame(
 void DashboardRenderer::BeginWidgetAnimationCollection() {
     snapshotWidgetAnimations_.clear();
     overlayWidgetAnimations_.clear();
+    widgetAnimationTranslationStack_.clear();
     widgetAnimationCollectionActive_ = true;
     currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
+    currentWidgetAnimationTranslation_ = {};
 }
 
 void DashboardRenderer::BeginWidgetAnimationLayer(WidgetAnimationLayer layer) {
     currentWidgetAnimationLayer_ = layer;
 }
 
-std::vector<WidgetAnimationPtr>& DashboardRenderer::WidgetAnimationsForLayer(WidgetAnimationLayer layer) {
+std::vector<DashboardPresentationAnimation>& DashboardRenderer::WidgetAnimationsForLayer(WidgetAnimationLayer layer) {
     return layer == WidgetAnimationLayer::Overlay ? overlayWidgetAnimations_ : snapshotWidgetAnimations_;
 }
 
-std::uint64_t DashboardRenderer::ResolveSurfaceGeneration() {
+std::uint64_t DashboardRenderer::ResolveSurfaceVersion() {
     const int width = WindowWidth();
     const int height = WindowHeight();
     if (presentedWidth_ != width || presentedHeight_ != height || std::abs(presentedScale_ - renderScale_) >= 0.0001) {
         presentedWidth_ = width;
         presentedHeight_ = height;
         presentedScale_ = renderScale_;
-        ++surfaceGeneration_;
+        ++surfaceVersion_;
     }
-    return surfaceGeneration_;
+    return surfaceVersion_;
+}
+
+void DashboardRenderer::PushWidgetAnimationTranslation(RenderPoint offset) {
+    widgetAnimationTranslationStack_.push_back(currentWidgetAnimationTranslation_);
+    currentWidgetAnimationTranslation_.x += offset.x;
+    currentWidgetAnimationTranslation_.y += offset.y;
+    Renderer().PushTranslation(offset);
+}
+
+void DashboardRenderer::PopWidgetAnimationTranslation() {
+    Renderer().PopTranslation();
+    if (widgetAnimationTranslationStack_.empty()) {
+        currentWidgetAnimationTranslation_ = {};
+        return;
+    }
+    currentWidgetAnimationTranslation_ = widgetAnimationTranslationStack_.back();
+    widgetAnimationTranslationStack_.pop_back();
 }
 
 void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
-    std::vector<WidgetAnimationPtr>& layerAnimations = WidgetAnimationsForLayer(layer);
+    std::vector<DashboardPresentationAnimation>& layerAnimations = WidgetAnimationsForLayer(layer);
     if (layerAnimations.empty()) {
         return;
     }
 
-    std::vector<WidgetAnimationPtr> animations;
+    std::vector<DashboardPresentationAnimation> animations;
     animations.swap(layerAnimations);
     const bool collectionWasActive = widgetAnimationCollectionActive_;
     widgetAnimationCollectionActive_ = false;
-    for (WidgetAnimationPtr& animation : animations) {
+    for (DashboardPresentationAnimation& command : animations) {
+        const WidgetAnimationPtr& animation = command.animation;
         if (animation == nullptr) {
             continue;
         }
         WidgetAnimationStatePtr target = animation->TargetState();
         if (target != nullptr) {
+            if (command.translation.x != 0 || command.translation.y != 0) {
+                Renderer().PushTranslation(command.translation);
+            }
             animation->Draw(Renderer(), *target);
+            if (command.translation.x != 0 || command.translation.y != 0) {
+                Renderer().PopTranslation();
+            }
         }
     }
     widgetAnimationCollectionActive_ = collectionWasActive;
@@ -501,8 +545,10 @@ void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
 void DashboardRenderer::EndWidgetAnimationCollection() {
     snapshotWidgetAnimations_.clear();
     overlayWidgetAnimations_.clear();
+    widgetAnimationTranslationStack_.clear();
     widgetAnimationCollectionActive_ = false;
     currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
+    currentWidgetAnimationTranslation_ = {};
 }
 
 void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {

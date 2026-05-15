@@ -17,13 +17,23 @@
 #include "renderer/renderer.h"
 #include "widget/animation.h"
 
+struct DashboardPresentationAnimation {
+    WidgetAnimationPtr animation;
+    RenderPoint translation{};
+};
+
 struct DashboardPresentationFrame {
     RendererStyle style;
     RenderBitmap snapshotLayer;
     std::optional<RenderBitmap> overlayLayer;
-    std::vector<WidgetAnimationPtr> snapshotAnimations;
-    std::vector<WidgetAnimationPtr> overlayAnimations;
-    std::uint64_t surfaceGeneration = 0;
+    std::vector<DashboardPresentationAnimation> snapshotAnimations;
+    std::vector<DashboardPresentationAnimation> overlayAnimations;
+    std::uint64_t surfaceVersion = 0;
+    std::uint64_t snapshotVersion = 0;
+    std::uint64_t overlayVersion = 0;
+    std::uint64_t animationGeometryVersion = 0;
+    std::uint64_t metricVersion = 0;
+    std::uint64_t styleVersion = 0;
     int width = 0;
     int height = 0;
     bool animate = false;
@@ -46,18 +56,18 @@ public:
     std::string LastError() const;
 
 private:
-    bool PrepareRenderer(Renderer& renderer, const DashboardPresentationFrame& frame, std::uint64_t& generation);
+    bool PrepareRenderer(Renderer& renderer, const DashboardPresentationFrame& frame, std::uint64_t& version);
     bool PresentFrame(Renderer& renderer,
         DashboardAnimationTimeline& timeline,
         DashboardPresentationFrame& frame,
-        std::uint64_t& generation);
+        std::uint64_t& version);
     void DrawFrame(Renderer& renderer,
         DashboardAnimationTimeline* timeline,
         const DashboardPresentationFrame& frame,
         DashboardAnimationTimeline::Clock::time_point now) const;
     void DrawAnimations(Renderer& renderer,
         DashboardAnimationTimeline* timeline,
-        const std::vector<WidgetAnimationPtr>& animations) const;
+        const std::vector<DashboardPresentationAnimation>& animations) const;
     void ThreadMain();
     void SetLastError(std::string error);
 
@@ -66,7 +76,7 @@ private:
     std::atomic_bool immediatePresent_{false};
     std::unique_ptr<Renderer> syncRenderer_;
     DashboardAnimationTimeline syncTimeline_;
-    std::uint64_t syncSurfaceGeneration_ = 0;
+    std::uint64_t syncSurfaceVersion_ = 0;
 
     mutable std::mutex mutex_;
     std::condition_variable wake_;

@@ -79,7 +79,7 @@ bool DashboardRenderThread::PresentFrameSynchronously(DashboardPresentationFrame
         syncRenderer_->AttachWindow(hwnd_.load());
         syncRenderer_->SetImmediatePresent(immediatePresent_.load());
     }
-    const bool presented = PresentFrame(*syncRenderer_, syncTimeline_, frame, syncSurfaceGeneration_);
+    const bool presented = PresentFrame(*syncRenderer_, syncTimeline_, frame, syncSurfaceVersion_);
     if (!presented) {
         SetLastError(syncRenderer_->LastError());
     }
@@ -140,12 +140,12 @@ std::string DashboardRenderThread::LastError() const {
 }
 
 bool DashboardRenderThread::PrepareRenderer(
-    Renderer& renderer, const DashboardPresentationFrame& frame, std::uint64_t& generation) {
+    Renderer& renderer, const DashboardPresentationFrame& frame, std::uint64_t& version) {
     renderer.AttachWindow(hwnd_.load());
     renderer.SetImmediatePresent(immediatePresent_.load());
-    if (generation != frame.surfaceGeneration) {
-        renderer.DiscardWindowTarget("surface_generation");
-        generation = frame.surfaceGeneration;
+    if (version != frame.surfaceVersion) {
+        renderer.DiscardWindowTarget("surface_version");
+        version = frame.surfaceVersion;
     }
     if (!renderer.SetStyle(frame.style)) {
         SetLastError(renderer.LastError());
@@ -157,8 +157,8 @@ bool DashboardRenderThread::PrepareRenderer(
 bool DashboardRenderThread::PresentFrame(Renderer& renderer,
     DashboardAnimationTimeline& timeline,
     DashboardPresentationFrame& frame,
-    std::uint64_t& generation) {
-    if (!PrepareRenderer(renderer, frame, generation)) {
+    std::uint64_t& version) {
+    if (!PrepareRenderer(renderer, frame, version)) {
         return false;
     }
 
@@ -193,9 +193,11 @@ void DashboardRenderThread::DrawFrame(Renderer& renderer,
     DrawAnimations(renderer, timeline, frame.overlayAnimations);
 }
 
-void DashboardRenderThread::DrawAnimations(
-    Renderer& renderer, DashboardAnimationTimeline* timeline, const std::vector<WidgetAnimationPtr>& animations) const {
-    for (const WidgetAnimationPtr& animation : animations) {
+void DashboardRenderThread::DrawAnimations(Renderer& renderer,
+    DashboardAnimationTimeline* timeline,
+    const std::vector<DashboardPresentationAnimation>& animations) const {
+    for (const DashboardPresentationAnimation& command : animations) {
+        const WidgetAnimationPtr& animation = command.animation;
         if (animation == nullptr) {
             continue;
         }
@@ -206,7 +208,13 @@ void DashboardRenderThread::DrawAnimations(
         WidgetAnimationStatePtr sampled =
             timeline != nullptr ? timeline->Resolve(animation->Key(), *target) : target->Clone();
         if (sampled != nullptr) {
+            if (command.translation.x != 0 || command.translation.y != 0) {
+                renderer.PushTranslation(command.translation);
+            }
             animation->Draw(renderer, *sampled);
+            if (command.translation.x != 0 || command.translation.y != 0) {
+                renderer.PopTranslation();
+            }
         }
     }
 }
@@ -214,7 +222,7 @@ void DashboardRenderThread::DrawAnimations(
 void DashboardRenderThread::ThreadMain() {
     std::unique_ptr<Renderer> renderer = CreateRenderer();
     DashboardAnimationTimeline timeline;
-    std::uint64_t surfaceGeneration = 0;
+    std::uint64_t surfaceVersion = 0;
     std::optional<DashboardPresentationFrame> activeFrame;
 
     for (;;) {
@@ -247,7 +255,7 @@ void DashboardRenderThread::ThreadMain() {
             continue;
         }
 
-        const bool presented = PresentFrame(*renderer, timeline, *activeFrame, surfaceGeneration);
+        const bool presented = PresentFrame(*renderer, timeline, *activeFrame, surfaceVersion);
         if (!presented) {
             activeFrame.reset();
             continue;

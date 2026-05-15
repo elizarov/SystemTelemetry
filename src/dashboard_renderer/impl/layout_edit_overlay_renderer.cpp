@@ -1177,7 +1177,7 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
     const int childStart = drag.horizontal ? childRect.left : childRect.top;
     const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
 
-    renderer_.Renderer().PushTranslation(drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset});
+    renderer_.PushWidgetAnimationTranslation(drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset});
     for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
         if (ShouldSkipForContainerChildReorder(card.chrome)) {
             renderer_.DrawResolvedWidget(card.chrome, metrics);
@@ -1193,5 +1193,5 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
             static_cast<float>(UseActiveEditEmphasis(*renderer_.activeOverlayState_, true)
                                    ? (std::max)(2, renderer_.ScaleLogical(2))
                                    : (std::max)(1, renderer_.ScaleLogical(1)))));
-    renderer_.Renderer().PopTranslation();
+    renderer_.PopWidgetAnimationTranslation();
 }

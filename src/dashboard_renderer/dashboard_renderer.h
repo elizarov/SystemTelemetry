@@ -136,12 +136,14 @@ private:
     void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
     void DrawOverlayLayerStatic(const DashboardOverlayState& overlayState, const MetricSource& metrics);
+    void PushWidgetAnimationTranslation(RenderPoint offset);
+    void PopWidgetAnimationTranslation();
     void BeginWidgetAnimationCollection();
     void BeginWidgetAnimationLayer(WidgetAnimationLayer layer);
     void DrawAnimationTargets(WidgetAnimationLayer layer);
     void EndWidgetAnimationCollection();
-    std::vector<WidgetAnimationPtr>& WidgetAnimationsForLayer(WidgetAnimationLayer layer);
-    std::uint64_t ResolveSurfaceGeneration();
+    std::vector<DashboardPresentationAnimation>& WidgetAnimationsForLayer(WidgetAnimationLayer layer);
+    std::uint64_t ResolveSurfaceVersion();
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -199,7 +201,13 @@ private:
     int presentedWidth_ = 0;
     int presentedHeight_ = 0;
     double presentedScale_ = 0.0;
-    std::uint64_t surfaceGeneration_ = 1;
-    std::vector<WidgetAnimationPtr> snapshotWidgetAnimations_;
-    std::vector<WidgetAnimationPtr> overlayWidgetAnimations_;
+    std::uint64_t surfaceVersion_ = 1;
+    std::uint64_t snapshotVersion_ = 0;
+    std::uint64_t overlayVersion_ = 0;
+    std::uint64_t animationGeometryVersion_ = 0;
+    std::uint64_t styleVersion_ = 1;
+    RenderPoint currentWidgetAnimationTranslation_{};
+    std::vector<RenderPoint> widgetAnimationTranslationStack_;
+    std::vector<DashboardPresentationAnimation> snapshotWidgetAnimations_;
+    std::vector<DashboardPresentationAnimation> overlayWidgetAnimations_;
 };
