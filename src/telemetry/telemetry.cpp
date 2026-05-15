@@ -3,6 +3,7 @@
 #include <chrono>
 
 #include "telemetry/impl/collector.h"
+#include "telemetry/timing.h"
 #include "util/lightweight_mutex.h"
 
 namespace {

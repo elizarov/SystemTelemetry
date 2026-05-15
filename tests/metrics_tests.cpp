@@ -53,13 +53,6 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, st
     snapshot.retainedHistories.push_back(std::move(series));
 }
 
-void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, const std::vector<double>& samples) {
-    RetainedHistorySeries series;
-    series.seriesRef = metricRef;
-    series.samples = samples;
-    snapshot.retainedHistories.push_back(std::move(series));
-}
-
 void AddThroughputHistorySeries(SystemSnapshot& snapshot,
     const std::string& metricRef,
     const std::vector<double>& samples,

@@ -1,7 +1,6 @@
 #include "dashboard_renderer/dashboard_renderer.h"
 
 #include <algorithm>
-#include <chrono>
 #include <cmath>
 #include <cstdio>
 #include <limits>
