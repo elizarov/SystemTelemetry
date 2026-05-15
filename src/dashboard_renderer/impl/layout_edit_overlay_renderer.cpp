@@ -267,6 +267,19 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
         collectHoveredCard(layoutResolver_.staticEditableAnchorRegions_);
         collectHoveredCard(layoutResolver_.dynamicEditableAnchorRegions_);
     }
+    if (overlayState.hoverOnExposedDashboard && overlayState.drawExposedDashboardChrome) {
+        const auto collectHoveredDashboard = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
+            for (const auto& region : regions) {
+                if (!region.showWhenWidgetHovered ||
+                    region.key.widget.kind != LayoutEditWidgetIdentity::Kind::DashboardChrome) {
+                    continue;
+                }
+                appendHighlight(region, false);
+            }
+        };
+        collectHoveredDashboard(layoutResolver_.staticEditableAnchorRegions_);
+        collectHoveredDashboard(layoutResolver_.dynamicEditableAnchorRegions_);
+    }
     appendByKey(overlayState.hoveredEditableAnchor, false);
     appendByKey(overlayState.activeEditableAnchor, true);
     if (highlights.empty()) {

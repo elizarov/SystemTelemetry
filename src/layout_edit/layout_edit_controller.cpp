@@ -81,12 +81,25 @@ int ContainerChildAxisEnd(const RenderRect& rect, bool horizontal) {
     return horizontal ? rect.right : rect.bottom;
 }
 
-int ContainerChildAxisExtent(const RenderRect& rect, bool horizontal) {
-    return (std::max)(1, ContainerChildAxisEnd(rect, horizontal) - ContainerChildAxisStart(rect, horizontal));
-}
-
-int ContainerChildAxisCenter(const RenderRect& rect, bool horizontal) {
-    return ContainerChildAxisStart(rect, horizontal) + (ContainerChildAxisExtent(rect, horizontal) / 2);
+std::optional<int> ContainerChildSlotIndexForCoordinate(
+    const std::vector<RenderRect>& childRects, bool horizontal, int coordinate) {
+    std::optional<int> lastSlot;
+    for (int index = 0; index < static_cast<int>(childRects.size()); ++index) {
+        const RenderRect& rect = childRects[static_cast<size_t>(index)];
+        if (rect.IsEmpty()) {
+            continue;
+        }
+        const int start = ContainerChildAxisStart(rect, horizontal);
+        const int end = ContainerChildAxisEnd(rect, horizontal);
+        if (coordinate < start) {
+            return lastSlot.has_value() ? std::nullopt : std::optional<int>(index);
+        }
+        if (coordinate < end) {
+            return index;
+        }
+        lastSlot = index;
+    }
+    return lastSlot;
 }
 
 double NormalizeDegrees(double degrees) {
@@ -347,26 +360,14 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 drag.key = *containerOrderKey;
                 drag.horizontal = node->name == "columns";
                 drag.currentIndex = region->key.anchorId;
-                drag.originalIndex = region->key.anchorId;
                 drag.childCount = static_cast<int>(node->children.size());
-                drag.containerStart = drag.horizontal ? region->targetRect.left : region->targetRect.top;
-                drag.draggedExtent = ContainerChildAxisExtent(region->targetRect, drag.horizontal);
                 drag.dragOffset = (drag.horizontal ? clientPoint.x : clientPoint.y) -
                                   (drag.horizontal ? region->targetRect.left : region->targetRect.top);
                 drag.mouseCoordinate = drag.horizontal ? clientPoint.x : clientPoint.y;
                 activeContainerChildReorderDrag_ = std::move(drag);
                 RefreshContainerChildReorderRects(*activeContainerChildReorderDrag_);
                 ContainerChildReorderDragState& activeDrag = *activeContainerChildReorderDrag_;
-                activeDrag.stableSnapCenters.clear();
-                activeDrag.stableSnapCenters.reserve(activeDrag.childRects.size());
-                for (const RenderRect& childRect : activeDrag.childRects) {
-                    activeDrag.stableSnapCenters.push_back(ContainerChildAxisCenter(childRect, activeDrag.horizontal));
-                }
-                if (activeDrag.currentIndex >= 0 &&
-                    activeDrag.currentIndex < static_cast<int>(activeDrag.childRects.size())) {
-                    activeDrag.draggedExtent = ContainerChildAxisExtent(
-                        activeDrag.childRects[static_cast<size_t>(activeDrag.currentIndex)], activeDrag.horizontal);
-                }
+                activeDrag.stableChildRects = activeDrag.childRects;
                 host_.SetLayoutEditInteractiveDragTraceActive(true);
                 host_.BeginLayoutEditTraceSession("container_child_reorder", DescribeEditableAnchor(region->key));
                 SyncRendererInteractionState();
@@ -1196,32 +1197,26 @@ void LayoutEditController::RefreshContainerChildReorderRects(ContainerChildReord
             drag.childRects[static_cast<size_t>(index)] = region->targetRect;
         }
     }
-    if (drag.currentIndex >= 0 && drag.currentIndex < static_cast<int>(drag.childRects.size())) {
-        const RenderRect& currentRect = drag.childRects[static_cast<size_t>(drag.currentIndex)];
-        drag.containerStart = drag.horizontal ? currentRect.left : currentRect.top;
-    }
 }
 
 bool LayoutEditController::UpdateContainerChildReorderDrag(RenderPoint clientPoint) {
     ContainerChildReorderDragState& drag = *activeContainerChildReorderDrag_;
     drag.mouseCoordinate = drag.horizontal ? clientPoint.x : clientPoint.y;
-    if (drag.stableSnapCenters.size() != static_cast<size_t>((std::max)(0, drag.childCount))) {
+    if (drag.stableChildRects.size() != static_cast<size_t>((std::max)(0, drag.childCount))) {
         SyncRendererInteractionState();
         host_.InvalidateLayoutEdit();
         return true;
     }
 
-    const int draggedCenter = drag.mouseCoordinate - drag.dragOffset + (drag.draggedExtent / 2);
-    int targetIndex = 0;
-    for (int index = 0; index < static_cast<int>(drag.stableSnapCenters.size()); ++index) {
-        if (index == drag.originalIndex) {
-            continue;
-        }
-        if (draggedCenter > drag.stableSnapCenters[static_cast<size_t>(index)]) {
-            ++targetIndex;
-        }
+    const std::optional<int> targetSlot =
+        ContainerChildSlotIndexForCoordinate(drag.stableChildRects, drag.horizontal, drag.mouseCoordinate);
+    if (!targetSlot.has_value()) {
+        SyncRendererInteractionState();
+        host_.InvalidateLayoutEdit();
+        return true;
     }
-    targetIndex = std::clamp(targetIndex, 0, (std::max)(0, drag.childCount - 1));
+
+    const int targetIndex = std::clamp(*targetSlot, 0, (std::max)(0, drag.childCount - 1));
     if (targetIndex == drag.currentIndex) {
         SyncRendererInteractionState();
         host_.InvalidateLayoutEdit();

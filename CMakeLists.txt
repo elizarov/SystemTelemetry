@@ -539,6 +539,7 @@ add_executable(CaseDashTests
     tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
+    tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
     tests/layout_edit_types_tests.cpp
@@ -581,6 +582,7 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
+    src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
