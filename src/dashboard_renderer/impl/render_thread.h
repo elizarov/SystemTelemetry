@@ -142,6 +142,7 @@ private:
         std::vector<PreparedDirtyAnimation>& prepared,
         std::vector<RenderRect>& dirtyRects) const;
     void DrawPreparedDirtyAnimations(Renderer& renderer, const std::vector<PreparedDirtyAnimation>& animations) const;
+    void CoalescePendingFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
     void MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const;
     void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
     void ReleaseBitmap(RenderBitmap bitmap) const;

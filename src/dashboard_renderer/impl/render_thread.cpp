@@ -195,16 +195,10 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
             return false;
         }
         if (pendingFrame_.has_value()) {
-            ReleaseFrameLayers(std::move(*pendingFrame_));
-            if (pendingFrameRequestId_ != 0) {
-                completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
-                completedFrameRequestSucceeded_ = false;
-                pendingFrameRequestId_ = 0;
-                framePresented_.notify_all();
-            }
+            CoalescePendingFrame(*pendingFrame_, std::move(frame));
+        } else {
+            pendingFrame_ = std::move(frame);
         }
-        pendingFrame_ = std::move(frame);
-        pendingFrameRequestId_ = 0;
     }
     wake_.notify_one();
     return true;
@@ -223,16 +217,13 @@ bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame
             ReleaseFrameLayers(std::move(frame));
             return false;
         }
-        if (pendingFrame_.has_value()) {
-            ReleaseFrameLayers(std::move(*pendingFrame_));
-            if (pendingFrameRequestId_ != 0) {
-                completedFrameRequestId_ = std::max(completedFrameRequestId_, pendingFrameRequestId_);
-                completedFrameRequestSucceeded_ = false;
-            }
-        }
         requestId = ++nextFrameRequestId_;
-        pendingFrame_ = std::move(frame);
-        pendingFrameRequestId_ = requestId;
+        if (pendingFrame_.has_value()) {
+            CoalescePendingFrame(*pendingFrame_, std::move(frame));
+        } else {
+            pendingFrame_ = std::move(frame);
+        }
+        pendingFrameRequestId_ = std::max(pendingFrameRequestId_, requestId);
     }
     wake_.notify_one();
 
@@ -595,6 +586,38 @@ void DashboardRenderThread::DrawPreparedDirtyAnimations(
             renderer.PopTranslation();
         }
         renderer.PopClipRect();
+    }
+}
+
+void DashboardRenderThread::CoalescePendingFrame(
+    DashboardPresentationFrame& target, DashboardPresentationFrame update) const {
+    target.style = std::move(update.style);
+    target.versions.surfaceVersion = update.versions.surfaceVersion;
+    target.versions.metricVersion = update.versions.metricVersion;
+    target.width = update.width;
+    target.height = update.height;
+    target.animate = update.animate;
+
+    if (update.snapshotLayerUpdated) {
+        if (target.snapshotLayerUpdated) {
+            ReleaseBitmap(std::move(target.snapshotLayer));
+        }
+        target.snapshotLayer = std::move(update.snapshotLayer);
+        target.snapshotAnimations = std::move(update.snapshotAnimations);
+        target.versions.snapshotVersion = update.versions.snapshotVersion;
+        target.snapshotLayerUpdated = true;
+    }
+    if (update.overlayLayerUpdated) {
+        if (target.overlayLayer.has_value()) {
+            ReleaseBitmap(std::move(*target.overlayLayer));
+        }
+        target.overlayLayer = std::move(update.overlayLayer);
+        target.overlayAnimations = std::move(update.overlayAnimations);
+        target.versions.overlayVersion = update.versions.overlayVersion;
+        target.overlayLayerUpdated = true;
+    }
+    if (update.snapshotLayerUpdated || update.overlayLayerUpdated) {
+        target.versions.animationGeometryVersion = update.versions.animationGeometryVersion;
     }
 }
 
