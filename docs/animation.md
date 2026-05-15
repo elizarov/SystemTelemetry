@@ -87,7 +87,7 @@ Widgets draw overlay-owned content through `Widget::DrawOverlay()` and submit `W
 
 Animation draw lists are not stored as bitmaps. Each list contains immutable widget animation draw objects plus the render-space translation that was active when the widget submitted the animation. The keyed data timeline is owned by the render thread, which redraws the current widget animation commands for the active layer on each animation frame.
 
-Widget animation objects contain renderer-safe geometry. Animation draw commands carry the widget-packaged target state plus layer placement data such as drag translation; this keeps geometry changes separate from metric target changes. They do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
+Widget animation objects contain renderer-safe geometry. Animation draw commands carry the widget-packaged target state plus layer placement data such as drag translation; this keeps geometry changes separate from metric target changes. The render thread resolves animation targets against the metric version, not the snapshot or overlay geometry version, so scale and layout repackaging cannot replace an existing keyed target unless new metric data arrived. Commands do not retain metric-source references, config references, string views, or main-thread-owned containers. Concrete animation data types stay private to the widget package; the render thread stores and samples them through the opaque `WidgetAnimationState` and `WidgetAnimationTransition` interfaces.
 
 The main thread repaints the opaque snapshot bitmap when telemetry text changes, layout or scale changes, theme/style changes, render mode changes, or layout-edit drag state changes. It repaints the optional transparent overlay bitmap on layout-edit hover changes, drag changes, move-mode changes, and editor selection changes. Normal dashboard operation keeps no overlay bitmap alive.
 
@@ -275,6 +275,8 @@ If Direct2D resources are shared across threads, the Direct2D factory is created
 ## Window Size And DPI Synchronization
 
 Window size, render scale, and DPI changes use a monotonically increasing `surfaceVersion`.
+Presentation frames and presented-frame state share one `DashboardPresentationVersions` record so version semantics stay
+identical on both sides of the render-thread handoff.
 
 Each layer update carries:
 
@@ -285,7 +287,7 @@ Each layer update carries:
 - Overlay version.
 - Animation geometry version.
 - Metric version.
-- Style version.
+- Renderer style payload.
 
 The render thread treats an update whose surface version differs from the current live target as a target-recreation boundary. When the version changes, it:
 
@@ -293,12 +295,18 @@ The render thread treats an update whose surface version differs from the curren
 - Releases target-local layer bitmaps for the old size.
 - Recreates or resizes the live presentation target.
 - Drops animation geometry from the old surface version.
-- Keeps animation data only when the new update carries compatible data keys.
+- Keeps metric-version animation data by key; compatibility is checked when a key is next touched.
 
 The render-thread and single-thread benchmark implementations follow the same data rule inside `DashboardAnimationTimeline`: config,
-layout, row-order, scale, and render-mode changes keep keyed opaque widget animation tracks alive. A track is removed
-only when its data key is not touched by the next live normal frame, so compatible metrics continue from their current
-interpolated value after layout edits instead of restarting from zero.
+layout, row-order, scale, and render-mode changes keep keyed opaque widget animation tracks alive. A track is pruned
+only on a live frame that carries a new metric version and no longer touches that data key, so compatible metrics continue
+from their current interpolated value after layout edits instead of restarting from zero.
+DPI and scale application updates renderer style and layout in place; it does not shut down the presenter, because the
+presenter owns the animation timeline and `surfaceVersion` already handles target recreation.
+
+Renderer trace output reports every animation timeline reset and any frame that prunes animation tracks. Reset lines use
+`renderer:animation_timeline_reset`; prune lines use `renderer:animation_timeline_prune` and include track counts, metric
+version, surface version, layer versions, and animation geometry version.
 
 The main thread always publishes a complete snapshot layer after a size, DPI, scale, or layout change. Partial updates are valid only within one surface version.
 

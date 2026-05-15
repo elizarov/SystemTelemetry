@@ -213,18 +213,24 @@ private:
     int presentedWidth_ = 0;
     int presentedHeight_ = 0;
     double presentedScale_ = 0.0;
+    // Guards presenter surface identity when window size or render scale changes.
     std::uint64_t surfaceVersion_ = 1;
+    // Guards snapshot layer rebuilds when any dashboard config or layout value changes.
     std::uint64_t configVersion_ = 1;
+    // Guards presenter snapshot bitmap replacement when the opaque base layer is rebuilt.
     std::uint64_t snapshotVersion_ = 0;
+    // Guards presenter overlay bitmap replacement when transparent edit/drag content changes.
     std::uint64_t overlayVersion_ = 0;
+    // Guards presenter dirty-animation reuse when animation command geometry changes.
     std::uint64_t animationGeometryVersion_ = 0;
-    std::uint64_t styleVersion_ = 1;
     bool snapshotLayerValid_ = false;
     bool overlayLayerVisible_ = false;
+    // Guards snapshot layer validity against telemetry revision changes.
     std::uint64_t snapshotLayerMetricVersion_ = 0;
+    // Guards snapshot layer validity against config/layout changes.
     std::uint64_t snapshotLayerConfigVersion_ = 0;
+    // Guards snapshot layer validity against surface size or render scale changes.
     std::uint64_t snapshotLayerSurfaceVersion_ = 0;
-    std::uint64_t snapshotLayerStyleVersion_ = 0;
     RenderMode snapshotLayerRenderMode_ = RenderMode::Normal;
     std::string snapshotLayerOverlaySignature_;
     RenderPoint currentWidgetAnimationTranslation_{};

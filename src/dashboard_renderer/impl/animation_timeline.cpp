@@ -26,7 +26,6 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
         track.start = target.InitialState();
         track.target = target.Clone();
         track.transition = track.target->TransitionFrom(*track.start);
-        track.observedTarget = &target;
         track.observedTargetVersion = targetVersion;
         track.startTime = frameTime_;
         track.touched = true;
@@ -34,15 +33,13 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
     } else {
         Track& track = it->second;
         const bool sameStateType = track.target != nullptr && track.target->TypeToken() == target.TypeToken();
-        const bool samePackagedTarget =
-            sameStateType && track.observedTarget == &target && track.observedTargetVersion == targetVersion;
-        if (!samePackagedTarget && (!sameStateType || !track.target->Equals(target))) {
+        const bool sameVersionTarget = sameStateType && track.observedTargetVersion == targetVersion;
+        if (!sameVersionTarget && (!sameStateType || !track.target->Equals(target))) {
             track.start = sameStateType ? target.RetargetStart(*SampleTrack(track, frameTime_)) : target.InitialState();
             track.target = target.Clone();
             track.transition = track.target->TransitionFrom(*track.start);
             track.startTime = frameTime_;
         }
-        track.observedTarget = &target;
         track.observedTargetVersion = targetVersion;
         track.touched = true;
     }
@@ -50,20 +47,29 @@ WidgetAnimationStatePtr DashboardAnimationTimeline::Resolve(
     return SampleTrack(it->second, frameTime_);
 }
 
-void DashboardAnimationTimeline::EndFrame() {
-    for (auto it = tracks_.begin(); it != tracks_.end();) {
-        if (!it->second.touched) {
-            it = tracks_.erase(it);
-        } else {
-            ++it;
+std::size_t DashboardAnimationTimeline::EndFrame(TrackRetention retention) {
+    std::size_t prunedCount = 0;
+    if (retention == TrackRetention::PruneUntouched) {
+        for (auto it = tracks_.begin(); it != tracks_.end();) {
+            if (!it->second.touched) {
+                it = tracks_.erase(it);
+                ++prunedCount;
+            } else {
+                ++it;
+            }
         }
     }
     frameActive_ = false;
+    return prunedCount;
 }
 
 void DashboardAnimationTimeline::Reset() {
     tracks_.clear();
     frameActive_ = false;
+}
+
+std::size_t DashboardAnimationTimeline::TrackCount() const {
+    return tracks_.size();
 }
 
 bool DashboardAnimationTimeline::HasActiveAnimations(Clock::time_point now) const {

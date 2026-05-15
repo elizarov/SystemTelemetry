@@ -107,11 +107,111 @@ TEST(AnimationTimeline, UnchangedScalarTargetKeepsProgressAcrossLayoutOnlyFrames
     timeline.EndFrame();
 
     timeline.BeginFrame(start + std::chrono::milliseconds(250));
-    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9), 2);
+    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
     timeline.EndFrame();
 
     ASSERT_TRUE(sample.valueRatio.has_value());
     EXPECT_DOUBLE_EQ(*sample.valueRatio, 0.4);
+    ASSERT_TRUE(sample.peakRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.9);
+}
+
+TEST(AnimationTimeline, ScaleOnlyRepackagedTargetKeepsStoredMetricTarget) {
+    DashboardAnimationTimeline timeline(std::chrono::milliseconds(500));
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ScalarKey("cpu.load");
+    WidgetAnimationStatePtr firstTarget = MakeScalarFillAnimationState(ScalarTarget(0.8, 0.9));
+    WidgetAnimationStatePtr scaleRepackagedTarget = MakeScalarFillAnimationState(ScalarTarget(0.0, 0.0));
+
+    timeline.BeginFrame(start);
+    (void)timeline.Resolve(key, *firstTarget, 7);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(250));
+    (void)timeline.Resolve(key, *scaleRepackagedTarget, 7);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(500));
+    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *scaleRepackagedTarget, 7);
+    const ScalarFillSample sample = ScalarFillSampleFromState(*sampled);
+    timeline.EndFrame();
+
+    ASSERT_TRUE(sample.valueRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.valueRatio, 0.8);
+    ASSERT_TRUE(sample.peakRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.9);
+}
+
+TEST(AnimationTimeline, LayoutOnlyRepackagedUnavailableTargetKeepsStoredMetricTarget) {
+    DashboardAnimationTimeline timeline(std::chrono::milliseconds(500));
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ScalarKey("gpu.load");
+    WidgetAnimationStatePtr firstTarget = MakeScalarFillAnimationState(ScalarTarget(0.8, 0.9));
+    WidgetAnimationStatePtr layoutRepackagedTarget = MakeScalarFillAnimationState(ScalarFillSample{});
+
+    timeline.BeginFrame(start);
+    (void)timeline.Resolve(key, *firstTarget, 11);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(250));
+    (void)timeline.Resolve(key, *layoutRepackagedTarget, 11);
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(500));
+    WidgetAnimationStatePtr sampled = timeline.Resolve(key, *layoutRepackagedTarget, 11);
+    const ScalarFillSample sample = ScalarFillSampleFromState(*sampled);
+    timeline.EndFrame();
+
+    ASSERT_TRUE(sample.valueRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.valueRatio, 0.8);
+    ASSERT_TRUE(sample.peakRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.9);
+}
+
+TEST(AnimationTimeline, UntouchedKeyCanSurviveLayoutOnlyFrame) {
+    DashboardAnimationTimeline timeline(std::chrono::milliseconds(500));
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ScalarKey("cpu.load");
+
+    timeline.BeginFrame(start);
+    (void)ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(200));
+    timeline.EndFrame(DashboardAnimationTimeline::TrackRetention::KeepUntouched);
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(250));
+    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    timeline.EndFrame();
+
+    ASSERT_TRUE(sample.valueRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.valueRatio, 0.4);
+    ASSERT_TRUE(sample.peakRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.9);
+}
+
+TEST(AnimationTimeline, CompletedUntouchedKeyCanSurviveLayoutOnlyFrame) {
+    DashboardAnimationTimeline timeline(std::chrono::milliseconds(500));
+    const Clock::time_point start = Clock::time_point{};
+    const AnimationDataKey key = ScalarKey("gpu.load");
+
+    timeline.BeginFrame(start);
+    (void)ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(500));
+    (void)ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    timeline.EndFrame();
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(600));
+    timeline.EndFrame(DashboardAnimationTimeline::TrackRetention::KeepUntouched);
+
+    timeline.BeginFrame(start + std::chrono::milliseconds(650));
+    const ScalarFillSample sample = ResolveScalar(timeline, key, ScalarTarget(0.8, 0.9));
+    timeline.EndFrame();
+
+    ASSERT_TRUE(sample.valueRatio.has_value());
+    EXPECT_DOUBLE_EQ(*sample.valueRatio, 0.8);
     ASSERT_TRUE(sample.peakRatio.has_value());
     EXPECT_DOUBLE_EQ(*sample.peakRatio, 0.9);
 }

@@ -22,6 +22,7 @@ DashboardRenderer::DashboardRenderer(Trace& trace)
     : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
       layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
       layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()) {
+    presentation_.SetTrace(&trace_);
     presentation_.SetBitmapPool(layerBitmapPool_);
 }
 
@@ -67,17 +68,10 @@ long long RectArea(const RenderRect& rect) {
     return width * height;
 }
 
-bool RendererStylesEqual(const RendererStyle& left, const RendererStyle& right) {
-    return left.colors == right.colors && left.layoutGuideSheet == right.layoutGuideSheet &&
-           left.fonts == right.fonts && left.iconNames == right.iconNames &&
-           std::abs(left.scale - right.scale) < 0.0001;
-}
-
 }  // namespace
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     lastError_.clear();
-    const RendererStyle previousStyle = BuildRendererStyle();
     ++configVersion_;
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
@@ -86,9 +80,6 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     }
     config_ = config;
     const RendererStyle nextStyle = BuildRendererStyle();
-    if (!RendererStylesEqual(previousStyle, nextStyle)) {
-        ++styleVersion_;
-    }
     if (!renderer_->SetStyle(nextStyle) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:reconfigure_failed" : renderer_->LastError();
     }
@@ -102,7 +93,6 @@ void DashboardRenderer::SetRenderScale(double scale) {
     }
     renderScale_ = nextScale;
     ++configVersion_;
-    ++styleVersion_;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:rescale_failed" : renderer_->LastError();
     }
@@ -127,6 +117,7 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
     }
     liveAnimationEnabled_ = enabled;
     if (!liveAnimationEnabled_) {
+        WriteTrace("renderer:animation_timeline_reset_request reason=live_animation_disabled");
         presentation_.ResetTimeline();
     }
 }
@@ -441,11 +432,10 @@ bool DashboardRenderer::BuildPresentationFrame(
     const bool overlayVisible = overlayState.ShouldDrawOverlayLayer();
     const bool updateOverlay = overlayVisible || overlayLayerVisible_;
 
-    frame.surfaceVersion = surfaceVersion;
-    frame.snapshotVersion = snapshotVersion_;
-    frame.overlayVersion = overlayVersion_;
-    frame.metricVersion = snapshot.revision;
-    frame.styleVersion = styleVersion_;
+    frame.versions.surfaceVersion = surfaceVersion;
+    frame.versions.snapshotVersion = snapshotVersion_;
+    frame.versions.overlayVersion = overlayVersion_;
+    frame.versions.metricVersion = snapshot.revision;
     frame.animate = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
     frame.snapshotLayerUpdated = updateSnapshot;
     frame.overlayLayerUpdated = updateOverlay;
@@ -470,7 +460,7 @@ bool DashboardRenderer::BuildPresentationFrame(
             activeOverlayState_ = nullptr;
             return false;
         }
-        frame.snapshotVersion = ++snapshotVersion_;
+        frame.versions.snapshotVersion = ++snapshotVersion_;
         frame.snapshotAnimations = std::move(snapshotWidgetAnimations_);
         MarkSnapshotLayerUpdated(snapshot, overlaySignature, surfaceVersion);
         layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
@@ -500,19 +490,19 @@ bool DashboardRenderer::BuildPresentationFrame(
             return false;
         }
         frame.overlayLayer = std::move(overlayBitmap);
-        frame.overlayVersion = ++overlayVersion_;
+        frame.versions.overlayVersion = ++overlayVersion_;
         frame.overlayAnimations = std::move(overlayWidgetAnimations_);
         overlayLayerVisible_ = true;
     } else if (updateOverlay) {
-        frame.overlayVersion = ++overlayVersion_;
+        frame.versions.overlayVersion = ++overlayVersion_;
         frame.overlayLayer.reset();
         frame.overlayAnimations.clear();
         overlayLayerVisible_ = false;
     }
     if (updateSnapshot || updateOverlay) {
-        frame.animationGeometryVersion = ++animationGeometryVersion_;
+        frame.versions.animationGeometryVersion = ++animationGeometryVersion_;
     } else {
-        frame.animationGeometryVersion = animationGeometryVersion_;
+        frame.versions.animationGeometryVersion = animationGeometryVersion_;
     }
 
     EndWidgetAnimationCollection();
@@ -587,7 +577,7 @@ bool DashboardRenderer::ShouldUpdateSnapshotLayer(
     const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, std::uint64_t surfaceVersion) const {
     return !snapshotLayerValid_ || snapshotLayerMetricVersion_ != snapshot.revision ||
            snapshotLayerConfigVersion_ != configVersion_ || snapshotLayerSurfaceVersion_ != surfaceVersion ||
-           snapshotLayerStyleVersion_ != styleVersion_ || snapshotLayerRenderMode_ != renderMode_ ||
+           snapshotLayerRenderMode_ != renderMode_ ||
            snapshotLayerOverlaySignature_ != SnapshotOverlaySignature(overlayState);
 }
 
@@ -597,7 +587,6 @@ void DashboardRenderer::MarkSnapshotLayerUpdated(
     snapshotLayerMetricVersion_ = snapshot.revision;
     snapshotLayerConfigVersion_ = configVersion_;
     snapshotLayerSurfaceVersion_ = surfaceVersion;
-    snapshotLayerStyleVersion_ = styleVersion_;
     snapshotLayerRenderMode_ = renderMode_;
     snapshotLayerOverlaySignature_ = overlaySignature;
 }

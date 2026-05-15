@@ -4,6 +4,8 @@
 #include <chrono>
 #include <utility>
 
+#include "util/trace.h"
+
 namespace {
 
 constexpr auto kAnimationFrameInterval = std::chrono::milliseconds(16);
@@ -24,6 +26,20 @@ RenderRect ClipRectToSurface(RenderRect rect, int width, int height) {
     rect.top = std::clamp(rect.top, 0, height);
     rect.bottom = std::clamp(rect.bottom, 0, height);
     return rect;
+}
+
+const char* BoolText(bool value) {
+    return value ? "yes" : "no";
+}
+
+const char* TrackRetentionText(DashboardAnimationTimeline::TrackRetention retention) {
+    switch (retention) {
+        case DashboardAnimationTimeline::TrackRetention::PruneUntouched:
+            return "prune_untouched";
+        case DashboardAnimationTimeline::TrackRetention::KeepUntouched:
+            return "keep_untouched";
+    }
+    return "unknown";
 }
 
 }  // namespace
@@ -67,6 +83,8 @@ DashboardRenderThread::~DashboardRenderThread() {
 
 void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePresent) {
     if (threaded_ != threaded) {
+        WriteTrace("renderer:render_thread_shutdown_request reason=configure_threading_change old_threaded=" +
+                   std::string(BoolText(threaded_)) + " new_threaded=" + BoolText(threaded));
         Shutdown();
     }
 
@@ -86,6 +104,10 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
     }
     syncRenderer_->AttachWindow(hwnd_.load());
     syncRenderer_->SetImmediatePresent(immediatePresent_.load());
+}
+
+void DashboardRenderThread::SetTrace(const Trace* trace) {
+    trace_.store(trace);
 }
 
 void DashboardRenderThread::SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool) {
@@ -112,6 +134,8 @@ void DashboardRenderThread::Shutdown() {
     if (syncRenderer_ != nullptr) {
         syncRenderer_->Shutdown();
     }
+    WriteTrace("renderer:animation_timeline_reset owner=sync reason=shutdown tracks=" +
+               std::to_string(syncTimeline_.TrackCount()));
     syncTimeline_.Reset();
     if (syncFrame_.has_value()) {
         ReleaseFrameLayers(std::move(*syncFrame_));
@@ -193,6 +217,8 @@ void DashboardRenderThread::DrawFrameForCurrentTarget(
 }
 
 void DashboardRenderThread::ResetTimeline() {
+    WriteTrace("renderer:animation_timeline_reset owner=sync reason=explicit_request tracks=" +
+               std::to_string(syncTimeline_.TrackCount()));
     syncTimeline_.Reset();
     activeAnimations_.store(false);
     if (threaded_) {
@@ -200,6 +226,7 @@ void DashboardRenderThread::ResetTimeline() {
             std::lock_guard lock(mutex_);
             resetTimelineRequested_ = true;
         }
+        WriteTrace("renderer:animation_timeline_reset_request owner=thread reason=explicit_request");
         wake_.notify_one();
     }
 }
@@ -212,7 +239,11 @@ void DashboardRenderThread::DiscardWindowTarget(std::string_view reason) {
         ReleaseFrameLayers(std::move(*syncFrame_));
     }
     syncFrame_.reset();
+    const std::uint64_t metricVersion = syncPresentedState_.versions.metricVersion;
+    const bool hasMetricVersion = syncPresentedState_.hasMetricVersion;
     syncPresentedState_ = {};
+    syncPresentedState_.versions.metricVersion = metricVersion;
+    syncPresentedState_.hasMetricVersion = hasMetricVersion;
     if (threaded_) {
         {
             std::lock_guard lock(mutex_);
@@ -236,10 +267,14 @@ bool DashboardRenderThread::PrepareRenderer(
     Renderer& renderer, const DashboardPresentationFrame& frame, DashboardPresentedFrameState& state) {
     renderer.AttachWindow(hwnd_.load());
     renderer.SetImmediatePresent(immediatePresent_.load());
-    if (state.surfaceVersion != frame.surfaceVersion) {
+    if (state.versions.surfaceVersion != frame.versions.surfaceVersion) {
+        const std::uint64_t metricVersion = state.versions.metricVersion;
+        const bool hasMetricVersion = state.hasMetricVersion;
         renderer.DiscardWindowTarget("surface_version");
         state = {};
-        state.surfaceVersion = frame.surfaceVersion;
+        state.versions.surfaceVersion = frame.versions.surfaceVersion;
+        state.versions.metricVersion = metricVersion;
+        state.hasMetricVersion = hasMetricVersion;
     }
     if (!renderer.SetStyle(frame.style)) {
         SetLastError(renderer.LastError());
@@ -252,6 +287,8 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
     DashboardAnimationTimeline& timeline,
     DashboardPresentationFrame& frame,
     DashboardPresentedFrameState& presentedState) {
+    const bool metricTargetsUpdated =
+        !presentedState.hasMetricVersion || presentedState.versions.metricVersion != frame.versions.metricVersion;
     if (!PrepareRenderer(renderer, frame, presentedState)) {
         return false;
     }
@@ -262,9 +299,9 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
         activeTimeline->BeginFrame(now);
     }
     const bool fullRedraw = !frame.animate || !presentedState.hasFrame ||
-                            presentedState.snapshotVersion != frame.snapshotVersion ||
-                            presentedState.overlayVersion != frame.overlayVersion ||
-                            presentedState.animationGeometryVersion != frame.animationGeometryVersion;
+                            presentedState.versions.snapshotVersion != frame.versions.snapshotVersion ||
+                            presentedState.versions.overlayVersion != frame.versions.overlayVersion ||
+                            presentedState.versions.animationGeometryVersion != frame.versions.animationGeometryVersion;
     bool presented = true;
     bool retainedContents = presentedState.retainedContents;
     if (fullRedraw) {
@@ -291,7 +328,23 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
         }
     }
     if (activeTimeline != nullptr) {
-        activeTimeline->EndFrame();
+        const auto retention = metricTargetsUpdated ? DashboardAnimationTimeline::TrackRetention::PruneUntouched
+                                                    : DashboardAnimationTimeline::TrackRetention::KeepUntouched;
+        const std::size_t trackCountBeforeEndFrame = activeTimeline->TrackCount();
+        const std::size_t prunedCount = activeTimeline->EndFrame(retention);
+        const std::size_t trackCountAfterEndFrame = activeTimeline->TrackCount();
+        if (prunedCount > 0) {
+            WriteTrace("renderer:animation_timeline_prune retention=" + std::string(TrackRetentionText(retention)) +
+                       " pruned=" + std::to_string(prunedCount) + " before=" +
+                       std::to_string(trackCountBeforeEndFrame) + " after=" + std::to_string(trackCountAfterEndFrame) +
+                       " metric_version=" + std::to_string(frame.versions.metricVersion) +
+                       " previous_metric_version=" + std::to_string(presentedState.versions.metricVersion) +
+                       " had_previous_metric=" + BoolText(presentedState.hasMetricVersion) +
+                       " surface_version=" + std::to_string(frame.versions.surfaceVersion) +
+                       " snapshot_version=" + std::to_string(frame.versions.snapshotVersion) +
+                       " overlay_version=" + std::to_string(frame.versions.overlayVersion) +
+                       " animation_geometry_version=" + std::to_string(frame.versions.animationGeometryVersion));
+        }
         activeAnimations_.store(activeTimeline->HasActiveAnimations(now));
     } else {
         activeAnimations_.store(false);
@@ -299,11 +352,9 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
     if (!presented) {
         SetLastError(renderer.LastError());
     } else {
-        presentedState.surfaceVersion = frame.surfaceVersion;
-        presentedState.snapshotVersion = frame.snapshotVersion;
-        presentedState.overlayVersion = frame.overlayVersion;
-        presentedState.animationGeometryVersion = frame.animationGeometryVersion;
+        presentedState.versions = frame.versions;
         presentedState.hasFrame = true;
+        presentedState.hasMetricVersion = true;
         presentedState.retainedContents = retainedContents;
     }
     return presented;
@@ -314,11 +365,11 @@ void DashboardRenderThread::DrawFrame(Renderer& renderer,
     const DashboardPresentationFrame& frame,
     DashboardAnimationTimeline::Clock::time_point) const {
     renderer.DrawBitmap(frame.snapshotLayer, RenderPoint{0, 0});
-    DrawAnimations(renderer, timeline, frame.snapshotAnimations, frame.snapshotVersion);
+    DrawAnimations(renderer, timeline, frame.snapshotAnimations, frame.versions.metricVersion);
     if (frame.overlayLayer.has_value()) {
         renderer.DrawBitmap(*frame.overlayLayer, RenderPoint{0, 0});
     }
-    DrawAnimations(renderer, timeline, frame.overlayAnimations, frame.overlayVersion);
+    DrawAnimations(renderer, timeline, frame.overlayAnimations, frame.versions.metricVersion);
 }
 
 void DashboardRenderThread::DrawFrameDirty(Renderer& renderer,
@@ -368,14 +419,14 @@ DashboardRenderThread::PreparedDirtyFrame DashboardRenderThread::PrepareDirtyFra
     preparedFrame.dirtyRects.reserve(frame.snapshotAnimations.size() + frame.overlayAnimations.size());
     AppendPreparedDirtyAnimations(timeline,
         frame.snapshotAnimations,
-        frame.snapshotVersion,
+        frame.versions.metricVersion,
         frame.width,
         frame.height,
         preparedFrame.snapshotAnimations,
         preparedFrame.dirtyRects);
     AppendPreparedDirtyAnimations(timeline,
         frame.overlayAnimations,
-        frame.overlayVersion,
+        frame.versions.metricVersion,
         frame.width,
         frame.height,
         preparedFrame.overlayAnimations,
@@ -431,9 +482,8 @@ void DashboardRenderThread::DrawPreparedDirtyAnimations(
 
 void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, DashboardPresentationFrame update) const {
     target.style = std::move(update.style);
-    target.surfaceVersion = update.surfaceVersion;
-    target.metricVersion = update.metricVersion;
-    target.styleVersion = update.styleVersion;
+    target.versions.surfaceVersion = update.versions.surfaceVersion;
+    target.versions.metricVersion = update.versions.metricVersion;
     target.width = update.width;
     target.height = update.height;
     target.animate = update.animate;
@@ -442,7 +492,7 @@ void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, Dashb
         ReleaseBitmap(std::move(target.snapshotLayer));
         target.snapshotLayer = std::move(update.snapshotLayer);
         target.snapshotAnimations = std::move(update.snapshotAnimations);
-        target.snapshotVersion = update.snapshotVersion;
+        target.versions.snapshotVersion = update.versions.snapshotVersion;
     }
     if (update.overlayLayerUpdated) {
         if (target.overlayLayer.has_value()) {
@@ -450,10 +500,10 @@ void DashboardRenderThread::MergeFrame(DashboardPresentationFrame& target, Dashb
         }
         target.overlayLayer = std::move(update.overlayLayer);
         target.overlayAnimations = std::move(update.overlayAnimations);
-        target.overlayVersion = update.overlayVersion;
+        target.versions.overlayVersion = update.versions.overlayVersion;
     }
     if (update.snapshotLayerUpdated || update.overlayLayerUpdated) {
-        target.animationGeometryVersion = update.animationGeometryVersion;
+        target.versions.animationGeometryVersion = update.versions.animationGeometryVersion;
     }
     target.snapshotLayerUpdated = true;
     target.overlayLayerUpdated = true;
@@ -489,12 +539,19 @@ void DashboardRenderThread::ThreadMain() {
                 break;
             }
             if (resetTimelineRequested_) {
+                WriteTrace("renderer:animation_timeline_reset owner=thread reason=explicit_request tracks=" +
+                           std::to_string(timeline.TrackCount()));
                 timeline.Reset();
                 activeAnimations_.store(false);
                 resetTimelineRequested_ = false;
             }
             if (discardTargetRequested_) {
                 renderer->DiscardWindowTarget(discardReason_);
+                const std::uint64_t metricVersion = presentedState.versions.metricVersion;
+                const bool hasMetricVersion = presentedState.hasMetricVersion;
+                presentedState = {};
+                presentedState.versions.metricVersion = metricVersion;
+                presentedState.hasMetricVersion = hasMetricVersion;
                 discardTargetRequested_ = false;
                 discardReason_.clear();
             }
@@ -537,7 +594,17 @@ void DashboardRenderThread::ThreadMain() {
         ReleaseFrameLayers(std::move(*activeFrame));
         activeFrame.reset();
     }
+    WriteTrace("renderer:animation_timeline_reset owner=thread reason=shutdown tracks=" +
+               std::to_string(timeline.TrackCount()));
+    timeline.Reset();
     renderer->Shutdown();
+}
+
+void DashboardRenderThread::WriteTrace(std::string text) const {
+    const Trace* trace = trace_.load();
+    if (trace != nullptr) {
+        trace->Write(text);
+    }
 }
 
 void DashboardRenderThread::SetLastError(std::string error) {

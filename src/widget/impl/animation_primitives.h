@@ -5,6 +5,7 @@
 
 #include "widget/animation.h"
 
+// Timeline samples stay geometry-free so layout and scale changes can reuse stored animation tracks.
 struct ScalarFillSample {
     std::optional<double> valueRatio;
     std::optional<double> peakRatio;

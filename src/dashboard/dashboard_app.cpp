@@ -427,9 +427,10 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
     }
 
     currentDpi_ = targetDpi;
-    ReleaseFonts();
     UpdateRendererScale(targetScale);
-    if (!InitializeFonts()) {
+    // Scale and DPI changes must preserve the presentation timeline; surfaceVersion handles target recreation.
+    if (!renderer_.LastError().empty()) {
+        lastError_ = renderer_.LastError();
         return false;
     }
 

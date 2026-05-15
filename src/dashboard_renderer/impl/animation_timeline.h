@@ -1,6 +1,7 @@
 #pragma once
 
 #include <chrono>
+#include <cstddef>
 #include <cstdint>
 #include <unordered_map>
 
@@ -10,14 +11,19 @@
 class DashboardAnimationTimeline {
 public:
     using Clock = std::chrono::steady_clock;
+    enum class TrackRetention {
+        PruneUntouched,
+        KeepUntouched,
+    };
 
     explicit DashboardAnimationTimeline(std::chrono::milliseconds duration = kTelemetryRefreshInterval);
 
     void BeginFrame(Clock::time_point now);
     WidgetAnimationStatePtr Resolve(
         const AnimationDataKey& key, const WidgetAnimationState& target, std::uint64_t targetVersion);
-    void EndFrame();
+    std::size_t EndFrame(TrackRetention retention = TrackRetention::PruneUntouched);
     void Reset();
+    std::size_t TrackCount() const;
     bool HasActiveAnimations(Clock::time_point now) const;
 
 private:
@@ -25,7 +31,7 @@ private:
         WidgetAnimationStatePtr start;
         WidgetAnimationStatePtr target;
         WidgetAnimationTransitionPtr transition;
-        const WidgetAnimationState* observedTarget = nullptr;
+        // Guards timeline retargeting against repeated resolutions for the same metric target.
         std::uint64_t observedTargetVersion = 0;
         Clock::time_point startTime{};
         bool touched = false;

@@ -17,10 +17,25 @@
 #include "renderer/renderer.h"
 #include "widget/animation.h"
 
+class Trace;
+
 struct DashboardPresentationAnimation {
     WidgetAnimationPtr animation;
     WidgetAnimationStatePtr targetState;
     RenderPoint translation{};
+};
+
+struct DashboardPresentationVersions {
+    // Guards live presenter target recreation when size, DPI, or render scale changes.
+    std::uint64_t surfaceVersion = 0;
+    // Guards snapshot bitmap replacement and full redraw when the opaque base layer changes.
+    std::uint64_t snapshotVersion = 0;
+    // Guards overlay bitmap replacement and full redraw when the transparent edit/drag layer changes.
+    std::uint64_t overlayVersion = 0;
+    // Guards animation dirty-rectangle reuse when animation bounds or translations change.
+    std::uint64_t animationGeometryVersion = 0;
+    // Guards animation target retargeting and stale-key pruning when telemetry data changes.
+    std::uint64_t metricVersion = 0;
 };
 
 struct DashboardPresentationFrame {
@@ -29,12 +44,7 @@ struct DashboardPresentationFrame {
     std::optional<RenderBitmap> overlayLayer;
     std::vector<DashboardPresentationAnimation> snapshotAnimations;
     std::vector<DashboardPresentationAnimation> overlayAnimations;
-    std::uint64_t surfaceVersion = 0;
-    std::uint64_t snapshotVersion = 0;
-    std::uint64_t overlayVersion = 0;
-    std::uint64_t animationGeometryVersion = 0;
-    std::uint64_t metricVersion = 0;
-    std::uint64_t styleVersion = 0;
+    DashboardPresentationVersions versions;
     int width = 0;
     int height = 0;
     bool animate = false;
@@ -43,11 +53,9 @@ struct DashboardPresentationFrame {
 };
 
 struct DashboardPresentedFrameState {
-    std::uint64_t surfaceVersion = 0;
-    std::uint64_t snapshotVersion = 0;
-    std::uint64_t overlayVersion = 0;
-    std::uint64_t animationGeometryVersion = 0;
+    DashboardPresentationVersions versions;
     bool hasFrame = false;
+    bool hasMetricVersion = false;
     bool retainedContents = false;
 };
 
@@ -68,6 +76,7 @@ public:
     ~DashboardRenderThread();
 
     void Configure(HWND hwnd, bool threaded, bool immediatePresent);
+    void SetTrace(const Trace* trace);
     void SetBitmapPool(std::shared_ptr<DashboardLayerBitmapPool> pool);
     void Shutdown();
     bool PublishFrame(DashboardPresentationFrame frame);
@@ -129,9 +138,11 @@ private:
     void ReleaseFrameLayers(DashboardPresentationFrame frame) const;
     void ReleaseBitmap(RenderBitmap bitmap) const;
     void ThreadMain();
+    void WriteTrace(std::string text) const;
     void SetLastError(std::string error);
 
     std::atomic<HWND> hwnd_{nullptr};
+    std::atomic<const Trace*> trace_{nullptr};
     bool threaded_ = false;
     std::atomic_bool immediatePresent_{false};
     std::unique_ptr<Renderer> syncRenderer_;
