@@ -29,6 +29,8 @@ public:
     void DiscardWindowTarget(std::string_view reason = {}) override;
     bool DrawWindow(int width, int height, const DrawCallback& draw) override;
     bool DrawOffscreen(int width, int height, const DrawCallback& draw) override;
+    bool DrawToBitmap(
+        RenderBitmap& bitmap, int width, int height, RenderBitmapClear clear, const DrawCallback& draw) override;
     bool SavePng(const FilePath& imagePath, int width, int height, const DrawCallback& draw) override;
     const std::string& LastError() const override;
     const TextStyleMetrics& TextMetrics() const override;
@@ -52,6 +54,7 @@ public:
     void PopClipRect() override;
     void PushTranslation(RenderPoint offset) override;
     void PopTranslation() override;
+    bool DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) override;
     bool DrawIcon(std::string_view iconName, const RenderRect& rect) override;
     bool FillSolidRect(const RenderRect& rect, RenderColorId color) override;
     bool FillSolidRoundedRect(const RenderRect& rect, int radius, RenderColorId color) override;

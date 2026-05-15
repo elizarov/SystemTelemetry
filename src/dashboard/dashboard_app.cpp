@@ -1095,11 +1095,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 return 0;
             }
             if (wParam == kAnimationFrameTimerId) {
-                if (renderer_.HasActiveDashboardAnimation()) {
-                    InvalidateRect(hwnd_, nullptr, FALSE);
-                } else {
-                    KillTimer(hwnd_, kAnimationFrameTimerId);
-                }
+                KillTimer(hwnd_, kAnimationFrameTimerId);
                 return 0;
             }
             if (wParam == kPlacementTimerId) {
@@ -1433,11 +1429,7 @@ void DashboardApp::Paint() {
     renderer_.DrawWindow(snapshot, rendererDashboardOverlayState_);
     const auto drawEnd = std::chrono::steady_clock::now();
     EndPaint(hwnd_, &ps);
-    if (renderer_.HasActiveDashboardAnimation()) {
-        SetTimer(hwnd_, kAnimationFrameTimerId, kAnimationFrameTimerMs, nullptr);
-    } else {
-        KillTimer(hwnd_, kAnimationFrameTimerId);
-    }
+    KillTimer(hwnd_, kAnimationFrameTimerId);
     const auto paintEnd = std::chrono::steady_clock::now();
     RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
     RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);

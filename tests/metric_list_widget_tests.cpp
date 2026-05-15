@@ -120,6 +120,16 @@ public:
         return true;
     }
 
+    bool DrawToBitmap(
+        RenderBitmap& bitmap, int width, int height, RenderBitmapClear, const DrawCallback& draw) override {
+        bitmap.width = width;
+        bitmap.height = height;
+        bitmap.stride = width * 4;
+        bitmap.bgra.assign(static_cast<size_t>(std::max(0, bitmap.stride) * std::max(0, height)), 0);
+        draw();
+        return true;
+    }
+
     bool SavePng(const FilePath&, int, int, const DrawCallback& draw) override {
         draw();
         return true;
@@ -178,6 +188,10 @@ public:
     void PushTranslation(RenderPoint) override {}
 
     void PopTranslation() override {}
+
+    bool DrawBitmap(const RenderBitmap&, RenderPoint) override {
+        return true;
+    }
 
     bool DrawIcon(std::string_view, const RenderRect&) override {
         return true;

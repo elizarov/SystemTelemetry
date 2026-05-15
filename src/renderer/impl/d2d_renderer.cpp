@@ -278,6 +278,61 @@ bool D2DRenderer::DrawOffscreen(int width, int height, const DrawCallback& draw)
     return DrawToWicBitmap(width, height, draw, "offscreen");
 }
 
+bool D2DRenderer::DrawToBitmap(
+    RenderBitmap& output, int width, int height, RenderBitmapClear clear, const DrawCallback& draw) {
+    if (!InitializeDirect2D()) {
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
+    const UINT bitmapWidth = static_cast<UINT>(std::max(1, width));
+    const UINT bitmapHeight = static_cast<UINT>(std::max(1, height));
+    HRESULT hr = wicFactory_->CreateBitmap(
+        bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
+    if (FAILED(hr) || bitmap == nullptr) {
+        lastError_ = "renderer:layer_wic_bitmap_failed hr=" + FormatHresult(hr);
+        return false;
+    }
+
+    Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
+    hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
+        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
+            D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
+            96.0f,
+            96.0f),
+        bitmapRenderTarget.GetAddressOf());
+    if (FAILED(hr) || bitmapRenderTarget == nullptr) {
+        lastError_ = "renderer:layer_d2d_target_failed hr=" + FormatHresult(hr);
+        return false;
+    }
+
+    if (!BeginDirect2DDraw(bitmapRenderTarget.Get())) {
+        return false;
+    }
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent
+                                        ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)
+                                        : palette_.Get(RenderColorId::Background).ToD2DColorF();
+    d2dActiveRenderTarget_->Clear(clearColor);
+    draw();
+    EndDirect2DDraw();
+    if (!lastError_.empty()) {
+        return false;
+    }
+
+    output.width = static_cast<int>(bitmapWidth);
+    output.height = static_cast<int>(bitmapHeight);
+    output.stride = output.width * 4;
+    output.bgra.resize(static_cast<size_t>(output.stride) * static_cast<size_t>(output.height));
+    hr = bitmap->CopyPixels(
+        nullptr, static_cast<UINT>(output.stride), static_cast<UINT>(output.bgra.size()), output.bgra.data());
+    if (FAILED(hr)) {
+        lastError_ = "renderer:layer_copy_pixels_failed hr=" + FormatHresult(hr);
+        output = {};
+        return false;
+    }
+    return true;
+}
+
 bool D2DRenderer::DrawToWicBitmap(int width,
     int height,
     const DrawCallback& draw,
@@ -670,6 +725,33 @@ void D2DRenderer::PopTranslation() {
     }
     d2dActiveRenderTarget_->SetTransform(d2dTransformStack_.back());
     d2dTransformStack_.pop_back();
+}
+
+bool D2DRenderer::DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) {
+    if (!IsDrawActive() || bitmap.Empty()) {
+        return false;
+    }
+    Microsoft::WRL::ComPtr<ID2D1Bitmap> d2dBitmap;
+    const D2D1_BITMAP_PROPERTIES properties =
+        D2D1::BitmapProperties(D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED));
+    const HRESULT hr = d2dActiveRenderTarget_->CreateBitmap(
+        D2D1::SizeU(static_cast<UINT>(bitmap.width), static_cast<UINT>(bitmap.height)),
+        bitmap.bgra.data(),
+        static_cast<UINT>(bitmap.stride),
+        properties,
+        d2dBitmap.GetAddressOf());
+    if (FAILED(hr) || d2dBitmap == nullptr) {
+        lastError_ = "renderer:draw_bitmap_create_failed hr=" + FormatHresult(hr);
+        return false;
+    }
+    d2dActiveRenderTarget_->DrawBitmap(d2dBitmap.Get(),
+        D2D1::RectF(static_cast<float>(origin.x),
+            static_cast<float>(origin.y),
+            static_cast<float>(origin.x + bitmap.width),
+            static_cast<float>(origin.y + bitmap.height)),
+        1.0f,
+        D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR);
+    return true;
 }
 
 bool D2DRenderer::DrawIcon(std::string_view iconName, const RenderRect& rect) {

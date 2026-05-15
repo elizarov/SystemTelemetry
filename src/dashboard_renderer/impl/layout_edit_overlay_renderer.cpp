@@ -1188,7 +1188,6 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
             }
         }
     }
-    renderer_.FlushWidgetAnimations(WidgetAnimationLayer::Overlay);
     renderer_.Renderer().DrawSolidRect(childRect,
         RenderStroke::Dotted(ActiveEditColor(*renderer_.activeOverlayState_),
             static_cast<float>(UseActiveEditEmphasis(*renderer_.activeOverlayState_, true)

@@ -213,6 +213,7 @@ add_executable(CaseDash WIN32
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/animation.cpp
@@ -265,6 +266,7 @@ set(casedash_release_speed_sources
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
@@ -621,6 +623,7 @@ add_executable(CaseDashTests
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
@@ -763,6 +766,7 @@ add_executable(CaseDashBenchmarks
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
     src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
     src/widget/animation.cpp

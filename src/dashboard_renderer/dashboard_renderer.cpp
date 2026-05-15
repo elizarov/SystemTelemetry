@@ -92,7 +92,12 @@ void DashboardRenderer::SetRenderScale(double scale) {
 }
 
 void DashboardRenderer::SetImmediatePresent(bool enabled) {
+    if (immediatePresent_ == enabled) {
+        return;
+    }
+    immediatePresent_ = enabled;
     renderer_->SetImmediatePresent(enabled);
+    presentation_.Configure(presentationHwnd_, presentationHwnd_ != nullptr && !immediatePresent_, immediatePresent_);
 }
 
 void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
@@ -101,7 +106,7 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
     }
     liveAnimationEnabled_ = enabled;
     if (!liveAnimationEnabled_) {
-        animationTimeline_.Reset();
+        presentation_.ResetTimeline();
     }
 }
 
@@ -127,7 +132,15 @@ double DashboardRenderer::RenderScale() const {
 }
 
 const std::string& DashboardRenderer::LastError() const {
-    return lastError_.empty() ? renderer_->LastError() : lastError_;
+    if (!lastError_.empty()) {
+        return lastError_;
+    }
+    const std::string presentationError = presentation_.LastError();
+    if (!presentationError.empty()) {
+        lastError_ = presentationError;
+        return lastError_;
+    }
+    return renderer_->LastError();
 }
 
 ::Renderer& DashboardRenderer::Renderer() {
@@ -368,25 +381,72 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
-    const bool animateLiveFrame = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
-    if (animateLiveFrame) {
-        animationTimeline_.BeginFrame(std::chrono::steady_clock::now());
+    DashboardPresentationFrame frame;
+    if (!BuildPresentationFrame(snapshot, overlayState, frame)) {
+        return false;
     }
-    renderer_->DrawWindow(WindowWidth(), WindowHeight(), [&] { DrawFrameWithAnimations(snapshot, overlayState); });
-    if (animateLiveFrame) {
-        animationTimeline_.EndFrame();
+    const bool presented = immediatePresent_ || presentationHwnd_ == nullptr
+                               ? presentation_.PresentFrameSynchronously(std::move(frame))
+                               : presentation_.PublishFrame(std::move(frame));
+    if (!presented) {
+        lastError_ = presentation_.LastError();
     }
-    if (!renderer_->LastError().empty()) {
-        lastError_ = renderer_->LastError();
-    }
-    return lastError_.empty();
+    return presented && lastError_.empty();
 }
 
-void DashboardRenderer::DrawFrameWithAnimations(
-    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+bool DashboardRenderer::BuildPresentationFrame(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, DashboardPresentationFrame& frame) {
     BeginWidgetAnimationCollection();
-    DrawFrame(snapshot, overlayState);
+    activeOverlayState_ = &overlayState;
+    layoutResolver_->ClearDynamicEditArtifacts();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
+
+    frame = {};
+    frame.width = WindowWidth();
+    frame.height = WindowHeight();
+    frame.style = BuildRendererStyle();
+    frame.surfaceGeneration = ResolveSurfaceGeneration();
+    frame.animate = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
+
+    const MetricSource& metrics = ResolveMetrics(snapshot);
+    BeginWidgetAnimationLayer(WidgetAnimationLayer::Snapshot);
+    const bool snapshotDrawn =
+        renderer_->DrawToBitmap(frame.snapshotLayer, frame.width, frame.height, RenderBitmapClear::Background, [&] {
+            DrawSnapshotLayer(overlayState, metrics);
+        });
+    if (!snapshotDrawn) {
+        lastError_ = renderer_->LastError();
+        EndWidgetAnimationCollection();
+        layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+        activeOverlayState_ = nullptr;
+        return false;
+    }
+    frame.snapshotAnimations = std::move(snapshotWidgetAnimations_);
+
+    layoutResolver_->ResolveDynamicEditArtifactCollisions();
+    if (overlayState.ShouldDrawOverlayLayer()) {
+        layoutResolver_->TagOverlayAffordanceLayers(overlayState);
+        BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
+        RenderBitmap overlayBitmap;
+        const bool overlayDrawn =
+            renderer_->DrawToBitmap(overlayBitmap, frame.width, frame.height, RenderBitmapClear::Transparent, [&] {
+                DrawOverlayLayerStatic(overlayState, metrics);
+            });
+        if (!overlayDrawn) {
+            lastError_ = renderer_->LastError();
+            EndWidgetAnimationCollection();
+            layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+            activeOverlayState_ = nullptr;
+            return false;
+        }
+        frame.overlayLayer = std::move(overlayBitmap);
+        frame.overlayAnimations = std::move(overlayWidgetAnimations_);
+    }
+
     EndWidgetAnimationCollection();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    activeOverlayState_ = nullptr;
+    return true;
 }
 
 void DashboardRenderer::BeginWidgetAnimationCollection() {
@@ -404,7 +464,19 @@ std::vector<WidgetAnimationPtr>& DashboardRenderer::WidgetAnimationsForLayer(Wid
     return layer == WidgetAnimationLayer::Overlay ? overlayWidgetAnimations_ : snapshotWidgetAnimations_;
 }
 
-void DashboardRenderer::FlushWidgetAnimations(WidgetAnimationLayer layer) {
+std::uint64_t DashboardRenderer::ResolveSurfaceGeneration() {
+    const int width = WindowWidth();
+    const int height = WindowHeight();
+    if (presentedWidth_ != width || presentedHeight_ != height || std::abs(presentedScale_ - renderScale_) >= 0.0001) {
+        presentedWidth_ = width;
+        presentedHeight_ = height;
+        presentedScale_ = renderScale_;
+        ++surfaceGeneration_;
+    }
+    return surfaceGeneration_;
+}
+
+void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
     std::vector<WidgetAnimationPtr>& layerAnimations = WidgetAnimationsForLayer(layer);
     if (layerAnimations.empty()) {
         return;
@@ -419,12 +491,8 @@ void DashboardRenderer::FlushWidgetAnimations(WidgetAnimationLayer layer) {
             continue;
         }
         WidgetAnimationStatePtr target = animation->TargetState();
-        if (target == nullptr) {
-            continue;
-        }
-        WidgetAnimationStatePtr sampled = animationTimeline_.Resolve(animation->Key(), *target);
-        if (sampled != nullptr) {
-            animation->Draw(Renderer(), *sampled);
+        if (target != nullptr) {
+            animation->Draw(Renderer(), *target);
         }
     }
     widgetAnimationCollectionActive_ = collectionWasActive;
@@ -438,20 +506,24 @@ void DashboardRenderer::EndWidgetAnimationCollection() {
 }
 
 void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    BeginWidgetAnimationCollection();
     activeOverlayState_ = &overlayState;
     layoutResolver_->ClearDynamicEditArtifacts();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
     const MetricSource& metrics = ResolveMetrics(snapshot);
+
     BeginWidgetAnimationLayer(WidgetAnimationLayer::Snapshot);
     DrawSnapshotLayer(overlayState, metrics);
-    FlushWidgetAnimations(WidgetAnimationLayer::Snapshot);
+    DrawAnimationTargets(WidgetAnimationLayer::Snapshot);
     layoutResolver_->ResolveDynamicEditArtifactCollisions();
     if (overlayState.ShouldDrawOverlayLayer()) {
         layoutResolver_->TagOverlayAffordanceLayers(overlayState);
         BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
-        DrawOverlayLayer(overlayState, metrics);
-        FlushWidgetAnimations(WidgetAnimationLayer::Overlay);
+        DrawOverlayLayerStatic(overlayState, metrics);
+        DrawAnimationTargets(WidgetAnimationLayer::Overlay);
     }
+
+    EndWidgetAnimationCollection();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
     activeOverlayState_ = nullptr;
 }
@@ -469,7 +541,7 @@ void DashboardRenderer::DrawSnapshotLayer(const DashboardOverlayState& overlaySt
     }
 }
 
-void DashboardRenderer::DrawOverlayLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
+void DashboardRenderer::DrawOverlayLayerStatic(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
     layoutEditOverlayRenderer_->DrawBackgroundAffordances(overlayState);
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
         DrawResolvedWidgetOverlay(card.chrome, metrics);
@@ -477,7 +549,6 @@ void DashboardRenderer::DrawOverlayLayer(const DashboardOverlayState& overlaySta
             DrawResolvedWidgetOverlay(widget, metrics);
         }
     }
-    FlushWidgetAnimations(WidgetAnimationLayer::Overlay);
     layoutEditOverlayRenderer_->DrawDraggedContent(metrics);
     layoutEditOverlayRenderer_->DrawForegroundAffordances(overlayState);
     DrawMoveOverlay(overlayState.moveOverlay);
@@ -490,8 +561,13 @@ bool DashboardRenderer::SaveSnapshotPng(const FilePath& imagePath, const SystemS
 bool DashboardRenderer::SaveSnapshotPng(
     const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
+    DashboardPresentationFrame frame;
+    if (!BuildPresentationFrame(snapshot, overlayState, frame)) {
+        return false;
+    }
+    frame.animate = false;
     const bool saved = renderer_->SavePng(
-        imagePath, WindowWidth(), WindowHeight(), [&] { DrawFrameWithAnimations(snapshot, overlayState); });
+        imagePath, frame.width, frame.height, [&] { presentation_.DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
@@ -635,7 +711,13 @@ LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCard
 bool DashboardRenderer::RenderSnapshotOffscreen(
     const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
-    renderer_->DrawOffscreen(WindowWidth(), WindowHeight(), [&] { DrawFrameWithAnimations(snapshot, overlayState); });
+    DashboardPresentationFrame frame;
+    if (!BuildPresentationFrame(snapshot, overlayState, frame)) {
+        return false;
+    }
+    frame.animate = false;
+    renderer_->DrawOffscreen(
+        frame.width, frame.height, [&] { presentation_.DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
@@ -648,8 +730,7 @@ bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
 }
 
 bool DashboardRenderer::HasActiveDashboardAnimation() const {
-    return liveAnimationEnabled_ && renderMode_ == RenderMode::Normal &&
-           animationTimeline_.HasActiveAnimations(std::chrono::steady_clock::now());
+    return liveAnimationEnabled_ && renderMode_ == RenderMode::Normal && presentation_.HasActiveAnimations();
 }
 
 LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
@@ -1018,7 +1099,8 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPr
 
 bool DashboardRenderer::Initialize(HWND hwnd) {
     lastError_.clear();
-    renderer_->AttachWindow(hwnd);
+    presentationHwnd_ = hwnd;
+    presentation_.Configure(hwnd, hwnd != nullptr && !immediatePresent_, immediatePresent_);
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
         lastError_ = renderer_->LastError().empty() ? "renderer:initialize_failed" : renderer_->LastError();
         return false;
@@ -1030,11 +1112,13 @@ void DashboardRenderer::Shutdown() {
     InvalidateMetricSourceCache();
     layoutResolver_->Clear();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    presentation_.Shutdown();
+    presentationHwnd_ = nullptr;
     renderer_->Shutdown();
 }
 
 void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
-    renderer_->DiscardWindowTarget(reason);
+    presentation_.DiscardWindowTarget(reason);
 }
 
 RendererStyle DashboardRenderer::BuildRendererStyle() const {

@@ -11,9 +11,9 @@
 #include <vector>
 
 #include "config/config.h"
-#include "dashboard_renderer/impl/animation_timeline.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "dashboard_renderer/impl/metric_lookup_cache.h"
+#include "dashboard_renderer/impl/render_thread.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_active_region.h"
 #include "renderer/renderer.h"
@@ -131,15 +131,17 @@ private:
         bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
-    void DrawFrameWithAnimations(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
+    bool BuildPresentationFrame(
+        const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, DashboardPresentationFrame& frame);
     void DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     void DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
-    void DrawOverlayLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics);
+    void DrawOverlayLayerStatic(const DashboardOverlayState& overlayState, const MetricSource& metrics);
     void BeginWidgetAnimationCollection();
     void BeginWidgetAnimationLayer(WidgetAnimationLayer layer);
-    void FlushWidgetAnimations(WidgetAnimationLayer layer);
+    void DrawAnimationTargets(WidgetAnimationLayer layer);
     void EndWidgetAnimationCollection();
     std::vector<WidgetAnimationPtr>& WidgetAnimationsForLayer(WidgetAnimationLayer layer);
+    std::uint64_t ResolveSurfaceGeneration();
     bool ResolveLayout(bool includeWidgetState = true);
     void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
@@ -182,16 +184,22 @@ private:
     const SystemSnapshot* cachedMetricSnapshot_ = nullptr;
     uint64_t cachedMetricSnapshotRevision_ = 0;
     mutable MetricLookupCache metricLookupCache_;
-    std::string lastError_;
+    mutable std::string lastError_;
     double renderScale_ = 1.0;
     RenderMode renderMode_ = RenderMode::Normal;
     bool layoutGuideDragActive_ = false;
     bool interactiveDragTraceActive_ = false;
     bool liveAnimationEnabled_ = false;
+    bool immediatePresent_ = false;
     bool widgetAnimationCollectionActive_ = false;
     WidgetAnimationLayer currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
     const DashboardOverlayState* activeOverlayState_ = nullptr;
-    DashboardAnimationTimeline animationTimeline_;
+    DashboardRenderThread presentation_;
+    HWND presentationHwnd_ = nullptr;
+    int presentedWidth_ = 0;
+    int presentedHeight_ = 0;
+    double presentedScale_ = 0.0;
+    std::uint64_t surfaceGeneration_ = 1;
     std::vector<WidgetAnimationPtr> snapshotWidgetAnimations_;
     std::vector<WidgetAnimationPtr> overlayWidgetAnimations_;
 };
