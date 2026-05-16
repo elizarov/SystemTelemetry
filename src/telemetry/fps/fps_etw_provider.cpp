@@ -169,7 +169,7 @@ public:
         LARGE_INTEGER frequency{};
         if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
             diagnostics_ = "QueryPerformanceFrequency failed.";
-            trace_.Write(TracePrefix::FpsEtw, "initialize_failed diagnostics=\"" + diagnostics_ + "\"");
+            trace_.WriteFmt(TracePrefix::FpsEtw, "initialize_failed diagnostics=\"%s\"", diagnostics_.c_str());
             return false;
         }
         qpcFrequency_ = frequency.QuadPart;
@@ -186,11 +186,11 @@ public:
         sessionProps.properties.MaximumBuffers = 16;
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-        trace_.Write(TracePrefix::FpsEtw, "start_trace status=" + Win32ErrorText(status));
+        trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", Win32ErrorText(status).c_str());
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-            trace_.Write(TracePrefix::FpsEtw, "start_trace_retry status=" + Win32ErrorText(status));
+            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", Win32ErrorText(status).c_str());
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
@@ -828,7 +828,7 @@ private:
             handle = traceHandle_;
         }
         const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-        trace_.Write(TracePrefix::FpsEtw, "process_trace_done status=" + Win32ErrorText(processStatus));
+        trace_.WriteFmt(TracePrefix::FpsEtw, "process_trace_done status=%s", Win32ErrorText(processStatus).c_str());
     }
 
     Trace& trace_;

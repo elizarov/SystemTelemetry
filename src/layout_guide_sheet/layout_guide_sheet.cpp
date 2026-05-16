@@ -107,8 +107,10 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     LayoutGuideSheetPipelineStats* outputStats = stats != nullptr ? stats : &collectedStats;
     *outputStats = {};
     const std::string imagePathText = imagePath.string();
-    trace.Write(TracePrefix::Diagnostics,
-        "layout_guide_sheet start path=\"" + imagePathText + "\" layout=\"" + config.display.layout + "\"");
+    trace.WriteFmt(TracePrefix::Diagnostics,
+        "layout_guide_sheet start path=\"%s\" layout=\"%s\"",
+        imagePathText.c_str(),
+        config.display.layout.c_str());
 
     DashboardRenderer renderer(trace);
     renderer.SetRenderScale(scale);
@@ -149,10 +151,10 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
 
     outputStats->traceDetails = traceDetails;
     for (const std::string& detail : outputStats->traceDetails) {
-        trace.Write(TracePrefix::Diagnostics, "layout_guide_sheet detail " + detail);
+        trace.WriteFmt(TracePrefix::Diagnostics, "layout_guide_sheet detail %s", detail.c_str());
     }
     WritePipelineStatsTrace(trace, *outputStats);
-    trace.Write(TracePrefix::Diagnostics, "layout_guide_sheet end path=\"" + imagePathText + "\"");
+    trace.WriteFmt(TracePrefix::Diagnostics, "layout_guide_sheet end path=\"%s\"", imagePathText.c_str());
     return true;
 }
 

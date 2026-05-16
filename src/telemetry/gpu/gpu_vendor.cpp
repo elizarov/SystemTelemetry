@@ -36,13 +36,11 @@ public:
 
         const std::string adapterName = adapter_.has_value() ? adapter_->adapterName : std::string();
         const unsigned int vendorId = adapter_.has_value() ? adapter_->vendorId : 0;
-        char buffer[256];
-        sprintf_s(buffer,
+        trace_.WriteFmt(TracePrefix::UnsupportedGpu,
             "initialize vendor_id=0x%04X name=\"%s\" fps=\"%s\"",
             vendorId,
             adapterName.c_str(),
             fpsDiagnostics_.c_str());
-        trace_.Write(TracePrefix::UnsupportedGpu, buffer);
         return true;
     }
 
@@ -95,9 +93,7 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
-        char buffer[128];
-        sprintf_s(buffer, "adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
-        trace.Write(TracePrefix::GpuVendor, buffer);
+        trace.WriteFmt(TracePrefix::GpuVendor, "adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
         return std::nullopt;
     }
 
@@ -110,9 +106,10 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
-            char buffer[128];
-            sprintf_s(buffer, "adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
-            trace.Write(TracePrefix::GpuVendor, buffer);
+            trace.WriteFmt(TracePrefix::GpuVendor,
+                "adapter_enum index=%u hr=0x%08X",
+                adapterIndex,
+                static_cast<unsigned int>(enumHr));
             break;
         }
 
@@ -123,26 +120,22 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
         if (SUCCEEDED(descHr) && !software) {
             selected = GpuVendorInfo{desc.VendorId, adapterName};
             const GpuVendor vendor = SelectGpuVendor(*selected);
-            char buffer[256];
-            sprintf_s(buffer,
+            trace.WriteFmt(TracePrefix::GpuVendor,
                 "adapter_selected index=%u vendor_id=0x%04X vendor=%s name=\"%s\"",
                 adapterIndex,
                 desc.VendorId,
                 GpuVendorName(vendor),
                 adapterName.c_str());
-            trace.Write(TracePrefix::GpuVendor, buffer);
             adapter->Release();
             break;
         }
 
-        char buffer[256];
-        sprintf_s(buffer,
+        trace.WriteFmt(TracePrefix::GpuVendor,
             "adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
             adapterIndex,
             static_cast<unsigned int>(descHr),
             Trace::BoolText(software),
             adapterName.c_str());
-        trace.Write(TracePrefix::GpuVendor, buffer);
         adapter->Release();
     }
 
@@ -156,6 +149,6 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace) {
     std::optional<GpuVendorInfo> adapter = ExtractPrimaryGpuVendorInfo(trace);
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
-    trace.Write(TracePrefix::GpuVendor, std::string("create vendor=") + GpuVendorName(vendor));
+    trace.WriteFmt(TracePrefix::GpuVendor, "create vendor=%s", GpuVendorName(vendor));
     return CreateGpuVendorProviderForVendor(trace, vendor, std::move(adapter));
 }

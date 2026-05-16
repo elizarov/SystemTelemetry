@@ -246,11 +246,11 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         const double load3d = loadTotals.total3d;
         const double loadAll = loadTotals.total;
         state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
-        state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-            return "gpu_load load3d=" + Trace::FormatValueDouble("value", load3d, 2) +
-                   " loadAll=" + Trace::FormatValueDouble("value", loadAll, 2) +
-                   " selected=" + Trace::FormatValueDouble("value", state.snapshot_.gpu.loadPercent, 2);
-        });
+        state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+            "gpu_load load3d=value=%.2f loadAll=value=%.2f selected=value=%.2f",
+            load3d,
+            loadAll,
+            state.snapshot_.gpu.loadPercent);
     }
     state.retainedHistoryStore_.PushSample(
         state.snapshot_, RetainedHistoryKey::GpuLoad, state.snapshot_.gpu.loadPercent);
@@ -261,10 +261,10 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
             TracePrefix::Telemetry, [&] { return "gpu_memory_collect status=" + PdhStatusCodeString(collectStatus); });
         const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter);
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
-        state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-            return "gpu_memory bytes=" + Trace::FormatValueDouble("value", bytes, 0) +
-                   " used_gb=" + Trace::FormatValueDouble("value", state.snapshot_.gpu.vram.usedGb, 2);
-        });
+        state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+            "gpu_memory bytes=value=%.0f used_gb=value=%.2f",
+            bytes,
+            state.snapshot_.gpu.vram.usedGb);
     }
 
     state.retainedHistoryStore_.PushSample(

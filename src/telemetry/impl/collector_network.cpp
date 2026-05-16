@@ -296,13 +296,12 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         state.network_.previousOutOctets = selected->outOctets;
         state.network_.previousTick = std::chrono::steady_clock::now();
         if (selected->info.hasIpv4) {
-            state.trace_.Write(TracePrefix::Telemetry,
-                ("network_ip_found interface=" + std::to_string(selected->interfaceIndex) +
-                    " ip=" + selected->info.ipAddress)
-                    .c_str());
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                "network_ip_found interface=%u ip=%s",
+                selected->interfaceIndex,
+                selected->info.ipAddress.c_str());
         } else {
-            state.trace_.Write(TracePrefix::Telemetry,
-                ("network_ip_missing interface=" + std::to_string(selected->interfaceIndex)).c_str());
+            state.trace_.WriteFmt(TracePrefix::Telemetry, "network_ip_missing interface=%u", selected->interfaceIndex);
         }
     } else {
         state.snapshot_.network.adapterName = state.settings_.selection.preferredAdapterName.empty()
@@ -343,9 +342,9 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;
         }
-        state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-            return "network_rates skipped=selection_missing interface=" + std::to_string(state.network_.selectedIndex);
-        });
+        state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+            "network_rates skipped=selection_missing interface=%lu",
+            state.network_.selectedIndex);
         return;
     }
 
@@ -370,12 +369,12 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
                 state.snapshot_, RetainedHistoryKey::NetworkUpload, state.snapshot_.network.uploadMbps);
             state.retainedHistoryStore_.PushSample(
                 state.snapshot_, RetainedHistoryKey::NetworkDownload, state.snapshot_.network.downloadMbps);
-            state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-                return "network_rates interface=" + std::to_string(selected.InterfaceIndex) +
-                       " seconds=" + Trace::FormatValueDouble("value", seconds, 3) +
-                       " upload_mbps=" + Trace::FormatValueDouble("value", state.snapshot_.network.uploadMbps, 3) +
-                       " download_mbps=" + Trace::FormatValueDouble("value", state.snapshot_.network.downloadMbps, 3);
-            });
+            state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+                "network_rates interface=%lu seconds=value=%.3f upload_mbps=value=%.3f download_mbps=value=%.3f",
+                selected.InterfaceIndex,
+                seconds,
+                state.snapshot_.network.uploadMbps,
+                state.snapshot_.network.downloadMbps);
         } else {
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;

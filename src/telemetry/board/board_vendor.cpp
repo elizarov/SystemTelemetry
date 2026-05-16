@@ -26,8 +26,10 @@ public:
             CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         sample_.available = false;
         sample_.diagnostics = "No supported board telemetry provider matches the baseboard manufacturer.";
-        trace_.Write(TracePrefix::UnsupportedBoard,
-            "initialize manufacturer=\"" + info_.manufacturer + "\" product=\"" + info_.product + "\"");
+        trace_.WriteFmt(TracePrefix::UnsupportedBoard,
+            "initialize manufacturer=\"%s\" product=\"%s\"",
+            info_.manufacturer.c_str(),
+            info_.product.c_str());
         return true;
     }
 
@@ -65,8 +67,10 @@ BoardVendorInfo ExtractBoardVendorInfo() {
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
     BoardVendorInfo info = ExtractBoardVendorInfo();
     const BoardVendor vendor = SelectBoardVendor(info);
-    trace.Write(TracePrefix::BoardVendor,
-        std::string("create vendor=") + BoardVendorName(vendor) + " manufacturer=\"" + info.manufacturer +
-            "\" product=\"" + info.product + "\"");
+    trace.WriteFmt(TracePrefix::BoardVendor,
+        "create vendor=%s manufacturer=\"%s\" product=\"%s\"",
+        BoardVendorName(vendor),
+        info.manufacturer.c_str(),
+        info.product.c_str());
     return CreateBoardProviderForVendor(trace, vendor, std::move(info));
 }

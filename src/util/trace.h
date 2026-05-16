@@ -61,6 +61,13 @@ public:
         Write(prefix, builder());
     }
 
+    template <typename... Args> void WriteLazyFmt(TracePrefix prefix, const char* format, Args... args) const {
+        if (!Enabled(prefix)) {
+            return;
+        }
+        WriteFmt(prefix, format, args...);
+    }
+
     static const char* PrefixName(TracePrefix prefix);
     static std::uint64_t PrefixMask(TracePrefix prefix);
     static std::uint64_t AllPrefixesMask();

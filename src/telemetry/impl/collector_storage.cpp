@@ -250,10 +250,9 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
     if (state.storage_.driveCandidates.empty()) {
         state.trace_.Write(TracePrefix::Telemetry, "storage_candidates skipped=no_drives");
     }
-    state.trace_.Write(TracePrefix::Telemetry,
-        ("storage_candidates count=" + std::to_string(state.storage_.driveCandidates.size())).c_str());
-    state.trace_.Write(
-        TracePrefix::Telemetry, ("drive_enumerate count=" + std::to_string(state.snapshot_.drives.size())).c_str());
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry, "storage_candidates count=%zu", state.storage_.driveCandidates.size());
+    state.trace_.WriteFmt(TracePrefix::Telemetry, "drive_enumerate count=%zu", state.snapshot_.drives.size());
     RefreshDriveUsage(state);
 }
 

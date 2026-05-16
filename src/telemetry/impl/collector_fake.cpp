@@ -468,7 +468,7 @@ public:
         if (useSyntheticSource_) {
             trace_.Write(TracePrefix::Fake, "initialize_begin source=synthetic");
         } else {
-            trace_.Write(TracePrefix::Fake, "initialize_begin path=\"" + fakePath_.string() + "\"");
+            trace_.WriteFmt(TracePrefix::Fake, "initialize_begin path=\"%s\"", fakePath_.string().c_str());
         }
         if (!ReloadFakeDump(true, errorText)) {
             trace_.Write(TracePrefix::Fake, "initialize_failed");
@@ -569,7 +569,7 @@ private:
 
         const std::string input = ReadBinaryFile(fakePath_);
         if (input.empty()) {
-            trace_.Write(TracePrefix::Fake, "load_failed reason=open path=\"" + fakePath_.string() + "\"");
+            trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=open path=\"%s\"", fakePath_.string().c_str());
             if (required && errorText != nullptr) {
                 *errorText = "Failed to open fake telemetry file:\n" + fakePath_.string();
             }
@@ -587,7 +587,7 @@ private:
         TelemetryDump loaded;
         std::string error;
         if (!loadFakeDump_(input, loaded, &error)) {
-            trace_.Write(TracePrefix::Fake, "load_failed reason=parse error=\"" + error + "\"");
+            trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=parse error=\"%s\"", error.c_str());
             if (required && errorText != nullptr) {
                 *errorText = "Failed to parse fake telemetry file:\n" + error;
             }
@@ -598,7 +598,7 @@ private:
         dump_ = sourceDump_;
         RefreshSelectionsAndSnapshot();
         lastReload_ = std::chrono::steady_clock::now();
-        trace_.Write(TracePrefix::Fake, "load_done path=\"" + fakePath_.string() + "\"");
+        trace_.WriteFmt(TracePrefix::Fake, "load_done path=\"%s\"", fakePath_.string().c_str());
         return true;
     }
 

@@ -970,15 +970,25 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             std::string tooltipText;
             const bool hasTooltipText =
                 BuildLayoutEditTooltipTextForPayload(config, target.payload, tooltipText, &tooltipError);
-            std::string traceText = "hover point=" + Trace::QuoteText(Trace::FormatPoint(hoverPoint.x, hoverPoint.y)) +
-                                    " target=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
+            const std::string targetText = Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
             if (hasTooltipText) {
-                traceText += " tooltip=" + Trace::QuoteText(tooltipText);
+                const std::string tooltipTraceText = Trace::QuoteText(tooltipText);
+                trace.WriteFmt(TracePrefix::Diagnostics,
+                    "hover point=\"%d,%d\" target=%s tooltip=%s",
+                    hoverPoint.x,
+                    hoverPoint.y,
+                    targetText.c_str(),
+                    tooltipTraceText.c_str());
             } else {
-                traceText +=
-                    " tooltip_error=" + Trace::QuoteText(tooltipError.empty() ? "unsupported_target" : tooltipError);
+                const std::string tooltipErrorText =
+                    Trace::QuoteText(tooltipError.empty() ? "unsupported_target" : tooltipError);
+                trace.WriteFmt(TracePrefix::Diagnostics,
+                    "hover point=\"%d,%d\" target=%s tooltip_error=%s",
+                    hoverPoint.x,
+                    hoverPoint.y,
+                    targetText.c_str(),
+                    tooltipErrorText.c_str());
             }
-            trace.Write(TracePrefix::Diagnostics, traceText);
         } else {
             trace.WriteFmt(
                 TracePrefix::Diagnostics, "hover point=\"%d,%d\" target=\"none\"", hoverPoint.x, hoverPoint.y);
