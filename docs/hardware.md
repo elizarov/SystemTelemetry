@@ -14,7 +14,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Board telemetry selects the supported hardware provider from the baseboard manufacturer.
 - Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
 - Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
-- Empty CPU and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
+- Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
 
 ## Adding Hardware Support
 
@@ -85,7 +85,7 @@ Troubleshooting:
 
 - Supported hardware family: ASUS board telemetry.
 - Runtime dependency: ASUS Armoury Crate or ASUS System Control Interface with the `\\.\ATKACPI` device available to the current user.
-- Metrics include CPU temperature and laptop fan RPM telemetry from the same ATK `DSTS` device ids used by Armoury Crate support libraries. Device id `0x00120094` is exposed as `CPU Temperature`, `0x00110013` as `CPU Fan`, and `0x00110014` as `System Fan`.
+- Metrics include CPU temperature and laptop fan RPM telemetry from the same ATK `DSTS` device ids used by Armoury Crate support libraries. Device id `0x00120094` is exposed as `CPU Temperature`, `0x00110013` as `CPU Fan`, and `0x00110014` as `GPU Fan`.
 - Trace output can include `asus_armoury_crate:*` provider details and `unsupported_board` selection markers.
 - If Windows denies access to ATKACPI, CaseDash keeps the board metrics unavailable and reports the provider error in diagnostics.
 

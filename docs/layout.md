@@ -49,7 +49,7 @@ The language is divided by responsibility:
 
 `[storage]` selects the drive letters to show in the drive-usage list. An empty drive selection means the runtime resolves all currently available fixed drives.
 
-`[board]` maps logical metric ids in the `board.temp.*` and `board.fan.*` families to provider-specific sensor names. Empty `cpu` and `system` mappings are resolved from matching provider sensor names at runtime and are persisted by the next `Save Config`.
+`[board]` maps logical metric ids in the `board.temp.*` and `board.fan.*` families to provider-specific sensor names. Empty `cpu`, `gpu`, and `system` mappings are resolved from matching provider sensor names at runtime and are persisted by the next `Save Config`.
 
 `[metrics]` defines the display registry used by bound widgets:
 

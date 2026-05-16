@@ -22,7 +22,7 @@ constexpr std::uint32_t kAsusUnsupportedStatus = 0xfffffffe;
 constexpr std::uint32_t kAsusDstsPresenceBit = 0x00010000;
 constexpr std::uint32_t kAsusAtkCpuTemperature = 0x00120094;
 constexpr std::uint32_t kAsusAtkCpuFan = 0x00110013;
-constexpr std::uint32_t kAsusAtkSystemFan = 0x00110014;
+constexpr std::uint32_t kAsusAtkGpuFan = 0x00110014;
 
 struct AsusArmouryCrateSnapshot {
     bool success = false;
@@ -167,7 +167,7 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
 
     CaptureAtkDriverTemperature(trace, device.Get(), snapshot.temperatures);
     CaptureAtkDriverFan(trace, device.Get(), kAsusAtkCpuFan, "CPU Fan", snapshot.fans);
-    CaptureAtkDriverFan(trace, device.Get(), kAsusAtkSystemFan, "System Fan", snapshot.fans);
+    CaptureAtkDriverFan(trace, device.Get(), kAsusAtkGpuFan, "GPU Fan", snapshot.fans);
 
     snapshot.success = true;
     snapshot.diagnostics =
