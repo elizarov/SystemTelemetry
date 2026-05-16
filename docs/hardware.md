@@ -7,7 +7,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 
 - CaseDash uses Windows-native telemetry for generic CPU, memory, network, storage, drive activity, clock, and presented-FPS data.
 - Hardware providers add hardware-specific GPU and board metrics when the matching driver, SDK, or utility is installed.
-- The fake provider uses built-in synthetic telemetry when `/fake` has no path. Headless `/fake /exit` uses the static baseline, while UI fake mode and benchmark fake mode use the live synthetic source.
+- The fake provider uses built-in synthetic telemetry when `/fake` has no path. Headless `/fake /exit` uses the static baseline, while UI fake mode and benchmark fake mode use the live synthetic source. UI fake mode advances at the same 250 ms cadence and retained-throughput smoothing as real telemetry.
 - Unsupported or unavailable hardware providers do not prevent the dashboard from running; their provider-owned values render as unavailable.
 - GPU telemetry selects the supported hardware provider from the primary non-software DXGI adapter identity.
 - Board telemetry selects the supported hardware provider from the baseboard manufacturer.

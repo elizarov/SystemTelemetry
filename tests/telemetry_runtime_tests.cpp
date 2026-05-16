@@ -77,6 +77,16 @@ protected:
     int callbackCount_ = 0;
 };
 
+const RetainedHistorySeries* FindRetainedHistory(const SystemSnapshot& snapshot, RetainedHistoryKey key) {
+    const std::string_view seriesRef = RetainedHistorySeriesRef(key);
+    for (const auto& history : snapshot.retainedHistories) {
+        if (history.seriesRef == seriesRef) {
+            return &history;
+        }
+    }
+    return nullptr;
+}
+
 }  // namespace
 
 TEST_F(TelemetryRuntimeTest, PublishesInitialAndWorkerUpdates) {
@@ -146,8 +156,47 @@ TEST(TelemetryCollectorTest, LiveFakeAdvancesBuiltInSnapshotOnUpdate) {
 
     const double initialCpuLoad = telemetry->Snapshot().cpu.loadPercent;
     const WORD initialSecond = telemetry->Snapshot().now.wSecond;
+    const WORD initialMilliseconds = telemetry->Snapshot().now.wMilliseconds;
     telemetry->UpdateSnapshot();
 
     EXPECT_NE(telemetry->Snapshot().cpu.loadPercent, initialCpuLoad);
-    EXPECT_NE(telemetry->Snapshot().now.wSecond, initialSecond);
+    EXPECT_EQ(telemetry->Snapshot().now.wSecond, initialSecond);
+    EXPECT_EQ(telemetry->Snapshot().now.wMilliseconds, initialMilliseconds + 250);
+}
+
+TEST(TelemetryCollectorTest, LiveFakeThroughputUsesRetainedHistorySmoothing) {
+    Trace trace;
+    TelemetryCollectorOptions options;
+    options.fake = true;
+    options.liveFake = true;
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
+    ASSERT_NE(telemetry, nullptr);
+    ASSERT_TRUE(telemetry->Initialize({}));
+
+    const RetainedHistorySeries* initial =
+        FindRetainedHistory(telemetry->Snapshot(), RetainedHistoryKey::NetworkUpload);
+    ASSERT_NE(initial, nullptr);
+    EXPECT_EQ(initial->throughputBucketSampleCount, 0u);
+    const std::vector<double> initialSamples = initial->samples;
+    const std::vector<double> initialLiveSamples = initial->throughputLiveSamples;
+
+    telemetry->UpdateSnapshot();
+    const RetainedHistorySeries* afterOne =
+        FindRetainedHistory(telemetry->Snapshot(), RetainedHistoryKey::NetworkUpload);
+    ASSERT_NE(afterOne, nullptr);
+    EXPECT_EQ(afterOne->throughputBucketSampleCount, 1u);
+    EXPECT_EQ(afterOne->samples, initialSamples);
+    EXPECT_NE(afterOne->throughputLiveSamples, initialLiveSamples);
+
+    telemetry->UpdateSnapshot();
+    telemetry->UpdateSnapshot();
+    telemetry->UpdateSnapshot();
+    const RetainedHistorySeries* afterFour =
+        FindRetainedHistory(telemetry->Snapshot(), RetainedHistoryKey::NetworkUpload);
+    ASSERT_NE(afterFour, nullptr);
+    EXPECT_EQ(afterFour->throughputBucketSampleCount, 0u);
+    EXPECT_NE(afterFour->samples, initialSamples);
+    EXPECT_NE(afterFour->throughputLiveSamples, initialLiveSamples);
+    EXPECT_EQ(telemetry->Snapshot().now.wSecond, 1);
+    EXPECT_EQ(telemetry->Snapshot().now.wMilliseconds, 88);
 }
