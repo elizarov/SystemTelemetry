@@ -24,7 +24,6 @@ constexpr std::uint32_t kAsusAtkCpuTemperature = 0x00120094;
 constexpr std::uint32_t kAsusAtkCpuFan = 0x00110013;
 constexpr std::uint32_t kAsusAtkGpuFan = 0x00110014;
 constexpr char kAsusGpuFanName[] = "GPU Fan";
-constexpr char kInternalGpuFanLogicalName[] = "gpu";
 
 struct AsusArmouryCrateSnapshot {
     bool success = false;
@@ -144,15 +143,6 @@ void CaptureAtkDriverFan(
     }
 }
 
-bool HasMetricNamed(const std::vector<NamedScalarMetric>& metrics, const char* name) {
-    for (const auto& metric : metrics) {
-        if (EqualsInsensitive(metric.name, name)) {
-            return true;
-        }
-    }
-    return false;
-}
-
 void CaptureAtkDriverTemperature(Trace& trace, HANDLE device, std::vector<BoardSensorReading>& temperatures) {
     std::uint32_t status = 0;
     if (!CaptureAtkDriverStatus(trace, device, "temp", kAsusAtkCpuTemperature, "cpu", status) ||
@@ -215,10 +205,6 @@ public:
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
-        if (!HasMetricNamed(fanMetricTemplate_, kInternalGpuFanLogicalName)) {
-            fanMetricTemplate_.push_back(
-                NamedScalarMetric{kInternalGpuFanLogicalName, ScalarMetric{std::nullopt, ScalarMetricUnit::Rpm}});
-        }
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
@@ -291,10 +277,6 @@ private:
     }
 
     std::string ResolveFanSensorName(const std::string& logicalName) const {
-        const auto it = settings_.fanSensorNames.find(logicalName);
-        if (it == settings_.fanSensorNames.end() && EqualsInsensitive(logicalName, kInternalGpuFanLogicalName)) {
-            return kAsusGpuFanName;
-        }
         return ResolveMappedBoardSensorName(settings_.fanSensorNames, logicalName);
     }
 

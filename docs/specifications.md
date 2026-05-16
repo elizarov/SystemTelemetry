@@ -90,7 +90,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Storage throughput uses system-wide disk I/O counters, while per-drive rows use the currently selected drive set.
 - Throughput graph smoothing keeps only complete adjacent-sample averages, so graph maximum selection uses smoothed values without a raw endpoint and does not depend on retained-history scroll phase.
 - Layout metric references are the only source of truth for which logical board metrics are requested from the board provider.
-- The board mapping section connects those logical names to provider-specific sensor names. Empty CPU and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. Supported provider details are defined in [docs/hardware.md](hardware.md).
+- The board mapping section connects those logical names to provider-specific sensor names. Empty CPU, GPU, and system bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. The `gpu` board fan binding is requested by `gpu.fan` as a fallback source when the selected GPU provider does not expose fan RPM. Supported provider details are defined in [docs/hardware.md](hardware.md).
 
 ## Refresh, Units, And Instance Behavior
 

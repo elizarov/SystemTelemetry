@@ -7,6 +7,11 @@
 
 namespace {
 
+constexpr char kBoardTemperaturePrefix[] = "board.temp.";
+constexpr char kBoardFanPrefix[] = "board.fan.";
+constexpr char kGpuFanMetric[] = "gpu.fan";
+constexpr char kGpuFanFallbackBoardName[] = "gpu";
+
 bool IsValidMetricId(std::string_view metricId) {
     if (metricId.empty()) {
         return false;
@@ -35,10 +40,12 @@ void CollectLayoutBindingsRecursive(
         if (!IsValidMetricId(metricRef)) {
             continue;
         }
-        if (metricRef.rfind("board.temp.", 0) == 0) {
-            AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
-        } else if (metricRef.rfind("board.fan.", 0) == 0) {
-            AddUniqueValue(boardFans, metricRef.substr(std::string("board.fan.").size()));
+        if (metricRef.rfind(kBoardTemperaturePrefix, 0) == 0) {
+            AddUniqueValue(boardTemperatures, metricRef.substr(std::string(kBoardTemperaturePrefix).size()));
+        } else if (metricRef.rfind(kBoardFanPrefix, 0) == 0) {
+            AddUniqueValue(boardFans, metricRef.substr(std::string(kBoardFanPrefix).size()));
+        } else if (metricRef == kGpuFanMetric) {
+            AddUniqueValue(boardFans, kGpuFanFallbackBoardName);
         }
     }
 

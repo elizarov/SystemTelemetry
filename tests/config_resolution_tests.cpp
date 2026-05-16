@@ -51,6 +51,21 @@ TEST(ConfigResolution, CollectsUniqueBoardBindingsFromNestedCardLayouts) {
     EXPECT_EQ(selection.boardFanNames[0], "system");
 }
 
+TEST(ConfigResolution, CollectsGpuFanFallbackBoardBindingFromGpuFanMetric) {
+    LayoutConfig layout;
+    LayoutCardConfig card;
+    card.id = "gpu";
+    card.layout = MakeContainerNode("rows",
+        {MakeWidgetNode("metric_list", "gpu.vram, gpu.fan"), MakeWidgetNode("metric_list", "board.fan.cpu, gpu.fan")});
+    layout.cards.push_back(card);
+
+    const LayoutBindingSelection selection = CollectLayoutBindings(layout);
+
+    ASSERT_EQ(selection.boardFanNames.size(), 2u);
+    EXPECT_EQ(selection.boardFanNames[0], "gpu");
+    EXPECT_EQ(selection.boardFanNames[1], "cpu");
+}
+
 TEST(ConfigResolution, NormalizesConfiguredDrivesAndRemovesDuplicates) {
     const std::vector<std::string> drives = NormalizeConfiguredDrives({" c", "D:", "c\\", "", "1", "d"});
 

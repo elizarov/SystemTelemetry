@@ -14,7 +14,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Board telemetry selects the supported hardware provider from the baseboard manufacturer.
 - Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
 - Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
-- Empty CPU and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists.
+- Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric.
 
 ## Adding Hardware Support
 
