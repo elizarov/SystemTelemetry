@@ -7,6 +7,7 @@
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -835,14 +836,14 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     if (node.cardReference) {
         if (ContainsCardReference(cardReferenceStack, node.name)) {
             if (writeTrace) {
-                renderer.WriteTrace("layout_card_ref_cycle id=\"" + node.name + "\"");
+                renderer.WriteTraceFmt("layout_card_ref_cycle id=\"%s\"", node.name.c_str());
             }
             return;
         }
         const LayoutCardConfig* referencedCard = renderer.FindCardConfigById(node.name);
         if (referencedCard == nullptr) {
             if (writeTrace) {
-                renderer.WriteTrace("layout_card_ref_missing id=\"" + node.name + "\"");
+                renderer.WriteTraceFmt("layout_card_ref_missing id=\"%s\"", node.name.c_str());
             }
             return;
         }
@@ -1216,8 +1217,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {}, overlayOwners);
 
     if (resolvedLayout_.cards.empty()) {
-        renderer.lastError_ =
-            "layout_resolve_failed cards=0 root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"";
+        renderer.lastError_ = FormatText(
+            "layout_resolve_failed cards=0 root=\"%s\"", renderer.config_.layout.structure.cardsLayout.name.c_str());
         return false;
     }
 

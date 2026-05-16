@@ -471,10 +471,11 @@ DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine
 
 bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
     if (options.hasInvalidTracePrefixFilter) {
-        std::string message =
-            "/trace-prefixes must contain a comma-separated list of trace prefixes: " + Trace::PrefixNamesText() + ".";
+        const std::string prefixNames = Trace::PrefixNamesText();
+        std::string message = FormatText(
+            "/trace-prefixes must contain a comma-separated list of trace prefixes: %s.", prefixNames.c_str());
         if (!options.invalidTracePrefixFilterName.empty()) {
-            message += " Unknown prefix: " + options.invalidTracePrefixFilterName + ".";
+            AppendFormat(message, " Unknown prefix: %s.", options.invalidTracePrefixFilterName.c_str());
         }
         if (!options.trace) {
             MessageBoxUtf8(message, MB_ICONERROR);
@@ -514,19 +515,19 @@ bool ApplyDiagnosticsLayoutOverride(
     }
     if (SelectLayout(config, options.layoutName)) {
         if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker(
-                TracePrefix::Diagnostics, "layout_override name=\"" + options.layoutName + "\"");
+            diagnostics->WriteTraceMarkerFmt(
+                TracePrefix::Diagnostics, "layout_override name=\"%s\"", options.layoutName.c_str());
         }
         return true;
     }
 
     if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(
-            TracePrefix::Diagnostics, "layout_override_failed name=\"" + options.layoutName + "\"");
+        diagnostics->WriteTraceMarkerFmt(
+            TracePrefix::Diagnostics, "layout_override_failed name=\"%s\"", options.layoutName.c_str());
         return false;
     }
 
-    MessageBoxUtf8("Unknown layout name:\n" + options.layoutName, MB_ICONERROR);
+    MessageBoxUtf8(FormatText("Unknown layout name:\n%s", options.layoutName.c_str()), MB_ICONERROR);
     return false;
 }
 
@@ -540,20 +541,20 @@ bool ApplyDiagnosticsThemeOverride(
             config.display.theme = options.themeName;
             ResolveConfiguredColors(config);
             if (diagnostics != nullptr) {
-                diagnostics->WriteTraceMarker(
-                    TracePrefix::Diagnostics, "theme_override name=\"" + options.themeName + "\"");
+                diagnostics->WriteTraceMarkerFmt(
+                    TracePrefix::Diagnostics, "theme_override name=\"%s\"", options.themeName.c_str());
             }
             return true;
         }
     }
 
     if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(
-            TracePrefix::Diagnostics, "theme_override_failed name=\"" + options.themeName + "\"");
+        diagnostics->WriteTraceMarkerFmt(
+            TracePrefix::Diagnostics, "theme_override_failed name=\"%s\"", options.themeName.c_str());
         return false;
     }
 
-    MessageBoxUtf8("Unknown theme name:\n" + options.themeName, MB_ICONERROR);
+    MessageBoxUtf8(FormatText("Unknown theme name:\n%s", options.themeName.c_str()), MB_ICONERROR);
     return false;
 }
 
@@ -938,7 +939,8 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
     if (!editLayoutWidgetName.empty()) {
         const auto widget = renderer.FindFirstLayoutEditPreviewWidget(editLayoutWidgetName);
         if (!widget.has_value()) {
-            const std::string error = "edit_layout_widget_not_found name=\"" + editLayoutWidgetName + "\"";
+            const std::string error =
+                FormatText("edit_layout_widget_not_found name=\"%s\"", editLayoutWidgetName.c_str());
             if (errorText != nullptr) {
                 *errorText = error;
             }

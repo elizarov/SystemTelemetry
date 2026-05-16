@@ -348,15 +348,19 @@ void SetDumpValue(DumpValues& values, std::string key, std::string value) {
     values.emplace_back(std::move(key), std::move(value));
 }
 
+void SetInvalidKeyError(std::string* error, const char* valueKind, const std::string& key) {
+    if (error != nullptr) {
+        AssignFormat(*error, "Invalid %s for key: %s", valueKind, key.c_str());
+    }
+}
+
 bool LoadString(const DumpValues& values, const std::string& key, std::string& field, std::string* error) {
     std::string text;
     if (!TryGetValue(values, key, text)) {
         return true;
     }
     if (!UnescapeQuotedString(text, field)) {
-        if (error != nullptr) {
-            *error = "Invalid quoted string for key: " + key;
-        }
+        SetInvalidKeyError(error, "quoted string", key);
         return false;
     }
     return true;
@@ -368,9 +372,7 @@ bool LoadDouble(const DumpValues& values, const std::string& key, double& field,
         return true;
     }
     if (!ParseStrictDouble(text, field)) {
-        if (error != nullptr) {
-            *error = "Invalid number for key: " + key;
-        }
+        SetInvalidKeyError(error, "number", key);
         return false;
     }
     return true;
@@ -385,9 +387,7 @@ bool LoadUnsigned(const DumpValues& values, const std::string& key, T& field, st
     unsigned long long parsed = 0;
     if (!ParseStrictUnsigned(text, parsed) ||
         parsed > static_cast<unsigned long long>((std::numeric_limits<T>::max)())) {
-        if (error != nullptr) {
-            *error = "Invalid integer for key: " + key;
-        }
+        SetInvalidKeyError(error, "integer", key);
         return false;
     }
     field = static_cast<T>(parsed);
@@ -406,9 +406,7 @@ bool LoadOptionalDouble(
     }
     double parsed = 0.0;
     if (!ParseStrictDouble(text, parsed)) {
-        if (error != nullptr) {
-            *error = "Invalid optional number for key: " + key;
-        }
+        SetInvalidKeyError(error, "optional number", key);
         return false;
     }
     field = parsed;
@@ -423,9 +421,7 @@ bool LoadScalarMetricUnit(
     }
     std::string parsed;
     if (!UnescapeQuotedString(text, parsed) || !ParseDumpScalarMetricUnit(parsed, field)) {
-        if (error != nullptr) {
-            *error = "Invalid scalar unit for key: " + key;
-        }
+        SetInvalidKeyError(error, "scalar unit", key);
         return false;
     }
     return true;
@@ -439,9 +435,7 @@ bool LoadScalarMetricIssue(
     }
     std::string parsed;
     if (!UnescapeQuotedString(text, parsed) || !TryEnumFromString(parsed, field)) {
-        if (error != nullptr) {
-            *error = "Invalid scalar issue for key: " + key;
-        }
+        SetInvalidKeyError(error, "scalar issue", key);
         return false;
     }
     return true;
@@ -454,9 +448,7 @@ bool LoadDoubleArrayField(
         return true;
     }
     if (!ParseDoubleArray(text, field)) {
-        if (error != nullptr) {
-            *error = "Invalid number array for key: " + key;
-        }
+        SetInvalidKeyError(error, "number array", key);
         return false;
     }
     return true;
