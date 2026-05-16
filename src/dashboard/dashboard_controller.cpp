@@ -20,6 +20,7 @@
 #include "util/elevated_process.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
@@ -265,7 +266,8 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         if (state_.diagnostics != nullptr) {
             std::string traceText = "telemetry_initialize_failed";
             if (!telemetryError.empty()) {
-                traceText += " detail=" + Trace::QuoteText(telemetryError);
+                const std::string telemetryErrorText = Trace::QuoteText(telemetryError);
+                AppendFormat(traceText, " detail=%s", telemetryErrorText.c_str());
             }
             state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, traceText);
         }
@@ -400,9 +402,9 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
                 : RenderPoint{},
             &errorText)) {
         const std::string pathText = path->string();
-        std::string message = "Failed to save screenshot:\n" + pathText;
+        std::string message = FormatText("Failed to save screenshot:\n%s", pathText.c_str());
         if (!errorText.empty()) {
-            message += "\n\n" + errorText;
+            AppendFormat(message, "\n\n%s", errorText.c_str());
         }
         shell.ShowError(message);
     }
@@ -425,9 +427,9 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
             shell.TraceLog(),
             &errorText)) {
         const std::string pathText = path->string();
-        std::string message = "Failed to save layout guide sheet:\n" + pathText;
+        std::string message = FormatText("Failed to save layout guide sheet:\n%s", pathText.c_str());
         if (!errorText.empty()) {
-            message += "\n\n" + errorText;
+            AppendFormat(message, "\n\n%s", errorText.c_str());
         }
         shell.ShowError(message);
     }

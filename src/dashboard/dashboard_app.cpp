@@ -816,56 +816,43 @@ void DashboardApp::TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* eve
     TraceLayoutEditUiEvent(prefix, event, text);
 }
 
-void AppendQuotedPoint(std::string& trace, const char* label, int x, int y) {
-    AppendFormat(trace, " %s=\"%d,%d\"", label, x, y);
-}
-
 std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
-    std::string trace = "layout=";
-    trace += Trace::QuoteText(state.config.display.layout);
-    trace += " editing=";
-    trace += Trace::BoolText(state.isEditingLayout);
-    trace += " moving=";
-    trace += Trace::BoolText(state.isMoving);
-    AppendFormat(trace, " modal_depth=%d", layoutEditModalUiDepth_);
-    trace += " tooltip_visible=";
-    trace += Trace::BoolText(layoutEditTooltipVisible_);
-    trace += " tooltip_suppressed=";
-    trace += Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
-    trace += " tooltip_rect_valid=";
-    trace += Trace::BoolText(layoutEditTooltipRectValid_);
-    trace += " mouse_tracking=";
-    trace += Trace::BoolText(layoutEditMouseTracking_);
-    trace += " drag_active=";
-    trace += Trace::BoolText(layoutEditController_.HasActiveDrag());
-
     const HWND capture = GetCapture();
-    trace += " capture=";
-    if (capture == nullptr) {
-        trace += Trace::QuoteText("none");
-    } else if (capture == hwnd_) {
-        trace += Trace::QuoteText("dashboard");
-    } else {
-        trace += Trace::QuoteText("other");
-    }
+    const char* captureText = capture == nullptr ? "none" : (capture == hwnd_ ? "dashboard" : "other");
+    const std::string layoutText = Trace::QuoteText(state.config.display.layout);
+    std::string trace =
+        FormatText("layout=%s editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
+                   "tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",
+            layoutText.c_str(),
+            Trace::BoolText(state.isEditingLayout),
+            Trace::BoolText(state.isMoving),
+            layoutEditModalUiDepth_,
+            Trace::BoolText(layoutEditTooltipVisible_),
+            Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
+            Trace::BoolText(layoutEditTooltipRectValid_),
+            Trace::BoolText(layoutEditMouseTracking_),
+            Trace::BoolText(layoutEditController_.HasActiveDrag()),
+            captureText);
 
     LayoutEditController::TooltipTarget target;
     if (const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget(target)) {
-        trace += " target=";
-        trace += Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
-        AppendQuotedPoint(trace, "target_point", target.clientPoint.x, target.clientPoint.y);
+        AppendFormat(trace,
+            " target=\"%s\" target_point=\"%d,%d\"",
+            LayoutEditTooltipPayloadTraceKind(target.payload),
+            target.clientPoint.x,
+            target.clientPoint.y);
     } else {
         trace += " target=\"none\"";
     }
 
     POINT cursor{};
     if (GetCursorPos(&cursor) != FALSE) {
-        AppendQuotedPoint(trace, "cursor_screen", cursor.x, cursor.y);
+        AppendFormat(trace, " cursor_screen=\"%d,%d\"", cursor.x, cursor.y);
         if (hwnd_ != nullptr) {
             POINT clientPoint = cursor;
             ScreenToClient(hwnd_, &clientPoint);
-            AppendQuotedPoint(trace, "cursor_client", clientPoint.x, clientPoint.y);
+            AppendFormat(trace, " cursor_client=\"%d,%d\"", clientPoint.x, clientPoint.y);
         }
     }
     return trace;

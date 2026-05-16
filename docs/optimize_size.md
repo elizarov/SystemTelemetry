@@ -14,9 +14,9 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `949,248` bytes.
+- Current measured `build\CaseDash.exe`: `948,736` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `755.1 KiB`, `.rdata` about `87.3 KiB`, `.pdata` about `37.1 KiB`, `.xdata` about `15.5 KiB`, and `.rsrc$02` about `11.1 KiB`.
+- Current largest sections: `.text$mn` about `754.7 KiB`, `.rdata` about `87.3 KiB`, `.pdata` about `37.1 KiB`, `.xdata` about `15.5 KiB`, and `.rsrc$02` about `11.1 KiB`.
 - Current largest project objects: `diagnostics.cpp.obj`, `layout_resolver.cpp.obj`, `editors.cpp.obj`, `dashboard_renderer.cpp.obj`, `dashboard_controller.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `dashboard_app.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `render_thread.cpp.obj`, `collector_fake.cpp.obj`, `config_parser.cpp.obj`, `metrics.cpp.obj`, `snapshot_dump.cpp.obj`, `util.cpp.obj`, `fps_etw_provider.cpp.obj`, `drive_usage_list.cpp.obj`, `config_writer.cpp.obj`, and `gauge.cpp.obj`.
 - Last validation: `format.cmd fix changed`, `format.cmd changed`, `lint.cmd tidy changed`, `build.cmd`, `test.cmd`, `build_maps.cmd`, `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_trace_prefix_validation.txt /trace-prefixes:diagnostics`.
 
@@ -151,6 +151,7 @@ Hard size lessons enforced by `lint.cmd` live in [docs/source_policy_guardrails.
 | Telemetry trace strings | Keep telemetry provider traces on `WriteFmt`, keep lambda builders on `WriteLazy`, and use explicit `Enabled` gates when a custom result string or UTF-16 conversion is needed. Keep fixed telemetry diagnostics on stack-buffer formatting instead of repeated `std::to_string` concatenation. | `960,000` to `951,296` bytes; `.text$mn` dropped from about `766.0 KiB` to `757.2 KiB`. |
 | Trace detail string formatting | Keep layout-edit UI point fields and layout-guide-sheet numeric trace details on stack-buffer formatting, and remove the now-unused shared point string builder. | `951,296` to `950,272` bytes; `.text$mn` dropped from about `757.2 KiB` to `756.0 KiB`. |
 | Shared text formatting helper | Keep sprintf-style stack-buffer formatting centralized in `util/text_format` through `FormatText`, `FormatTextV`, `AssignFormat`, and `AppendFormat`; caller code should format trace, diagnostics, dump, color, crash-report, and metric text through this helper instead of open-coded stack buffers. | `950,272` to `949,248` bytes; `.text$mn` dropped from about `756.0 KiB` to `755.1 KiB`, and direct `sprintf_s`, `snprintf`, and `vsnprintf` calls are confined to `text_format.cpp`. |
+| Trace append consolidation | Keep layout-edit UI trace state and diagnostics save/open error strings on shared format calls instead of many short string appends. | `949,248` to `948,736` bytes; `.text$mn` dropped from about `755.1 KiB` to `754.7 KiB`. |
 
 ## Rejected Or Neutral Experiments
 

@@ -29,6 +29,7 @@
 #include "util/paths.h"
 #include "util/scale.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
 
@@ -667,19 +668,13 @@ bool DiagnosticsSession::ReportSaveError(const char* traceEvent,
     std::string_view detail,
     std::string_view traceSuffix) {
     const std::string pathText = path.string();
-    const std::string message = "Failed to " + std::string(messageAction) + ":\n" + pathText;
-    std::string traceText = traceEvent;
-    traceText += " path=\"";
-    traceText += pathText;
-    traceText += "\"";
+    const std::string message = FormatText("Failed to %s:\n%s", messageAction, pathText.c_str());
+    std::string traceText = FormatText("%s path=\"%s\"", traceEvent, pathText.c_str());
     if (!traceSuffix.empty()) {
-        traceText += ' ';
-        traceText += traceSuffix;
+        AppendFormat(traceText, " %.*s", static_cast<int>(traceSuffix.size()), traceSuffix.data());
     }
     if (!detail.empty()) {
-        traceText += " detail=\"";
-        traceText += detail;
-        traceText += "\"";
+        AppendFormat(traceText, " detail=\"%.*s\"", static_cast<int>(detail.size()), detail.data());
     }
     ReportError(TracePrefix::Diagnostics, traceText, message);
     return false;
@@ -738,7 +733,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
                 "save app icon",
                 appIconPath_,
                 appIconError,
-                "size=" + std::to_string(options_.appIconSize));
+                FormatText("size=%d", options_.appIconSize));
         }
         const std::string pathText = appIconPath_.string();
         WriteTraceMarkerFmt(
@@ -758,9 +753,9 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 
 void DiagnosticsSession::ShowFileOpenError(const char* label, const FilePath& path) {
     const std::string pathText = path.string();
-    const std::string message = std::string("Failed to open ") + label + ":\n" + pathText;
+    const std::string message = FormatText("Failed to open %s:\n%s", label, pathText.c_str());
     ReportError(TracePrefix::Diagnostics,
-        "file_open_failed label=\"" + std::string(label) + "\" path=\"" + pathText + "\"",
+        FormatText("file_open_failed label=\"%s\" path=\"%s\"", label, pathText.c_str()),
         message);
 }
 
