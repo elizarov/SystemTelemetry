@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cmath>
 #include <commctrl.h>
-#include <cstdio>
 #include <cstring>
 #include <cwchar>
 
@@ -14,6 +13,7 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "telemetry/metrics.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -85,16 +85,14 @@ double RoundToStep(double value, double step) {
 }
 
 void SetDialogControlRoundedDecimal(HWND hwnd, int controlId, double value, int decimalPlaces) {
-    char buffer[64] = {};
-    sprintf_s(buffer, "%.*f", decimalPlaces, value);
-    size_t length = std::char_traits<char>::length(buffer);
-    while (length > 0 && buffer[length - 1] == '0') {
-        buffer[--length] = '\0';
+    std::string text = FormatText("%.*f", decimalPlaces, value);
+    while (!text.empty() && text.back() == '0') {
+        text.pop_back();
     }
-    if (length > 0 && buffer[length - 1] == '.') {
-        buffer[--length] = '\0';
+    if (!text.empty() && text.back() == '.') {
+        text.pop_back();
     }
-    SetDialogControlTextUtf8(hwnd, controlId, length == 0 || strcmp(buffer, "-0") == 0 ? "0" : buffer);
+    SetDialogControlTextUtf8(hwnd, controlId, text.empty() || text == "-0" ? "0" : text);
 }
 
 void SetDialogControlRoundedInteger(HWND hwnd, int controlId, double value) {
@@ -287,9 +285,7 @@ LRESULT AddComboStringUtf8(HWND combo, std::string_view text) {
 }
 
 std::string FormatDialogColorHex(unsigned int color) {
-    char buffer[16] = {};
-    sprintf_s(buffer, "#%08X", color);
-    return buffer;
+    return FormatText("#%08X", color);
 }
 
 std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {

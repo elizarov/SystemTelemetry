@@ -9,6 +9,7 @@
 
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -32,8 +33,9 @@ void SetSupportDiagnostics(std::string& diagnostics,
     ADLX_RESULT fanResult,
     adlx_bool vramSupported,
     ADLX_RESULT vramResult) {
-    char supportText[192];
-    sprintf_s(supportText,
+    diagnostics = "ADLX GPU=";
+    diagnostics += gpuName;
+    AppendFormat(diagnostics,
         " usage_supported=%s(%d) temp_supported=%s(%d) clock_supported=%s(%d) fan_supported=%s(%d) "
         "vram_supported=%s(%d)",
         usageSupported ? "yes" : "no",
@@ -46,9 +48,6 @@ void SetSupportDiagnostics(std::string& diagnostics,
         static_cast<int>(fanResult),
         vramSupported ? "yes" : "no",
         static_cast<int>(vramResult));
-    diagnostics = "ADLX GPU=";
-    diagnostics += gpuName;
-    diagnostics += supportText;
 }
 
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {

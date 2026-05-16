@@ -17,6 +17,7 @@
 #include "telemetry/fps/impl/gpu_raw_counter_map.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/lightweight_mutex.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -56,15 +57,11 @@ const char* PresentEventSourceName(PresentEventSource source) {
 }
 
 void SetGpuUsageStatusText(std::string& text, const char* label, long status) {
-    char buffer[64];
-    sprintf_s(buffer, " %s=%ld", label, status);
-    text = buffer;
+    AssignFormat(text, " %s=%ld", label, status);
 }
 
 void SetGpuUsageTwoStatusText(std::string& text, long collectStatus, const char* label, long status) {
-    char buffer[96];
-    sprintf_s(buffer, " gpu3d_collect=%ld %s=%ld", collectStatus, label, status);
-    text = buffer;
+    AssignFormat(text, " gpu3d_collect=%ld %s=%ld", collectStatus, label, status);
 }
 
 std::string Win32ErrorText(ULONG status) {
@@ -91,9 +88,7 @@ std::string Win32ErrorText(ULONG status) {
 }
 
 std::string FallbackProcessName(DWORD processId) {
-    char buffer[32];
-    sprintf_s(buffer, "pid:%lu", static_cast<unsigned long>(processId));
-    return buffer;
+    return FormatText("pid:%lu", static_cast<unsigned long>(processId));
 }
 
 bool IsPermissionDenied(ULONG status) {
@@ -101,9 +96,7 @@ bool IsPermissionDenied(ULONG status) {
 }
 
 std::wstring BuildSessionName() {
-    char buffer[64] = {};
-    sprintf_s(buffer, "CaseDashPresentedFps-%lu", static_cast<unsigned long>(GetCurrentProcessId()));
-    return WideFromUtf8(buffer);
+    return WideFromUtf8(FormatText("CaseDashPresentedFps-%lu", static_cast<unsigned long>(GetCurrentProcessId())));
 }
 
 void LowerAsciiInPlace(wchar_t* value, size_t length) {
@@ -320,16 +313,14 @@ public:
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
-        char metrics[128];
-        sprintf_s(metrics,
+        std::string detail = " process=";
+        detail += sample.processName;
+        AppendFormat(detail,
             " source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f",
             PresentEventSourceName(bestSelection.source),
             bestSelection.count,
             rawFps,
             fps);
-        std::string detail = " process=";
-        detail += sample.processName;
-        detail += metrics;
         detail += GpuUsageDiagnostics();
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return sample;
@@ -492,16 +483,14 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        char selectedText[96];
-        sprintf_s(selectedText,
-            " selected_source=%s selected_window_count=%zu",
-            PresentEventSourceName(selected.source),
-            selected.count);
         std::string detail = " top GPU 3D application has no matching present events. process=";
         detail += sample.processName;
         detail += " selected_process=";
         detail += ResolveProcessNameLocked(selected.processId);
-        detail += selectedText;
+        AppendFormat(detail,
+            " selected_source=%s selected_window_count=%zu",
+            PresentEventSourceName(selected.source),
+            selected.count);
         detail += GpuUsageDiagnosticsForProcess(selected.processId);
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return true;
@@ -723,19 +712,15 @@ private:
         }
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
-        char prefix[96];
-        sprintf_s(prefix,
+        AssignFormat(gpuUsageDiagnostics_,
             " gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process=",
             static_cast<long>(collectStatus),
             static_cast<long>(status));
-        gpuUsageDiagnostics_ = prefix;
         gpuUsageDiagnostics_ += ResolveProcessNameLocked(topGpu3dProcessId_);
-        char suffix[96];
-        sprintf_s(suffix,
+        AppendFormat(gpuUsageDiagnostics_,
             " top_gpu3d_pid=%lu top_gpu3d=value=%.1f",
             static_cast<unsigned long>(topGpu3dProcessId_),
             topGpu3dUsage_);
-        gpuUsageDiagnostics_ += suffix;
     }
 
     std::string GpuUsageDiagnostics() const {
@@ -746,9 +731,9 @@ private:
         if (processId == 0) {
             return gpuUsageDiagnostics_;
         }
-        char suffix[48];
-        sprintf_s(suffix, " selected_gpu3d=value=%.1f", Gpu3dUsageForProcess(processId));
-        return gpuUsageDiagnostics_ + suffix;
+        std::string diagnostics = gpuUsageDiagnostics_;
+        AppendFormat(diagnostics, " selected_gpu3d=value=%.1f", Gpu3dUsageForProcess(processId));
+        return diagnostics;
     }
 
     ULONG EnableProvider(const GUID& providerGuid, uint64_t anyKeyword, UCHAR level) const {
@@ -818,13 +803,11 @@ private:
     }
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
-        char counts[96];
-        sprintf_s(counts,
+        std::string text = diagnostics_;
+        AppendFormat(text,
             " runtime_events=%llu dxgkrnl_events=%llu",
             static_cast<unsigned long long>(runtimePresentEvents_),
             static_cast<unsigned long long>(kernelPresentEvents_));
-        std::string text = diagnostics_;
-        text += counts;
         text += suffix;
         return text;
     }

@@ -2,7 +2,6 @@
 
 #include <windows.h>
 
-#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -15,6 +14,7 @@
 #include "telemetry/impl/system_info_support.h"
 #include "util/file_path.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -113,12 +113,9 @@ public:
 
     MsiCenterSnapshot FinishSuccess() {
         snapshot_.success = true;
-        char diagnostics[128];
-        sprintf_s(diagnostics,
-            "MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu",
+        snapshot_.diagnostics = FormatText("MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu",
             snapshot_.fans.size(),
             snapshot_.temperatures.size());
-        snapshot_.diagnostics = diagnostics;
         return std::move(snapshot_);
     }
 

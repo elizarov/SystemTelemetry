@@ -3,12 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 #include <string_view>
 #include <utility>
 
 #include "telemetry/timing.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -106,58 +106,43 @@ std::string FormatScalarValue(std::optional<double> value, std::string_view unit
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.*f", precision, *value);
-    } else {
-        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.*f", precision, *value);
     }
-    return buffer;
+    return FormatText("%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatPercentValue(std::optional<double> value, std::string_view unit, int precision) {
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.*f", precision, *value);
+        return FormatText("%.*f", precision, *value);
     } else if (unit == "%") {
-        sprintf_s(buffer, "%.*f%%", precision, *value);
-    } else {
-        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.*f%%", precision, *value);
     }
-    return buffer;
+    return FormatText("%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatMemoryValue(double usedGb, double totalGb, std::string_view unit) {
     if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.1f / %.0f", usedGb, totalGb);
-    } else {
-        sprintf_s(buffer, "%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.1f / %.0f", usedGb, totalGb);
     }
-    return buffer;
+    return FormatText("%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatThroughputValue(double valueMbps, std::string_view unit) {
     if (!IsFiniteDouble(valueMbps) || valueMbps < 0.0) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
-    } else {
-        sprintf_s(buffer,
-            valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s",
-            valueMbps,
-            static_cast<int>(unit.size()),
-            unit.data());
+        return FormatText(valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
     }
-    return buffer;
+    return FormatText(
+        valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s", valueMbps, static_cast<int>(unit.size()), unit.data());
 }
 
 std::pair<std::string_view, std::string_view> SplitSizeUnits(std::string_view units) {
@@ -173,19 +158,15 @@ std::string FormatSizeAutoValue(double valueGb, std::string_view units) {
         return "N/A";
     }
     const auto [smallUnit, largeUnit] = SplitSizeUnits(units);
-    char buffer[64];
     if (valueGb >= 1024.0) {
         if (largeUnit.empty()) {
-            sprintf_s(buffer, "%.1f", valueGb / 1024.0);
-        } else {
-            sprintf_s(buffer, "%.1f %.*s", valueGb / 1024.0, static_cast<int>(largeUnit.size()), largeUnit.data());
+            return FormatText("%.1f", valueGb / 1024.0);
         }
+        return FormatText("%.1f %.*s", valueGb / 1024.0, static_cast<int>(largeUnit.size()), largeUnit.data());
     } else if (smallUnit.empty()) {
-        sprintf_s(buffer, "%.0f", valueGb);
-    } else {
-        sprintf_s(buffer, "%.0f %.*s", valueGb, static_cast<int>(smallUnit.size()), smallUnit.data());
+        return FormatText("%.0f", valueGb);
     }
-    return buffer;
+    return FormatText("%.0f %.*s", valueGb, static_cast<int>(smallUnit.size()), smallUnit.data());
 }
 
 double AverageThroughputLiveSamples(const std::vector<double>& samples) {
@@ -742,9 +723,7 @@ void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSourc
 }
 
 std::string TwoDigit(int value) {
-    char buffer[8];
-    sprintf_s(buffer, "%02d", value);
-    return buffer;
+    return FormatText("%02d", value);
 }
 
 std::string NumberText(int value) {

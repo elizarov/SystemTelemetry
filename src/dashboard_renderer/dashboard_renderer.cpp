@@ -17,6 +17,7 @@
 #include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_service.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 
 DashboardRenderer::DashboardRenderer(Trace& trace)
@@ -330,15 +331,12 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const int titleHeight = (std::max)(1, Renderer().TextMetrics().label);
     const int bodyHeight = (std::max)(1, Renderer().TextMetrics().smallText);
 
-    char positionTextBuffer[96];
-    sprintf_s(positionTextBuffer, "Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
-    char scaleTextBuffer[96];
-    sprintf_s(scaleTextBuffer, "Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
-
     const std::string titleText = "Move Mode";
     const std::string monitorText = "Monitor: " + overlayState.monitorName;
-    const std::string positionText = positionTextBuffer;
-    const std::string scaleText = scaleTextBuffer;
+    const std::string positionText =
+        FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
+    const std::string scaleText =
+        FormatText("Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
     const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
 
     const int minContentWidth = ScaleLogical(220);

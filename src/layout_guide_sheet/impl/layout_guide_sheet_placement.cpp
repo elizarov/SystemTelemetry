@@ -2,10 +2,10 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdio>
 #include <limits>
 #include <string_view>
 
+#include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
@@ -964,23 +964,19 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             const CardCalloutColumns& columns = plannedByCard[cardIndex];
             const int leaderScore = countLeaderIntersections(columns, cardPlacements[cardIndex]);
             const std::string& cardId = cardPlacements[cardIndex].id;
-            char counts[128];
-            sprintf_s(counts, "=%d", leaderScore);
             std::string detail = "leader_score_";
             detail += cardId;
-            detail += counts;
-            sprintf_s(counts, "=%d leader_columns_", columns.leaderRepairPasses);
+            AppendFormat(detail, "=%d", leaderScore);
             detail += " leader_repair_passes_";
             detail += cardId;
-            detail += counts;
+            AppendFormat(detail, "=%d leader_columns_", columns.leaderRepairPasses);
             detail += cardId;
-            sprintf_s(counts,
+            AppendFormat(detail,
                 "=\"%zu,%zu,%zu,%zu\"",
                 columns.left.size(),
                 columns.top.size(),
                 columns.right.size(),
                 columns.bottom.size());
-            detail += counts;
             traceDetails->push_back(detail);
         }
     }

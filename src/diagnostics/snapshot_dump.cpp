@@ -9,6 +9,8 @@
 #include <string_view>
 #include <utility>
 
+#include "util/text_format.h"
+
 namespace {
 
 constexpr char kDumpFormatVersion[] = "casedash_snapshot_v12";
@@ -179,9 +181,7 @@ void WriteString(std::string& output, const std::string& key, const std::string&
 }
 
 void WriteDouble(std::string& output, const std::string& key, double value, int precision = 6) {
-    char buffer[64];
-    sprintf_s(buffer, "%.*f", precision, value);
-    WriteLine(output, key, buffer);
+    WriteLine(output, key, FormatText("%.*f", precision, value));
 }
 
 template <typename T> void WriteInteger(std::string& output, const std::string& key, T value) {
@@ -204,9 +204,7 @@ void WriteDoubleArray(std::string& output, const std::string& key, const std::ve
         if (i != 0) {
             output += ',';
         }
-        char buffer[64];
-        sprintf_s(buffer, "%.6f", values[i]);
-        output += buffer;
+        AppendFormat(output, "%.6f", values[i]);
     }
     output += "]\n";
 }

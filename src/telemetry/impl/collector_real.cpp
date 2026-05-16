@@ -11,6 +11,7 @@
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_storage.h"
 #include "telemetry/impl/collector_storage_selection.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -29,15 +30,11 @@ public:
         const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
         state_->trace_.Write(TracePrefix::Telemetry, "initialize_begin");
-        {
-            char buffer[128];
-            sprintf_s(buffer,
-                "wsa_startup result=%d version=%u.%u",
+        state_->trace_.Write(TracePrefix::Telemetry,
+            FormatText("wsa_startup result=%d version=%u.%u",
                 wsaStartupResult,
                 LOBYTE(wsaData.wVersion),
-                HIBYTE(wsaData.wVersion));
-            state_->trace_.Write(TracePrefix::Telemetry, buffer);
-        }
+                HIBYTE(wsaData.wVersion)));
         InitializeBoardCollector(*state_, settings.board);
         InitializeCpuCollector(*state_);
         InitializeGpuCollector(*state_);

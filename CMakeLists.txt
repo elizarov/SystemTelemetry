@@ -120,6 +120,7 @@ add_executable(CaseDash WIN32
     src/util/file_path.cpp
     src/util/message_box.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/paths.cpp
     src/util/scale.cpp
     src/util/lightweight_mutex.cpp
@@ -593,6 +594,7 @@ add_executable(CaseDashTests
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
     src/util/lightweight_mutex.cpp
@@ -712,6 +714,7 @@ add_executable(CaseDashBenchmarks
     tests/benchmarks.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/win32_format.cpp
     src/util/scale.cpp
     src/config/config.cpp

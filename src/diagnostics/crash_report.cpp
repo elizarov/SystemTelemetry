@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <cstdio>
 #include <dbghelp.h>
 #include <string>
 #include <string_view>
@@ -14,6 +13,7 @@
 #include "diagnostics/diagnostics.h"
 #include "util/file_path.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -27,9 +27,7 @@ constexpr wchar_t kWriteBinaryMode[] = L"wb";   // _wfopen_s mode string follows
 std::string CrashReportFileName() {
     SYSTEMTIME time{};
     GetLocalTime(&time);
-    char buffer[80];
-    sprintf_s(buffer,
-        "casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
+    return FormatText("casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
         time.wYear,
         time.wMonth,
         time.wDay,
@@ -38,7 +36,6 @@ std::string CrashReportFileName() {
         time.wSecond,
         time.wMilliseconds,
         static_cast<unsigned long>(GetCurrentProcessId()));
-    return buffer;
 }
 
 FilePath PathWithSuffix(const FilePath& path, std::string_view suffix) {
@@ -62,18 +59,13 @@ FilePath ResolveCrashOutputBase() {
 }
 
 std::string ExceptionCodeText(DWORD code) {
-    char buffer[16];
-    sprintf_s(buffer, "0x%08lX", static_cast<unsigned long>(code));
-    return buffer;
+    return FormatText("0x%08lX", static_cast<unsigned long>(code));
 }
 
 std::string PointerText(const void* address) {
-    char buffer[2 + sizeof(void*) * 2 + 1];
-    sprintf_s(buffer,
-        "0x%0*llX",
+    return FormatText("0x%0*llX",
         static_cast<int>(sizeof(void*) * 2),
         static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(address)));
-    return buffer;
 }
 
 std::string ModulePathForAddress(void* address) {

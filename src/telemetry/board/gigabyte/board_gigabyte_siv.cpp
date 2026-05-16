@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,6 +15,7 @@
 #include "telemetry/impl/system_info_support.h"
 #include "util/file_path.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -125,12 +125,10 @@ public:
 
     GigabyteSivSnapshot FinishSuccess() {
         snapshot_.success = true;
-        char diagnostics[128];
-        sprintf_s(diagnostics,
-            "Gigabyte SIV hardware-monitor query completed. fan_count=%zu temp_count=%zu",
-            snapshot_.fans.size(),
-            snapshot_.temperatures.size());
-        snapshot_.diagnostics = diagnostics;
+        snapshot_.diagnostics =
+            FormatText("Gigabyte SIV hardware-monitor query completed. fan_count=%zu temp_count=%zu",
+                snapshot_.fans.size(),
+                snapshot_.temperatures.size());
         trace_.WriteFmt(TracePrefix::GigabyteSiv,
             "snapshot_done fan_count=%zu temp_count=%zu",
             snapshot_.fans.size(),

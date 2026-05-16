@@ -1,11 +1,13 @@
 #include "telemetry/impl/collector_gpu.h"
 
 #include <dxgi.h>
+#include <string>
 #include <vector>
 
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -13,6 +15,10 @@ namespace {
 constexpr wchar_t kGpuEngine3dMarker[] = L"engtype_3D";  // PDH GPU engine instance names are UTF-16.
 
 void WriteTelemetryTrace(const RealTelemetryCollectorState& state, const char* text) {
+    state.trace_.Write(TracePrefix::Telemetry, text);
+}
+
+void WriteTelemetryTrace(const RealTelemetryCollectorState& state, const std::string& text) {
     state.trace_.Write(TracePrefix::Telemetry, text);
 }
 
@@ -108,9 +114,7 @@ void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
-        char buffer[128];
-        sprintf_s(buffer, "gpu_adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
-        WriteTelemetryTrace(state, buffer);
+        WriteTelemetryTrace(state, FormatText("gpu_adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr)));
         return;
     }
 
@@ -122,9 +126,8 @@ void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
-            char buffer[128];
-            sprintf_s(buffer, "gpu_adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
-            WriteTelemetryTrace(state, buffer);
+            WriteTelemetryTrace(state,
+                FormatText("gpu_adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr)));
             break;
         }
 
@@ -138,28 +141,24 @@ void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
                 state.snapshot_.gpu.name = adapterName;
             }
 
-            char buffer[256];
-            sprintf_s(buffer,
-                "gpu_adapter_selected index=%u hr=0x%08X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\"",
-                adapterIndex,
-                static_cast<unsigned int>(descHr),
-                static_cast<unsigned long long>(desc.DedicatedVideoMemory),
-                state.snapshot_.gpu.vram.totalGb,
-                adapterName.c_str());
-            WriteTelemetryTrace(state, buffer);
+            WriteTelemetryTrace(state,
+                FormatText("gpu_adapter_selected index=%u hr=0x%08X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\"",
+                    adapterIndex,
+                    static_cast<unsigned int>(descHr),
+                    static_cast<unsigned long long>(desc.DedicatedVideoMemory),
+                    state.snapshot_.gpu.vram.totalGb,
+                    adapterName.c_str()));
             adapter->Release();
             break;
         }
 
         const std::string adapterName = SUCCEEDED(descHr) ? Utf8FromWide(desc.Description) : std::string();
-        char buffer[256];
-        sprintf_s(buffer,
-            "gpu_adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
-            adapterIndex,
-            static_cast<unsigned int>(descHr),
-            Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0),
-            adapterName.c_str());
-        WriteTelemetryTrace(state, buffer);
+        WriteTelemetryTrace(state,
+            FormatText("gpu_adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
+                adapterIndex,
+                static_cast<unsigned int>(descHr),
+                Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0),
+                adapterName.c_str()));
         adapter->Release();
     }
 

@@ -7,6 +7,7 @@
 
 #include "util/lightweight_mutex.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -84,22 +85,7 @@ void Trace::WriteVFmt(TracePrefix prefix, const char* format, va_list args) cons
         return;
     }
 
-    char buffer[512];
-    va_list measureArgs;
-    va_copy(measureArgs, args);
-    const int length = vsnprintf(buffer, sizeof(buffer), format, measureArgs);
-    va_end(measureArgs);
-    if (length < 0) {
-        return;
-    }
-    if (static_cast<std::size_t>(length) < sizeof(buffer)) {
-        WriteTraceLine(output_, PrefixName(prefix), buffer);
-        return;
-    }
-
-    std::string text(static_cast<std::size_t>(length) + 1, '\0');
-    vsnprintf(text.data(), text.size(), format, args);
-    text.resize(static_cast<std::size_t>(length));
+    const std::string text = FormatTextV(format, args);
     WriteTraceLine(output_, PrefixName(prefix), text.c_str());
 }
 
@@ -205,9 +191,7 @@ const char* Trace::BoolText(bool value) {
 std::string Trace::FormatTimestamp() {
     SYSTEMTIME localTime{};
     GetLocalTime(&localTime);
-    char buffer[32];
-    sprintf_s(buffer,
-        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+    return FormatText("%04u-%02u-%02u %02u:%02u:%02u.%03u",
         localTime.wYear,
         localTime.wMonth,
         localTime.wDay,
@@ -215,7 +199,6 @@ std::string Trace::FormatTimestamp() {
         localTime.wMinute,
         localTime.wSecond,
         localTime.wMilliseconds);
-    return buffer;
 }
 
 std::string Trace::FormatValueDouble(const char* label, double value, int precision) {

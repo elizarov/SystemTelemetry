@@ -4,7 +4,6 @@
 #include <cmath>
 #include <commctrl.h>
 #include <cstdarg>
-#include <cstdio>
 #include <cstring>
 #include <vector>
 #include <windowsx.h>
@@ -20,6 +19,7 @@
 #include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
@@ -809,32 +809,15 @@ void DashboardApp::TraceLayoutEditUiEvent(TracePrefix prefix, const char* event,
 }
 
 void DashboardApp::TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* event, const char* format, ...) const {
-    char details[256];
     va_list args;
     va_start(args, format);
-    const int length = vsnprintf(details, sizeof(details), format, args);
+    const std::string text = FormatTextV(format, args);
     va_end(args);
-    if (length < 0) {
-        TraceLayoutEditUiEvent(prefix, event);
-        return;
-    }
-    if (static_cast<std::size_t>(length) < sizeof(details)) {
-        TraceLayoutEditUiEvent(prefix, event, details);
-        return;
-    }
-
-    std::string text(static_cast<std::size_t>(length) + 1, '\0');
-    va_start(args, format);
-    vsnprintf(text.data(), text.size(), format, args);
-    va_end(args);
-    text.resize(static_cast<std::size_t>(length));
     TraceLayoutEditUiEvent(prefix, event, text);
 }
 
 void AppendQuotedPoint(std::string& trace, const char* label, int x, int y) {
-    char buffer[64];
-    sprintf_s(buffer, " %s=\"%d,%d\"", label, x, y);
-    trace += buffer;
+    AppendFormat(trace, " %s=\"%d,%d\"", label, x, y);
 }
 
 std::string DashboardApp::BuildLayoutEditUiTraceState() const {
@@ -845,9 +828,7 @@ std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     trace += Trace::BoolText(state.isEditingLayout);
     trace += " moving=";
     trace += Trace::BoolText(state.isMoving);
-    char modalText[32];
-    sprintf_s(modalText, " modal_depth=%d", layoutEditModalUiDepth_);
-    trace += modalText;
+    AppendFormat(trace, " modal_depth=%d", layoutEditModalUiDepth_);
     trace += " tooltip_visible=";
     trace += Trace::BoolText(layoutEditTooltipVisible_);
     trace += " tooltip_suppressed=";

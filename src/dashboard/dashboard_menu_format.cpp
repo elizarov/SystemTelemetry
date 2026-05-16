@@ -1,6 +1,6 @@
 #include "dashboard/dashboard_menu_format.h"
 
-#include <cstdio>
+#include "util/text_format.h"
 
 std::string FormatNetworkMenuText(const std::string& adapterName, const std::string& ipAddress) {
     if (adapterName.empty()) {
@@ -22,11 +22,8 @@ std::string FormatStorageDriveMenuText(const std::string& driveLetter, const std
 }
 
 std::string FormatStorageDriveSize(double totalGb) {
-    char buffer[64];
     if (totalGb >= 1024.0) {
-        std::snprintf(buffer, sizeof(buffer), "%.1f TB", totalGb / 1024.0);
-    } else {
-        std::snprintf(buffer, sizeof(buffer), "%.0f GB", totalGb);
+        return FormatText("%.1f TB", totalGb / 1024.0);
     }
-    return buffer;
+    return FormatText("%.0f GB", totalGb);
 }

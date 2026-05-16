@@ -9,6 +9,7 @@
 #include "telemetry/metrics.h"
 #include "telemetry/timing.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 #include "widget/impl/animation_primitives.h"
 #include "widget/widget_host.h"
 
@@ -163,8 +164,7 @@ void DrawGraphSnapshot(WidgetHost& renderer,
     if (maxValue <= 0.0) {
         maxValue = 10.0;
     }
-    char maxLabel[32];
-    sprintf_s(maxLabel, "%.0f", maxValue);
+    const std::string maxLabel = FormatText("%.0f", maxValue);
     RenderRect maxRect{rect.left, rect.top, rect.left + layout.axisWidth, layout.graphTop};
     if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
         const WidgetHost::TextLayoutResult maxLabelLayout = renderer.Renderer().DrawTextBlock(maxRect,
