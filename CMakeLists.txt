@@ -703,6 +703,7 @@ add_executable(CaseDashBenchmarks
     src/config/config_parser.cpp
     src/config/config_runtime_fields.cpp
     src/config/config_resolution.cpp
+    src/config/metric_board_binding.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
