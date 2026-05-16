@@ -11,6 +11,7 @@
 
 #include "telemetry/fps/fps_etw_provider.h"
 #include "telemetry/fps_service_protocol.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -47,7 +48,7 @@ std::string Win32ErrorText(DWORD status) {
         message,
         static_cast<DWORD>(std::size(message)),
         nullptr);
-    std::string text = std::to_string(static_cast<unsigned long>(status));
+    std::string text = FormatText("%lu", static_cast<unsigned long>(status));
     if (length > 0) {
         size_t trimmedLength = length;
         while (trimmedLength > 0 && (message[trimmedLength - 1] == '\r' || message[trimmedLength - 1] == '\n')) {

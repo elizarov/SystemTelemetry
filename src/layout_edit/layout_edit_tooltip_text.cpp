@@ -10,6 +10,7 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/localization_catalog.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -95,9 +96,14 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
 
     const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
     const LayoutNodeConfig& rightChild = node->children[guide.separatorIndex + 1];
-    return "[" + sectionName + "] " + configMember + " = " + node->name + "(" + LayoutGuideChildName(leftChild) + ":" +
-           std::to_string((std::max)(1, leftChild.weight)) + ", " + LayoutGuideChildName(rightChild) + ":" +
-           std::to_string((std::max)(1, rightChild.weight)) + ")";
+    return FormatText("[%s] %s = %s(%s:%d, %s:%d)",
+        sectionName.c_str(),
+        configMember.c_str(),
+        node->name.c_str(),
+        LayoutGuideChildName(leftChild).c_str(),
+        (std::max)(1, leftChild.weight),
+        LayoutGuideChildName(rightChild).c_str(),
+        (std::max)(1, rightChild.weight));
 }
 
 std::string BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEditGuide& guide) {
@@ -265,9 +271,10 @@ bool BuildLayoutEditTooltipTextForPayload(
             return AbortTooltipBuild(errorReason, "missing_node_field");
         }
         const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
-                                           ? std::string(EnumToString(nodeFieldKey->widgetClass)) + " format"
+                                           ? FormatText("%s format", EnumToString(nodeFieldKey->widgetClass))
                                            : std::string(EnumToString(nodeFieldKey->widgetClass));
-        std::string text = valueLabel + " = " + ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
+        std::string text =
+            FormatText("%s = %s", valueLabel.c_str(), ReadLayoutNodeFieldValue(*node, nodeFieldKey->field).c_str());
         AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionKey));
         tooltipText = std::move(text);
         return true;

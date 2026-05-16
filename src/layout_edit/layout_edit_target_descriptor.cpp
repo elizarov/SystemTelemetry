@@ -3,6 +3,8 @@
 #include <array>
 #include <utility>
 
+#include "util/text_format.h"
+
 namespace {
 
 constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
@@ -70,5 +72,5 @@ std::string LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& key) {
 std::string LayoutNodeFieldEditTraceLabel(const LayoutNodeFieldEditKey& key, std::string_view sectionName) {
     const std::string prefix(sectionName);
     return prefix.empty() ? std::string(EnumToString(key.widgetClass))
-                          : prefix + "." + std::string(EnumToString(key.widgetClass));
+                          : FormatText("%s.%s", prefix.c_str(), EnumToString(key.widgetClass));
 }

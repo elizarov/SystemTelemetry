@@ -9,6 +9,7 @@
 
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -117,7 +118,7 @@ public:
                 return Utf8FromAnsi(text);
             }
         }
-        return std::to_string(result);
+        return FormatText("%d", result);
     }
 
     NvmlReturn DeviceCount(unsigned int& count) const {

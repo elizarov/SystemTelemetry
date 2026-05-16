@@ -263,7 +263,7 @@ void SetDialogControlTextUtf8(HWND hwnd, int controlId, std::string_view text) {
 }
 
 void SetDialogControlInteger(HWND hwnd, int controlId, int value) {
-    SetDialogControlTextUtf8(hwnd, controlId, std::to_string(value));
+    SetDialogControlTextUtf8(hwnd, controlId, FormatText("%d", value));
 }
 
 void SetDialogControlIntegerOrEmpty(HWND hwnd, int controlId, int value, bool hasValue) {

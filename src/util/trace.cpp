@@ -202,7 +202,7 @@ std::string Trace::FormatTimestamp() {
 }
 
 std::string Trace::FormatValueDouble(const char* label, double value, int precision) {
-    return std::string(label) + "=" + FormatDoubleFixed(value, precision);
+    return FormatText("%s=%s", label, FormatDoubleFixed(value, precision).c_str());
 }
 
 void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::string& error) {

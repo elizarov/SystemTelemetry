@@ -453,7 +453,7 @@ bool DashboardController::IsAutoStartEnabled() const {
 void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
     const bool enable = !IsAutoStartEnabled();
     if (!UpdateAutoStartRegistration(enable, shell.WindowHandle())) {
-        shell.ShowError(std::string("Failed to ") + (enable ? "enable" : "disable") + " auto-start on user logon.");
+        shell.ShowError(FormatText("Failed to %s auto-start on user logon.", enable ? "enable" : "disable"));
     }
 }
 

@@ -4,6 +4,7 @@
 
 #include "config/config_parser.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 
 FilePath GetRuntimeConfigPath() {
     return GetExecutableDirectory() / "config.ini";
@@ -33,8 +34,8 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     }
 
     const FilePath parent = path.has_parent_path() ? path.parent_path() : CurrentDirectoryPath();
-    const std::string probeName =
-        ".config-write-test-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(GetTickCount64()) + ".tmp";
+    const std::string probeName = FormatText(
+        ".config-write-test-%lu-%llu.tmp", GetCurrentProcessId(), static_cast<unsigned long long>(GetTickCount64()));
     const FilePath probePath = parent / probeName;
     const std::wstring wideProbePath = probePath.Wide();
     HANDLE probe = CreateFileW(wideProbePath.c_str(),

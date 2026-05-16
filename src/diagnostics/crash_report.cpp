@@ -108,8 +108,8 @@ std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* e
     AppendLine(text, "build_kind", casedash::version::kBuildKind);
     AppendLine(text, "git_commit", casedash::version::kGitCommit);
     AppendLine(text, "git_dirty", casedash::version::kGitDirty ? "yes" : "no");
-    AppendLine(text, "process_id", std::to_string(GetCurrentProcessId()));
-    AppendLine(text, "thread_id", std::to_string(GetCurrentThreadId()));
+    AppendLine(text, "process_id", FormatText("%lu", GetCurrentProcessId()));
+    AppendLine(text, "thread_id", FormatText("%lu", GetCurrentThreadId()));
     AppendLine(text, "exception_code", record != nullptr ? ExceptionCodeText(record->ExceptionCode) : "unknown");
     AppendLine(text, "exception_address", PointerText(exceptionAddress));
     AppendLine(text, "faulting_module", ModulePathForAddress(const_cast<void*>(exceptionAddress)));

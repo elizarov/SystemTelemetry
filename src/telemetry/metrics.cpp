@@ -727,7 +727,7 @@ std::string TwoDigit(int value) {
 }
 
 std::string NumberText(int value) {
-    return std::to_string(value);
+    return FormatText("%d", value);
 }
 
 std::string MonthName(int month) {

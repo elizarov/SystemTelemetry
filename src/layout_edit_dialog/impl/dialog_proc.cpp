@@ -416,20 +416,22 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
                     state->dialog->Host().TraceLayoutEditDialogEvent("picker_open",
-                        BuildTraceNodeText(state->selectedNode) +
-                            " current=" + QuoteTraceText(FormatTraceColorHex(currentColor)));
+                        BuildTraceNodeDetail(state->selectedNode,
+                            " current=%s",
+                            QuoteTraceText(FormatTraceColorHex(currentColor)).c_str()));
                     if (ChooseColorW(&chooseColor) == TRUE) {
                         const unsigned int currentAlpha = ReadColorDialogValue(hwnd).value_or(currentColor) & 0xFFu;
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
                                                        (GetGValue(chooseColor.rgbResult) << 16) |
                                                        (GetBValue(chooseColor.rgbResult) << 8) | currentAlpha;
                         state->dialog->Host().TraceLayoutEditDialogEvent("picker_return",
-                            BuildTraceNodeText(state->selectedNode) +
-                                " accepted=\"true\" chosen=" + QuoteTraceText(FormatTraceColorHex(nextColor)));
+                            BuildTraceNodeDetail(state->selectedNode,
+                                " accepted=\"true\" chosen=%s",
+                                QuoteTraceText(FormatTraceColorHex(nextColor)).c_str()));
                         SetSelectedDialogColor(state, hwnd, nextColor);
                     } else {
                         state->dialog->Host().TraceLayoutEditDialogEvent(
-                            "picker_return", BuildTraceNodeText(state->selectedNode) + " accepted=\"false\"");
+                            "picker_return", BuildTraceNodeDetail(state->selectedNode, " accepted=\"false\""));
                     }
                     RefreshLayoutEditValidationState(state, hwnd);
                     return handled(TRUE);

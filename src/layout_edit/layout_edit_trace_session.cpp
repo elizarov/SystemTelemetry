@@ -1,6 +1,7 @@
 #include "layout_edit/layout_edit_trace_session.h"
 
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -64,16 +65,20 @@ void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
         const double averageMs = DurationMilliseconds(stats.total) / static_cast<double>(stats.samples);
         text += " avg_";
         text += name;
-        text += "_ms=" + FormatMilliseconds(averageMs);
+        text += "_ms=";
+        text += FormatMilliseconds(averageMs);
         text += ' ';
         text += name;
-        text += "_samples=" + std::to_string(stats.samples);
+        AppendFormat(text, "_samples=%zu", stats.samples);
     };
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;
-    std::string summary =
-        "end kind=\"" + kind_ + "\" detail=\"" + detail_ + "\" reason=\"" + reason + "\" elapsed_ms=" +
-        FormatMilliseconds(DurationMilliseconds(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed)));
+    std::string summary = FormatText("end kind=\"%s\" detail=\"%s\" reason=\"%s\" elapsed_ms=%s",
+        kind_.c_str(),
+        detail_.c_str(),
+        reason,
+        FormatMilliseconds(DurationMilliseconds(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed)))
+            .c_str());
     appendAverage(summary, "snap", snap_);
     appendAverage(summary, "apply", apply_);
     appendAverage(summary, "paint_total", paintTotal_);

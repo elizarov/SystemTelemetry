@@ -625,14 +625,14 @@ std::string DashboardRenderer::SnapshotOverlaySignature(const DashboardOverlaySt
         signature += '|';
         signature += drag.widget.editCardId;
         signature += '|';
-        signature += std::to_string(static_cast<int>(drag.widget.kind));
+        AppendFormat(signature, "%d", static_cast<int>(drag.widget.kind));
         signature += '|';
         for (size_t pathIndex : drag.widget.nodePath) {
-            signature += std::to_string(pathIndex);
+            AppendFormat(signature, "%zu", pathIndex);
             signature += '.';
         }
         signature += ':';
-        signature += std::to_string(drag.currentIndex);
+        AppendFormat(signature, "%d", drag.currentIndex);
     }
     if (overlayState.activeContainerChildReorderDrag.has_value()) {
         const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
@@ -640,11 +640,11 @@ std::string DashboardRenderer::SnapshotOverlaySignature(const DashboardOverlaySt
         signature += drag.key.editCardId;
         signature += '|';
         for (size_t pathIndex : drag.key.nodePath) {
-            signature += std::to_string(pathIndex);
+            AppendFormat(signature, "%zu", pathIndex);
             signature += '.';
         }
         signature += ':';
-        signature += std::to_string(drag.currentIndex);
+        AppendFormat(signature, "%d", drag.currentIndex);
     }
     return signature;
 }

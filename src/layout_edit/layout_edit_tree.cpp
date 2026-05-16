@@ -5,6 +5,7 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -81,16 +82,26 @@ std::string ChildDisplayName(const LayoutNodeConfig& node) {
 }
 
 std::string SectionLocationText(std::string_view sectionName) {
-    return "[" + std::string(sectionName) + "]";
+    return FormatText("[%.*s]", static_cast<int>(sectionName.size()), sectionName.data());
 }
 
 std::string MemberLocationText(std::string_view sectionName, std::string_view memberName) {
-    return SectionLocationText(sectionName) + " " + std::string(memberName);
+    return FormatText("[%.*s] %.*s",
+        static_cast<int>(sectionName.size()),
+        sectionName.data(),
+        static_cast<int>(memberName.size()),
+        memberName.data());
 }
 
 std::string ContainerLocationText(
     std::string_view sectionName, std::string_view memberName, std::string_view containerName) {
-    return MemberLocationText(sectionName, memberName) + " " + std::string(containerName) + "(...)";
+    return FormatText("[%.*s] %.*s %.*s(...)",
+        static_cast<int>(sectionName.size()),
+        sectionName.data(),
+        static_cast<int>(memberName.size()),
+        memberName.data(),
+        static_cast<int>(containerName.size()),
+        containerName.data());
 }
 
 std::optional<LayoutEditSelectionHighlight> SectionSelectionHighlight(std::string_view sectionName) {
@@ -120,19 +131,19 @@ std::string SectionDescriptionKey(std::string_view sectionName) {
     if (sectionName.rfind("card.", 0) == 0) {
         return "layout_edit.section.card";
     }
-    return "layout_edit.section." + std::string(sectionName);
+    return FormatText("layout_edit.section.%.*s", static_cast<int>(sectionName.size()), sectionName.data());
 }
 
 std::string GroupDescriptionKey(std::string_view memberName) {
-    return "layout_edit.group." + std::string(memberName);
+    return FormatText("layout_edit.group.%.*s", static_cast<int>(memberName.size()), memberName.data());
 }
 
 std::string CardMemberDescriptionKey(std::string_view memberName) {
-    return "config.card." + std::string(memberName);
+    return FormatText("config.card.%.*s", static_cast<int>(memberName.size()), memberName.data());
 }
 
 std::string ContainerDescriptionKey(std::string_view containerName) {
-    return "layout_edit.container." + std::string(containerName);
+    return FormatText("layout_edit.container.%.*s", static_cast<int>(containerName.size()), containerName.data());
 }
 
 bool IsFixedHeightRowChild(const LayoutNodeConfig& node) {

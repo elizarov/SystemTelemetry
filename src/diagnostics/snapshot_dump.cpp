@@ -185,7 +185,7 @@ void WriteDouble(std::string& output, const std::string& key, double value, int 
 }
 
 template <typename T> void WriteInteger(std::string& output, const std::string& key, T value) {
-    WriteLine(output, key, std::to_string(static_cast<long long>(value)));
+    WriteLine(output, key, FormatText("%lld", static_cast<long long>(value)));
 }
 
 void WriteOptionalDouble(

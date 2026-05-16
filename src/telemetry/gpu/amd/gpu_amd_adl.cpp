@@ -18,7 +18,7 @@ namespace {
 using namespace adlx;
 
 std::string AdlxResultCodeString(ADLX_RESULT result) {
-    return std::to_string(static_cast<int>(result));
+    return FormatText("%d", static_cast<int>(result));
 }
 
 void SetSupportDiagnostics(std::string& diagnostics,

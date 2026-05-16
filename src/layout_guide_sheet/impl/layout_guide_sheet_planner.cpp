@@ -8,6 +8,7 @@
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "layout_model/layout_edit_hit_priority.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -171,7 +172,7 @@ std::string LayoutGuideSheetCalloutKey(
             nodeFieldKey != nullptr && nodeFieldKey->widgetClass == WidgetClass::MetricList) {
             std::string key = "metric_list_layout:" + nodeFieldKey->editCardId;
             for (const size_t pathPart : nodeFieldKey->nodePath) {
-                key += "/" + std::to_string(pathPart);
+                AppendFormat(key, "/%zu", pathPart);
             }
             return key;
         }

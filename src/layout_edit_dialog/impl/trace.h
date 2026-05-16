@@ -13,5 +13,6 @@ std::string FormatTraceColorHex(unsigned int color);
 std::string JoinNodePath(const std::vector<size_t>& path);
 std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf);
 std::string BuildTraceNodeText(const LayoutEditTreeNode* node);
+std::string BuildTraceNodeDetail(const LayoutEditTreeNode* node, const char* format, ...);
 std::string BuildColorDialogTraceValues(HWND hwnd);
 std::string BuildMetricDialogTraceValues(HWND hwnd);

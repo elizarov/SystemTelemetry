@@ -6,6 +6,7 @@
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -106,7 +107,8 @@ template <typename Section, typename CompareOwner, typename UpdateKeyFn>
 void SaveStructuredSectionDifferences(
     const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
-        const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
+        const std::string sectionName =
+            FormatText("[%.*s]", static_cast<int>(Section::name.view().size()), Section::name.view().data());
         for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
             if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
                 updateKey(

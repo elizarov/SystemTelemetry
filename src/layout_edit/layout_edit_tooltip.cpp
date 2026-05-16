@@ -5,6 +5,7 @@
 #include "config/color_format.h"
 #include "layout_edit/layout_edit_service.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
     if (format == configschema::ValueFormat::String || format == configschema::ValueFormat::FontSpec ||
@@ -12,7 +13,7 @@ std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat
         return {};
     }
     if (format == configschema::ValueFormat::Integer) {
-        return std::to_string(static_cast<int>(std::lround(value)));
+        return FormatText("%d", static_cast<int>(std::lround(value)));
     }
 
     return FormatDoubleFixedTrimmed(value, 2);
@@ -23,7 +24,7 @@ std::string FormatLayoutEditTooltipValue(unsigned int value) {
 }
 
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value) {
-    return value.face + "," + std::to_string(value.size) + "," + std::to_string(value.weight);
+    return FormatText("%s,%d,%d", value.face.c_str(), value.size, value.weight);
 }
 
 std::string FormatLayoutEditTooltipValue(std::string_view value) {
@@ -31,20 +32,31 @@ std::string FormatLayoutEditTooltipValue(std::string_view value) {
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, double value) {
-    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " +
-           FormatLayoutEditTooltipValue(value, descriptor.valueFormat);
+    return FormatText("[%s] %s = %s",
+        descriptor.sectionName.c_str(),
+        descriptor.memberName.c_str(),
+        FormatLayoutEditTooltipValue(value, descriptor.valueFormat).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, unsigned int value) {
-    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " + FormatLayoutEditTooltipValue(value);
+    return FormatText("[%s] %s = %s",
+        descriptor.sectionName.c_str(),
+        descriptor.memberName.c_str(),
+        FormatLayoutEditTooltipValue(value).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value) {
-    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " + FormatLayoutEditTooltipValue(value);
+    return FormatText("[%s] %s = %s",
+        descriptor.sectionName.c_str(),
+        descriptor.memberName.c_str(),
+        FormatLayoutEditTooltipValue(value).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, std::string_view value) {
-    return "[" + descriptor.sectionName + "] " + descriptor.memberName + " = " + FormatLayoutEditTooltipValue(value);
+    return FormatText("[%s] %s = %s",
+        descriptor.sectionName.c_str(),
+        descriptor.memberName.c_str(),
+        FormatLayoutEditTooltipValue(value).c_str());
 }
 
 std::optional<std::string> BuildMetricListOrderTooltipLine(
@@ -64,7 +76,10 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
                                     : key.editCardId.empty() ? "layout"
                                                              : "card." + key.editCardId;
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    return "[" + sectionName + "] " + memberName + " = metric_list(" + metricRefs[static_cast<size_t>(rowIndex)] + ")";
+    return FormatText("[%s] %s = metric_list(%s)",
+        sectionName.c_str(),
+        memberName.c_str(),
+        metricRefs[static_cast<size_t>(rowIndex)].c_str());
 }
 
 std::optional<std::string> BuildMetricListAddRowTooltipLine(
@@ -79,7 +94,7 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
                                     : key.editCardId.empty() ? "layout"
                                                              : "card." + key.editCardId;
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    return "[" + sectionName + "] " + memberName + " = metric_list()";
+    return FormatText("[%s] %s = metric_list()", sectionName.c_str(), memberName.c_str());
 }
 
 std::optional<std::string> BuildContainerChildOrderTooltipLine(
@@ -94,7 +109,7 @@ std::optional<std::string> BuildContainerChildOrderTooltipLine(
                                     : key.editCardId.empty() ? "layout"
                                                              : "card." + key.editCardId;
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    std::string text = "[" + sectionName + "] " + memberName + " = " + node->name + "(";
+    std::string text = FormatText("[%s] %s = %s(", sectionName.c_str(), memberName.c_str(), node->name.c_str());
     for (size_t i = 0; i < node->children.size(); ++i) {
         if (i > 0) {
             text += ", ";

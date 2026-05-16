@@ -9,6 +9,7 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -18,7 +19,7 @@ std::string FormatNodePath(const std::vector<size_t>& path) {
         if (!formatted.empty()) {
             formatted += ".";
         }
-        formatted += std::to_string(path[i]);
+        AppendFormat(formatted, "%zu", path[i]);
     }
     return formatted.empty() ? "root" : formatted;
 }
@@ -28,35 +29,46 @@ const char* AxisName(LayoutGuideAxis axis) {
 }
 
 std::string DescribeLayoutGuide(const LayoutEditGuide& guide) {
-    std::string detail = "axis=" + std::string(AxisName(guide.axis)) +
-                         " separator=" + std::to_string(guide.separatorIndex) +
-                         " path=" + FormatNodePath(guide.nodePath);
+    std::string detail = FormatText("axis=%s separator=%zu path=%s",
+        AxisName(guide.axis),
+        guide.separatorIndex,
+        FormatNodePath(guide.nodePath).c_str());
     if (!guide.editCardId.empty()) {
-        detail += " card=" + guide.editCardId;
+        detail += " card=";
+        detail += guide.editCardId;
     }
     return detail;
 }
 
 std::string DescribeWidgetParameter(LayoutEditParameter parameter) {
     const auto metadata = GetLayoutEditConfigFieldMetadata(parameter);
-    return std::string(metadata.sectionName) + "." + std::string(metadata.parameterName);
+    return FormatText("%s.%s", metadata.sectionName, metadata.parameterName);
 }
 
 std::string DescribeWidgetGuide(const LayoutEditWidgetGuide& guide) {
-    return "axis=" + std::string(AxisName(guide.axis)) + " parameter=" + DescribeWidgetParameter(guide.parameter) +
-           " guide_id=" + std::to_string(guide.guideId) +
-           (guide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
-                   ? " card=" + guide.widget.editCardId
-                   : " path=" + FormatNodePath(guide.widget.nodePath));
+    std::string detail = FormatText("axis=%s parameter=%s guide_id=%d",
+        AxisName(guide.axis),
+        DescribeWidgetParameter(guide.parameter).c_str(),
+        guide.guideId);
+    if (guide.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+        detail += " card=";
+        detail += guide.widget.editCardId;
+    } else {
+        detail += " path=";
+        detail += FormatNodePath(guide.widget.nodePath);
+    }
+    return detail;
 }
 
 std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
     const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome
                                   ? " dashboard"
                                   : " card=" + anchor.key.widget.renderCardId;
-    return "axis=" + std::string(AxisName(anchor.axis)) +
-           " parameter=" + DescribeWidgetParameter(anchor.key.parameter) +
-           " path=" + FormatNodePath(anchor.key.nodePath) + scope;
+    return FormatText("axis=%s parameter=%s path=%s%s",
+        AxisName(anchor.axis),
+        DescribeWidgetParameter(anchor.key.parameter).c_str(),
+        FormatNodePath(anchor.key.nodePath).c_str(),
+        scope.c_str());
 }
 
 std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
@@ -67,10 +79,15 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
                                 : LayoutEditAnchorNodeFieldKey(key).has_value()           ? "node_field"
                                 : LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder"
                                                                                           : "subject=unknown";
-    return subject + " anchor_id=" + std::to_string(key.anchorId) +
-           (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome
-                   ? " card=" + key.widget.editCardId
-                   : " path=" + FormatNodePath(key.widget.nodePath));
+    std::string detail = FormatText("%s anchor_id=%d", subject.c_str(), key.anchorId);
+    if (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
+        detail += " card=";
+        detail += key.widget.editCardId;
+    } else {
+        detail += " path=";
+        detail += FormatNodePath(key.widget.nodePath);
+    }
+    return detail;
 }
 
 int ContainerChildAxisStart(const RenderRect& rect, bool horizontal) {

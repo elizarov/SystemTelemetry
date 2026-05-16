@@ -972,20 +972,17 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             const CardCalloutColumns& columns = plannedByCard[cardIndex];
             const int leaderScore = countLeaderIntersections(columns, cardPlacements[cardIndex]);
             const std::string& cardId = cardPlacements[cardIndex].id;
-            std::string detail = "leader_score_";
-            detail += cardId;
-            AppendFormat(detail, "=%d", leaderScore);
-            detail += " leader_repair_passes_";
-            detail += cardId;
-            AppendFormat(detail, "=%d leader_columns_", columns.leaderRepairPasses);
-            detail += cardId;
-            AppendFormat(detail,
-                "=\"%zu,%zu,%zu,%zu\"",
+            traceDetails->push_back(FormatText("leader_score_%s=%d leader_repair_passes_%s=%d "
+                                               "leader_columns_%s=\"%zu,%zu,%zu,%zu\"",
+                cardId.c_str(),
+                leaderScore,
+                cardId.c_str(),
+                columns.leaderRepairPasses,
+                cardId.c_str(),
                 columns.left.size(),
                 columns.top.size(),
                 columns.right.size(),
-                columns.bottom.size());
-            traceDetails->push_back(detail);
+                columns.bottom.size()));
         }
     }
     return result;
