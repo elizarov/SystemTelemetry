@@ -107,6 +107,25 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     }
 }
 
+std::optional<double> FindBoardGpuFanRpm(const SystemSnapshot& snapshot) {
+    for (const auto& fan : snapshot.boardFans) {
+        if (fan.name == "gpu") {
+            return FiniteOptional(fan.metric.value);
+        }
+    }
+    return std::nullopt;
+}
+
+void ApplyBoardGpuFanFallback(RealTelemetryCollectorState& state) {
+    if (state.snapshot_.gpu.fan.value.has_value()) {
+        return;
+    }
+    if (auto fanRpm = FindBoardGpuFanRpm(state.snapshot_); fanRpm.has_value()) {
+        state.snapshot_.gpu.fan.value = *fanRpm;
+        state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    }
+}
+
 void ResetGpuProviderState(RealTelemetryCollectorState& state) {
     state.gpu_.providerName = "None";
     state.gpu_.providerDiagnostics = "Provider not initialized.";
@@ -232,6 +251,7 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
                    state.gpu_.providerDiagnostics + "\"";
         });
     }
+    ApplyBoardGpuFanFallback(state);
 
     if (!hasVendorLoad && state.gpu_.query != nullptr) {
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);

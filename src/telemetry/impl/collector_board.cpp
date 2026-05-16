@@ -54,9 +54,6 @@ std::optional<std::string> FindAutoBoardSensorName(
     if (EqualsInsensitive(logicalName, "cpu")) {
         return findContaining("cpu");
     }
-    if (EqualsInsensitive(logicalName, "gpu")) {
-        return findContaining("gpu");
-    }
     if (EqualsInsensitive(logicalName, "system")) {
         if (auto match = findContaining("system"); match.has_value()) {
             return match;
