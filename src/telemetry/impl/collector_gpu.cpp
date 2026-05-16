@@ -174,18 +174,20 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
         state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_initialize_begin");
         if (state.gpu_.provider->Initialize()) {
             ApplyGpuVendorSample(state, state.gpu_.provider->Sample());
-            state.trace_.Write(TracePrefix::Telemetry,
-                "gpu_provider_initialize_done provider=" + state.gpu_.providerName +
-                    " available=" + Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
-                    state.gpu_.providerDiagnostics + "\"");
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                "gpu_provider_initialize_done provider=%s available=%s diagnostics=\"%s\"",
+                state.gpu_.providerName.c_str(),
+                Trace::BoolText(state.gpu_.providerAvailable),
+                state.gpu_.providerDiagnostics.c_str());
         } else {
             const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
             state.gpu_.providerName = sample.providerName.empty() ? "GPU vendor" : sample.providerName;
             state.gpu_.providerDiagnostics =
                 sample.diagnostics.empty() ? "Provider initialization failed." : sample.diagnostics;
-            state.trace_.Write(TracePrefix::Telemetry,
-                "gpu_provider_initialize_failed provider=" + state.gpu_.providerName + " diagnostics=\"" +
-                    state.gpu_.providerDiagnostics + "\"");
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                "gpu_provider_initialize_failed provider=%s diagnostics=\"%s\"",
+                state.gpu_.providerName.c_str(),
+                state.gpu_.providerDiagnostics.c_str());
         }
     } else {
         state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_create result=null");
@@ -225,11 +227,11 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         hasVendorLoad = sample.loadPercent.has_value();
         hasVendorVram = sample.usedVramGb.has_value();
         ApplyGpuVendorSample(state, sample);
-        state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-            return "gpu_vendor_sample provider=" + state.gpu_.providerName +
-                   " available=" + Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
-                   state.gpu_.providerDiagnostics + "\"";
-        });
+        state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+            "gpu_vendor_sample provider=%s available=%s diagnostics=\"%s\"",
+            state.gpu_.providerName.c_str(),
+            Trace::BoolText(state.gpu_.providerAvailable),
+            state.gpu_.providerDiagnostics.c_str());
     }
 
     if (!hasVendorLoad && state.gpu_.query != nullptr) {

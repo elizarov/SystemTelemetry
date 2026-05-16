@@ -55,13 +55,16 @@ public:
                 sample.fps = *fpsSample.fps;
                 sample.available = true;
             }
-            trace_.WriteLazy(TracePrefix::UnsupportedGpu, [&] {
-                return std::string("get_presented_fps available=") + Trace::BoolText(fpsSample.fps.has_value()) +
-                       " value=" +
-                       (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
-                                                  : std::string("fps=N/A")) +
-                       " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";
-            });
+            if (trace_.Enabled(TracePrefix::UnsupportedGpu)) {
+                const std::string fpsText =
+                    fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
+                trace_.WriteFmt(TracePrefix::UnsupportedGpu,
+                    "get_presented_fps available=%s value=%s process=\"%s\" diagnostics=\"%s\"",
+                    Trace::BoolText(fpsSample.fps.has_value()),
+                    fpsText.c_str(),
+                    fpsSample.processName.c_str(),
+                    fpsSample.diagnostics.c_str());
+            }
         }
 
         sample.diagnostics += " fps=" + fpsDiagnostics_;

@@ -235,17 +235,21 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
             continue;
         }
 
-        state.trace_.Write(TracePrefix::Telemetry,
-            ("network_candidate interface=" + std::to_string(candidateState.interfaceIndex) + " alias=\"" +
-                candidateState.alias + "\" description=\"" + candidateState.description + "\"" + " exact_match=" +
-                Trace::BoolText(configuredExactMatch) + " partial_match=" + Trace::BoolText(configuredPartialMatch) +
-                " matched=" + Trace::BoolText(candidateState.info.matched) +
-                " has_ipv4=" + Trace::BoolText(candidateState.info.hasIpv4) +
-                " has_gateway=" + Trace::BoolText(candidateState.info.hasGateway) +
-                " hardware=" + Trace::BoolText(candidateState.hardwareInterface) +
-                " connector=" + Trace::BoolText(candidateState.connectorPresent) +
-                " traffic=" + std::to_string(candidateState.traffic) + " ip=" + candidateState.info.ipAddress)
-                .c_str());
+        state.trace_.WriteFmt(TracePrefix::Telemetry,
+            "network_candidate interface=%u alias=\"%s\" description=\"%s\" exact_match=%s partial_match=%s matched=%s "
+            "has_ipv4=%s has_gateway=%s hardware=%s connector=%s traffic=%llu ip=%s",
+            candidateState.interfaceIndex,
+            candidateState.alias.c_str(),
+            candidateState.description.c_str(),
+            Trace::BoolText(configuredExactMatch),
+            Trace::BoolText(configuredPartialMatch),
+            Trace::BoolText(candidateState.info.matched),
+            Trace::BoolText(candidateState.info.hasIpv4),
+            Trace::BoolText(candidateState.info.hasGateway),
+            Trace::BoolText(candidateState.hardwareInterface),
+            Trace::BoolText(candidateState.connectorPresent),
+            static_cast<unsigned long long>(candidateState.traffic),
+            candidateState.info.ipAddress.c_str());
 
         NetworkAdapterCandidate adapterCandidate;
         adapterCandidate.adapterName =
@@ -278,12 +282,16 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
     }
 
     if (selected != nullptr) {
-        state.trace_.Write(TracePrefix::Telemetry,
-            ("network_selected interface=" + std::to_string(selected->interfaceIndex) + " alias=\"" + selected->alias +
-                "\" description=\"" + selected->description + "\" has_ipv4=" + Trace::BoolText(selected->info.hasIpv4) +
-                " has_gateway=" + Trace::BoolText(selected->info.hasGateway) +
-                " traffic=" + std::to_string(selected->traffic) + " ip=" + selected->info.ipAddress)
-                .c_str());
+        state.trace_.WriteFmt(TracePrefix::Telemetry,
+            "network_selected interface=%u alias=\"%s\" description=\"%s\" has_ipv4=%s has_gateway=%s traffic=%llu "
+            "ip=%s",
+            selected->interfaceIndex,
+            selected->alias.c_str(),
+            selected->description.c_str(),
+            Trace::BoolText(selected->info.hasIpv4),
+            Trace::BoolText(selected->info.hasGateway),
+            static_cast<unsigned long long>(selected->traffic),
+            selected->info.ipAddress.c_str());
         state.snapshot_.network.adapterName = !selected->alias.empty() ? selected->alias : selected->description;
         state.resolvedSelections_.adapterName = state.snapshot_.network.adapterName;
         state.snapshot_.network.ipAddress = selected->info.ipAddress;

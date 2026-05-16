@@ -103,15 +103,17 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
                 state.board_.provider->Initialize(state.settings_.board);
                 ApplyBoardVendorSample(state, state.board_.provider->Sample());
             }
-            state.trace_.Write(TracePrefix::Telemetry,
-                "board_provider_initialize_done provider=" + state.board_.providerName +
-                    " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
-                    state.board_.providerDiagnostics + "\"");
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                "board_provider_initialize_done provider=%s available=%s diagnostics=\"%s\"",
+                state.board_.providerName.c_str(),
+                Trace::BoolText(state.board_.providerAvailable),
+                state.board_.providerDiagnostics.c_str());
         } else {
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
-            state.trace_.Write(TracePrefix::Telemetry,
-                "board_provider_initialize_failed provider=" + state.board_.providerName + " diagnostics=\"" +
-                    state.board_.providerDiagnostics + "\"");
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                "board_provider_initialize_failed provider=%s diagnostics=\"%s\"",
+                state.board_.providerName.c_str(),
+                state.board_.providerDiagnostics.c_str());
         }
     } else {
         state.trace_.Write(TracePrefix::Telemetry, "board_provider_create result=null");
@@ -132,15 +134,17 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
             state.board_.provider->Initialize(state.settings_.board);
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
         }
-        state.trace_.Write(TracePrefix::Telemetry,
-            "board_provider_reconfigure_done provider=" + state.board_.providerName +
-                " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
-                state.board_.providerDiagnostics + "\"");
+        state.trace_.WriteFmt(TracePrefix::Telemetry,
+            "board_provider_reconfigure_done provider=%s available=%s diagnostics=\"%s\"",
+            state.board_.providerName.c_str(),
+            Trace::BoolText(state.board_.providerAvailable),
+            state.board_.providerDiagnostics.c_str());
     } else {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
-        state.trace_.Write(TracePrefix::Telemetry,
-            "board_provider_reconfigure_failed provider=" + state.board_.providerName + " diagnostics=\"" +
-                state.board_.providerDiagnostics + "\"");
+        state.trace_.WriteFmt(TracePrefix::Telemetry,
+            "board_provider_reconfigure_failed provider=%s diagnostics=\"%s\"",
+            state.board_.providerName.c_str(),
+            state.board_.providerDiagnostics.c_str());
     }
 }
 
@@ -151,11 +155,11 @@ void UpdateBoardMetrics(RealTelemetryCollectorState& state) {
             state.board_.provider->Initialize(state.settings_.board);
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
         }
-        state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-            return "board_vendor_sample provider=" + state.board_.providerName +
-                   " available=" + Trace::BoolText(state.board_.providerAvailable) + " diagnostics=\"" +
-                   state.board_.providerDiagnostics + "\"";
-        });
+        state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+            "board_vendor_sample provider=%s available=%s diagnostics=\"%s\"",
+            state.board_.providerName.c_str(),
+            Trace::BoolText(state.board_.providerAvailable),
+            state.board_.providerDiagnostics.c_str());
     }
     state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
 }

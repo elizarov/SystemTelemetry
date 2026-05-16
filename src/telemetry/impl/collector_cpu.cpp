@@ -91,11 +91,12 @@ void UpdateCpuMetrics(RealTelemetryCollectorState& state) {
             state.snapshot_.cpu.clock.unit = ScalarMetricUnit::Gigahertz;
         }
     }
-    state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-        return "cpu_clock status=" + std::to_string(static_cast<long>(clockStatus)) + " value=" +
-               (state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2)
-                                                            : std::string("N/A"));
-    });
+    if (state.trace_.Enabled(TracePrefix::Telemetry)) {
+        const std::string valueText =
+            state.snapshot_.cpu.clock.value.has_value() ? FormatScalarMetric(state.snapshot_.cpu.clock, 2) : "N/A";
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry, "cpu_clock status=%ld value=%s", static_cast<long>(clockStatus), valueText.c_str());
+    }
     state.retainedHistoryStore_.PushSample(
         state.snapshot_, RetainedHistoryKey::CpuClock, state.snapshot_.cpu.clock.value.value_or(0.0));
 

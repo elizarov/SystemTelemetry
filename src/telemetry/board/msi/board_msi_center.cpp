@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -86,7 +87,10 @@ public:
     }
 
     void TraceAssemblyLoaded(const wchar_t* path) override {
-        trace_.Write(TracePrefix::MsiCenter, "assembly_loaded path=\"" + Utf8FromNullableWide(path) + "\"");
+        if (trace_.Enabled(TracePrefix::MsiCenter)) {
+            const std::string pathText = Utf8FromNullableWide(path);
+            trace_.WriteFmt(TracePrefix::MsiCenter, "assembly_loaded path=\"%s\"", pathText.c_str());
+        }
     }
 
     void TraceQuerySuccess(int fanCount, int temperatureCount) override {
@@ -95,19 +99,27 @@ public:
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write(TracePrefix::MsiCenter, "initialize_exception " + Utf8FromNullableWide(diagnostics));
+        if (trace_.Enabled(TracePrefix::MsiCenter)) {
+            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            trace_.WriteFmt(TracePrefix::MsiCenter, "initialize_exception %s", diagnosticsText.c_str());
+        }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy(
-            TracePrefix::MsiCenter, [&] { return "snapshot_exception " + Utf8FromNullableWide(diagnostics); });
+        if (trace_.Enabled(TracePrefix::MsiCenter)) {
+            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            trace_.WriteFmt(TracePrefix::MsiCenter, "snapshot_exception %s", diagnosticsText.c_str());
+        }
     }
 
     MsiCenterSnapshot FinishSuccess() {
         snapshot_.success = true;
-        snapshot_.diagnostics =
-            "MSI Center hardware-monitor query completed. fan_count=" + std::to_string(snapshot_.fans.size()) +
-            " temp_count=" + std::to_string(snapshot_.temperatures.size());
+        char diagnostics[128];
+        sprintf_s(diagnostics,
+            "MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu",
+            snapshot_.fans.size(),
+            snapshot_.temperatures.size());
+        snapshot_.diagnostics = diagnostics;
         return std::move(snapshot_);
     }
 
@@ -130,8 +142,10 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace().Write(TracePrefix::MsiCenter,
-            "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+        trace().WriteFmt(TracePrefix::MsiCenter,
+            "board manufacturer=\"%s\" product=\"%s\"",
+            boardManufacturer_.c_str(),
+            boardProduct_.c_str());
 
         if (SelectBoardVendor(info_) != BoardVendor::Msi) {
             diagnostics_ = "Baseboard manufacturer is not MSI.";

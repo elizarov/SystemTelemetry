@@ -55,6 +55,18 @@ const char* PresentEventSourceName(PresentEventSource source) {
     return source == PresentEventSource::Runtime ? "runtime" : "dxgkrnl";
 }
 
+void SetGpuUsageStatusText(std::string& text, const char* label, long status) {
+    char buffer[64];
+    sprintf_s(buffer, " %s=%ld", label, status);
+    text = buffer;
+}
+
+void SetGpuUsageTwoStatusText(std::string& text, long collectStatus, const char* label, long status) {
+    char buffer[96];
+    sprintf_s(buffer, " gpu3d_collect=%ld %s=%ld", collectStatus, label, status);
+    text = buffer;
+}
+
 std::string Win32ErrorText(ULONG status) {
     char message[256]{};
     const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
@@ -186,11 +198,15 @@ public:
         sessionProps.properties.MaximumBuffers = 16;
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-        trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", Win32ErrorText(status).c_str());
+        if (trace_.Enabled(TracePrefix::FpsEtw)) {
+            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", Win32ErrorText(status).c_str());
+        }
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
-            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", Win32ErrorText(status).c_str());
+            if (trace_.Enabled(TracePrefix::FpsEtw)) {
+                trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", Win32ErrorText(status).c_str());
+            }
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
@@ -205,9 +221,16 @@ public:
         dxgiEnabled_ = dxgiStatus == ERROR_SUCCESS;
         d3d9Enabled_ = d3d9Status == ERROR_SUCCESS;
         dxgkrnlEnabled_ = dxgkrnlStatus == ERROR_SUCCESS;
-        trace_.Write(TracePrefix::FpsEtw,
-            "enable dxgi=" + Win32ErrorText(dxgiStatus) + " d3d9=" + Win32ErrorText(d3d9Status) +
-                " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus));
+        if (trace_.Enabled(TracePrefix::FpsEtw)) {
+            const std::string dxgiText = Win32ErrorText(dxgiStatus);
+            const std::string d3d9Text = Win32ErrorText(d3d9Status);
+            const std::string dxgkrnlText = Win32ErrorText(dxgkrnlStatus);
+            trace_.WriteFmt(TracePrefix::FpsEtw,
+                "enable dxgi=%s d3d9=%s dxgkrnl=%s",
+                dxgiText.c_str(),
+                d3d9Text.c_str(),
+                dxgkrnlText.c_str());
+        }
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
@@ -240,9 +263,11 @@ public:
         diagnostics_ = "Presented FPS ETW provider active.";
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.Write(TracePrefix::FpsEtw,
-            std::string("initialize_done dxgi=") + Trace::BoolText(dxgiEnabled_) +
-                " d3d9=" + Trace::BoolText(d3d9Enabled_) + " dxgkrnl=" + Trace::BoolText(dxgkrnlEnabled_));
+        trace_.WriteFmt(TracePrefix::FpsEtw,
+            "initialize_done dxgi=%s d3d9=%s dxgkrnl=%s",
+            Trace::BoolText(dxgiEnabled_),
+            Trace::BoolText(d3d9Enabled_),
+            Trace::BoolText(dxgkrnlEnabled_));
         return true;
     }
 
@@ -563,7 +588,7 @@ private:
 
         const PDH_STATUS openStatus = PdhOpenQueryW(nullptr, 0, &gpuQuery_);
         if (openStatus != ERROR_SUCCESS || gpuQuery_ == nullptr) {
-            gpuUsageDiagnostics_ = " gpu3d_open=" + std::to_string(static_cast<long>(openStatus));
+            SetGpuUsageStatusText(gpuUsageDiagnostics_, "gpu3d_open", static_cast<long>(openStatus));
             gpuQuery_ = nullptr;
             return;
         }
@@ -571,13 +596,13 @@ private:
         const PDH_STATUS addStatus =
             AddCounterCompat(gpuQuery_, "\\GPU Engine(*)\\Utilization Percentage", &gpu3dCounter_);
         if (addStatus != ERROR_SUCCESS || gpu3dCounter_ == nullptr) {
-            gpuUsageDiagnostics_ = " gpu3d_add=" + std::to_string(static_cast<long>(addStatus));
+            SetGpuUsageStatusText(gpuUsageDiagnostics_, "gpu3d_add", static_cast<long>(addStatus));
             PdhCloseQuery(gpuQuery_);
             gpuQuery_ = nullptr;
             return;
         }
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
-        gpuUsageDiagnostics_ = " gpu3d_collect=" + std::to_string(static_cast<long>(collectStatus));
+        SetGpuUsageStatusText(gpuUsageDiagnostics_, "gpu3d_collect", static_cast<long>(collectStatus));
         CapturePreviousGpu3dRawValuesLocked();
     }
 
@@ -623,8 +648,8 @@ private:
         DWORD itemCount = 0;
         PDH_STATUS status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
         if (status != PDH_MORE_DATA) {
-            gpuUsageDiagnostics_ = " gpu3d_collect=" + std::to_string(static_cast<long>(collectStatus)) +
-                                   " gpu3d_prepare=" + std::to_string(static_cast<long>(status));
+            SetGpuUsageTwoStatusText(
+                gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_prepare", static_cast<long>(status));
             return;
         }
 
@@ -632,8 +657,8 @@ private:
         auto* items = reinterpret_cast<PDH_RAW_COUNTER_ITEM_W*>(gpuCounterArrayBuffer_.data());
         status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, items);
         if (status != ERROR_SUCCESS) {
-            gpuUsageDiagnostics_ = " gpu3d_collect=" + std::to_string(static_cast<long>(collectStatus)) +
-                                   " gpu3d_fetch=" + std::to_string(static_cast<long>(status));
+            SetGpuUsageTwoStatusText(
+                gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_fetch", static_cast<long>(status));
             return;
         }
 
@@ -678,11 +703,19 @@ private:
         }
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
-        gpuUsageDiagnostics_ = " gpu3d_collect=" + std::to_string(static_cast<long>(collectStatus)) +
-                               " gpu3d_fetch=" + std::to_string(static_cast<long>(status)) +
-                               " top_gpu3d_process=" + ResolveProcessNameLocked(topGpu3dProcessId_) +
-                               " top_gpu3d_pid=" + std::to_string(static_cast<unsigned long>(topGpu3dProcessId_)) +
-                               " " + Trace::FormatValueDouble("top_gpu3d", topGpu3dUsage_, 1);
+        char prefix[96];
+        sprintf_s(prefix,
+            " gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process=",
+            static_cast<long>(collectStatus),
+            static_cast<long>(status));
+        gpuUsageDiagnostics_ = prefix;
+        gpuUsageDiagnostics_ += ResolveProcessNameLocked(topGpu3dProcessId_);
+        char suffix[96];
+        sprintf_s(suffix,
+            " top_gpu3d_pid=%lu top_gpu3d=value=%.1f",
+            static_cast<unsigned long>(topGpu3dProcessId_),
+            topGpu3dUsage_);
+        gpuUsageDiagnostics_ += suffix;
     }
 
     std::string GpuUsageDiagnostics() const {
@@ -693,8 +726,9 @@ private:
         if (processId == 0) {
             return gpuUsageDiagnostics_;
         }
-        return gpuUsageDiagnostics_ + " " +
-               Trace::FormatValueDouble("selected_gpu3d", Gpu3dUsageForProcess(processId), 1);
+        char suffix[48];
+        sprintf_s(suffix, " selected_gpu3d=value=%.1f", Gpu3dUsageForProcess(processId));
+        return gpuUsageDiagnostics_ + suffix;
     }
 
     ULONG EnableProvider(const GUID& providerGuid, uint64_t anyKeyword, UCHAR level) const {

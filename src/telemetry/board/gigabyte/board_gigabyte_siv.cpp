@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <cstdio>
 #include <memory>
 #include <optional>
 #include <string>
@@ -91,11 +92,17 @@ public:
     }
 
     void TraceAssemblyPreload(const wchar_t* path) override {
-        trace_.Write(TracePrefix::GigabyteSiv, "assembly_preload path=\"" + Utf8FromNullableWide(path) + "\"");
+        if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
+            const std::string pathText = Utf8FromNullableWide(path);
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, "assembly_preload path=\"%s\"", pathText.c_str());
+        }
     }
 
     void TraceMonitorCreated(const wchar_t* typeName) override {
-        trace_.Write(TracePrefix::GigabyteSiv, "monitor_created type=\"" + Utf8FromNullableWide(typeName) + "\"");
+        if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
+            const std::string typeText = Utf8FromNullableWide(typeName);
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, "monitor_created type=\"%s\"", typeText.c_str());
+        }
     }
 
     void TraceInitializeSuccess() override {
@@ -103,19 +110,27 @@ public:
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
-        trace_.Write(TracePrefix::GigabyteSiv, "initialize_exception " + Utf8FromNullableWide(diagnostics));
+        if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
+            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, "initialize_exception %s", diagnosticsText.c_str());
+        }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
-        trace_.WriteLazy(
-            TracePrefix::GigabyteSiv, [&] { return "snapshot_exception " + Utf8FromNullableWide(diagnostics); });
+        if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
+            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, "snapshot_exception %s", diagnosticsText.c_str());
+        }
     }
 
     GigabyteSivSnapshot FinishSuccess() {
         snapshot_.success = true;
-        snapshot_.diagnostics =
-            "Gigabyte SIV hardware-monitor query completed. fan_count=" + std::to_string(snapshot_.fans.size()) +
-            " temp_count=" + std::to_string(snapshot_.temperatures.size());
+        char diagnostics[128];
+        sprintf_s(diagnostics,
+            "Gigabyte SIV hardware-monitor query completed. fan_count=%zu temp_count=%zu",
+            snapshot_.fans.size(),
+            snapshot_.temperatures.size());
+        snapshot_.diagnostics = diagnostics;
         trace_.WriteLazyFmt(TracePrefix::GigabyteSiv,
             "snapshot_done fan_count=%zu temp_count=%zu",
             snapshot_.fans.size(),
@@ -142,8 +157,10 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace().Write(TracePrefix::GigabyteSiv,
-            "board manufacturer=\"" + boardManufacturer_ + "\" product=\"" + boardProduct_ + "\"");
+        trace().WriteFmt(TracePrefix::GigabyteSiv,
+            "board manufacturer=\"%s\" product=\"%s\"",
+            boardManufacturer_.c_str(),
+            boardProduct_.c_str());
 
         if (SelectBoardVendor(info_) != BoardVendor::Gigabyte) {
             diagnostics_ = "Baseboard manufacturer is not Gigabyte.";

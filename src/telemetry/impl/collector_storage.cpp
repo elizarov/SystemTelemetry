@@ -78,8 +78,8 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         const UINT driveType = GetDriveTypeW(root.c_str());
         drive.driveType = driveType;
         if (!IsSelectableStorageDriveType(driveType)) {
-            state.trace_.WriteLazy(TracePrefix::Telemetry,
-                [&] { return "drive_skip label=" + drive.label + " type=" + std::to_string(driveType); });
+            state.trace_.WriteLazyFmt(
+                TracePrefix::Telemetry, "drive_skip label=%s type=%u", drive.label.c_str(), driveType);
             continue;
         }
 
@@ -87,10 +87,11 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         ULARGE_INTEGER totalBytes{};
         const BOOL diskOk = GetDiskFreeSpaceExW(root.c_str(), &freeBytes, &totalBytes, nullptr);
         if (!diskOk || totalBytes.QuadPart == 0) {
-            state.trace_.WriteLazy(TracePrefix::Telemetry, [&] {
-                return "drive_space label=" + drive.label + " ok=" + Trace::BoolText(diskOk != FALSE) +
-                       " total_bytes=" + std::to_string(totalBytes.QuadPart);
-            });
+            state.trace_.WriteLazyFmt(TracePrefix::Telemetry,
+                "drive_space label=%s ok=%s total_bytes=%llu",
+                drive.label.c_str(),
+                Trace::BoolText(diskOk != FALSE),
+                static_cast<unsigned long long>(totalBytes.QuadPart));
             continue;
         }
 
@@ -216,7 +217,7 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
         DriveInfo info;
         info.label = label;
         state.snapshot_.drives.push_back(std::move(info));
-        state.trace_.Write(TracePrefix::Telemetry, ("drive_config label=" + label).c_str());
+        state.trace_.WriteFmt(TracePrefix::Telemetry, "drive_config label=%s", label.c_str());
 
         if (state.storage_.query != nullptr) {
             DriveCounterState counters;

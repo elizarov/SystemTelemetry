@@ -20,6 +20,37 @@ std::string AdlxResultCodeString(ADLX_RESULT result) {
     return std::to_string(static_cast<int>(result));
 }
 
+void SetSupportDiagnostics(std::string& diagnostics,
+    const std::string& gpuName,
+    adlx_bool usageSupported,
+    ADLX_RESULT usageResult,
+    adlx_bool tempSupported,
+    ADLX_RESULT tempResult,
+    adlx_bool clockSupported,
+    ADLX_RESULT clockResult,
+    adlx_bool fanSupported,
+    ADLX_RESULT fanResult,
+    adlx_bool vramSupported,
+    ADLX_RESULT vramResult) {
+    char supportText[192];
+    sprintf_s(supportText,
+        " usage_supported=%s(%d) temp_supported=%s(%d) clock_supported=%s(%d) fan_supported=%s(%d) "
+        "vram_supported=%s(%d)",
+        usageSupported ? "yes" : "no",
+        static_cast<int>(usageResult),
+        tempSupported ? "yes" : "no",
+        static_cast<int>(tempResult),
+        clockSupported ? "yes" : "no",
+        static_cast<int>(clockResult),
+        fanSupported ? "yes" : "no",
+        static_cast<int>(fanResult),
+        vramSupported ? "yes" : "no",
+        static_cast<int>(vramResult));
+    diagnostics = "ADLX GPU=";
+    diagnostics += gpuName;
+    diagnostics += supportText;
+}
+
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
     explicit AmdAdlxGpuTelemetryProvider(Trace& trace) : trace_(trace) {}
@@ -136,15 +167,18 @@ public:
         fanSupported_ = ADLX_SUCCEEDED(fanResult) && fanSupported;
         vramSupported_ = ADLX_SUCCEEDED(vramResult) && vramSupported;
 
-        diagnostics_ =
-            "ADLX GPU=" + gpuName_ + " usage_supported=" + (usageSupported ? "yes" : "no") + "(" +
-            std::to_string(static_cast<int>(usageResult)) + ")" + " temp_supported=" + (tempSupported ? "yes" : "no") +
-            "(" + std::to_string(static_cast<int>(tempResult)) + ")" +
-            " clock_supported=" + (clockSupported ? "yes" : "no") + "(" +
-            std::to_string(static_cast<int>(clockResult)) + ")" + " fan_supported=" + (fanSupported ? "yes" : "no") +
-            "(" + std::to_string(static_cast<int>(fanResult)) + ")" +
-            " vram_supported=" + (vramSupported ? "yes" : "no") + "(" + std::to_string(static_cast<int>(vramResult)) +
-            ")";
+        SetSupportDiagnostics(diagnostics_,
+            gpuName_,
+            usageSupported,
+            usageResult,
+            tempSupported,
+            tempResult,
+            clockSupported,
+            clockResult,
+            fanSupported,
+            fanResult,
+            vramSupported,
+            vramResult);
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
@@ -185,8 +219,8 @@ public:
         if (ADLX_FAILED(metricsResult) || !metrics) {
             sample.diagnostics = diagnostics_ + " current_metrics=" + AdlxResultCodeString(metricsResult);
             sample.available = false;
-            trace().WriteLazy(TracePrefix::AmdAdlx,
-                [&] { return "get_current_metrics_failed diagnostics=\"" + sample.diagnostics + "\""; });
+            trace().WriteLazyFmt(
+                TracePrefix::AmdAdlx, "get_current_metrics_failed diagnostics=\"%s\"", sample.diagnostics.c_str());
             return sample;
         }
         bool hasAnyMetric = false;
@@ -275,21 +309,25 @@ public:
                     hasAnyMetric = true;
                 }
             }
-            trace().WriteLazy(TracePrefix::AmdAdlx, [&] {
-                return std::string("get_presented_fps available=") + Trace::BoolText(fpsSample.fps.has_value()) +
-                       " permission_required=" + Trace::BoolText(fpsSample.permissionRequired) + " value=" +
-                       (fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1)
-                                                  : std::string("fps=N/A")) +
-                       " process=\"" + fpsSample.processName + "\" diagnostics=\"" + fpsSample.diagnostics + "\"";
-            });
+            if (trace().Enabled(TracePrefix::AmdAdlx)) {
+                const std::string fpsText =
+                    fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
+                trace().WriteFmt(TracePrefix::AmdAdlx,
+                    "get_presented_fps available=%s permission_required=%s value=%s process=\"%s\" diagnostics=\"%s\"",
+                    Trace::BoolText(fpsSample.fps.has_value()),
+                    Trace::BoolText(fpsSample.permissionRequired),
+                    fpsText.c_str(),
+                    fpsSample.processName.c_str(),
+                    fpsSample.diagnostics.c_str());
+            }
         }
 
         sample.available = hasAnyMetric;
         sample.diagnostics += " fps=" + fpsDiagnostics_;
-        trace().WriteLazy(TracePrefix::AmdAdlx, [&] {
-            return std::string("sample_done available=") + Trace::BoolText(sample.available) + " diagnostics=\"" +
-                   sample.diagnostics + "\"";
-        });
+        trace().WriteLazyFmt(TracePrefix::AmdAdlx,
+            "sample_done available=%s diagnostics=\"%s\"",
+            Trace::BoolText(sample.available),
+            sample.diagnostics.c_str());
         return sample;
     }
 
