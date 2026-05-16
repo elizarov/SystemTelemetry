@@ -84,6 +84,10 @@ public:
         return state_->resolvedSelections_;
     }
 
+    const std::vector<GpuAdapterCandidate>& GpuAdapterCandidates() const override {
+        return state_->gpu_.adapterCandidates;
+    }
+
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
         return state_->network_.adapterCandidates;
     }
@@ -94,14 +98,22 @@ public:
 
     void ApplySettings(const TelemetrySettings& settings) override {
         const bool boardChanged = state_->settings_.board != settings.board;
-        const bool selectionChanged = state_->settings_.selection != settings.selection;
+        const TelemetrySelectionSettings previousSelection = state_->settings_.selection;
+        const bool selectionChanged = previousSelection != settings.selection;
         state_->settings_ = settings;
         state_->resolvedSelections_.boardTemperatureSensorNames.clear();
         state_->resolvedSelections_.boardFanSensorNames.clear();
 
         if (selectionChanged) {
-            SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
-            SetSelectedStorageDrives(settings.selection.configuredDrives);
+            if (previousSelection.preferredAdapterName != settings.selection.preferredAdapterName) {
+                SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
+            }
+            if (previousSelection.preferredGpuAdapterName != settings.selection.preferredGpuAdapterName) {
+                SetPreferredGpuAdapterName(settings.selection.preferredGpuAdapterName);
+            }
+            if (previousSelection.configuredDrives != settings.selection.configuredDrives) {
+                SetSelectedStorageDrives(settings.selection.configuredDrives);
+            }
         }
 
         if (boardChanged) {
@@ -115,6 +127,12 @@ public:
         ++state_->snapshot_.revision;
     }
 
+    void SetPreferredGpuAdapterName(std::string adapterName) override {
+        state_->settings_.selection.preferredGpuAdapterName = std::move(adapterName);
+        ReconfigureGpuCollector(*state_);
+        ++state_->snapshot_.revision;
+    }
+
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters) override {
         state_->settings_.selection.configuredDrives = NormalizeConfiguredStorageDriveLetters(driveLetters);
         ResolveStorageSelection(*state_);
@@ -122,6 +140,7 @@ public:
     }
 
     void RefreshSelectionsAndSnapshot() override {
+        ReconfigureGpuCollector(*state_);
         ResolveNetworkSelection(*state_);
         ResolveStorageSelection(*state_);
         ++state_->snapshot_.revision;

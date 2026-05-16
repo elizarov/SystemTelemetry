@@ -1,6 +1,7 @@
 #include "telemetry/impl/collector_gpu.h"
 
 #include <dxgi.h>
+#include <utility>
 #include <vector>
 
 #include "telemetry/impl/collector_state.h"
@@ -106,92 +107,80 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     }
 }
 
-void InitializeGpuAdapterInfo(RealTelemetryCollectorState& state) {
-    IDXGIFactory1* factory = nullptr;
-    const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
-    if (FAILED(factoryHr) || factory == nullptr) {
-        char buffer[128];
-        sprintf_s(buffer, "gpu_adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
-        WriteTelemetryTrace(state, buffer);
+void ResetGpuProviderState(RealTelemetryCollectorState& state) {
+    state.gpu_.providerName = "None";
+    state.gpu_.providerDiagnostics = "Provider not initialized.";
+    state.gpu_.providerAvailable = false;
+}
+
+void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
+    if (!state.gpu_.selectedAdapter.has_value()) {
+        state.snapshot_.gpu.name = state.settings_.selection.preferredGpuAdapterName.empty()
+                                       ? "GPU"
+                                       : state.settings_.selection.preferredGpuAdapterName;
+        state.snapshot_.gpu.vram.totalGb = 0.0;
+        WriteTelemetryTrace(state, "gpu_adapter_selected none");
         return;
     }
 
-    for (UINT adapterIndex = 0;; ++adapterIndex) {
-        IDXGIAdapter1* adapter = nullptr;
-        const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
-        if (enumHr == DXGI_ERROR_NOT_FOUND) {
-            WriteTelemetryTrace(state, "gpu_adapter_enum done");
-            break;
-        }
-        if (FAILED(enumHr) || adapter == nullptr) {
-            char buffer[128];
-            sprintf_s(buffer, "gpu_adapter_enum index=%u hr=0x%08X", adapterIndex, static_cast<unsigned int>(enumHr));
-            WriteTelemetryTrace(state, buffer);
-            break;
-        }
+    const GpuVendorInfo& adapter = *state.gpu_.selectedAdapter;
+    state.snapshot_.gpu.name = adapter.adapterName.empty() ? "GPU" : adapter.adapterName;
+    state.snapshot_.gpu.vram.totalGb =
+        static_cast<double>(adapter.dedicatedVideoMemoryBytes) / (1024.0 * 1024.0 * 1024.0);
 
-        DXGI_ADAPTER_DESC1 desc{};
-        const HRESULT descHr = adapter->GetDesc1(&desc);
-        if (SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) == 0) {
-            const std::string adapterName = Utf8FromWide(desc.Description);
-            state.snapshot_.gpu.vram.totalGb =
-                static_cast<double>(desc.DedicatedVideoMemory) / (1024.0 * 1024.0 * 1024.0);
-            if (state.snapshot_.gpu.name == "GPU" && !adapterName.empty()) {
-                state.snapshot_.gpu.name = adapterName;
-            }
+    char buffer[320];
+    sprintf_s(buffer,
+        "gpu_adapter_selected index=%u vendor_id=0x%04X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\"",
+        adapter.adapterIndex,
+        adapter.vendorId,
+        static_cast<unsigned long long>(adapter.dedicatedVideoMemoryBytes),
+        state.snapshot_.gpu.vram.totalGb,
+        adapter.adapterName.c_str());
+    WriteTelemetryTrace(state, buffer);
+}
 
-            char buffer[256];
-            sprintf_s(buffer,
-                "gpu_adapter_selected index=%u hr=0x%08X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\"",
-                adapterIndex,
-                static_cast<unsigned int>(descHr),
-                static_cast<unsigned long long>(desc.DedicatedVideoMemory),
-                state.snapshot_.gpu.vram.totalGb,
-                adapterName.c_str());
-            WriteTelemetryTrace(state, buffer);
-            adapter->Release();
-            break;
-        }
+void ResolveGpuSelection(RealTelemetryCollectorState& state) {
+    GpuAdapterSelection selection =
+        ResolveGpuAdapterSelection(state.trace_, state.settings_.selection.preferredGpuAdapterName);
+    state.gpu_.selectedAdapter = selection.selectedAdapter;
+    state.gpu_.adapterCandidates = std::move(selection.candidates);
+    state.resolvedSelections_.gpuAdapterName =
+        state.gpu_.selectedAdapter.has_value() ? state.gpu_.selectedAdapter->adapterName : std::string();
+    state.snapshot_.gpu = GpuTelemetry{};
+    ApplySelectedGpuAdapterInfo(state);
+}
 
-        const std::string adapterName = SUCCEEDED(descHr) ? Utf8FromWide(desc.Description) : std::string();
-        char buffer[256];
-        sprintf_s(buffer,
-            "gpu_adapter_skip index=%u hr=0x%08X software=%s name=\"%s\"",
-            adapterIndex,
-            static_cast<unsigned int>(descHr),
-            Trace::BoolText(SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0),
-            adapterName.c_str());
-        WriteTelemetryTrace(state, buffer);
-        adapter->Release();
+void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
+    state.gpu_.provider = CreateGpuVendorTelemetryProvider(state.trace_, state.gpu_.selectedAdapter);
+    if (state.gpu_.provider == nullptr) {
+        state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_create result=null");
+        return;
     }
 
-    factory->Release();
+    state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_initialize_begin");
+    if (state.gpu_.provider->Initialize()) {
+        ApplyGpuVendorSample(state, state.gpu_.provider->Sample());
+        state.trace_.Write(TracePrefix::Telemetry,
+            "gpu_provider_initialize_done provider=" + state.gpu_.providerName +
+                " available=" + Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
+                state.gpu_.providerDiagnostics + "\"");
+    } else {
+        const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
+        state.gpu_.providerName = sample.providerName.empty() ? "GPU vendor" : sample.providerName;
+        state.gpu_.providerDiagnostics =
+            sample.diagnostics.empty() ? "Provider initialization failed." : sample.diagnostics;
+        state.trace_.Write(TracePrefix::Telemetry,
+            "gpu_provider_initialize_failed provider=" + state.gpu_.providerName + " diagnostics=\"" +
+                state.gpu_.providerDiagnostics + "\"");
+    }
 }
 
 }  // namespace
 
 void InitializeGpuCollector(RealTelemetryCollectorState& state) {
-    state.gpu_.provider = CreateGpuVendorTelemetryProvider(state.trace_);
-    if (state.gpu_.provider != nullptr) {
-        state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_initialize_begin");
-        if (state.gpu_.provider->Initialize()) {
-            ApplyGpuVendorSample(state, state.gpu_.provider->Sample());
-            state.trace_.Write(TracePrefix::Telemetry,
-                "gpu_provider_initialize_done provider=" + state.gpu_.providerName +
-                    " available=" + Trace::BoolText(state.gpu_.providerAvailable) + " diagnostics=\"" +
-                    state.gpu_.providerDiagnostics + "\"");
-        } else {
-            const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
-            state.gpu_.providerName = sample.providerName.empty() ? "GPU vendor" : sample.providerName;
-            state.gpu_.providerDiagnostics =
-                sample.diagnostics.empty() ? "Provider initialization failed." : sample.diagnostics;
-            state.trace_.Write(TracePrefix::Telemetry,
-                "gpu_provider_initialize_failed provider=" + state.gpu_.providerName + " diagnostics=\"" +
-                    state.gpu_.providerDiagnostics + "\"");
-        }
-    } else {
-        state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_create result=null");
-    }
+    ResetGpuProviderState(state);
+    ResolveGpuSelection(state);
+    InitializeGpuVendorProvider(state);
 
     const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.gpu_.query);
     state.trace_.Write(
@@ -218,8 +207,14 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     const PDH_STATUS memoryCollectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
     state.trace_.Write(TracePrefix::Telemetry,
         ("pdh_collect gpu_memory_query status=" + PdhStatusCodeString(memoryCollectStatus)).c_str());
+}
 
-    InitializeGpuAdapterInfo(state);
+void ReconfigureGpuCollector(RealTelemetryCollectorState& state) {
+    state.trace_.Write(TracePrefix::Telemetry, "gpu_provider_shutdown provider=" + state.gpu_.providerName);
+    state.gpu_.provider.reset();
+    ResetGpuProviderState(state);
+    ResolveGpuSelection(state);
+    InitializeGpuVendorProvider(state);
 }
 
 void UpdateGpuMetrics(RealTelemetryCollectorState& state) {

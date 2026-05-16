@@ -94,5 +94,10 @@ TEST_F(TelemetryRuntimeTest, SelectionChangesPublishFreshResolvedSelections) {
     update = runtime->Latest();
     EXPECT_EQ(update.resolvedSelections.adapterName, "Ethernet");
     EXPECT_EQ(update.dump.snapshot.network.adapterName, "Ethernet");
+
+    runtime->SetPreferredGpuAdapterName("FluxDrive");
+    update = runtime->Latest();
+    EXPECT_EQ(update.resolvedSelections.gpuAdapterName, "FluxDrive 8800 XT");
+    EXPECT_EQ(update.dump.snapshot.gpu.name, "FluxDrive 8800 XT");
     runtime->Shutdown();
 }

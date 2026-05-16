@@ -17,6 +17,10 @@ struct ResolvedNetworkCandidate {
     std::string ipAddress = "N/A";
 };
 
+struct ResolvedGpuCandidate {
+    std::string adapterName;
+};
+
 struct SyntheticHistorySpec {
     double base = 0.0;
     double amplitudeA = 0.0;
@@ -323,6 +327,58 @@ std::vector<NetworkAdapterCandidate> EnumerateSnapshotNetworkCandidates(const Sy
     return candidates;
 }
 
+std::vector<GpuAdapterCandidate> EnumerateSnapshotGpuAdapterCandidates(const SystemSnapshot& snapshot) {
+    std::vector<GpuAdapterCandidate> candidates;
+    if (snapshot.gpu.name.empty() || snapshot.gpu.name == "GPU") {
+        return candidates;
+    }
+
+    GpuAdapterCandidate candidate;
+    candidate.adapterName = snapshot.gpu.name;
+    candidate.vendorName = "Synthetic";
+    candidate.dedicatedVramGb = snapshot.gpu.vram.totalGb;
+    candidates.push_back(std::move(candidate));
+    return candidates;
+}
+
+ResolvedGpuCandidate ResolveConfiguredGpuCandidate(
+    const std::string& configuredAdapterName, const std::vector<GpuAdapterCandidate>& availableCandidates) {
+    ResolvedGpuCandidate resolved;
+    if (availableCandidates.empty()) {
+        return resolved;
+    }
+
+    if (!configuredAdapterName.empty()) {
+        for (const auto& candidate : availableCandidates) {
+            if (EqualsInsensitive(candidate.adapterName, configuredAdapterName)) {
+                resolved.adapterName = candidate.adapterName;
+                return resolved;
+            }
+        }
+    }
+
+    if (!configuredAdapterName.empty()) {
+        for (const auto& candidate : availableCandidates) {
+            if (ContainsInsensitive(candidate.adapterName, configuredAdapterName)) {
+                resolved.adapterName = candidate.adapterName;
+                return resolved;
+            }
+        }
+    }
+
+    resolved.adapterName = availableCandidates.front().adapterName;
+    return resolved;
+}
+
+void MarkSelectedGpuAdapterCandidates(
+    std::vector<GpuAdapterCandidate>& candidates, const ResolvedGpuCandidate& selectedCandidate) {
+    bool selected = false;
+    for (auto& candidate : candidates) {
+        candidate.selected = !selected && candidate.adapterName == selectedCandidate.adapterName;
+        selected = selected || candidate.selected;
+    }
+}
+
 ResolvedNetworkCandidate ResolveConfiguredNetworkCandidate(
     const std::string& configuredAdapterName, const std::vector<NetworkAdapterCandidate>& availableCandidates) {
     ResolvedNetworkCandidate resolved;
@@ -444,6 +500,10 @@ public:
         return resolvedSelections_;
     }
 
+    const std::vector<GpuAdapterCandidate>& GpuAdapterCandidates() const override {
+        return gpuAdapters_;
+    }
+
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
         return networkAdapters_;
     }
@@ -462,12 +522,18 @@ public:
         RefreshNetworkSelection();
     }
 
+    void SetPreferredGpuAdapterName(std::string adapterName) override {
+        selectionSettings_.preferredGpuAdapterName = std::move(adapterName);
+        RefreshGpuSelection();
+    }
+
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters) override {
         selectionSettings_.configuredDrives = NormalizeConfiguredStorageDriveLetters(driveLetters);
         RefreshStorageSelection();
     }
 
     void RefreshSelectionsAndSnapshot() override {
+        RefreshGpuSelection();
         RefreshNetworkSelection();
         RefreshStorageSelection();
     }
@@ -480,6 +546,18 @@ public:
     }
 
 private:
+    void RefreshGpuSelection() {
+        gpuAdapters_ = EnumerateSnapshotGpuAdapterCandidates(sourceDump_.snapshot);
+        resolvedGpu_ = ResolveConfiguredGpuCandidate(selectionSettings_.preferredGpuAdapterName, gpuAdapters_);
+        MarkSelectedGpuAdapterCandidates(gpuAdapters_, resolvedGpu_);
+        resolvedSelections_.gpuAdapterName = resolvedGpu_.adapterName;
+
+        if (!resolvedGpu_.adapterName.empty()) {
+            dump_.snapshot.gpu.name = resolvedGpu_.adapterName;
+        }
+        ++dump_.snapshot.revision;
+    }
+
     void RefreshNetworkSelection() {
         networkAdapters_ = EnumerateSnapshotNetworkCandidates(sourceDump_.snapshot);
         resolvedNetwork_ = ResolveConfiguredNetworkCandidate(selectionSettings_.preferredAdapterName, networkAdapters_);
@@ -563,8 +641,10 @@ private:
     ResolvedTelemetrySelections resolvedSelections_{};
     TelemetryDump sourceDump_{};
     TelemetryDump dump_{};
+    std::vector<GpuAdapterCandidate> gpuAdapters_{};
     std::vector<NetworkAdapterCandidate> networkAdapters_{};
     std::vector<StorageDriveCandidate> storageDrives_{};
+    ResolvedGpuCandidate resolvedGpu_{};
     ResolvedNetworkCandidate resolvedNetwork_{};
     std::vector<std::string> resolvedStorageDrives_{};
     Trace& trace_;

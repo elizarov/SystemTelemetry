@@ -566,6 +566,17 @@ void DashboardController::SelectNetworkAdapter(DashboardShellHost& shell, const 
     FinishConfigMutation(shell, false);
 }
 
+void DashboardController::SelectGpuAdapter(DashboardShellHost& shell, const std::string& adapterName) {
+    if (state_.telemetry == nullptr) {
+        return;
+    }
+    state_.config.gpu.adapterName = adapterName;
+    state_.telemetry->SetPreferredGpuAdapterName(adapterName);
+    state_.telemetryUpdate = state_.telemetry->Latest();
+    ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
+    FinishConfigMutation(shell, false);
+}
+
 void DashboardController::ToggleStorageDrive(DashboardShellHost& shell, const std::string& driveLetter) {
     if (state_.telemetry == nullptr) {
         return;
@@ -637,6 +648,7 @@ bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost
         return false;
     }
     if (state_.telemetry != nullptr) {
+        state_.telemetry->SetPreferredGpuAdapterName(state_.config.gpu.adapterName);
         state_.telemetry->SetPreferredNetworkAdapterName(state_.config.network.adapterName);
         state_.telemetry->SetSelectedStorageDrives(state_.config.storage.drives);
         state_.telemetry->RefreshSelections();

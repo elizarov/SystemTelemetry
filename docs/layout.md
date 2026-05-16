@@ -24,7 +24,7 @@ See also: [resources/config.ini](../resources/config.ini) for the maintained shi
 The language is divided by responsibility:
 
 - Widget sections own widget-local geometry: `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, and `[layout_editor]`.
-- Runtime selection sections own runtime target choice: `[display]`, `[network]`, and `[storage]`.
+- Runtime selection sections own runtime target choice: `[display]`, `[gpu]`, `[network]`, and `[storage]`.
 - `[board]` owns logical board-metric to provider-sensor bindings.
 - `[metrics]` owns metric presentation and normalization definitions.
 - `[theme.<name>]` owns base color tokens and the user-visible theme description.
@@ -42,6 +42,8 @@ The language is divided by responsibility:
 ## Runtime Sections
 
 `[display]` selects the target monitor, active named layout, wallpaper, placement, and optional explicit render scale.
+
+`[gpu]` selects the preferred GPU adapter by display name. An empty or missing `adapter_name` means the runtime selects the first non-software DXGI adapter.
 
 `[network]` selects the preferred runtime adapter.
 

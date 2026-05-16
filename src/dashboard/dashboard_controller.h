@@ -79,6 +79,7 @@ public:
     bool SwitchLayout(DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout);
     bool SwitchTheme(DashboardShellHost& shell, const std::string& themeName, bool diagnosticsEditLayout);
     bool SetDisplayScale(DashboardShellHost& shell, double scale);
+    void SelectGpuAdapter(DashboardShellHost& shell, const std::string& adapterName);
     void SelectNetworkAdapter(DashboardShellHost& shell, const std::string& adapterName);
     void ToggleStorageDrive(DashboardShellHost& shell, const std::string& driveLetter);
     void RefreshTelemetrySelections(DashboardShellHost& shell);

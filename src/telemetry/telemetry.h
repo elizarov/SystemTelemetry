@@ -12,6 +12,7 @@
 
 #include "config/telemetry_settings.h"
 #include "telemetry/board/board_vendor.h"
+#include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/metric_types.h"
 #include "util/file_path.h"
 #include "util/trace.h"
@@ -134,6 +135,7 @@ struct TelemetryDump {
 struct TelemetryUpdate {
     TelemetryDump dump;
     ResolvedTelemetrySelections resolvedSelections;
+    std::vector<GpuAdapterCandidate> gpuAdapterCandidates;
     std::vector<NetworkAdapterCandidate> networkAdapterCandidates;
     std::vector<StorageDriveCandidate> storageDriveCandidates;
 };
@@ -173,6 +175,11 @@ public:
     // Thread-safe. Blocks behind any active telemetry collection, changes the network selection on the telemetry-owned
     // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
     virtual void SetPreferredNetworkAdapterName(std::string adapterName) = 0;
+
+    // Thread-safe. Blocks behind any active telemetry collection, changes the GPU selection on the telemetry-owned
+    // collector, recreates the matching vendor provider, publishes one fresh update, and leaves the 500 ms worker
+    // cadence running.
+    virtual void SetPreferredGpuAdapterName(std::string adapterName) = 0;
 
     // Thread-safe. Blocks behind any active telemetry collection, changes the storage selection on the telemetry-owned
     // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.

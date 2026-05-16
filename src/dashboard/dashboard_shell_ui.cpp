@@ -962,6 +962,14 @@ void DashboardShellUi::ExecuteCommand(
                 }
                 break;
             }
+            if (selected >= kCommandGpuAdapterBase && selected <= kCommandGpuAdapterMax) {
+                const size_t index = selected - kCommandGpuAdapterBase;
+                const auto& candidates = state.telemetryUpdate.gpuAdapterCandidates;
+                if (index < candidates.size()) {
+                    app_.controller_.SelectGpuAdapter(app_, candidates[index].adapterName);
+                }
+                break;
+            }
             if (selected >= kCommandThemeBase && selected <= kCommandThemeMax) {
                 const size_t index = selected - kCommandThemeBase;
                 if (index < state.config.layout.themes.size()) {
@@ -1017,6 +1025,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU menu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU themeMenu = CreatePopupMenu();
+    HMENU gpuMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
     HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
@@ -1050,6 +1059,17 @@ void DashboardShellUi::ShowContextMenu(
             const std::string label = FormatNamedMenuLabel(theme.name, theme.description);
             AppendMenuUtf8(themeMenu, flags, commandId, label);
             SetMenuItemRadioStyle(themeMenu, commandId);
+        }
+    }
+    const auto& gpuCandidates = state.telemetryUpdate.gpuAdapterCandidates;
+    if (gpuCandidates.empty()) {
+        AppendMenuUtf8(gpuMenu, MF_STRING | MF_GRAYED, kCommandGpuAdapterBase, "No adapters found");
+    } else {
+        for (size_t i = 0; i < gpuCandidates.size() && (kCommandGpuAdapterBase + i) <= kCommandGpuAdapterMax; ++i) {
+            const UINT commandId = kCommandGpuAdapterBase + static_cast<UINT>(i);
+            const UINT flags = MF_STRING | (gpuCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuUtf8(gpuMenu, flags, commandId, gpuCandidates[i].adapterName);
+            SetMenuItemRadioStyle(gpuMenu, commandId);
         }
     }
     const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
@@ -1119,6 +1139,7 @@ void DashboardShellUi::ShowContextMenu(
     }
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
+    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), "Network");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), "Storage Drives");
     AppendMenuUtf8(editLayoutMenu,

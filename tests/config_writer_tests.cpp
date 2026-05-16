@@ -78,6 +78,18 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
     EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
 }
 
+TEST(ConfigWriter, MinimalSavePersistsGpuAdapterAgainstEmptySourceConfig) {
+    AppConfig compareConfig;
+    compareConfig.gpu.adapterName.clear();
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("[gpu]\r\nadapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\r\n"));
+}
+
 TEST(ConfigWriter, MinimalSavePersistsResolvedBoardBindingsAgainstEmptySourceConfig) {
     AppConfig compareConfig;
     compareConfig.layout.board.requestedTemperatureNames = {"cpu"};

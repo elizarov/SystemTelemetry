@@ -3,6 +3,8 @@
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
+#include <vector>
 
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "util/trace.h"
@@ -30,5 +32,12 @@ public:
     virtual GpuVendorTelemetrySample Sample() = 0;
 };
 
+struct GpuAdapterSelection {
+    std::optional<GpuVendorInfo> selectedAdapter;
+    std::vector<GpuAdapterCandidate> candidates;
+};
+
+GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view preferredAdapterName);
 std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace);
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
+    Trace& trace, const std::optional<GpuVendorInfo>& adapter);

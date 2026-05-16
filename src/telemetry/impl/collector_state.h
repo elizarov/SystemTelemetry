@@ -11,6 +11,7 @@
 #include <iphlpapi.h>
 #include <memory>
 #include <netioapi.h>
+#include <optional>
 #include <pdh.h>
 #include <pdhmsg.h>
 #include <string>
@@ -55,6 +56,8 @@ struct RealTelemetryCollectorState {
         std::string providerName = "None";
         std::string providerDiagnostics = "Provider not initialized.";
         bool providerAvailable = false;
+        std::optional<GpuVendorInfo> selectedAdapter;
+        std::vector<GpuAdapterCandidate> adapterCandidates;
         PDH_HQUERY query = nullptr;
         PDH_HCOUNTER loadCounter = nullptr;
         PDH_HQUERY memoryQuery = nullptr;

@@ -15,6 +15,7 @@ struct BoardTelemetrySettings {
 
 struct TelemetrySelectionSettings {
     std::string preferredAdapterName;
+    std::string preferredGpuAdapterName;
     std::vector<std::string> configuredDrives;
 
     bool operator==(const TelemetrySelectionSettings& other) const = default;
@@ -29,6 +30,7 @@ struct TelemetrySettings {
 
 struct ResolvedTelemetrySelections {
     std::string adapterName;
+    std::string gpuAdapterName;
     std::vector<std::string> drives;
     std::unordered_map<std::string, std::string> boardTemperatureSensorNames;
     std::unordered_map<std::string, std::string> boardFanSensorNames;

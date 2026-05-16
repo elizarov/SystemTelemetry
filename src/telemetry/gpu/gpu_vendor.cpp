@@ -1,9 +1,11 @@
 #include "telemetry/gpu/gpu_vendor.h"
 
+#include <cstdint>
 #include <dxgi.h>
 #include <memory>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 
 #include "telemetry/fps/fps_service_client_provider.h"
@@ -11,6 +13,7 @@
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/gpu/intel/gpu_intel_level_zero.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
+#include "util/strings.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -24,7 +27,7 @@ public:
     bool Initialize() override {
         sample_.providerName = "Unsupported GPU";
         sample_.available = false;
-        sample_.diagnostics = "No supported GPU telemetry provider matches the primary adapter vendor.";
+        sample_.diagnostics = "No supported GPU telemetry provider matches the selected adapter vendor.";
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
@@ -93,19 +96,36 @@ std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(
     return std::make_unique<UnsupportedGpuTelemetryProvider>(trace, std::move(adapter));
 }
 
+int PreferredGpuAdapterMatchRank(const std::string& adapterName, std::string_view preferredAdapterName) {
+    if (preferredAdapterName.empty()) {
+        return 0;
+    }
+    const std::string preferredText(preferredAdapterName);
+    if (EqualsInsensitive(adapterName, preferredText)) {
+        return 2;
+    }
+    return ContainsInsensitive(adapterName, preferredText) ? 1 : 0;
+}
+
+double DedicatedVideoMemoryGb(std::uint64_t bytes) {
+    return static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
+}
+
 }  // namespace
 
-std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
+GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view preferredAdapterName) {
+    GpuAdapterSelection selection;
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
         char buffer[128];
         sprintf_s(buffer, "adapter_factory hr=0x%08X", static_cast<unsigned int>(factoryHr));
         trace.Write(TracePrefix::GpuVendor, buffer);
-        return std::nullopt;
+        return selection;
     }
 
-    std::optional<GpuVendorInfo> selected;
+    std::optional<size_t> selectedCandidateIndex;
+    int selectedMatchRank = 0;
     for (UINT adapterIndex = 0;; ++adapterIndex) {
         IDXGIAdapter1* adapter = nullptr;
         const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
@@ -125,18 +145,41 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
         const bool software = SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
         const std::string adapterName = SUCCEEDED(descHr) ? Utf8FromWide(desc.Description) : std::string();
         if (SUCCEEDED(descHr) && !software) {
-            selected = GpuVendorInfo{desc.VendorId, adapterName};
-            const GpuVendor vendor = SelectGpuVendor(*selected);
-            char buffer[256];
+            GpuVendorInfo info{
+                desc.VendorId, adapterName, adapterIndex, static_cast<std::uint64_t>(desc.DedicatedVideoMemory)};
+            const GpuVendor vendor = SelectGpuVendor(info);
+            const int matchRank = PreferredGpuAdapterMatchRank(adapterName, preferredAdapterName);
+            const bool select = !selection.selectedAdapter.has_value() ||
+                                (!preferredAdapterName.empty() && matchRank > selectedMatchRank);
+            if (select) {
+                if (selectedCandidateIndex.has_value()) {
+                    selection.candidates[*selectedCandidateIndex].selected = false;
+                }
+                selection.selectedAdapter = info;
+                selectedMatchRank = matchRank;
+                selectedCandidateIndex = selection.candidates.size();
+            }
+
+            GpuAdapterCandidate candidate;
+            candidate.adapterName = adapterName;
+            candidate.vendorName = GpuVendorName(vendor);
+            candidate.vendorId = desc.VendorId;
+            candidate.dedicatedVramGb = DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes);
+            candidate.selected = select;
+            selection.candidates.push_back(std::move(candidate));
+
+            char buffer[320];
             sprintf_s(buffer,
-                "adapter_selected index=%u vendor_id=0x%04X vendor=%s name=\"%s\"",
+                "adapter_candidate index=%u vendor_id=0x%04X vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\"",
                 adapterIndex,
                 desc.VendorId,
                 GpuVendorName(vendor),
+                matchRank,
+                DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
                 adapterName.c_str());
             trace.Write(TracePrefix::GpuVendor, buffer);
             adapter->Release();
-            break;
+            continue;
         }
 
         char buffer[256];
@@ -151,15 +194,32 @@ std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
     }
 
     factory->Release();
-    if (!selected.has_value()) {
+    if (selection.selectedAdapter.has_value()) {
+        const GpuVendor vendor = SelectGpuVendor(*selection.selectedAdapter);
+        char buffer[320];
+        sprintf_s(buffer,
+            "adapter_selected index=%u vendor_id=0x%04X vendor=%s preferred=\"%s\" name=\"%s\"",
+            selection.selectedAdapter->adapterIndex,
+            selection.selectedAdapter->vendorId,
+            GpuVendorName(vendor),
+            std::string(preferredAdapterName).c_str(),
+            selection.selectedAdapter->adapterName.c_str());
+        trace.Write(TracePrefix::GpuVendor, buffer);
+    } else {
         trace.Write(TracePrefix::GpuVendor, "adapter_selected none");
     }
-    return selected;
+    return selection;
 }
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace) {
-    std::optional<GpuVendorInfo> adapter = ExtractPrimaryGpuVendorInfo(trace);
+std::optional<GpuVendorInfo> ExtractPrimaryGpuVendorInfo(Trace& trace) {
+    return ResolveGpuAdapterSelection(trace, {}).selectedAdapter;
+}
+
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
+    Trace& trace, const std::optional<GpuVendorInfo>& adapter) {
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
-    trace.Write(TracePrefix::GpuVendor, std::string("create vendor=") + GpuVendorName(vendor));
-    return CreateGpuVendorProviderForVendor(trace, vendor, std::move(adapter));
+    trace.Write(TracePrefix::GpuVendor,
+        std::string("create vendor=") + GpuVendorName(vendor) + " adapter=\"" +
+            (adapter.has_value() ? adapter->adapterName : std::string()) + "\"");
+    return CreateGpuVendorProviderForVendor(trace, vendor, adapter);
 }
