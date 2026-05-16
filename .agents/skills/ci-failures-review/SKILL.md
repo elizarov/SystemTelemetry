@@ -41,6 +41,7 @@ Use this skill to investigate a failed workflow from the failing run outward, th
 - Some direct Windows SDK headers are not self-contained under the CaseDash build defines. For example, replacing `windows.h` with `sysinfoapi.h` for `SYSTEMTIME` and `GetLocalTime` can fail with `winnt.h` reporting `No Target Architecture`. In that case, keep `windows.h` in source and add a precise include-cleaner allowlist entry.
 - If a clang-tidy fix only changes `tools/run_clang_tidy.ps1`, `lint.cmd tidy changed` can legitimately report no eligible changed project source or header files. Treat that as validation of the lint entrypoint and script parsing, not as proof that a full tidy sweep ran.
 - When local `HEAD` is ahead of the failed run SHA, run `format.cmd` against the current worktree before treating the CI failure as isolated. `format.cmd fix changed` only repairs dirty changed files; use `format.cmd fix` when branch-ahead committed files also block the full format check.
+- Clang-tidy can emit `Processing file ...` progress lines before returning a non-zero code for otherwise filtered include-cleaner diagnostics. Those progress lines are not reportable diagnostics; filter them before deciding the result still failed.
 
 ## Local Validation
 

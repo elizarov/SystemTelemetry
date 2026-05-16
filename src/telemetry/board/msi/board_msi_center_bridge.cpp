@@ -21,125 +21,117 @@ array<unsigned char> ^
     MsiCenterCurrentDataCommand() { return gcnew array<unsigned char>{0x05, 0x03, 0x01, 0x08, 0x01, 0x00, 0x00, 0x01}; }
 
     String
-    ^
-    ManagedStringFromUtf8(std::string_view text) {
-        const std::wstring wide = WideFromUtf8(text);
-        return gcnew String(wide.c_str());
-    }
+    ^ ManagedStringFromUtf8(std::string_view text) {
+    const std::wstring wide = WideFromUtf8(text);
+    return gcnew String(wide.c_str());
+}
 
-    void SetDiagnosticsUtf8(MsiCenterCaptureSink& sink, std::string_view text) {
+void SetDiagnosticsUtf8(MsiCenterCaptureSink& sink, std::string_view text) {
     const std::wstring wide = WideFromUtf8(text);
     sink.SetDiagnostics(wide.c_str());
 }
 
+String ^ CombinePath(String ^ directory, const char* fileName) {
+    return Path::Combine(directory, ManagedStringFromUtf8(fileName));
+}
+
+String ^ MsiFanNameFromId(int id) {
+    switch (id) {
+        case 1:
+            return "CPU Fan 1";
+        case 2:
+            return "PUMP Fan 1";
+        case 3:
+            return "PUMP Fan 2";
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 10:
+        case 11:
+            return "SYS Fan " + Int32(id - 3).ToString(Globalization::CultureInfo::InvariantCulture);
+        case 12:
+            return "Water Flow";
+        case 13:
+            return "Chipset Fan";
+        case 14:
+            return "MOS Fan";
+        case 15:
+            return "JAF Fan 1";
+        case 16:
+            return "JAF Fan 2";
+    }
+    return "Fan " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
+}
+
+String ^ MsiTemperatureNameFromId(int id) {
+    switch (id) {
+        case 1:
+            return "CPU";
+        case 2:
+            return "CPU Socket";
+        case 3:
+            return "System";
+        case 4:
+            return "MOS";
+        case 5:
+            return "PCH";
+        case 6:
+            return "PCIe 1";
+        case 7:
+            return "PCIe 2";
+        case 8:
+            return "PCIe 3";
+        case 9:
+            return "PCIe 4";
+        case 10:
+            return "PCIe 5";
+        case 11:
+            return "M.2 1";
+        case 12:
+            return "M.2 2";
+        case 13:
+            return "M.2 3";
+    }
+    return "Temperature " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
+}
+
 String ^
-    CombinePath(
-        String ^ directory, const char* fileName) { return Path::Combine(directory, ManagedStringFromUtf8(fileName)); }
-
-    String
-    ^
-    MsiFanNameFromId(int id) {
-        switch (id) {
-            case 1:
-                return "CPU Fan 1";
-            case 2:
-                return "PUMP Fan 1";
-            case 3:
-                return "PUMP Fan 2";
-            case 4:
-            case 5:
-            case 6:
-            case 7:
-            case 8:
-            case 9:
-            case 10:
-            case 11:
-                return "SYS Fan " + Int32(id - 3).ToString(Globalization::CultureInfo::InvariantCulture);
-            case 12:
-                return "Water Flow";
-            case 13:
-                return "Chipset Fan";
-            case 14:
-                return "MOS Fan";
-            case 15:
-                return "JAF Fan 1";
-            case 16:
-                return "JAF Fan 2";
-        }
-        return "Fan " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
-    }
-
-    String
-    ^
-    MsiTemperatureNameFromId(int id) {
-        switch (id) {
-            case 1:
-                return "CPU";
-            case 2:
-                return "CPU Socket";
-            case 3:
-                return "System";
-            case 4:
-                return "MOS";
-            case 5:
-                return "PCH";
-            case 6:
-                return "PCIe 1";
-            case 7:
-                return "PCIe 2";
-            case 8:
-                return "PCIe 3";
-            case 9:
-                return "PCIe 4";
-            case 10:
-                return "PCIe 5";
-            case 11:
-                return "M.2 1";
-            case 12:
-                return "M.2 2";
-            case 13:
-                return "M.2 3";
-        }
-        return "Temperature " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
-    }
-
-    String
-    ^
     ReadMsiFanName(Object ^ fanName, FieldInfo ^ fanNameBytesField, FieldInfo ^ fanNameLengthField, int fallbackId) {
-        if (fanName != nullptr && fanNameBytesField != nullptr && fanNameLengthField != nullptr) {
-            array<unsigned char> ^ bytes = dynamic_cast<array<unsigned char> ^>(fanNameBytesField->GetValue(fanName));
-            Object ^ lengthObject = fanNameLengthField->GetValue(fanName);
-            if (bytes != nullptr && lengthObject != nullptr) {
-                const int length = Math::Min(
-                    Convert::ToInt32(lengthObject, Globalization::CultureInfo::InvariantCulture), bytes->Length);
-                if (length > 0) {
-                    String ^ name = Text::Encoding::ASCII->GetString(bytes, 0, length)->Trim();
-                    if (!String::IsNullOrWhiteSpace(name)) {
-                        return name->TrimEnd(gcnew array<wchar_t>{wchar_t{}, static_cast<wchar_t>(' ')});
-                    }
+    if (fanName != nullptr && fanNameBytesField != nullptr && fanNameLengthField != nullptr) {
+        array<unsigned char> ^ bytes = dynamic_cast<array<unsigned char> ^>(fanNameBytesField->GetValue(fanName));
+        Object ^ lengthObject = fanNameLengthField->GetValue(fanName);
+        if (bytes != nullptr && lengthObject != nullptr) {
+            const int length =
+                Math::Min(Convert::ToInt32(lengthObject, Globalization::CultureInfo::InvariantCulture), bytes->Length);
+            if (length > 0) {
+                String ^ name = Text::Encoding::ASCII->GetString(bytes, 0, length)->Trim();
+                if (!String::IsNullOrWhiteSpace(name)) {
+                    return name->TrimEnd(gcnew array<wchar_t>{wchar_t{}, static_cast<wchar_t>(' ')});
                 }
             }
         }
-        return MsiFanNameFromId(fallbackId);
     }
+    return MsiFanNameFromId(fallbackId);
+}
 
-    MethodInfo
-    ^
-    FindJsonDeserializer(Type ^ jsonType) {
-        for each (MethodInfo ^ method in jsonType->GetMethods(BindingFlags::Public | BindingFlags::Static)) {
-            if (!String::Equals(method->Name, "JSONDeSerializer", StringComparison::Ordinal) ||
-                !method->IsGenericMethodDefinition) {
-                continue;
-            }
-            array<ParameterInfo ^> ^ parameters = method->GetParameters();
-            if (parameters->Length == 1 && parameters[0]->ParameterType == String::typeid) {
-                return method;
-            }
+MethodInfo ^ FindJsonDeserializer(Type ^ jsonType) {
+    for each (MethodInfo ^ method in jsonType->GetMethods(BindingFlags::Public | BindingFlags::Static)) {
+        if (!String::Equals(method->Name, "JSONDeSerializer", StringComparison::Ordinal) ||
+            !method->IsGenericMethodDefinition) {
+            continue;
         }
-        return nullptr;
+        array<ParameterInfo ^> ^ parameters = method->GetParameters();
+        if (parameters->Length == 1 && parameters[0]->ParameterType == String::typeid) {
+            return method;
+        }
     }
+    return nullptr;
+}
 
-    ref class MsiCenterRuntimeContext sealed {
+ref class MsiCenterRuntimeContext sealed {
 public:
     String ^ msiCenterDirectory = nullptr;
     String ^ commonAssemblyPath = nullptr;

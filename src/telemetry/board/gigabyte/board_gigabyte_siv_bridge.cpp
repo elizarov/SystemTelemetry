@@ -22,21 +22,21 @@ bool ManagedUnitEquals(String ^ unit, String ^ expected) {
     return String::Equals(unit, expected, StringComparison::OrdinalIgnoreCase);
 }
 
-String ^
-    ManagedStringFromUtf8(std::string_view text) {
-        const std::wstring wide = WideFromUtf8(text);
-        return gcnew String(wide.c_str());
-    }
+String ^ ManagedStringFromUtf8(std::string_view text) {
+    const std::wstring wide = WideFromUtf8(text);
+    return gcnew String(wide.c_str());
+}
 
-    void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
+void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
     const std::wstring wide = WideFromUtf8(text);
     sink.SetDiagnostics(wide.c_str());
 }
 
-String ^ CombinePath(String ^ directory,
-             const char* fileName) { return Path::Combine(directory, ManagedStringFromUtf8(fileName)); }
+String ^ CombinePath(String ^ directory, const char* fileName) {
+    return Path::Combine(directory, ManagedStringFromUtf8(fileName));
+}
 
-    ref class GigabyteAssemblyResolver abstract sealed {
+ref class GigabyteAssemblyResolver abstract sealed {
 public:
     static void EnsureInstalled(String ^ directory) {
         toolDirectory_ = directory;
@@ -49,22 +49,20 @@ public:
     }
 
 private:
-    static Assembly ^
-        ResolveAssembly(Object ^, ResolveEventArgs ^ args) {
-            if (String::IsNullOrWhiteSpace(toolDirectory_)) {
-                return nullptr;
-            }
-
-            AssemblyName ^ name = gcnew AssemblyName(args->Name);
-            String ^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
-            if (!File::Exists(candidate)) {
-                return nullptr;
-            }
-            return Assembly::LoadFrom(candidate);
+    static Assembly ^ ResolveAssembly(Object ^, ResolveEventArgs ^ args) {
+        if (String::IsNullOrWhiteSpace(toolDirectory_)) {
+            return nullptr;
         }
 
-        static String
-        ^ toolDirectory_ = nullptr;
+        AssemblyName ^ name = gcnew AssemblyName(args->Name);
+        String ^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
+        if (!File::Exists(candidate)) {
+            return nullptr;
+        }
+        return Assembly::LoadFrom(candidate);
+    }
+
+    static String ^ toolDirectory_ = nullptr;
     static bool installed_ = false;
 };
 

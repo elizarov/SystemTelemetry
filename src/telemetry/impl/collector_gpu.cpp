@@ -1,13 +1,14 @@
 #include "telemetry/impl/collector_gpu.h"
 
-#include <dxgi.h>
+#include <cwchar>
+#include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
-#include "util/utf8.h"
 
 namespace {
 
