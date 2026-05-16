@@ -5,6 +5,7 @@
 enum class GpuVendor {
     Unknown,
     Amd,
+    Intel,
     Nvidia,
 };
 

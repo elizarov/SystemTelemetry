@@ -36,6 +36,8 @@ const char* TracePrefixText(TracePrefix prefix) {
             return "gigabyte_siv:";
         case TracePrefix::GpuVendor:
             return "gpu_vendor:";
+        case TracePrefix::IntelLevelZero:
+            return "intel_level_zero:";
         case TracePrefix::LayoutEditDialog:
             return "layout_edit_dialog:";
         case TracePrefix::LayoutEditDrag:

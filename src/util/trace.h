@@ -15,6 +15,7 @@ enum class TracePrefix : unsigned char {
     FpsServiceClient,
     GigabyteSiv,
     GpuVendor,
+    IntelLevelZero,
     LayoutEditDialog,
     LayoutEditDrag,
     LayoutEditHover,

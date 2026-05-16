@@ -196,6 +196,7 @@ add_executable(CaseDash WIN32
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
@@ -305,6 +306,7 @@ set(casedash_release_speed_sources
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -719,6 +721,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp

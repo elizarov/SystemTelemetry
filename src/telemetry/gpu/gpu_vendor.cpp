@@ -9,6 +9,7 @@
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/amd/gpu_amd_adl.h"
 #include "telemetry/gpu/gpu_vendor_selection.h"
+#include "telemetry/gpu/intel/gpu_intel_level_zero.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -85,6 +86,9 @@ std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(
     }
     if (vendor == GpuVendor::Amd) {
         return CreateAmdGpuTelemetryProvider(trace);
+    }
+    if (vendor == GpuVendor::Intel) {
+        return CreateIntelGpuTelemetryProvider(trace, adapter.has_value() ? adapter->adapterName : std::string());
     }
     return std::make_unique<UnsupportedGpuTelemetryProvider>(trace, std::move(adapter));
 }

@@ -17,6 +17,7 @@ struct KnownTestBoard {
 
 const KnownTestGpu kKnownTestGpus[] = {
     {GpuVendorInfo{0x1002u, "AMD Radeon RX 6800"}, GpuVendor::Amd},
+    {GpuVendorInfo{0x8086u, "Intel(R) UHD Graphics"}, GpuVendor::Intel},
     {GpuVendorInfo{0x10deu, "NVIDIA GeForce RTX 3080"}, GpuVendor::Nvidia},
 };
 

@@ -9,6 +9,8 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Hardware providers add hardware-specific GPU and board metrics when the matching driver, SDK, or utility is installed.
 - Unsupported or unavailable hardware providers do not prevent the dashboard from running; their provider-owned values render as unavailable.
 - GPU telemetry selects the supported hardware provider from the primary non-software DXGI adapter identity.
+- On hybrid laptops, the integrated adapter can be the primary DXGI adapter even when a discrete GPU is also installed; CaseDash selects the provider for that primary adapter.
+- The displayed GPU product name uses the selected DXGI adapter description when available; provider diagnostics can still include lower-level runtime device names.
 - Board telemetry selects the supported hardware provider from the baseboard manufacturer.
 - Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
 - Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
@@ -47,6 +49,22 @@ Troubleshooting:
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
 3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
 4. Inspect the exported dump and trace outputs for the provider state on that machine.
+
+## Intel
+
+- Supported hardware family: Intel GPU telemetry.
+- Runtime dependency: Intel display driver with the Level Zero Sysman loader (`ze_loader.dll`) available.
+- Metrics include provider-supplied GPU telemetry such as engine load, temperature, clock, device-local memory, and fan speed when the driver exposes those Sysman components.
+- Integrated GPUs commonly expose no device-local memory or fan component; in those cases CaseDash keeps VRAM on the generic Windows dedicated-memory fallback and renders fan speed unavailable.
+- Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because Level Zero Sysman has no native game-FPS metric.
+- Trace output can include `intel_level_zero:*` provider details and `unsupported_gpu` fallback markers.
+
+Troubleshooting:
+
+1. Install or update the Intel graphics driver.
+2. Confirm `ze_loader.dll` is present in `C:\Windows\System32`.
+3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported dump and trace outputs for Level Zero Sysman component counts and provider state on that machine.
 
 ## NVIDIA
 

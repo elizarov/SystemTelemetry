@@ -8,7 +8,7 @@
 - Package-private collectors perform synchronous provider work behind `TelemetryRuntime`.
 - Windows-native collection covers CPU, memory, network, storage, and clock data.
 - Hardware providers extend collection with supported GPU and board telemetry paths.
-- GPU telemetry extracts the primary non-software DXGI adapter identity, maps it through the pure GPU vendor-selection module, and creates one matching provider; unsupported GPU providers expose only presented FPS.
+- GPU telemetry extracts the primary non-software DXGI adapter identity, maps it through the pure GPU vendor-selection module, and creates one matching provider. Hybrid systems follow the primary DXGI adapter even when a secondary discrete GPU is installed; unsupported GPU providers expose only presented FPS.
 - Board telemetry extracts baseboard registry strings, maps them through the pure board vendor-selection module, and creates one matching provider.
 - Presented-FPS collection asks `CashDashService` over `\\.\pipe\CashDashService` first, then falls back to local ETW collection when the service is absent or unreachable.
 - The FPS pipe protocol uses a generic request envelope with a stable request id and request name. The current FPS query is `PresentedFpsSample` / `presented_fps_sample`.

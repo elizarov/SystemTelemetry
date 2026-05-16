@@ -67,6 +67,7 @@ Each feature item uses short copy and, where useful, a small cropped screenshot 
 The hardware section lists currently supported providers and telemetry families:
 
 - AMD Radeon GPU telemetry through ADLX.
+- Intel GPU telemetry through Level Zero Sysman.
 - NVIDIA GPU telemetry through NVML.
 - Presented-FPS capture through ETW via the CaseDash service.
 - MSI board temperature and fan telemetry through MSI Center SDK.
