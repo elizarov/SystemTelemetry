@@ -7,6 +7,7 @@
 
 #include "telemetry/metrics.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "widget/impl/pill_bar.h"
 #include "widget/widget_host.h"
 
@@ -73,9 +74,13 @@ std::string FitMiddleEllipsis(const Renderer& renderer, TextStyleId style, std::
     const std::string_view lastLetter(original.data() + lastStart, original.size() - lastStart);
     for (size_t prefixEnd = PreviousUtf8CodePointStart(original, lastStart); prefixEnd > 0;
         prefixEnd = PreviousUtf8CodePointStart(original, prefixEnd)) {
-        std::string candidate = original.substr(0, prefixEnd);
-        candidate += kEllipsis;
-        candidate += lastLetter;
+        const std::string candidate = FormatText("%.*s%.*s%.*s",
+            static_cast<int>(prefixEnd),
+            original.c_str(),
+            static_cast<int>(kEllipsis.size()),
+            kEllipsis.data(),
+            static_cast<int>(lastLetter.size()),
+            lastLetter.data());
         if (renderer.MeasureTextWidth(style, candidate) <= maxWidth) {
             return candidate;
         }

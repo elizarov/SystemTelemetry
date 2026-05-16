@@ -17,8 +17,7 @@ namespace {
 void AppendTooltipDescription(std::string& text, std::string_view descriptionText) {
     // Size: keep tooltip assembly UTF-8 until the Win32 tooltip boundary to limit wide-string helper code.
     if (!descriptionText.empty()) {
-        text += "\r\n";
-        text += descriptionText;
+        AppendFormat(text, "\r\n%.*s", static_cast<int>(descriptionText.size()), descriptionText.data());
     }
 }
 
@@ -48,10 +47,10 @@ std::string TooltipColorExpression(const ColorConfig& color) {
 
 std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
-        return "card." + guide.editCardId;
+        return FormatText("card.%s", guide.editCardId.c_str());
     }
     if (!config.display.layout.empty()) {
-        return "layout." + config.display.layout;
+        return FormatText("layout.%s", config.display.layout.c_str());
     }
     return "layout";
 }
@@ -72,7 +71,7 @@ const LayoutCardConfig* FindCardById(const AppConfig& config, std::string_view c
 LayoutEditTooltipDescriptor CardTitleTooltipDescriptor(const LayoutCardTitleEditKey& key) {
     LayoutEditTooltipDescriptor descriptor;
     descriptor.configKey = "config.card.title";
-    descriptor.sectionName = "card." + key.cardId;
+    descriptor.sectionName = FormatText("card.%s", key.cardId.c_str());
     descriptor.memberName = "title";
     descriptor.valueFormat = configschema::ValueFormat::String;
     return descriptor;
@@ -91,7 +90,7 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
     const std::string configMember = LayoutGuideTooltipConfigMember(guide);
     const LayoutNodeConfig* node = FindLayoutGuideNode(config, guide);
     if (node == nullptr || node->children.size() < 2 || guide.separatorIndex + 1 >= node->children.size()) {
-        return "[" + sectionName + "] " + configMember;
+        return FormatText("[%s] %s", sectionName.c_str(), configMember.c_str());
     }
 
     const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
@@ -111,7 +110,8 @@ std::string BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEdi
 }
 
 std::string BuildMetricTooltipText(const LayoutMetricEditKey& key, const MetricDefinitionConfig& definition) {
-    return TooltipText("[metrics] " + key.metricId + " = " + FormatMetricDefinitionValue(definition),
+    return TooltipText(
+        FormatText("[metrics] %s = %s", key.metricId.c_str(), FormatMetricDefinitionValue(definition).c_str()),
         FindLocalizedText("layout_edit.metric_definition"));
 }
 

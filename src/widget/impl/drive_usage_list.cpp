@@ -9,6 +9,7 @@
 #include <vector>
 
 #include "telemetry/metrics.h"
+#include "util/text_format.h"
 #include "widget/impl/animation_primitives.h"
 #include "widget/impl/pill_bar.h"
 #include "widget/widget_host.h"
@@ -75,7 +76,7 @@ DriveUsageListWidget::MeasuredColumnWidths MeasureColumnWidths(const WidgetHost&
     const std::string writeLabel = ResolveDriveMetricLabel(renderer, "drive.activity.write", "W");
     const std::string usageSample = ResolveDriveMetricSampleValue(renderer, "drive.usage", "100%");
     return DriveUsageListWidget::MeasuredColumnWidths{
-        std::max(1, renderer.Renderer().MeasureTextWidth(TextStyleId::Label, writeLabel + ":")),
+        std::max(1, renderer.Renderer().MeasureTextWidth(TextStyleId::Label, FormatText("%s:", writeLabel.c_str()))),
         std::max(1, renderer.Renderer().MeasureTextWidth(TextStyleId::Label, usageSample)),
     };
 }

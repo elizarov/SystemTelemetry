@@ -10,6 +10,8 @@
 #include <utility>
 #include <vector>
 
+#include "util/text_format.h"
+
 namespace configschema {
 
 template <size_t N> struct FixedString {
@@ -317,7 +319,11 @@ template <FixedString Prefix, typename Owner, typename... Fields> struct Dynamic
     }
 
     static std::string FormatName(std::string_view suffix) {
-        return "[" + std::string(prefix.view()) + std::string(suffix) + "]";
+        return FormatText("[%.*s%.*s]",
+            static_cast<int>(prefix.view().size()),
+            prefix.view().data(),
+            static_cast<int>(suffix.size()),
+            suffix.data());
     }
 };
 
@@ -401,7 +407,11 @@ template <FixedString Prefix, typename Owner> struct AutoDynamicSectionDescripto
     }
 
     static std::string FormatName(std::string_view suffix) {
-        return "[" + std::string(prefix.view()) + std::string(suffix) + "]";
+        return FormatText("[%.*s%.*s]",
+            static_cast<int>(prefix.view().size()),
+            prefix.view().data(),
+            static_cast<int>(suffix.size()),
+            suffix.data());
     }
 };
 

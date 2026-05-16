@@ -190,10 +190,13 @@ public:
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
-            requestedDiagnosticsSuffix_ += " requested_temps=" + JoinNames(settings_.requestedTemperatureNames);
+            AppendFormat(requestedDiagnosticsSuffix_,
+                " requested_temps=%s",
+                JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            requestedDiagnosticsSuffix_ += " requested_fans=" + JoinNames(settings_.requestedFanNames);
+            AppendFormat(
+                requestedDiagnosticsSuffix_, " requested_fans=%s", JoinNames(settings_.requestedFanNames).c_str());
         }
         initialized_ = true;
         return true;
@@ -212,7 +215,7 @@ public:
         sample.temperatures = temperatureMetricTemplate_;
         sample.fans = fanMetricTemplate_;
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
+        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
 
         if (!initialized_ || !sivDirectory_.has_value()) {
             return sample;
@@ -224,7 +227,7 @@ public:
         GigabyteSivSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;
-            sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
+            sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
             return sample;
         }
 
@@ -242,7 +245,7 @@ public:
             snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = diagnostics_ + requestedDiagnosticsSuffix_;
+        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
 

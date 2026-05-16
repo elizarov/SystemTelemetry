@@ -12,6 +12,7 @@
 #include "renderer/png_export.h"
 #include "resource.h"
 #include "util/lightweight_mutex.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 #include "util/win32_format.h"
 
@@ -57,15 +58,12 @@ const void* D2DRenderBitmapResourceTypeToken() {
 }
 
 void SetHresultError(std::string& errorText, const char* prefix, HRESULT hr) {
-    errorText = prefix;
-    errorText += " hr=";
+    AssignFormat(errorText, "%s hr=", prefix);
     AppendHresult(errorText, hr);
 }
 
 void SetPrefixedHresultError(std::string& errorText, std::string_view prefix, const char* suffix, HRESULT hr) {
-    errorText.assign(prefix);
-    errorText += suffix;
-    errorText += " hr=";
+    AssignFormat(errorText, "%.*s%s hr=", static_cast<int>(prefix.size()), prefix.data(), suffix);
     AppendHresult(errorText, hr);
 }
 
@@ -1747,7 +1745,7 @@ bool D2DRenderer::LoadIcons() {
             continue;
         }
         if (GetPanelIconAtlasSlot(iconName) < 0) {
-            lastError_ = "icon_unknown name=\"" + iconName + "\"";
+            lastError_ = FormatText("icon_unknown name=\"%s\"", iconName.c_str());
             ReleaseIcons();
             return false;
         }

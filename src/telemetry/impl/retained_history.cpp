@@ -2,6 +2,7 @@
 
 #include "telemetry/timing.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -148,9 +149,9 @@ void RetainedHistoryStore::PushSample(SystemSnapshot& snapshot, const std::strin
 
 void RetainedHistoryStore::PushBoardMetricSamples(SystemSnapshot& snapshot) const {
     for (const auto& metric : snapshot.boardTemperatures) {
-        PushSample(snapshot, "board.temp." + metric.name, metric.metric.value.value_or(0.0));
+        PushSample(snapshot, FormatText("board.temp.%s", metric.name.c_str()), metric.metric.value.value_or(0.0));
     }
     for (const auto& metric : snapshot.boardFans) {
-        PushSample(snapshot, "board.fan." + metric.name, metric.metric.value.value_or(0.0));
+        PushSample(snapshot, FormatText("board.fan.%s", metric.name.c_str()), metric.metric.value.value_or(0.0));
     }
 }

@@ -39,8 +39,7 @@ std::string CrashReportFileName() {
 }
 
 FilePath PathWithSuffix(const FilePath& path, std::string_view suffix) {
-    std::string text = path.string();
-    text += suffix;
+    std::string text = FormatText("%s%.*s", path.string().c_str(), static_cast<int>(suffix.size()), suffix.data());
     return FilePath(std::move(text));
 }
 
@@ -91,10 +90,7 @@ std::string ModulePathForAddress(void* address) {
 }
 
 void AppendLine(std::string& text, const char* key, const std::string& value) {
-    text += key;
-    text += ": ";
-    text += value;
-    text += "\r\n";
+    AppendFormat(text, "%s: %s\r\n", key, value.c_str());
 }
 
 std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* exceptionPointers) {
@@ -187,7 +183,8 @@ LONG WINAPI HandleUnhandledException(EXCEPTION_POINTERS* exceptionPointers) {
     AppendLine(reportText, "minidump_written", dumpWritten ? "yes" : "no");
     WriteFileBinary(reportPath, reportText);
     AppendCrashTrace(reportPath, dumpPath, exceptionPointers);
-    const std::wstring debugText = WideFromUtf8("CaseDash crash report written to " + reportPath.string() + "\n");
+    const std::wstring debugText =
+        WideFromUtf8(FormatText("CaseDash crash report written to %s\n", reportPath.string().c_str()));
     OutputDebugStringW(debugText.c_str());
     return EXCEPTION_CONTINUE_SEARCH;
 }

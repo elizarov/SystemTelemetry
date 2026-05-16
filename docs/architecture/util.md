@@ -1,6 +1,6 @@
 # Util Package
 
-`src/util/` owns pure shared utilities that are domain-neutral and safe for lower layers.
+`src/util/` owns pure shared utilities that are domain-neutral and safe for every package layer.
 
 ## Responsibilities
 
@@ -21,6 +21,7 @@
 ## Boundaries
 
 - `util` may depend on `util` only.
+- Every non-util package may depend on `util` for domain-neutral helpers.
 - It does not depend on config, telemetry, renderer, widget, UI, diagnostics, or application-facing packages.
 - `strings.*` stays limited to domain-neutral string operations; config-language spelling, menu labels, telemetry labels, and UI copy live in the package that owns that contract.
 - Project filesystem operations use `src/util/file_path.*` helpers instead of `std::filesystem` so app-owned path data stays UTF-8 while filesystem calls still use the Win32 wide API.

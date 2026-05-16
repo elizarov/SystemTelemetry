@@ -719,12 +719,9 @@ bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style) {
 }
 
 std::string BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first) {
-    std::string label =
+    const char* side =
         leaf.weightAxis == LayoutGuideAxis::Vertical ? (first ? "Left" : "Right") : (first ? "Top" : "Bottom");
-    label += " ";
-    label += first ? leaf.firstWeightName : leaf.secondWeightName;
-    label += " weight:";
-    return label;
+    return FormatText("%s %s weight:", side, (first ? leaf.firstWeightName : leaf.secondWeightName).c_str());
 }
 
 std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
@@ -739,9 +736,7 @@ std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     if (const auto* metricLeaf =
             node->leaf.has_value() ? std::get_if<LayoutMetricEditKey>(&node->leaf->focusKey) : nullptr;
         metricLeaf != nullptr) {
-        std::string title = "Metric: ";
-        title += metricLeaf->metricId;
-        return title;
+        return FormatText("Metric: %s", metricLeaf->metricId.c_str());
     }
     if (const auto* titleLeaf =
             node->leaf.has_value() ? std::get_if<LayoutCardTitleEditKey>(&node->leaf->focusKey) : nullptr;

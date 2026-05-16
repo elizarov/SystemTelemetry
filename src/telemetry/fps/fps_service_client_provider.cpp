@@ -14,6 +14,7 @@
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
+#include "util/win32_format.h"
 
 namespace {
 
@@ -37,29 +38,6 @@ std::string CleanProcessDisplayName(std::string processName) {
         }
     }
     return processName;
-}
-
-std::string Win32ErrorText(DWORD status) {
-    char message[256]{};
-    const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr,
-        status,
-        0,
-        message,
-        static_cast<DWORD>(std::size(message)),
-        nullptr);
-    std::string text = FormatText("%lu", static_cast<unsigned long>(status));
-    if (length > 0) {
-        size_t trimmedLength = length;
-        while (trimmedLength > 0 && (message[trimmedLength - 1] == '\r' || message[trimmedLength - 1] == '\n')) {
-            message[trimmedLength - 1] = '\0';
-            --trimmedLength;
-        }
-        text += " (";
-        text += message;
-        text += ")";
-    }
-    return text;
 }
 
 class Handle {
@@ -87,14 +65,15 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     diagnostics.clear();
     const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
     if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
-        diagnostics = "CashDash service pipe is unavailable: " + Win32ErrorText(GetLastError());
+        diagnostics = FormatText("CashDash service pipe is unavailable: %s", FormatWin32Error(GetLastError()).c_str());
         return std::nullopt;
     }
 
     Handle pipe(CreateFileW(
         pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
-        diagnostics = "Failed to connect to CashDash service pipe: " + Win32ErrorText(GetLastError());
+        diagnostics =
+            FormatText("Failed to connect to CashDash service pipe: %s", FormatWin32Error(GetLastError()).c_str());
         return std::nullopt;
     }
 
@@ -102,7 +81,8 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     DWORD written = 0;
     if (!WriteFile(pipe.Get(), request.data(), static_cast<DWORD>(request.size()), &written, nullptr) ||
         written != request.size()) {
-        diagnostics = "Failed to write CashDash service request: " + Win32ErrorText(GetLastError());
+        diagnostics =
+            FormatText("Failed to write CashDash service request: %s", FormatWin32Error(GetLastError()).c_str());
         return std::nullopt;
     }
 
@@ -115,7 +95,7 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
             if (error == ERROR_BROKEN_PIPE || error == ERROR_PIPE_NOT_CONNECTED) {
                 break;
             }
-            diagnostics = "Failed to read FPS service response: " + Win32ErrorText(error);
+            diagnostics = FormatText("Failed to read FPS service response: %s", FormatWin32Error(error).c_str());
             return std::nullopt;
         }
         if (read == 0) {
@@ -175,7 +155,7 @@ public:
             unavailable.processName = cachedSample_->processName;
         }
         trace_.WriteLazy(TracePrefix::FpsServiceClient,
-            [&] { return "sample_failed diagnostics=\"" + unavailable.diagnostics + "\""; });
+            [&] { return FormatText("sample_failed diagnostics=\"%s\"", unavailable.diagnostics.c_str()); });
         return unavailable;
     }
 

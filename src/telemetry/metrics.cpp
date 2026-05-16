@@ -854,7 +854,7 @@ std::string FormatWithTokens(
             const FormatToken& token = tokens[tokenIndex];
             if (format.size() - index >= token.length &&
                 format.compare(index, token.length, token.text, token.length) == 0) {
-                output += ResolveFormatToken(time, token.kind);
+                AppendFormat(output, "%s", ResolveFormatToken(time, token.kind).c_str());
                 index += token.length;
                 matched = true;
                 break;
@@ -1024,7 +1024,8 @@ const std::string& MetricSource::ResolveNetworkFooter() const {
         if (snapshot_.network.adapterName.empty()) {
             networkFooterCache_ = snapshot_.network.ipAddress;
         } else {
-            networkFooterCache_ = snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
+            networkFooterCache_ =
+                FormatText("%s | %s", snapshot_.network.adapterName.c_str(), snapshot_.network.ipAddress.c_str());
         }
         networkFooterCached_ = true;
     }

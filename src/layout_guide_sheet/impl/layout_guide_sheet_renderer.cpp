@@ -983,11 +983,11 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         std::string selectedCards = "cards=\"";
         for (size_t i = 0; i < cardPlacements.size(); ++i) {
             if (i > 0) {
-                selectedCards += ",";
+                AppendFormat(selectedCards, ",");
             }
-            selectedCards += cardPlacements[i].id;
+            AppendFormat(selectedCards, "%s", cardPlacements[i].id.c_str());
         }
-        selectedCards += "\"";
+        AppendFormat(selectedCards, "\"");
         traceDetails->push_back(selectedCards);
         traceDetails->push_back(FormatText("callouts=%zu", callouts.size()));
     }

@@ -253,14 +253,7 @@ std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, 
             return *reinterpret_cast<const std::string*>(address);
         case RuntimeConfigFieldValueKind::StringList: {
             const auto& values = *reinterpret_cast<const std::vector<std::string>*>(address);
-            std::string encoded;
-            for (size_t i = 0; i < values.size(); ++i) {
-                if (i > 0) {
-                    encoded += ",";
-                }
-                encoded += values[i];
-            }
-            return encoded;
+            return JoinNames(values);
         }
         case RuntimeConfigFieldValueKind::LogicalPoint: {
             const LogicalPointConfig& point = *reinterpret_cast<const LogicalPointConfig*>(address);
@@ -317,18 +310,16 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
         AppendFormat(text, ":%d", node.weight);
     }
     if (!node.children.empty()) {
-        text += "(";
+        AppendFormat(text, "(");
         for (size_t i = 0; i < node.children.size(); ++i) {
             if (i > 0) {
-                text += ",";
+                AppendFormat(text, ",");
             }
-            text += FormatLayoutExpression(node.children[i]);
+            AppendFormat(text, "%s", FormatLayoutExpression(node.children[i]).c_str());
         }
-        text += ")";
+        AppendFormat(text, ")");
     } else if (!node.parameter.empty()) {
-        text += "(";
-        text += node.parameter;
-        text += ")";
+        AppendFormat(text, "(%s)", node.parameter.c_str());
     }
     return text;
 }

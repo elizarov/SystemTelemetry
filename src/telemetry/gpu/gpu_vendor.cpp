@@ -10,6 +10,7 @@
 #include "telemetry/gpu/amd/gpu_amd_adl.h"
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -67,7 +68,7 @@ public:
             }
         }
 
-        sample.diagnostics += " fps=" + fpsDiagnostics_;
+        AppendFormat(sample.diagnostics, " fps=%s", fpsDiagnostics_.c_str());
         return sample;
     }
 

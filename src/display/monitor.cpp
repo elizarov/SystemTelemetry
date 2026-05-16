@@ -134,7 +134,7 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
         const std::string friendlyName = Utf8FromWide(targetName.monitorFriendlyDeviceName);
         const std::string monitorPath = Utf8FromWide(targetName.monitorDevicePath);
         if (IsUsefulFriendlyName(friendlyName)) {
-            identity.displayName = friendlyName + " (" + SimplifyDeviceName(deviceName) + ")";
+            identity.displayName = FormatText("%s (%s)", friendlyName.c_str(), SimplifyDeviceName(deviceName).c_str());
             identity.configName = friendlyName;
         } else if (!monitorPath.empty()) {
             identity.displayName = SimplifyDeviceName(deviceName);

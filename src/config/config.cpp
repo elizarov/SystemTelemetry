@@ -2,6 +2,7 @@
 
 #include "config/color_format.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -106,15 +107,8 @@ AppConfig BuildEffectiveRuntimeConfig(
 }
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
-    std::string text;
-    if (definition.telemetryScale) {
-        text = "*";
-    } else {
-        text = FormatDoubleGeneral(definition.scale);
-    }
-    text += ",";
-    text += definition.unit;
-    text += ",";
-    text += definition.label;
-    return text;
+    return FormatText("%s,%s,%s",
+        definition.telemetryScale ? "*" : FormatDoubleGeneral(definition.scale).c_str(),
+        definition.unit.c_str(),
+        definition.label.c_str());
 }

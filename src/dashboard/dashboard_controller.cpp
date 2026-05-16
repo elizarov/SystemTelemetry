@@ -71,10 +71,9 @@ bool SaveConfigElevated(
         return false;
     }
 
-    std::string parameters = "/save-config ";
-    parameters += QuoteCommandLineArgument(tempPath.string());
-    parameters += " /save-config-target ";
-    parameters += QuoteCommandLineArgument(targetPath.string());
+    const std::string parameters = FormatText("/save-config %s /save-config-target %s",
+        QuoteCommandLineArgument(tempPath.string()).c_str(),
+        QuoteCommandLineArgument(targetPath.string()).c_str());
 
     DWORD exitCode = 1;
     const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);
@@ -365,14 +364,14 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
     const std::wstring widePath = path->Wide();
     if (_wfopen_s(&output, widePath.c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
         const std::string pathText = path->string();
-        shell.ShowError("Failed to open dump file:\n" + pathText);
+        shell.ShowError(FormatText("Failed to open dump file:\n%s", pathText.c_str()));
         return;
     }
     const bool written = WriteTelemetryDump(output, state_.telemetryUpdate.dump);
     fclose(output);
     if (!written) {
         const std::string pathText = path->string();
-        shell.ShowError("Failed to write dump file:\n" + pathText);
+        shell.ShowError(FormatText("Failed to write dump file:\n%s", pathText.c_str()));
     }
 }
 
@@ -442,7 +441,7 @@ void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     }
     if (!SaveFullConfig(*path, BuildCurrentConfigForSaving(shell))) {
         const std::string pathText = path->string();
-        shell.ShowError("Failed to save full config file:\n" + pathText);
+        shell.ShowError(FormatText("Failed to save full config file:\n%s", pathText.c_str()));
     }
 }
 
@@ -816,7 +815,7 @@ bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& s
     const FilePath configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving(shell);
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
-        shell.ShowError("Failed to save " + configPath.string() + ".");
+        shell.ShowError(FormatText("Failed to save %s.", configPath.string().c_str()));
         return false;
     }
     state_.config = std::move(config);

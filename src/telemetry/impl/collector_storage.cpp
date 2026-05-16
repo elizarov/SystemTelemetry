@@ -7,6 +7,7 @@
 #include "telemetry/impl/collector_storage_selection.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -74,7 +75,8 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         auto& drive = state.snapshot_.drives[i];
         DriveCounterState* counters =
             i < state.storage_.driveCounters.size() ? &state.storage_.driveCounters[i] : nullptr;
-        const std::wstring root = WideFromUtf8(counters != nullptr ? counters->rootPath : drive.label + "\\");
+        const std::wstring root =
+            WideFromUtf8(counters != nullptr ? counters->rootPath : FormatText("%s\\", drive.label.c_str()));
         const UINT driveType = GetDriveTypeW(root.c_str());
         drive.driveType = driveType;
         if (!IsSelectableStorageDriveType(driveType)) {
@@ -213,7 +215,7 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
     state.snapshot_.drives.clear();
     state.storage_.driveCounters.clear();
     for (const auto& letter : state.storage_.resolvedDriveLetters) {
-        const std::string label = letter + ":";
+        const std::string label = FormatText("%s:", letter.c_str());
         DriveInfo info;
         info.label = label;
         state.snapshot_.drives.push_back(std::move(info));
@@ -222,15 +224,9 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
         if (state.storage_.query != nullptr) {
             DriveCounterState counters;
             counters.label = label;
-            std::string rootLabel = label;
-            rootLabel += "\\";
-            counters.rootPath = rootLabel;
-            std::string readPath = "\\LogicalDisk(";
-            readPath += label;
-            readPath += ")\\Disk Read Bytes/sec";
-            std::string writePath = "\\LogicalDisk(";
-            writePath += label;
-            writePath += ")\\Disk Write Bytes/sec";
+            counters.rootPath = FormatText("%s\\", label.c_str());
+            const std::string readPath = FormatText("\\LogicalDisk(%s)\\Disk Read Bytes/sec", label.c_str());
+            const std::string writePath = FormatText("\\LogicalDisk(%s)\\Disk Write Bytes/sec", label.c_str());
             const PDH_STATUS readStatus = AddCounterCompat(state.storage_.query, readPath, &counters.readCounter);
             const PDH_STATUS writeStatus = AddCounterCompat(state.storage_.query, writePath, &counters.writeCounter);
             state.trace_.WriteFmt(TracePrefix::Telemetry,

@@ -13,6 +13,7 @@
 #include "telemetry/fps_service_protocol.h"
 #include "util/command_line.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -152,7 +153,7 @@ std::string BuildFpsServiceBinaryPath() {
     if (!executablePath.has_value()) {
         return {};
     }
-    return QuoteCommandLineArgument(executablePath->string()) + " /service";
+    return FormatText("%s /service", QuoteCommandLineArgument(executablePath->string()).c_str());
 }
 
 DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceHandle& service) {

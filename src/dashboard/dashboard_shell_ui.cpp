@@ -23,6 +23,7 @@
 #include "telemetry/metrics.h"
 #include "util/message_box.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -210,8 +211,7 @@ bool IsPredefinedDisplayScale(double scale) {
 }
 
 std::string FormatScaleLabel(double scale) {
-    std::string value = FormatDoubleGeneral(scale * 100.0, 12);
-    return value + "%";
+    return FormatText("%s%%", FormatDoubleGeneral(scale * 100.0, 12).c_str());
 }
 
 std::string FormatScalePercentageValue(double scale) {
@@ -219,12 +219,12 @@ std::string FormatScalePercentageValue(double scale) {
 }
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
-    std::string label(name);
-    if (!description.empty()) {
-        label += " - ";
-        label += description;
-    }
-    return label;
+    return description.empty() ? std::string(name)
+                               : FormatText("%.*s - %.*s",
+                                     static_cast<int>(name.size()),
+                                     name.data(),
+                                     static_cast<int>(description.size()),
+                                     description.data());
 }
 
 size_t BuildScaleMenuEntries(double currentScale, double* entries, size_t capacity) {
@@ -257,27 +257,23 @@ void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
 }
 
 std::string BuildLayoutEditMenuLabel(std::string_view subject) {
-    std::string label = "Edit ";
-    label += subject;
-    label += " ...";
-    return label;
+    return FormatText("Edit %.*s ...", static_cast<int>(subject.size()), subject.data());
 }
 
 std::string BuildAboutText() {
-    std::string text = "CaseDash ";
-    text += casedash::version::kVersion;
-    text += "\n";
-    text += casedash::version::kOfficialRelease ? "Official release" : "Development build";
+    std::string text = FormatText("CaseDash %s\n%s",
+        casedash::version::kVersion,
+        casedash::version::kOfficialRelease ? "Official release" : "Development build");
     if (std::string_view(casedash::version::kGitCommitShort) != "unknown") {
-        text += "\nCommit ";
-        text += casedash::version::kGitCommitShort;
+        AppendFormat(text, "\nCommit %s", casedash::version::kGitCommitShort);
         if (casedash::version::kGitDirty) {
-            text += " (dirty)";
+            AppendFormat(text, " (dirty)");
         }
     }
-    text += "\n\nA compact dashboard for dedicated PC telemetry screens.";
-    text += "\nCopyright (c) Roman Elizarov.";
-    text += "\nLicensed under the Apache License 2.0.";
+    AppendFormat(text,
+        "\n\nA compact dashboard for dedicated PC telemetry screens."
+        "\nCopyright (c) Roman Elizarov."
+        "\nLicensed under the Apache License 2.0.");
     return text;
 }
 
@@ -555,9 +551,7 @@ void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::
     if (details.empty()) {
         state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, event);
     } else {
-        std::string text(event);
-        text += ' ';
-        text += details;
+        std::string text = FormatText("%s %s", event, details.c_str());
         state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, text);
     }
 }
@@ -1141,7 +1135,7 @@ void DashboardShellUi::ShowContextMenu(
             const auto focusKey = TooltipPayloadFocusKey(layoutEditTarget->payload);
             if (label.empty() && focusKey.has_value()) {
                 if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey); metricKey != nullptr) {
-                    label = BuildLayoutEditMenuLabel(metricKey->metricId + " metric");
+                    label = BuildLayoutEditMenuLabel(FormatText("%s metric", metricKey->metricId.c_str()));
                 }
             }
             if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {

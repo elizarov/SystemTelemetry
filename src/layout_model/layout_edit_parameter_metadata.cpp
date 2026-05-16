@@ -5,6 +5,7 @@
 #include <type_traits>
 
 #include "config/config.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -91,7 +92,7 @@ std::string GetLayoutEditParameterDisplayName(LayoutEditParameter parameter) {
     const auto& field = GetLayoutEditConfigFieldMetadata(parameter);
     std::string label = HumanizeSnakeCase(field.parameterName);
     if (IsFontLayoutEditParameter(parameter)) {
-        label += " font";
+        label = FormatText("%s font", label.c_str());
     }
     return label;
 }
@@ -114,7 +115,7 @@ std::optional<LayoutEditTooltipDescriptor> FindLayoutEditTooltipDescriptor(Layou
     LayoutEditTooltipDescriptor descriptor;
     descriptor.sectionName = std::string(field.sectionName);
     descriptor.memberName = std::string(field.parameterName);
-    descriptor.configKey = "config." + descriptor.sectionName + "." + descriptor.memberName;
+    descriptor.configKey = FormatText("config.%s.%s", descriptor.sectionName.c_str(), descriptor.memberName.c_str());
     descriptor.valueFormat = field.valueFormat;
     return descriptor;
 }

@@ -170,7 +170,7 @@ std::string LayoutGuideSheetCalloutKey(
         }
         if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
             nodeFieldKey != nullptr && nodeFieldKey->widgetClass == WidgetClass::MetricList) {
-            std::string key = "metric_list_layout:" + nodeFieldKey->editCardId;
+            std::string key = FormatText("metric_list_layout:%s", nodeFieldKey->editCardId.c_str());
             for (const size_t pathPart : nodeFieldKey->nodePath) {
                 AppendFormat(key, "/%zu", pathPart);
             }
@@ -181,7 +181,7 @@ std::string LayoutGuideSheetCalloutKey(
         return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide"
                                                           : "overview_vertical_sizing_guide";
     }
-    return parameterLine + "\n" + descriptionLine;
+    return FormatText("%s\n%s", parameterLine.c_str(), descriptionLine.c_str());
 }
 
 void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,

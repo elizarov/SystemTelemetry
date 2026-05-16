@@ -56,7 +56,7 @@ private:
             }
 
             AssemblyName ^ name = gcnew AssemblyName(args->Name);
-            String ^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
+            String ^ candidate = Path::Combine(toolDirectory_, String::Concat(name->Name, ".dll"));
             if (!File::Exists(candidate)) {
                 return nullptr;
             }

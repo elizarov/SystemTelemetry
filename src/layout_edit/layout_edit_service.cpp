@@ -70,14 +70,7 @@ bool ApplyLayoutNodeMutation(
 }
 
 std::string JoinMetricRefs(const std::vector<std::string>& metricRefs) {
-    std::string parameter;
-    for (size_t i = 0; i < metricRefs.size(); ++i) {
-        if (i > 0) {
-            parameter += ",";
-        }
-        parameter += metricRefs[i];
-    }
-    return parameter;
+    return JoinNames(metricRefs);
 }
 
 }  // namespace

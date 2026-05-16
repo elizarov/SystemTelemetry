@@ -702,8 +702,7 @@ void FinishPopulateLayoutEditSelectionUi(LayoutEditDialogState* state, HWND hwnd
 }
 
 void TracePopulateLayoutEditSelection(LayoutEditDialogState* state, const std::string& detail) {
-    std::string text = BuildTraceNodeText(state->selectedNode);
-    text += detail;
+    const std::string text = FormatText("%s%s", BuildTraceNodeText(state->selectedNode).c_str(), detail.c_str());
     state->dialog->Host().TraceLayoutEditDialogEvent("populate_selection", text);
 }
 

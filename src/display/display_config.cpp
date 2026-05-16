@@ -14,6 +14,7 @@
 #include "util/elevated_process.h"
 #include "util/paths.h"
 #include "util/temp_file.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
@@ -166,14 +167,12 @@ bool ConfigureDisplay(
         return false;
     }
 
-    std::string parameters = "/configure-display ";
-    parameters += QuoteCommandLineArgument(tempConfigPath.string());
-    parameters += " /configure-display-target ";
-    parameters += QuoteCommandLineArgument(configPath.string());
-    parameters += " /configure-display-dump ";
-    parameters += QuoteCommandLineArgument(tempDumpPath.string());
-    parameters += " /configure-display-image-target ";
-    parameters += QuoteCommandLineArgument(imagePath.string());
+    const std::string parameters = FormatText("/configure-display %s /configure-display-target %s "
+                                              "/configure-display-dump %s /configure-display-image-target %s",
+        QuoteCommandLineArgument(tempConfigPath.string()).c_str(),
+        QuoteCommandLineArgument(configPath.string()).c_str(),
+        QuoteCommandLineArgument(tempDumpPath.string()).c_str(),
+        QuoteCommandLineArgument(imagePath.string()).c_str());
 
     DWORD exitCode = 1;
     const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);

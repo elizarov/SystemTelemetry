@@ -8,6 +8,7 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
+#include "util/text_format.h"
 #include "util/win32_format.h"
 
 namespace {
@@ -21,8 +22,7 @@ bool SetError(std::string* errorText, std::string text) {
 
 bool SetHresultError(std::string* errorText, std::string_view prefix, HRESULT hr) {
     if (errorText != nullptr) {
-        errorText->assign(prefix);
-        *errorText += " hr=";
+        AssignFormat(*errorText, "%.*s hr=", static_cast<int>(prefix.size()), prefix.data());
         AppendHresult(*errorText, hr);
     }
     return false;
@@ -30,9 +30,7 @@ bool SetHresultError(std::string* errorText, std::string_view prefix, HRESULT hr
 
 bool SetPrefixedHresultError(std::string* errorText, std::string_view prefix, const char* suffix, HRESULT hr) {
     if (errorText != nullptr) {
-        errorText->assign(prefix);
-        *errorText += suffix;
-        *errorText += " hr=";
+        AssignFormat(*errorText, "%.*s%s hr=", static_cast<int>(prefix.size()), prefix.data(), suffix);
         AppendHresult(*errorText, hr);
     }
     return false;
@@ -42,9 +40,7 @@ bool SetPrefixedHresultPathError(
     std::string* errorText, std::string_view prefix, const char* suffix, HRESULT hr, const FilePath& imagePath) {
     if (errorText != nullptr) {
         SetPrefixedHresultError(errorText, prefix, suffix, hr);
-        *errorText += " path=\"";
-        *errorText += imagePath.string();
-        *errorText += "\"";
+        AppendFormat(*errorText, " path=\"%s\"", imagePath.string().c_str());
     }
     return false;
 }
@@ -98,7 +94,7 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     std::string* errorText) {
     const std::string prefix(errorPrefix);
     if (factory == nullptr || source == nullptr) {
-        return SetError(errorText, prefix + "_wic_unavailable");
+        return SetError(errorText, FormatText("%s_wic_unavailable", prefix.c_str()));
     }
 
     UINT bitmapWidth = 0;

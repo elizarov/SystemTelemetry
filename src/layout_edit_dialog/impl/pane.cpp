@@ -12,6 +12,7 @@
 #include "layout_edit_dialog/theme_preview.h"
 #include "resource.h"
 #include "util/localization_catalog.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 void ShowDialogControls(HWND hwnd, const int* controlIds, size_t controlCount, bool show);
@@ -1452,8 +1453,7 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
     }
     state->previewColor = RGB((color >> 24) & 0xFFu, (color >> 16) & 0xFFu, (color >> 8) & 0xFFu);
     SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, "Sample text in the selected color");
-    std::string derivedHexText = "Hex: ";
-    derivedHexText += FormatDialogColorHex(color);
+    const std::string derivedHexText = FormatText("Hex: %s", FormatDialogColorHex(color).c_str());
     SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL, derivedHexText);
     InvalidateDialogControls(hwnd, kColorPreviewInvalidationControls, ARRAYSIZE(kColorPreviewInvalidationControls));
 }

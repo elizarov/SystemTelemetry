@@ -821,12 +821,10 @@ int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& target
 }
 
 std::string FormatTelemetryInitializeError(std::string_view errorText) {
-    std::string message = "Failed to initialize telemetry collector.";
-    if (!errorText.empty()) {
-        message += "\n\n";
-        message += errorText;
-    }
-    return message;
+    return errorText.empty() ? "Failed to initialize telemetry collector."
+                             : FormatText("Failed to initialize telemetry collector.\n\n%.*s",
+                                   static_cast<int>(errorText.size()),
+                                   errorText.data());
 }
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,

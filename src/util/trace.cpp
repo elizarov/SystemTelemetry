@@ -177,9 +177,9 @@ std::string Trace::PrefixNamesText() {
     std::string text;
     for (unsigned index = 0; index < static_cast<unsigned>(TracePrefix::Count); ++index) {
         if (!text.empty()) {
-            text += ",";
+            AppendFormat(text, ",");
         }
-        text += PrefixName(static_cast<TracePrefix>(index));
+        AppendFormat(text, "%s", PrefixName(static_cast<TracePrefix>(index)));
     }
     return text;
 }

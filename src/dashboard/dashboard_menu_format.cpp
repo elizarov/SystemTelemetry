@@ -9,15 +9,15 @@ std::string FormatNetworkMenuText(const std::string& adapterName, const std::str
     if (ipAddress.empty()) {
         return adapterName;
     }
-    return adapterName + " | " + ipAddress;
+    return FormatText("%s | %s", adapterName.c_str(), ipAddress.c_str());
 }
 
 std::string FormatStorageDriveMenuText(const std::string& driveLetter, const std::string& volumeLabel, double totalGb) {
-    std::string text = driveLetter + ":";
+    std::string text = FormatText("%s:", driveLetter.c_str());
     if (!volumeLabel.empty()) {
-        text += " | " + volumeLabel;
+        AppendFormat(text, " | %s", volumeLabel.c_str());
     }
-    text += " | " + FormatStorageDriveSize(totalGb);
+    AppendFormat(text, " | %s", FormatStorageDriveSize(totalGb).c_str());
     return text;
 }
 

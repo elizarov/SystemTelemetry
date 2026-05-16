@@ -191,7 +191,7 @@ public:
         NvmlReturn result = nvml_.Initialize();
         trace_.WriteFmt(TracePrefix::NvidiaNvml, "init_done result=\"%s\"", nvml_.ResultText(result).c_str());
         if (result != kNvmlSuccess) {
-            diagnostics_ = "NVML initialization failed: " + nvml_.ResultText(result);
+            diagnostics_ = FormatText("NVML initialization failed: %s", nvml_.ResultText(result).c_str());
             return false;
         }
 
@@ -200,7 +200,7 @@ public:
         trace_.WriteFmt(
             TracePrefix::NvidiaNvml, "get_count result=\"%s\" count=%u", nvml_.ResultText(result).c_str(), deviceCount);
         if (result != kNvmlSuccess || deviceCount == 0) {
-            diagnostics_ = "NVML found no NVIDIA GPUs: count=" + nvml_.ResultText(result);
+            diagnostics_ = FormatText("NVML found no NVIDIA GPUs: count=%s", nvml_.ResultText(result).c_str());
             return false;
         }
 
@@ -210,7 +210,8 @@ public:
             nvml_.ResultText(result).c_str(),
             Trace::BoolText(device_ != nullptr));
         if (result != kNvmlSuccess || device_ == nullptr) {
-            diagnostics_ = "NVML failed to open first NVIDIA GPU: device=" + nvml_.ResultText(result);
+            diagnostics_ =
+                FormatText("NVML failed to open first NVIDIA GPU: device=%s", nvml_.ResultText(result).c_str());
             return false;
         }
 
@@ -237,8 +238,9 @@ public:
             totalVramGb_ = static_cast<double>(memory.total) / (1024.0 * 1024.0 * 1024.0);
         }
 
-        diagnostics_ = "NVML GPU=" + gpuName_ + " fan_rpm_supported=" + (HasFanSpeedRpm() ? "yes" : "no") +
-                       " native_fps_supported=no";
+        diagnostics_ = FormatText("NVML GPU=%s fan_rpm_supported=%s native_fps_supported=no",
+            gpuName_.c_str(),
+            HasFanSpeedRpm() ? "yes" : "no");
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = "Presented FPS ETW provider active.";
@@ -366,7 +368,7 @@ public:
         }
 
         sample.available = hasAnyMetric;
-        sample.diagnostics += " fps=" + fpsDiagnostics_;
+        AppendFormat(sample.diagnostics, " fps=%s", fpsDiagnostics_.c_str());
         trace_.WriteFmt(TracePrefix::NvidiaNvml,
             "sample_done available=%s diagnostics=\"%s\"",
             Trace::BoolText(sample.available),

@@ -4,6 +4,8 @@
 #include <cctype>
 #include <utility>
 
+#include "util/text_format.h"
+
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -89,9 +91,9 @@ std::string JoinNames(const std::vector<std::string>& names) {
     std::string joined;
     for (size_t i = 0; i < names.size(); ++i) {
         if (i != 0) {
-            joined += ",";
+            AppendFormat(joined, ",");
         }
-        joined += names[i];
+        AppendFormat(joined, "%s", names[i].c_str());
     }
     return joined;
 }

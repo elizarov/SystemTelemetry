@@ -4,6 +4,7 @@
 
 #include "util/resource_loader.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -30,7 +31,7 @@ LocalizationCatalogMap ParseLocalizationCatalog(std::string_view text) {
                 const std::string key = Trim(line.substr(0, equals));
                 const std::string value = Trim(line.substr(equals + 1));
                 if (!key.empty()) {
-                    values[section.empty() ? key : section + "." + key] = value;
+                    values[section.empty() ? key : FormatText("%s.%s", section.c_str(), key.c_str())] = value;
                 }
             }
         }

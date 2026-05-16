@@ -63,13 +63,8 @@ void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
             return;
         }
         const double averageMs = DurationMilliseconds(stats.total) / static_cast<double>(stats.samples);
-        text += " avg_";
-        text += name;
-        text += "_ms=";
-        text += FormatMilliseconds(averageMs);
-        text += ' ';
-        text += name;
-        AppendFormat(text, "_samples=%zu", stats.samples);
+        AppendFormat(
+            text, " avg_%s_ms=%s %s_samples=%zu", name, FormatMilliseconds(averageMs).c_str(), name, stats.samples);
     };
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;

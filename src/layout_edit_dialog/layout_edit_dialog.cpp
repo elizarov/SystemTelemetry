@@ -240,9 +240,9 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace =
                 FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
         } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
-            initialFocusTrace = "[metrics] " + metricKey->metricId;
+            initialFocusTrace = FormatText("[metrics] %s", metricKey->metricId.c_str());
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
-            initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
+            initialFocusTrace = FormatText("[card.%s] title", cardTitleKey->cardId.c_str());
         } else if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey)) {
             initialFocusTrace =
                 nodeFieldKey->editCardId.empty()

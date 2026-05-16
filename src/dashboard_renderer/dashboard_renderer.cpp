@@ -332,7 +332,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const int bodyHeight = (std::max)(1, Renderer().TextMetrics().smallText);
 
     const std::string titleText = "Move Mode";
-    const std::string monitorText = "Monitor: " + overlayState.monitorName;
+    const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
     const std::string positionText =
         FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
     const std::string scaleText =
@@ -620,30 +620,22 @@ std::string DashboardRenderer::SnapshotOverlaySignature(const DashboardOverlaySt
     std::string signature;
     if (overlayState.activeMetricListReorderDrag.has_value()) {
         const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
-        signature += "metric:";
-        signature += drag.widget.renderCardId;
-        signature += '|';
-        signature += drag.widget.editCardId;
-        signature += '|';
+        AppendFormat(signature, "metric:%s|%s|", drag.widget.renderCardId.c_str(), drag.widget.editCardId.c_str());
         AppendFormat(signature, "%d", static_cast<int>(drag.widget.kind));
-        signature += '|';
+        AppendFormat(signature, "|");
         for (size_t pathIndex : drag.widget.nodePath) {
-            AppendFormat(signature, "%zu", pathIndex);
-            signature += '.';
+            AppendFormat(signature, "%zu.", pathIndex);
         }
-        signature += ':';
+        AppendFormat(signature, ":");
         AppendFormat(signature, "%d", drag.currentIndex);
     }
     if (overlayState.activeContainerChildReorderDrag.has_value()) {
         const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
-        signature += "container:";
-        signature += drag.key.editCardId;
-        signature += '|';
+        AppendFormat(signature, "container:%s|", drag.key.editCardId.c_str());
         for (size_t pathIndex : drag.key.nodePath) {
-            AppendFormat(signature, "%zu", pathIndex);
-            signature += '.';
+            AppendFormat(signature, "%zu.", pathIndex);
         }
-        signature += ':';
+        AppendFormat(signature, ":");
         AppendFormat(signature, "%d", drag.currentIndex);
     }
     return signature;

@@ -34,6 +34,7 @@ Other top-level areas:
 
 - Dependencies flow downward. Higher layers may include lower-layer contracts, but lower layers do not include or call higher layers.
 - The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `layout_edit`, `layout_edit_dialog`, and `main`.
+- `util` is the lowest layer and is available to every non-util package for domain-neutral helpers.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Config-language DTOs live in `config`, runtime telemetry DTOs live in `telemetry`, and domain-neutral helpers live in `util`.
 - Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
 - Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
@@ -42,12 +43,12 @@ Other top-level areas:
 
 ## Package Dependency Rules
 
-- `util` may depend on `util` only.
+- `util` may depend on `util` only; every other package may depend on `util`.
 - `config` may depend on `config` and `util`.
 - `telemetry` may depend on `telemetry`, `config`, and `util`.
 - `renderer` may depend on `renderer`, `config`, `util`, and the synthetic `d2d` package.
 - `widget` may depend on `widget`, `renderer`, `telemetry`, `config`, and `util`.
-- `layout_model` may depend on `layout_model`, `config`, `renderer`, and `widget`.
+- `layout_model` may depend on `layout_model`, `config`, `renderer`, `util`, and `widget`.
 - `dashboard_renderer` may depend on `dashboard_renderer`, `config`, `layout_model`, `renderer`, `telemetry`, `util`, and `widget`.
 - `layout_edit` may depend on `layout_edit`, `config`, `layout_model`, `util`, and `widget`.
 - `layout_edit_dialog` may depend on `layout_edit_dialog`, `config`, `layout_edit`, `layout_model`, `telemetry`, `util`, and `widget`.

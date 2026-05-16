@@ -98,19 +98,20 @@ std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutE
     }
     const DisplayConfig& display = state->dialog->Host().CurrentConfig().display;
     if (node->kind == LayoutEditTreeNodeKind::Section && node->label.rfind("theme.", 0) == 0) {
-        return "[theme." + display.theme + "]";
+        return FormatText("[theme.%s]", display.theme.c_str());
     }
     if (node->kind == LayoutEditTreeNodeKind::Section && node->label.rfind("layout.", 0) == 0) {
-        return "[layout." + display.layout + "]";
+        return FormatText("[layout.%s]", display.layout.c_str());
     }
     if (node->locationText.rfind("[theme.", 0) == 0) {
         if (const std::string::size_type sectionEnd = node->locationText.find(']'); sectionEnd != std::string::npos) {
-            return "[theme." + display.theme + "]" + node->locationText.substr(sectionEnd + 1);
+            return FormatText("[theme.%s]%s", display.theme.c_str(), node->locationText.substr(sectionEnd + 1).c_str());
         }
     }
     if (node->locationText.rfind("[layout.", 0) == 0) {
         if (const std::string::size_type sectionEnd = node->locationText.find(']'); sectionEnd != std::string::npos) {
-            return "[layout." + display.layout + "]" + node->locationText.substr(sectionEnd + 1);
+            return FormatText(
+                "[layout.%s]%s", display.layout.c_str(), node->locationText.substr(sectionEnd + 1).c_str());
         }
     }
     return node->locationText;
@@ -147,8 +148,7 @@ void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, const char* even
     }
     std::string text = BuildTreeViewportTraceText(state, tree);
     if (!detail.empty()) {
-        text += ' ';
-        text += detail;
+        AppendFormat(text, " %s", detail.c_str());
     }
     state->dialog->Host().TraceLayoutEditDialogEvent(event, text);
 }
@@ -275,7 +275,7 @@ void RebuildLayoutEditTree(
     if (preferredFocus.has_value()) {
         if (const LayoutEditTreeLeaf* leaf = FindLayoutEditTreeLeaf(state->treeModel, *preferredFocus);
             leaf != nullptr) {
-            preferredLocation = "[" + leaf->sectionName + "] " + leaf->memberName;
+            preferredLocation = FormatText("[%s] %s", leaf->sectionName.c_str(), leaf->memberName.c_str());
         }
     } else if (state->selectedNode != nullptr) {
         preferredLocation = TreeNodeViewportLocation(state, state->selectedNode);

@@ -20,6 +20,7 @@
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
+#include "util/win32_format.h"
 
 namespace {
 
@@ -62,29 +63,6 @@ void SetGpuUsageStatusText(std::string& text, const char* label, long status) {
 
 void SetGpuUsageTwoStatusText(std::string& text, long collectStatus, const char* label, long status) {
     AssignFormat(text, " gpu3d_collect=%ld %s=%ld", collectStatus, label, status);
-}
-
-std::string Win32ErrorText(ULONG status) {
-    char message[256]{};
-    const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        nullptr,
-        status,
-        0,
-        message,
-        static_cast<DWORD>(std::size(message)),
-        nullptr);
-    std::string text = FormatText("%lu", static_cast<unsigned long>(status));
-    if (length > 0) {
-        size_t trimmedLength = length;
-        while (trimmedLength > 0 && (message[trimmedLength - 1] == '\r' || message[trimmedLength - 1] == '\n')) {
-            message[trimmedLength - 1] = '\0';
-            --trimmedLength;
-        }
-        text += " (";
-        text += message;
-        text += ")";
-    }
-    return text;
 }
 
 std::string FallbackProcessName(DWORD processId) {
@@ -198,18 +176,18 @@ public:
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
         if (trace_.Enabled(TracePrefix::FpsEtw)) {
-            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", Win32ErrorText(status).c_str());
+            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", FormatWin32Error(status).c_str());
         }
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
             if (trace_.Enabled(TracePrefix::FpsEtw)) {
-                trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", Win32ErrorText(status).c_str());
+                trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", FormatWin32Error(status).c_str());
             }
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
-            diagnostics_ = "Failed to start FPS ETW session: " + Win32ErrorText(status);
+            diagnostics_ = FormatText("Failed to start FPS ETW session: %s", FormatWin32Error(status).c_str());
             return false;
         }
 
@@ -221,9 +199,9 @@ public:
         d3d9Enabled_ = d3d9Status == ERROR_SUCCESS;
         dxgkrnlEnabled_ = dxgkrnlStatus == ERROR_SUCCESS;
         if (trace_.Enabled(TracePrefix::FpsEtw)) {
-            const std::string dxgiText = Win32ErrorText(dxgiStatus);
-            const std::string d3d9Text = Win32ErrorText(d3d9Status);
-            const std::string dxgkrnlText = Win32ErrorText(dxgkrnlStatus);
+            const std::string dxgiText = FormatWin32Error(dxgiStatus);
+            const std::string d3d9Text = FormatWin32Error(d3d9Status);
+            const std::string dxgkrnlText = FormatWin32Error(dxgkrnlStatus);
             trace_.WriteFmt(TracePrefix::FpsEtw,
                 "enable dxgi=%s d3d9=%s dxgkrnl=%s",
                 dxgiText.c_str(),
@@ -233,8 +211,10 @@ public:
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
-            diagnostics_ = "Failed to enable FPS ETW providers: dxgi=" + Win32ErrorText(dxgiStatus) +
-                           " d3d9=" + Win32ErrorText(d3d9Status) + " dxgkrnl=" + Win32ErrorText(dxgkrnlStatus);
+            diagnostics_ = FormatText("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s",
+                FormatWin32Error(dxgiStatus).c_str(),
+                FormatWin32Error(d3d9Status).c_str(),
+                FormatWin32Error(dxgkrnlStatus).c_str());
             StopLocked();
             return false;
         }
@@ -247,14 +227,15 @@ public:
         traceLog.Context = this;
         traceHandle_ = OpenTraceW(&traceLog);
         if (traceHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            diagnostics_ = "Failed to open FPS ETW trace: " + Win32ErrorText(GetLastError());
+            diagnostics_ = FormatText("Failed to open FPS ETW trace: %s", FormatWin32Error(GetLastError()).c_str());
             StopLocked();
             return false;
         }
 
         processingThread_ = CreateThread(nullptr, 0, &PresentedFpsEtwProvider::ProcessTraceThread, this, 0, nullptr);
         if (processingThread_ == nullptr) {
-            diagnostics_ = "Failed to create FPS ETW processing thread: " + Win32ErrorText(GetLastError());
+            diagnostics_ =
+                FormatText("Failed to create FPS ETW processing thread: %s", FormatWin32Error(GetLastError()).c_str());
             StopLocked();
             return false;
         }
@@ -302,7 +283,8 @@ public:
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
             ResetSelectionLocked();
             sample.available = false;
-            sample.diagnostics = BuildDiagnosticsLocked(" No presenting application selected." + GpuUsageDiagnostics());
+            sample.diagnostics = BuildDiagnosticsLocked(
+                FormatText(" No presenting application selected.%s", GpuUsageDiagnostics().c_str()));
             return sample;
         }
 
@@ -313,15 +295,14 @@ public:
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
-        std::string detail = " process=";
-        detail += sample.processName;
+        std::string detail = FormatText(" process=%s", sample.processName.c_str());
         AppendFormat(detail,
             " source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f",
             PresentEventSourceName(bestSelection.source),
             bestSelection.count,
             rawFps,
             fps);
-        detail += GpuUsageDiagnostics();
+        AppendFormat(detail, "%s", GpuUsageDiagnostics().c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return sample;
     }
@@ -483,15 +464,15 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        std::string detail = " top GPU 3D application has no matching present events. process=";
-        detail += sample.processName;
-        detail += " selected_process=";
-        detail += ResolveProcessNameLocked(selected.processId);
+        std::string detail = FormatText(" top GPU 3D application has no matching present events. process=%s "
+                                        "selected_process=%s",
+            sample.processName.c_str(),
+            ResolveProcessNameLocked(selected.processId).c_str());
         AppendFormat(detail,
             " selected_source=%s selected_window_count=%zu",
             PresentEventSourceName(selected.source),
             selected.count);
-        detail += GpuUsageDiagnosticsForProcess(selected.processId);
+        AppendFormat(detail, "%s", GpuUsageDiagnosticsForProcess(selected.processId).c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return true;
     }
@@ -716,7 +697,7 @@ private:
             " gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process=",
             static_cast<long>(collectStatus),
             static_cast<long>(status));
-        gpuUsageDiagnostics_ += ResolveProcessNameLocked(topGpu3dProcessId_);
+        AppendFormat(gpuUsageDiagnostics_, "%s", ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
         AppendFormat(gpuUsageDiagnostics_,
             " top_gpu3d_pid=%lu top_gpu3d=value=%.1f",
             static_cast<unsigned long>(topGpu3dProcessId_),
@@ -808,7 +789,7 @@ private:
             " runtime_events=%llu dxgkrnl_events=%llu",
             static_cast<unsigned long long>(runtimePresentEvents_),
             static_cast<unsigned long long>(kernelPresentEvents_));
-        text += suffix;
+        AppendFormat(text, "%s", suffix.c_str());
         return text;
     }
 
@@ -873,7 +854,7 @@ private:
             handle = traceHandle_;
         }
         const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-        trace_.WriteFmt(TracePrefix::FpsEtw, "process_trace_done status=%s", Win32ErrorText(processStatus).c_str());
+        trace_.WriteFmt(TracePrefix::FpsEtw, "process_trace_done status=%s", FormatWin32Error(processStatus).c_str());
     }
 
     Trace& trace_;

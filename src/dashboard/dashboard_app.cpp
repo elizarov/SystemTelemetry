@@ -797,13 +797,11 @@ void DashboardApp::TraceLayoutEditUiEvent(TracePrefix prefix, const char* event,
 
     std::string text = event;
     if (!details.empty()) {
-        text += " ";
-        text += details;
+        AppendFormat(text, " %s", details.c_str());
     }
     const std::string uiState = BuildLayoutEditUiTraceState();
     if (!uiState.empty()) {
-        text += " ";
-        text += uiState;
+        AppendFormat(text, " %s", uiState.c_str());
     }
     state.diagnostics->WriteTraceMarker(prefix, text);
 }
@@ -842,7 +840,7 @@ std::string DashboardApp::BuildLayoutEditUiTraceState() const {
             target.clientPoint.x,
             target.clientPoint.y);
     } else {
-        trace += " target=\"none\"";
+        AppendFormat(trace, " target=\"none\"");
     }
 
     POINT cursor{};

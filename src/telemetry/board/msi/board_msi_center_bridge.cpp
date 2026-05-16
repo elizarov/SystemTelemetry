@@ -54,7 +54,7 @@ String ^
             case 9:
             case 10:
             case 11:
-                return "SYS Fan " + Int32(id - 3).ToString(Globalization::CultureInfo::InvariantCulture);
+                return String::Format(Globalization::CultureInfo::InvariantCulture, "SYS Fan {0}", id - 3);
             case 12:
                 return "Water Flow";
             case 13:
@@ -66,7 +66,7 @@ String ^
             case 16:
                 return "JAF Fan 2";
         }
-        return "Fan " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
+        return String::Format(Globalization::CultureInfo::InvariantCulture, "Fan {0}", id);
     }
 
     String
@@ -100,7 +100,7 @@ String ^
             case 13:
                 return "M.2 3";
         }
-        return "Temperature " + Int32(id).ToString(Globalization::CultureInfo::InvariantCulture);
+        return String::Format(Globalization::CultureInfo::InvariantCulture, "Temperature {0}", id);
     }
 
     String

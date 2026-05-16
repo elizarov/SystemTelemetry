@@ -10,6 +10,7 @@
 #include "telemetry/timing.h"
 #include "util/file_path.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
@@ -632,7 +633,7 @@ private:
         if (input.empty()) {
             trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=open path=\"%s\"", fakePath_.string().c_str());
             if (required && errorText != nullptr) {
-                *errorText = "Failed to open fake telemetry file:\n" + fakePath_.string();
+                *errorText = FormatText("Failed to open fake telemetry file:\n%s", fakePath_.string().c_str());
             }
             return false;
         }
@@ -650,7 +651,7 @@ private:
         if (!loadFakeDump_(input, loaded, &error)) {
             trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=parse error=\"%s\"", error.c_str());
             if (required && errorText != nullptr) {
-                *errorText = "Failed to parse fake telemetry file:\n" + error;
+                *errorText = FormatText("Failed to parse fake telemetry file:\n%s", error.c_str());
             }
             return false;
         }
