@@ -29,3 +29,4 @@
 - It publishes runtime contracts such as `TelemetryRuntime`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
 - It does not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main.
 - Provider .NET assembly reflection stays in CLR-enabled bridge translation units; native provider state stays out of CLR metadata.
+- Native vendor providers keep provider-specific setup and method translation inside the provider module, including contracts such as ASUS ATKACPI `DSTS` device calls and vendor SDK bridges, then publish normal board-provider samples to the collector.

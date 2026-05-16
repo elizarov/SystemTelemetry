@@ -201,6 +201,7 @@ add_executable(CaseDash WIN32
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
@@ -297,6 +298,7 @@ set(casedash_release_speed_sources
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
@@ -726,6 +728,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp

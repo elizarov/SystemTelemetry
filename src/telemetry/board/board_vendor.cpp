@@ -2,6 +2,7 @@
 
 #include <utility>
 
+#include "telemetry/board/asus/board_asus_armoury_crate.h"
 #include "telemetry/board/gigabyte/board_gigabyte_siv.h"
 #include "telemetry/board/msi/board_msi_center.h"
 #include "telemetry/impl/system_info_support.h"
@@ -43,6 +44,9 @@ private:
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
     Trace& trace, BoardVendor vendor, BoardVendorInfo info) {
+    if (vendor == BoardVendor::Asus) {
+        return CreateAsusBoardTelemetryProvider(trace, std::move(info));
+    }
     if (vendor == BoardVendor::Msi) {
         return CreateMsiBoardTelemetryProvider(trace, std::move(info));
     }

@@ -81,6 +81,22 @@ Troubleshooting:
 3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
 4. Inspect the exported dump and trace outputs for the provider state on that machine.
 
+## ASUS
+
+- Supported hardware family: ASUS board telemetry.
+- Runtime dependency: ASUS Armoury Crate or ASUS System Control Interface with the `\\.\ATKACPI` device available to the current user.
+- Metrics include CPU temperature and laptop fan RPM telemetry from the same ATK `DSTS` device ids used by Armoury Crate support libraries. Device id `0x00120094` is exposed as `CPU Temperature`, `0x00110013` as `CPU Fan`, and `0x00110014` as `System Fan`.
+- Trace output can include `asus_armoury_crate:*` provider details and `unsupported_board` selection markers.
+- If Windows denies access to ATKACPI, CaseDash keeps the board metrics unavailable and reports the provider error in diagnostics.
+
+Troubleshooting:
+
+1. Install or update Armoury Crate or ASUS System Control Interface.
+2. Confirm Armoury Crate can show the machine's fan and temperature telemetry from a normal user session.
+3. Confirm the `\\.\ATKACPI` device opens for the current user; trace output reports `atk_driver_open_failed` when Windows blocks it.
+4. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
+5. Inspect the dump for `board.*` values and the trace for `asus_armoury_crate:*` diagnostics.
+
 ## MSI
 
 - Supported hardware family: MSI board telemetry.

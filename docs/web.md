@@ -70,6 +70,7 @@ The hardware section lists currently supported providers and telemetry families:
 - Intel GPU telemetry through Level Zero Sysman.
 - NVIDIA GPU telemetry through NVML.
 - Presented-FPS capture through ETW via the CaseDash service.
+- ASUS board temperature and fan telemetry through Armoury Crate ATKACPI.
 - MSI board temperature and fan telemetry through MSI Center SDK.
 - Gigabyte board temperature and fan telemetry through SIV.
 
