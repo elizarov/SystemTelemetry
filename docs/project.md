@@ -13,7 +13,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
-- `docs/source_policy_guardrails.md` owns short explanations for hard lint-enforced source-policy lessons.
+- `docs/source_policy_guardrails.md` owns short explanations for hard source-policy lessons, including lint-enforced bans and review-enforced rules that are too noisy to check mechanically.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
 - `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and performance experiment history.
@@ -57,6 +57,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
 - Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.
 - Keep source string constants as narrow UTF-8 literals by default. `lint.cmd` blocks undocumented wide literals in maintained source and test files; only `const` or `constexpr wchar_t` string constants with an end-of-line reason comment are allowed for fixed Win32 or managed interop boundary text.
+- Keep shared string formatting on trace formatting APIs, `src/util/text_format.*`, and domain-owned utility helpers instead of repeating local `std::to_string` concatenation or append-builder chains.
 - Keep config-file I/O on standard C++ streams and preserve strict UTF-8 handling without ANSI code-page fallback.
 - Keep project filesystem operations on `src/util/file_path.*` helpers instead of `std::filesystem`; paths are stored as UTF-8 and widened only at filesystem API calls. `lint.cmd` enforces this source-policy rule for maintained source and test files.
 - Keep native app and benchmark targets built without native C++ exception handling; the C++/CLI bridge owns the managed exception boundary separately.

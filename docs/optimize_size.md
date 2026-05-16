@@ -32,7 +32,7 @@ This document owns executable-size assumptions, constraints, map workflow notes,
 
 ## Source Policy Guardrails
 
-Hard size lessons enforced by `lint.cmd` live in [docs/source_policy_guardrails.md](source_policy_guardrails.md). Keep that short summary in sync when source-policy checks are added, removed, or materially changed.
+Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.md](source_policy_guardrails.md). Keep that short summary in sync when source-policy checks are added, removed, or materially changed, including review-enforced rules that are too noisy to lint.
 
 ## Kept Decisions
 
