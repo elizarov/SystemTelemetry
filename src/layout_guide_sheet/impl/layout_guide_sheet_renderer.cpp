@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cstdio>
 #include <optional>
 #include <string>
 #include <utility>
@@ -978,7 +979,9 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         *errorText = dashboardRenderer_.LastError();
     }
     if (saved && traceDetails != nullptr) {
-        traceDetails->push_back("canvas=\"" + std::to_string(sheetWidth) + "x" + std::to_string(sheetHeight) + "\"");
+        char canvasText[48];
+        sprintf_s(canvasText, "canvas=\"%dx%d\"", sheetWidth, sheetHeight);
+        traceDetails->push_back(canvasText);
         std::string selectedCards = "cards=\"";
         for (size_t i = 0; i < cardPlacements.size(); ++i) {
             if (i > 0) {
@@ -988,7 +991,9 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         }
         selectedCards += "\"";
         traceDetails->push_back(selectedCards);
-        traceDetails->push_back("callouts=" + std::to_string(callouts.size()));
+        char calloutText[32];
+        sprintf_s(calloutText, "callouts=%zu", callouts.size());
+        traceDetails->push_back(calloutText);
     }
     return saved;
 }

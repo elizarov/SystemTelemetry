@@ -90,6 +90,12 @@ std::string Win32ErrorText(ULONG status) {
     return text;
 }
 
+std::string FallbackProcessName(DWORD processId) {
+    char buffer[32];
+    sprintf_s(buffer, "pid:%lu", static_cast<unsigned long>(processId));
+    return buffer;
+}
+
 bool IsPermissionDenied(ULONG status) {
     return status == ERROR_ACCESS_DENIED;
 }
@@ -314,11 +320,18 @@ public:
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
-        sample.diagnostics = BuildDiagnosticsLocked(
-            " process=" + sample.processName + " source=" + PresentEventSourceName(bestSelection.source) +
-            " window_count=" + std::to_string(bestSelection.count) + " " +
-            Trace::FormatValueDouble("raw_fps", rawFps, 1) + " " + Trace::FormatValueDouble("smoothed_fps", fps, 1) +
-            GpuUsageDiagnostics());
+        char metrics[128];
+        sprintf_s(metrics,
+            " source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f",
+            PresentEventSourceName(bestSelection.source),
+            bestSelection.count,
+            rawFps,
+            fps);
+        std::string detail = " process=";
+        detail += sample.processName;
+        detail += metrics;
+        detail += GpuUsageDiagnostics();
+        sample.diagnostics = BuildDiagnosticsLocked(detail);
         return sample;
     }
 
@@ -479,11 +492,18 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        sample.diagnostics = BuildDiagnosticsLocked(
-            " top GPU 3D application has no matching present events. process=" + sample.processName +
-            " selected_process=" + ResolveProcessNameLocked(selected.processId) + " selected_source=" +
-            PresentEventSourceName(selected.source) + " selected_window_count=" + std::to_string(selected.count) +
-            GpuUsageDiagnosticsForProcess(selected.processId));
+        char selectedText[96];
+        sprintf_s(selectedText,
+            " selected_source=%s selected_window_count=%zu",
+            PresentEventSourceName(selected.source),
+            selected.count);
+        std::string detail = " top GPU 3D application has no matching present events. process=";
+        detail += sample.processName;
+        detail += " selected_process=";
+        detail += ResolveProcessNameLocked(selected.processId);
+        detail += selectedText;
+        detail += GpuUsageDiagnosticsForProcess(selected.processId);
+        sample.diagnostics = BuildDiagnosticsLocked(detail);
         return true;
     }
 
@@ -782,8 +802,7 @@ private:
         bool permissionRequired = false;
         std::string processName = QueryProcessBaseName(processId, permissionRequired);
         if (processName.empty()) {
-            processName =
-                permissionRequired ? "!admin" : "pid:" + std::to_string(static_cast<unsigned long>(processId));
+            processName = permissionRequired ? "!admin" : FallbackProcessName(processId);
         }
         ProcessNameCacheEntry entry;
         entry.processId = processId;
@@ -799,8 +818,15 @@ private:
     }
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
-        return diagnostics_ + " runtime_events=" + std::to_string(runtimePresentEvents_) +
-               " dxgkrnl_events=" + std::to_string(kernelPresentEvents_) + suffix;
+        char counts[96];
+        sprintf_s(counts,
+            " runtime_events=%llu dxgkrnl_events=%llu",
+            static_cast<unsigned long long>(runtimePresentEvents_),
+            static_cast<unsigned long long>(kernelPresentEvents_));
+        std::string text = diagnostics_;
+        text += counts;
+        text += suffix;
+        return text;
     }
 
     void RecordPresent(EVENT_RECORD* eventRecord) {
@@ -836,10 +862,12 @@ private:
         uint64_t& sourceCount = source == PresentEventSource::Runtime ? runtimePresentEvents_ : kernelPresentEvents_;
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
-            trace_.Write(TracePrefix::FpsEtw,
-                "present source=" + std::string(PresentEventSourceName(source)) +
-                    " pid=" + std::to_string(static_cast<unsigned long>(header.ProcessId)) + " event_id=" +
-                    std::to_string(header.EventDescriptor.Id) + " source_events=" + std::to_string(sourceCount));
+            trace_.WriteFmt(TracePrefix::FpsEtw,
+                "present source=%s pid=%lu event_id=%u source_events=%llu",
+                PresentEventSourceName(source),
+                static_cast<unsigned long>(header.ProcessId),
+                static_cast<unsigned>(header.EventDescriptor.Id),
+                static_cast<unsigned long long>(sourceCount));
         }
     }
 

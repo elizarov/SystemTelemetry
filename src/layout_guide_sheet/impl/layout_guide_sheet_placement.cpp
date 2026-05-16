@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdio>
 #include <limits>
 #include <string_view>
 
@@ -963,11 +964,24 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             const CardCalloutColumns& columns = plannedByCard[cardIndex];
             const int leaderScore = countLeaderIntersections(columns, cardPlacements[cardIndex]);
             const std::string& cardId = cardPlacements[cardIndex].id;
-            traceDetails->push_back(
-                "leader_score_" + cardId + "=" + std::to_string(leaderScore) + " leader_repair_passes_" + cardId + "=" +
-                std::to_string(columns.leaderRepairPasses) + " leader_columns_" + cardId + "=\"" +
-                std::to_string(columns.left.size()) + "," + std::to_string(columns.top.size()) + "," +
-                std::to_string(columns.right.size()) + "," + std::to_string(columns.bottom.size()) + "\"");
+            char counts[128];
+            sprintf_s(counts, "=%d", leaderScore);
+            std::string detail = "leader_score_";
+            detail += cardId;
+            detail += counts;
+            sprintf_s(counts, "=%d leader_columns_", columns.leaderRepairPasses);
+            detail += " leader_repair_passes_";
+            detail += cardId;
+            detail += counts;
+            detail += cardId;
+            sprintf_s(counts,
+                "=\"%zu,%zu,%zu,%zu\"",
+                columns.left.size(),
+                columns.top.size(),
+                columns.right.size(),
+                columns.bottom.size());
+            detail += counts;
+            traceDetails->push_back(detail);
         }
     }
     return result;

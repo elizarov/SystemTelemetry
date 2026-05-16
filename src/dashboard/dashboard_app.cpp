@@ -4,6 +4,7 @@
 #include <cmath>
 #include <commctrl.h>
 #include <cstdarg>
+#include <cstdio>
 #include <cstring>
 #include <vector>
 #include <windowsx.h>
@@ -830,14 +831,23 @@ void DashboardApp::TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* eve
     TraceLayoutEditUiEvent(prefix, event, text);
 }
 
+void AppendQuotedPoint(std::string& trace, const char* label, int x, int y) {
+    char buffer[64];
+    sprintf_s(buffer, " %s=\"%d,%d\"", label, x, y);
+    trace += buffer;
+}
+
 std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
-    std::string trace = "layout=" + Trace::QuoteText(state.config.display.layout);
+    std::string trace = "layout=";
+    trace += Trace::QuoteText(state.config.display.layout);
     trace += " editing=";
     trace += Trace::BoolText(state.isEditingLayout);
     trace += " moving=";
     trace += Trace::BoolText(state.isMoving);
-    trace += " modal_depth=" + std::to_string(layoutEditModalUiDepth_);
+    char modalText[32];
+    sprintf_s(modalText, " modal_depth=%d", layoutEditModalUiDepth_);
+    trace += modalText;
     trace += " tooltip_visible=";
     trace += Trace::BoolText(layoutEditTooltipVisible_);
     trace += " tooltip_suppressed=";
@@ -861,19 +871,20 @@ std::string DashboardApp::BuildLayoutEditUiTraceState() const {
 
     LayoutEditController::TooltipTarget target;
     if (const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget(target)) {
-        trace += " target=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
-        trace += " target_point=" + Trace::QuoteText(Trace::FormatPoint(target.clientPoint.x, target.clientPoint.y));
+        trace += " target=";
+        trace += Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
+        AppendQuotedPoint(trace, "target_point", target.clientPoint.x, target.clientPoint.y);
     } else {
-        trace += " target=" + Trace::QuoteText("none");
+        trace += " target=\"none\"";
     }
 
     POINT cursor{};
     if (GetCursorPos(&cursor) != FALSE) {
-        trace += " cursor_screen=" + Trace::QuoteText(Trace::FormatPoint(cursor.x, cursor.y));
+        AppendQuotedPoint(trace, "cursor_screen", cursor.x, cursor.y);
         if (hwnd_ != nullptr) {
             POINT clientPoint = cursor;
             ScreenToClient(hwnd_, &clientPoint);
-            trace += " cursor_client=" + Trace::QuoteText(Trace::FormatPoint(clientPoint.x, clientPoint.y));
+            AppendQuotedPoint(trace, "cursor_client", clientPoint.x, clientPoint.y);
         }
     }
     return trace;

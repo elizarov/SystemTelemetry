@@ -222,10 +222,6 @@ std::string Trace::FormatValueDouble(const char* label, double value, int precis
     return std::string(label) + "=" + FormatDoubleFixed(value, precision);
 }
 
-std::string Trace::FormatPoint(int x, int y) {
-    return std::to_string(x) + "," + std::to_string(y);
-}
-
 std::string Trace::EscapeText(std::string_view text) {
     std::string escaped;
     escaped.reserve(text.size());
