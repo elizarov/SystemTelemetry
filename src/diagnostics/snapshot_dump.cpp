@@ -257,7 +257,7 @@ void WriteNamedScalarMetrics(
     std::string& output, const std::string& prefix, const std::vector<NamedScalarMetric>& metrics) {
     WriteInteger(output, prefix + ".count", metrics.size());
     for (size_t i = 0; i < metrics.size(); ++i) {
-        const std::string metricPrefix = prefix + "." + std::to_string(i);
+        const std::string metricPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         WriteString(output, metricPrefix + ".name", metrics[i].name);
         WriteOptionalDouble(output, metricPrefix + ".value", metrics[i].metric.value, 6);
         WriteScalarMetricUnit(output, metricPrefix + ".unit", metrics[i].metric.unit);
@@ -268,7 +268,7 @@ void WriteRetainedHistories(
     std::string& output, const std::string& prefix, const std::vector<RetainedHistorySeries>& histories) {
     WriteInteger(output, prefix + ".count", histories.size());
     for (size_t i = 0; i < histories.size(); ++i) {
-        const std::string historyPrefix = prefix + "." + std::to_string(i);
+        const std::string historyPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         WriteString(output, historyPrefix + ".series_ref", histories[i].seriesRef);
         WriteDoubleArray(output, historyPrefix + ".samples", histories[i].samples);
         WriteDoubleArray(output, historyPrefix + ".throughput_live_samples", histories[i].throughputLiveSamples);
@@ -514,7 +514,7 @@ bool LoadNamedScalarMetrics(
     field.reserve(count);
     for (size_t i = 0; i < count; ++i) {
         NamedScalarMetric metric;
-        const std::string metricPrefix = prefix + "." + std::to_string(i);
+        const std::string metricPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         if (!LoadString(values, metricPrefix + ".name", metric.name, error) ||
             !LoadOptionalDouble(values, metricPrefix + ".value", metric.metric.value, error) ||
             !LoadScalarMetricUnit(values, metricPrefix + ".unit", metric.metric.unit, error)) {
@@ -538,7 +538,7 @@ bool LoadRetainedHistories(const DumpValues& values,
     field.reserve(count);
     for (size_t i = 0; i < count; ++i) {
         RetainedHistorySeries history;
-        const std::string historyPrefix = prefix + "." + std::to_string(i);
+        const std::string historyPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         if (!LoadString(values, historyPrefix + ".series_ref", history.seriesRef, error) ||
             !LoadDoubleArrayField(values, historyPrefix + ".samples", history.samples, error) ||
             !LoadDoubleArrayField(
@@ -569,7 +569,7 @@ bool WriteTelemetryDumpText(std::string& output, const TelemetryDump& dump) {
 
     WriteInteger(output, "drives.count", dump.snapshot.drives.size());
     for (size_t i = 0; i < dump.snapshot.drives.size(); ++i) {
-        const std::string prefix = "drives." + std::to_string(i);
+        const std::string prefix = FormatText("drives.%zu", i);
         WriteString(output, prefix + ".label", dump.snapshot.drives[i].label);
         WriteDouble(output, prefix + ".used_percent", dump.snapshot.drives[i].usedPercent, 6);
         WriteDouble(output, prefix + ".free_gb", dump.snapshot.drives[i].freeGb, 6);
@@ -616,7 +616,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
         const size_t equals = trimmed.find('=');
         if (equals == std::string::npos) {
             if (error != nullptr) {
-                *error = "Missing '=' on line " + std::to_string(lineNumber);
+                *error = FormatText("Missing '=' on line %zu", lineNumber);
             }
             return false;
         }
@@ -652,7 +652,7 @@ bool LoadTelemetryDump(std::string_view input, TelemetryDump& dump, std::string*
     parsed.snapshot.drives.reserve(driveCount);
     for (size_t i = 0; i < driveCount; ++i) {
         DriveInfo drive;
-        const std::string prefix = "drives." + std::to_string(i);
+        const std::string prefix = FormatText("drives.%zu", i);
         if (!LoadString(values, prefix + ".label", drive.label, error) ||
             !LoadDouble(values, prefix + ".used_percent", drive.usedPercent, error) ||
             !LoadDouble(values, prefix + ".free_gb", drive.freeGb, error) ||

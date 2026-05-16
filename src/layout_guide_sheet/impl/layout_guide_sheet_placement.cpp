@@ -926,12 +926,15 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                                                 size_t secondIndex,
                                                 LayoutGuideSheetExitSide firstSide,
                                                 LayoutGuideSheetExitSide secondSide) {
-                traceDetails->push_back("intersection_card=" + Trace::QuoteText(sourceCardId()) +
-                                        " intersection_kind=" + Trace::QuoteText(kind) +
-                                        " first_side=" + Trace::QuoteText(ExitSideName(firstSide)) +
-                                        " first_callout=" + Trace::QuoteText(calloutKey(firstIndex)) +
-                                        " second_side=" + Trace::QuoteText(ExitSideName(secondSide)) +
-                                        " second_callout=" + Trace::QuoteText(calloutKey(secondIndex)));
+                traceDetails->push_back(FormatText(
+                    "intersection_card=%s intersection_kind=%s first_side=%s first_callout=%s second_side=%s "
+                    "second_callout=%s",
+                    Trace::QuoteText(sourceCardId()).c_str(),
+                    Trace::QuoteText(kind).c_str(),
+                    Trace::QuoteText(ExitSideName(firstSide)).c_str(),
+                    Trace::QuoteText(calloutKey(firstIndex)).c_str(),
+                    Trace::QuoteText(ExitSideName(secondSide)).c_str(),
+                    Trace::QuoteText(calloutKey(secondIndex)).c_str()));
             };
             for (size_t leaderIndex : leaders) {
                 const LayoutGuideSheetPlacementCallout& leader = callouts[leaderIndex];

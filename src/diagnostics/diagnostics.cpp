@@ -887,7 +887,8 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
         if (diagnostics != nullptr) {
             std::string traceText = "reload_config_failed";
             if (!reloadError.empty()) {
-                traceText += " detail=" + Trace::QuoteText(reloadError);
+                const std::string reloadErrorText = Trace::QuoteText(reloadError);
+                AppendFormat(traceText, " detail=%s", reloadErrorText.c_str());
             }
             diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, traceText);
         }
@@ -1042,7 +1043,8 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     if (telemetry == nullptr) {
         std::string traceText = "telemetry_initialize_failed";
         if (!telemetryError.empty()) {
-            traceText += " detail=" + Trace::QuoteText(telemetryError);
+            const std::string telemetryErrorText = Trace::QuoteText(telemetryError);
+            AppendFormat(traceText, " detail=%s", telemetryErrorText.c_str());
         }
         diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, traceText);
         if (diagnostics.ShouldShowDialogs()) {

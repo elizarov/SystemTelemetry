@@ -383,9 +383,10 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 
 void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
     if (layoutEditDialog_ != nullptr) {
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditDialog,
+        app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditDialog,
             "refresh_begin",
-            "preferred_focus=" + Trace::QuoteText(preferredFocus.has_value() ? "set" : "none"));
+            "preferred_focus=\"%s\"",
+            preferredFocus.has_value() ? "set" : "none");
         layoutEditDialog_->Refresh(preferredFocus);
         layoutEditDialog_->SetSelectionHighlightVisible(true);
         layoutEditDialog_->RestackAnchor();
