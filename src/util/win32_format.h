@@ -2,4 +2,4 @@
 
 #include <string>
 
-std::string FormatHresult(long value);
+void AppendHresult(std::string& text, long value);

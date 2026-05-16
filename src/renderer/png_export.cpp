@@ -19,6 +19,36 @@ bool SetError(std::string* errorText, std::string text) {
     return false;
 }
 
+bool SetHresultError(std::string* errorText, std::string_view prefix, HRESULT hr) {
+    if (errorText != nullptr) {
+        errorText->assign(prefix);
+        *errorText += " hr=";
+        AppendHresult(*errorText, hr);
+    }
+    return false;
+}
+
+bool SetPrefixedHresultError(std::string* errorText, std::string_view prefix, const char* suffix, HRESULT hr) {
+    if (errorText != nullptr) {
+        errorText->assign(prefix);
+        *errorText += suffix;
+        *errorText += " hr=";
+        AppendHresult(*errorText, hr);
+    }
+    return false;
+}
+
+bool SetPrefixedHresultPathError(
+    std::string* errorText, std::string_view prefix, const char* suffix, HRESULT hr, const FilePath& imagePath) {
+    if (errorText != nullptr) {
+        SetPrefixedHresultError(errorText, prefix, suffix, hr);
+        *errorText += " path=\"";
+        *errorText += imagePath.string();
+        *errorText += "\"";
+    }
+    return false;
+}
+
 const WICPixelFormatGUID& WicPixelFormat(PngPixelFormat pixelFormat) {
     switch (pixelFormat) {
         case PngPixelFormat::BgrOpaque:
@@ -35,7 +65,7 @@ bool SaveBgraPngWithInitializedCom(
     HRESULT hr =
         CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()));
     if (FAILED(hr) || factory == nullptr) {
-        return SetError(errorText, "png_wic_factory_failed hr=" + FormatHresult(hr));
+        return SetHresultError(errorText, "png_wic_factory_failed", hr);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmap> source;
@@ -51,7 +81,7 @@ bool SaveBgraPngWithInitializedCom(
         const_cast<BYTE*>(bgra.data()),
         source.GetAddressOf());
     if (FAILED(hr) || source == nullptr) {
-        return SetError(errorText, "png_wic_bitmap_failed hr=" + FormatHresult(hr));
+        return SetHresultError(errorText, "png_wic_bitmap_failed", hr);
     }
 
     return SaveWicBitmapSourcePng(
@@ -75,7 +105,7 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     UINT bitmapHeight = 0;
     HRESULT hr = source->GetSize(&bitmapWidth, &bitmapHeight);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_bitmap_size_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_bitmap_size_failed", hr);
     }
 
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
@@ -84,12 +114,12 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     if (pixelFormat == PngPixelFormat::BgrOpaque) {
         hr = factory->CreateFormatConverter(converter.GetAddressOf());
         if (FAILED(hr) || converter == nullptr) {
-            return SetError(errorText, prefix + "_converter_failed hr=" + FormatHresult(hr));
+            return SetPrefixedHresultError(errorText, errorPrefix, "_converter_failed", hr);
         }
         hr = converter->Initialize(
             source, targetPixelFormat, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
         if (FAILED(hr)) {
-            return SetError(errorText, prefix + "_converter_init_failed hr=" + FormatHresult(hr));
+            return SetPrefixedHresultError(errorText, errorPrefix, "_converter_init_failed", hr);
         }
         frameSource = converter.Get();
     }
@@ -97,55 +127,54 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     Microsoft::WRL::ComPtr<IWICStream> stream;
     hr = factory->CreateStream(stream.GetAddressOf());
     if (FAILED(hr) || stream == nullptr) {
-        return SetError(errorText, prefix + "_stream_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_stream_failed", hr);
     }
     const std::wstring wideImagePath = imagePath.Wide();
     hr = stream->InitializeFromFilename(wideImagePath.c_str(), GENERIC_WRITE);
     if (FAILED(hr)) {
-        return SetError(
-            errorText, prefix + "_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" + imagePath.string() + "\"");
+        return SetPrefixedHresultPathError(errorText, errorPrefix, "_stream_open_failed", hr, imagePath);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
     hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf());
     if (FAILED(hr) || encoder == nullptr) {
-        return SetError(errorText, prefix + "_encoder_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_encoder_failed", hr);
     }
     hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_encoder_init_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_encoder_init_failed", hr);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
     hr = encoder->CreateNewFrame(frame.GetAddressOf(), nullptr);
     if (FAILED(hr) || frame == nullptr) {
-        return SetError(errorText, prefix + "_frame_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_failed", hr);
     }
     hr = frame->Initialize(nullptr);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_init_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_init_failed", hr);
     }
     hr = frame->SetSize(bitmapWidth, bitmapHeight);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_size_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_size_failed", hr);
     }
 
     WICPixelFormatGUID frameFormat = targetPixelFormat;
     hr = frame->SetPixelFormat(&frameFormat);
     if (FAILED(hr) || !IsEqualGUID(frameFormat, targetPixelFormat)) {
-        return SetError(errorText, prefix + "_frame_format_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_format_failed", hr);
     }
     hr = frame->WriteSource(frameSource, nullptr);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_write_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_write_failed", hr);
     }
     hr = frame->Commit();
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_commit_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_frame_commit_failed", hr);
     }
     hr = encoder->Commit();
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_encoder_commit_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, "_encoder_commit_failed", hr);
     }
     return true;
 }
@@ -162,7 +191,7 @@ bool SaveBgraPng(
 
     const HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(initHr) && initHr != RPC_E_CHANGED_MODE) {
-        return SetError(errorText, "png_com_init_failed hr=" + FormatHresult(initHr));
+        return SetHresultError(errorText, "png_com_init_failed", initHr);
     }
     const bool shouldUninitialize = initHr == S_OK || initHr == S_FALSE;
     const bool ok = SaveBgraPngWithInitializedCom(imagePath, width, height, bgra, errorText);

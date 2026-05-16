@@ -56,6 +56,19 @@ const void* D2DRenderBitmapResourceTypeToken() {
     return &token;
 }
 
+void SetHresultError(std::string& errorText, const char* prefix, HRESULT hr) {
+    errorText = prefix;
+    errorText += " hr=";
+    AppendHresult(errorText, hr);
+}
+
+void SetPrefixedHresultError(std::string& errorText, std::string_view prefix, const char* suffix, HRESULT hr) {
+    errorText.assign(prefix);
+    errorText += suffix;
+    errorText += " hr=";
+    AppendHresult(errorText, hr);
+}
+
 class D2DSharedDevice final {
 public:
     bool Ensure(std::string& errorText) {
@@ -71,7 +84,7 @@ public:
                 &options,
                 reinterpret_cast<void**>(d2dFactory_.ReleaseAndGetAddressOf()));
             if (FAILED(hr) || d2dFactory_ == nullptr) {
-                errorText = "d2d_factory_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "d2d_factory_failed", hr);
                 return false;
             }
         }
@@ -112,7 +125,7 @@ public:
                 }
             }
             if (FAILED(hr) || d3dDevice_ == nullptr) {
-                errorText = "d3d_device_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "d3d_device_failed", hr);
                 return false;
             }
         }
@@ -121,24 +134,24 @@ public:
             Microsoft::WRL::ComPtr<IDXGIDevice> dxgiDevice;
             HRESULT hr = d3dDevice_.As(&dxgiDevice);
             if (FAILED(hr) || dxgiDevice == nullptr) {
-                errorText = "dxgi_device_query_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "dxgi_device_query_failed", hr);
                 return false;
             }
             hr = d2dFactory_->CreateDevice(dxgiDevice.Get(), d2dDevice_.ReleaseAndGetAddressOf());
             if (FAILED(hr) || d2dDevice_ == nullptr) {
-                errorText = "d2d_device_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "d2d_device_failed", hr);
                 return false;
             }
 
             Microsoft::WRL::ComPtr<IDXGIAdapter> adapter;
             hr = dxgiDevice->GetAdapter(adapter.GetAddressOf());
             if (FAILED(hr) || adapter == nullptr) {
-                errorText = "dxgi_adapter_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "dxgi_adapter_failed", hr);
                 return false;
             }
             hr = adapter->GetParent(IID_PPV_ARGS(dxgiFactory_.ReleaseAndGetAddressOf()));
             if (FAILED(hr) || dxgiFactory_ == nullptr) {
-                errorText = "dxgi_factory_failed hr=" + FormatHresult(hr);
+                SetHresultError(errorText, "dxgi_factory_failed", hr);
                 return false;
             }
         }
@@ -537,7 +550,7 @@ bool D2DRenderer::DrawToBitmap(
         hr = wicFactory_->CreateBitmap(
             bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
         if (FAILED(hr) || bitmap == nullptr) {
-            lastError_ = "layer_wic_bitmap_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "layer_wic_bitmap_failed", hr);
             return false;
         }
 
@@ -548,7 +561,7 @@ bool D2DRenderer::DrawToBitmap(
                 96.0f),
             bitmapRenderTarget.GetAddressOf());
         if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-            lastError_ = "layer_d2d_target_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "layer_d2d_target_failed", hr);
             return false;
         }
     }
@@ -593,7 +606,7 @@ bool D2DRenderer::DrawToLiveLayerBitmap(
         const HRESULT hr = d2dDeviceContext_->CreateBitmap(
             D2D1::SizeU(bitmapWidth, bitmapHeight), nullptr, 0, properties, targetBitmap.GetAddressOf());
         if (FAILED(hr) || targetBitmap == nullptr) {
-            lastError_ = "layer_d2d_bitmap_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "layer_d2d_bitmap_failed", hr);
             return false;
         }
     }
@@ -638,7 +651,7 @@ bool D2DRenderer::DrawToWicBitmap(int width,
     HRESULT hr = wicFactory_->CreateBitmap(
         bitmapWidth, bitmapHeight, GUID_WICPixelFormat32bppPBGRA, WICBitmapCacheOnLoad, &bitmap);
     if (FAILED(hr) || bitmap == nullptr) {
-        lastError_ = std::string(errorPrefix) + "_wic_bitmap_failed hr=" + FormatHresult(hr);
+        SetPrefixedHresultError(lastError_, errorPrefix, "_wic_bitmap_failed", hr);
         return false;
     }
 
@@ -650,7 +663,7 @@ bool D2DRenderer::DrawToWicBitmap(int width,
             96.0f),
         bitmapRenderTarget.GetAddressOf());
     if (FAILED(hr) || bitmapRenderTarget == nullptr) {
-        lastError_ = std::string(errorPrefix) + "_d2d_target_failed hr=" + FormatHresult(hr);
+        SetPrefixedHresultError(lastError_, errorPrefix, "_d2d_target_failed", hr);
         return false;
     }
 
@@ -802,7 +815,7 @@ bool D2DRenderer::InitializeDirect2D() {
             __uuidof(IDWriteFactory),
             reinterpret_cast<IUnknown**>(dwriteFactory_.ReleaseAndGetAddressOf()));
         if (FAILED(hr) || dwriteFactory_ == nullptr) {
-            lastError_ = "dwrite_factory_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "dwrite_factory_failed", hr);
             return false;
         }
     }
@@ -840,7 +853,7 @@ bool D2DRenderer::EnsureDeviceContext() {
     const HRESULT hr =
         device->CreateDeviceContext(D2D1_DEVICE_CONTEXT_OPTIONS_NONE, d2dDeviceContext_.ReleaseAndGetAddressOf());
     if (FAILED(hr) || d2dDeviceContext_ == nullptr) {
-        lastError_ = "d2d_device_context_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "d2d_device_context_failed", hr);
         return false;
     }
     return true;
@@ -853,7 +866,7 @@ bool D2DRenderer::InitializeWic() {
 
     const HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(initHr) && initHr != RPC_E_CHANGED_MODE) {
-        lastError_ = "wic_com_init_failed hr=" + FormatHresult(initHr);
+        SetHresultError(lastError_, "wic_com_init_failed", initHr);
         return false;
     }
     wicComInitialized_ = initHr == S_OK || initHr == S_FALSE;
@@ -861,7 +874,7 @@ bool D2DRenderer::InitializeWic() {
     const HRESULT hr = CoCreateInstance(
         CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(wicFactory_.ReleaseAndGetAddressOf()));
     if (FAILED(hr) || wicFactory_ == nullptr) {
-        lastError_ = "wic_factory_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "wic_factory_failed", hr);
         if (wicComInitialized_) {
             CoUninitialize();
             wicComInitialized_ = false;
@@ -922,7 +935,7 @@ bool D2DRenderer::EnsureWindowRenderTarget(int width, int height, bool retainCon
             D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(targetWidth, targetHeight), presentOptions),
             d2dWindowRenderTarget_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dWindowRenderTarget_ == nullptr) {
-            lastError_ = "d2d_hwnd_target_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "d2d_hwnd_target_failed", hr);
             return false;
         }
         d2dWindowRetainContents_ = retainContents;
@@ -974,7 +987,7 @@ bool D2DRenderer::EnsureDxgiWindowTarget(int width, int height, bool retainConte
         const HRESULT hr = factory->CreateSwapChainForHwnd(
             device, hwnd_, &swapChainDesc, nullptr, nullptr, dxgiSwapChain_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || dxgiSwapChain_ == nullptr) {
-            lastError_ = "dxgi_swap_chain_failed hr=" + FormatHresult(hr);
+            SetHresultError(lastError_, "dxgi_swap_chain_failed", hr);
             return false;
         }
         factory->MakeWindowAssociation(hwnd_, DXGI_MWA_NO_ALT_ENTER);
@@ -999,7 +1012,7 @@ bool D2DRenderer::EnsureDxgiWindowTarget(int width, int height, bool retainConte
         0, static_cast<UINT>(targetWidth), static_cast<UINT>(targetHeight), DXGI_FORMAT_UNKNOWN, 0);
     if (FAILED(hr)) {
         DiscardWindowTarget("dxgi_resize_failed");
-        lastError_ = "dxgi_resize_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "dxgi_resize_failed", hr);
         return false;
     }
     dxgiWindowWidth_ = targetWidth;
@@ -1019,7 +1032,7 @@ bool D2DRenderer::CreateDxgiWindowTargetBitmap() {
     Microsoft::WRL::ComPtr<IDXGISurface> backBuffer;
     HRESULT hr = dxgiSwapChain_->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf()));
     if (FAILED(hr) || backBuffer == nullptr) {
-        lastError_ = "dxgi_back_buffer_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "dxgi_back_buffer_failed", hr);
         return false;
     }
 
@@ -1031,7 +1044,7 @@ bool D2DRenderer::CreateDxgiWindowTargetBitmap() {
     hr = d2dDeviceContext_->CreateBitmapFromDxgiSurface(
         backBuffer.Get(), properties, dxgiWindowTargetBitmap_.ReleaseAndGetAddressOf());
     if (FAILED(hr) || dxgiWindowTargetBitmap_ == nullptr) {
-        lastError_ = "dxgi_d2d_target_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "dxgi_d2d_target_failed", hr);
         return false;
     }
     d2dCache_.ResetTarget();
@@ -1049,11 +1062,11 @@ bool D2DRenderer::PresentDxgiWindow() {
     const HRESULT hr = dxgiSwapChain_->Present(d2dImmediatePresent_ ? 0 : 1, 0);
     if (hr == DXGI_ERROR_DEVICE_REMOVED || hr == DXGI_ERROR_DEVICE_RESET) {
         DiscardWindowTarget("dxgi_device_lost");
-        lastError_ = "dxgi_present_device_lost hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "dxgi_present_device_lost", hr);
         return false;
     }
     if (FAILED(hr)) {
-        lastError_ = "dxgi_present_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "dxgi_present_failed", hr);
         return false;
     }
     return true;
@@ -1102,7 +1115,7 @@ void D2DRenderer::EndDirect2DDraw() {
         if (activeWindowTarget) {
             DiscardWindowTarget("end_draw_failed");
         }
-        lastError_ = "d2d_end_draw_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "d2d_end_draw_failed", hr);
     }
 }
 
@@ -1224,7 +1237,7 @@ Microsoft::WRL::ComPtr<ID2D1Bitmap> D2DRenderer::D2DBitmapForRenderBitmap(const 
         }
     }
     if (FAILED(hr) || d2dBitmap == nullptr) {
-        lastError_ = "draw_bitmap_create_failed hr=" + FormatHresult(hr);
+        SetHresultError(lastError_, "draw_bitmap_create_failed", hr);
         return {};
     }
     return d2dBitmap;
@@ -1295,7 +1308,7 @@ bool D2DRenderer::DrawBitmapRegions(const RenderBitmap& bitmap, std::span<const 
             D2D1::BrushProperties(),
             createdBrush.GetAddressOf());
         if (FAILED(brushHr) || createdBrush == nullptr) {
-            lastError_ = "draw_bitmap_regions_brush_failed hr=" + FormatHresult(brushHr);
+            SetHresultError(lastError_, "draw_bitmap_regions_brush_failed", brushHr);
             return false;
         }
         bitmapBrush = createdBrush.Get();

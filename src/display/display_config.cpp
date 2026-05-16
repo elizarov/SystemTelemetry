@@ -15,7 +15,6 @@
 #include "util/paths.h"
 #include "util/temp_file.h"
 #include "util/trace.h"
-#include "util/win32_format.h"
 
 namespace {
 
@@ -55,8 +54,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT initStatus = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool shouldUninitialize = initStatus == S_OK || initStatus == S_FALSE;
     if (FAILED(initStatus) && initStatus != RPC_E_CHANGED_MODE) {
-        const std::string statusText = FormatHresult(initStatus);
-        trace.WriteFmt(TracePrefix::Wallpaper, "coinitialize_failed hr=%s", statusText.c_str());
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, "coinitialize_failed hr=0x%08lX", static_cast<unsigned long>(initStatus));
         return false;
     }
 
@@ -64,8 +63,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT createStatus =
         CoCreateInstance(CLSID_DesktopWallpaper, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&desktopWallpaper));
     if (FAILED(createStatus) || desktopWallpaper == nullptr) {
-        const std::string statusText = FormatHresult(createStatus);
-        trace.WriteFmt(TracePrefix::Wallpaper, "create_failed hr=%s", statusText.c_str());
+        trace.WriteFmt(TracePrefix::Wallpaper, "create_failed hr=0x%08lX", static_cast<unsigned long>(createStatus));
         if (shouldUninitialize) {
             CoUninitialize();
         }
@@ -77,8 +75,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     UINT monitorCount = 0;
     const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
     if (FAILED(countStatus)) {
-        const std::string statusText = FormatHresult(countStatus);
-        trace.WriteFmt(TracePrefix::Wallpaper, "monitor_count_failed hr=%s", statusText.c_str());
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, "monitor_count_failed hr=0x%08lX", static_cast<unsigned long>(countStatus));
     } else {
         for (UINT index = 0; index < monitorCount; ++index) {
             LPWSTR monitorId = nullptr;
@@ -95,13 +93,12 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
                 const std::string pathText = wallpaperPath.string();
-                const std::string statusText = FormatHresult(setStatus);
                 trace.WriteFmt(TracePrefix::Wallpaper,
-                    "apply_%s monitor=\"%s\" path=\"%s\" hr=%s",
+                    "apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX",
                     applied ? "done" : "failed",
                     config.display.monitorName.c_str(),
                     pathText.c_str(),
-                    statusText.c_str());
+                    static_cast<unsigned long>(setStatus));
                 CoTaskMemFree(monitorId);
                 break;
             }
