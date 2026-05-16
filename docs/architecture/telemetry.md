@@ -14,7 +14,7 @@
 - Presented-FPS collection asks `CashDashService` over `\\.\pipe\CashDashService` first, then falls back to local ETW collection when the service is absent or unreachable.
 - The FPS pipe protocol uses a generic request envelope with a stable request id and request name. The current FPS query is `PresentedFpsSample` / `presented_fps_sample`.
 - The metric catalog adapts snapshots and metric definitions into widget-facing metric values, histories, drive rows, and formatted text.
-- Fake-runtime support serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot.
+- Fake-runtime support serves either the built-in synthetic snapshot or a reloadable dump-backed snapshot. The built-in synthetic source has a static mode for deterministic one-shot diagnostics and a live mode for the UI and benchmark harnesses.
 - Board telemetry keeps discovered provider sensor-name lists cached alongside live samples so layout-edit binding pickers stay populated across transient sample gaps.
 
 ## Subpackages

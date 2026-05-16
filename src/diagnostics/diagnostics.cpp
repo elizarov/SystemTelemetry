@@ -801,6 +801,7 @@ std::optional<FilePath> PromptSavePath(HWND owner,
 TelemetryCollectorOptions BuildTelemetryCollectorOptions(const DiagnosticsOptions& diagnosticsOptions) {
     TelemetryCollectorOptions options;
     options.fake = diagnosticsOptions.fake;
+    options.liveFake = diagnosticsOptions.fake && !diagnosticsOptions.exit;
     options.fakePath = diagnosticsOptions.fakePath;
     options.loadFakeDump = &LoadTelemetryDump;
     return options;

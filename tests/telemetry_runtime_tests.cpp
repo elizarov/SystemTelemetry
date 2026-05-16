@@ -2,6 +2,7 @@
 #include <gtest/gtest.h>
 
 #include "config/config.h"
+#include "telemetry/impl/collector.h"
 #include "telemetry/impl/collector_real.h"
 #include "telemetry/telemetry.h"
 #include "util/file_path.h"
@@ -116,4 +117,37 @@ TEST_F(TelemetryRuntimeTest, SelectionChangesPublishFreshResolvedSelections) {
     EXPECT_EQ(update.resolvedSelections.adapterName, "Ethernet");
     EXPECT_EQ(update.dump.snapshot.network.adapterName, "Ethernet");
     runtime->Shutdown();
+}
+
+TEST(TelemetryCollectorTest, StaticFakeKeepsBuiltInSnapshotStableAcrossUpdates) {
+    Trace trace;
+    TelemetryCollectorOptions options;
+    options.fake = true;
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
+    ASSERT_NE(telemetry, nullptr);
+    ASSERT_TRUE(telemetry->Initialize({}));
+
+    const double initialCpuLoad = telemetry->Snapshot().cpu.loadPercent;
+    const WORD initialSecond = telemetry->Snapshot().now.wSecond;
+    telemetry->UpdateSnapshot();
+
+    EXPECT_EQ(telemetry->Snapshot().cpu.loadPercent, initialCpuLoad);
+    EXPECT_EQ(telemetry->Snapshot().now.wSecond, initialSecond);
+}
+
+TEST(TelemetryCollectorTest, LiveFakeAdvancesBuiltInSnapshotOnUpdate) {
+    Trace trace;
+    TelemetryCollectorOptions options;
+    options.fake = true;
+    options.liveFake = true;
+    std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
+    ASSERT_NE(telemetry, nullptr);
+    ASSERT_TRUE(telemetry->Initialize({}));
+
+    const double initialCpuLoad = telemetry->Snapshot().cpu.loadPercent;
+    const WORD initialSecond = telemetry->Snapshot().now.wSecond;
+    telemetry->UpdateSnapshot();
+
+    EXPECT_NE(telemetry->Snapshot().cpu.loadPercent, initialCpuLoad);
+    EXPECT_NE(telemetry->Snapshot().now.wSecond, initialSecond);
 }

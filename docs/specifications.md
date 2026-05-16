@@ -99,6 +99,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The telemetry runtime owns collection on a 250 ms cadence, skips missed intervals after process stalls or machine sleep, and publishes each new snapshot to the dashboard when collection finishes.
 - The telemetry cadence is the shared duration used by live dashboard animation, so a visual transition completes as the next steady-state telemetry snapshot becomes due.
 - CPU, GPU, network, storage, drive activity, retained histories, and the clock all refresh from that telemetry-owned cadence.
+- The built-in fake telemetry source is static for deterministic one-shot diagnostics and live for normal fake dashboard runs.
 - The dashboard redraws after receiving a new telemetry snapshot instead of driving collection from the UI message loop.
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
 - Dashboard formatting uses the configured metric display definitions, while dump serialization keeps its own stable machine-facing unit contract.

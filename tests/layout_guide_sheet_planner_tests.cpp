@@ -49,7 +49,7 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, false, trace);
     EXPECT_NE(telemetry, nullptr);
     std::string telemetryError;
     EXPECT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;

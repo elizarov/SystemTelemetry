@@ -234,6 +234,7 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
 std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
     options.fake = true;
+    options.liveFake = true;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
@@ -317,67 +318,6 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
             static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
     }
     return path;
-}
-
-double SnapshotHandoffWave(size_t iteration, double phase) {
-    return 0.5 + (0.5 * std::sin((static_cast<double>(iteration) * 0.37) + phase));
-}
-
-double SnapshotHandoffRange(size_t iteration, double phase, double minimum, double maximum) {
-    return minimum + ((maximum - minimum) * SnapshotHandoffWave(iteration, phase));
-}
-
-SystemSnapshot BuildSnapshotHandoffIterationSnapshot(const SystemSnapshot& baseSnapshot, size_t iteration) {
-    SystemSnapshot snapshot = baseSnapshot;
-    snapshot.revision = baseSnapshot.revision + iteration + 1;
-    snapshot.cpu.loadPercent = SnapshotHandoffRange(iteration, 0.0, 5.0, 95.0);
-    snapshot.cpu.clock.value = SnapshotHandoffRange(iteration, 0.6, 2.5, 4.9);
-    snapshot.cpu.memory.usedGb = SnapshotHandoffRange(iteration, 1.2, 4.0, 48.0);
-    snapshot.gpu.loadPercent = SnapshotHandoffRange(iteration, 1.8, 2.0, 98.0);
-    snapshot.gpu.temperature.value = SnapshotHandoffRange(iteration, 2.4, 35.0, 85.0);
-    snapshot.gpu.clock.value = SnapshotHandoffRange(iteration, 3.0, 100.0, 2400.0);
-    snapshot.gpu.fan.value = SnapshotHandoffRange(iteration, 3.6, 0.0, 2600.0);
-    snapshot.gpu.fps.value = SnapshotHandoffRange(iteration, 4.2, 48.0, 165.0);
-    snapshot.gpu.vram.usedGb = SnapshotHandoffRange(iteration, 4.8, 1.0, 14.0);
-    snapshot.network.uploadMbps = SnapshotHandoffRange(iteration, 5.4, 0.0, 80.0);
-    snapshot.network.downloadMbps = SnapshotHandoffRange(iteration, 6.0, 0.0, 120.0);
-    snapshot.storage.readMbps = SnapshotHandoffRange(iteration, 6.6, 0.0, 160.0);
-    snapshot.storage.writeMbps = SnapshotHandoffRange(iteration, 7.2, 0.0, 120.0);
-
-    for (size_t index = 0; index < snapshot.boardTemperatures.size(); ++index) {
-        snapshot.boardTemperatures[index].metric.value =
-            SnapshotHandoffRange(iteration, 7.8 + static_cast<double>(index), 30.0, 85.0);
-    }
-    for (size_t index = 0; index < snapshot.boardFans.size(); ++index) {
-        snapshot.boardFans[index].metric.value =
-            SnapshotHandoffRange(iteration, 9.0 + static_cast<double>(index), 400.0, 2400.0);
-    }
-    for (size_t index = 0; index < snapshot.drives.size(); ++index) {
-        DriveInfo& drive = snapshot.drives[index];
-        drive.usedPercent = SnapshotHandoffRange(iteration, 11.0 + static_cast<double>(index), 10.0, 95.0);
-        drive.readMbps = SnapshotHandoffRange(iteration, 15.0 + static_cast<double>(index), 0.0, 180.0);
-        drive.writeMbps = SnapshotHandoffRange(iteration, 19.0 + static_cast<double>(index), 0.0, 120.0);
-        if (drive.totalGb > 0.0) {
-            drive.freeGb = drive.totalGb * (1.0 - (drive.usedPercent / 100.0));
-        }
-    }
-    for (size_t seriesIndex = 0; seriesIndex < snapshot.retainedHistories.size(); ++seriesIndex) {
-        RetainedHistorySeries& series = snapshot.retainedHistories[seriesIndex];
-        for (size_t sampleIndex = 0; sampleIndex < series.samples.size(); ++sampleIndex) {
-            const double scale =
-                0.75 + (0.5 * SnapshotHandoffWave(iteration,
-                                  23.0 + static_cast<double>(seriesIndex) + (static_cast<double>(sampleIndex) * 0.07)));
-            series.samples[sampleIndex] = std::max(0.0, series.samples[sampleIndex] * scale);
-        }
-        for (size_t sampleIndex = 0; sampleIndex < series.throughputLiveSamples.size(); ++sampleIndex) {
-            const double scale =
-                0.75 + (0.5 * SnapshotHandoffWave(iteration,
-                                  29.0 + static_cast<double>(seriesIndex) + (static_cast<double>(sampleIndex) * 0.11)));
-            series.throughputLiveSamples[sampleIndex] =
-                std::max(0.0, series.throughputLiveSamples[sampleIndex] * scale);
-        }
-    }
-    return snapshot;
 }
 
 void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
@@ -987,15 +927,15 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
 }
 
 SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
-    DashboardRenderer& renderer, const SystemSnapshot& baseSnapshot, size_t iterations) {
+    DashboardRenderer& renderer, TelemetryCollector& telemetry, size_t iterations) {
     SnapshotHandoffBenchTotals totals{};
     if (iterations == 0) {
         return totals;
     }
 
+    telemetry.UpdateSnapshot();
     DashboardPresentationFrame warmupFrame;
-    const SystemSnapshot warmupSnapshot = BuildSnapshotHandoffIterationSnapshot(baseSnapshot, 0);
-    if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, warmupSnapshot, warmupFrame) ||
+    if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), warmupFrame) ||
         !DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(warmupFrame))) {
         totals.succeeded = false;
         totals.errorText = "snapshot handoff warmup failed: " + renderer.LastError();
@@ -1005,11 +945,11 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
 
     for (size_t iteration = 0; iteration < iterations; ++iteration) {
         const auto iterationStart = Clock::now();
-        const SystemSnapshot snapshot = BuildSnapshotHandoffIterationSnapshot(baseSnapshot, iteration + 1);
+        telemetry.UpdateSnapshot();
 
         DashboardPresentationFrame frame;
         const auto buildStart = Clock::now();
-        if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, snapshot, frame)) {
+        if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), frame)) {
             totals.succeeded = false;
             totals.errorText = "snapshot frame build failed: " + renderer.LastError();
             return totals;
@@ -1366,7 +1306,7 @@ int RunSnapshotHandoffBenchmarkCommand(size_t iterations, double renderScale, Tr
               << kSnapshotHandoffBenchmarkCadence.count() << " iterations=" << iterations
               << " render_scale=" << renderScale << " window=" << renderer.WindowWidth() << "x"
               << renderer.WindowHeight() << "\n";
-    const SnapshotHandoffBenchTotals totals = RunSnapshotHandoffBenchmark(renderer, telemetry->Snapshot(), iterations);
+    const SnapshotHandoffBenchTotals totals = RunSnapshotHandoffBenchmark(renderer, *telemetry, iterations);
     renderer.Shutdown();
     DestroyWindow(hwnd);
     if (!totals.succeeded) {

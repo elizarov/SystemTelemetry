@@ -330,7 +330,7 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     AddSyntheticThroughputHistory(snapshot, RetainedHistoryKey::StorageWrite, storageWrite);
 
     snapshot.now = BuildSyntheticTimestamp(tick);
-    snapshot.revision = 1;
+    snapshot.revision = tick + 1;
 
     dump.boardProvider.boardManufacturer = "Gigabyte Technology Co., Ltd.";
     dump.boardProvider.boardProduct = "X570 AORUS ULTRA";
@@ -456,9 +456,9 @@ FilePath ResolveFakePath(const FilePath& workingDirectory, const FilePath& confi
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(FilePath fakePath, TelemetryDumpLoader loadFakeDump, Trace& trace)
+    FakeTelemetryCollector(FilePath fakePath, TelemetryDumpLoader loadFakeDump, bool liveSyntheticSource, Trace& trace)
         : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump),
-          trace_(trace) {}
+          liveSyntheticSource_(liveSyntheticSource), trace_(trace) {}
 
     bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
@@ -466,7 +466,9 @@ public:
         }
         selectionSettings_ = settings.selection;
         if (useSyntheticSource_) {
-            trace_.Write(TracePrefix::Fake, "initialize_begin source=synthetic");
+            trace_.WriteFmt(TracePrefix::Fake,
+                "initialize_begin source=synthetic mode=%s",
+                liveSyntheticSource_ ? "live" : "static");
         } else {
             trace_.WriteFmt(TracePrefix::Fake, "initialize_begin path=\"%s\"", fakePath_.string().c_str());
         }
@@ -519,6 +521,13 @@ public:
     }
 
     void UpdateSnapshot() override {
+        if (useSyntheticSource_) {
+            if (liveSyntheticSource_) {
+                ReloadFakeDump(false);
+            }
+            return;
+        }
+
         const auto now = std::chrono::steady_clock::now();
         if (lastReload_.time_since_epoch().count() == 0 || now - lastReload_ >= std::chrono::seconds(1)) {
             ReloadFakeDump(false);
@@ -559,11 +568,15 @@ private:
 
     bool ReloadFakeDump(bool required, std::string* errorText = nullptr) {
         if (useSyntheticSource_) {
-            sourceDump_ = BuildSyntheticTelemetryDump(syntheticTick_++);
+            const uint64_t tick = liveSyntheticSource_ ? syntheticTick_++ : 0;
+            sourceDump_ = BuildSyntheticTelemetryDump(tick);
             dump_ = sourceDump_;
             RefreshSelectionsAndSnapshot();
             lastReload_ = std::chrono::steady_clock::now();
-            trace_.Write(TracePrefix::Fake, "load_done source=synthetic");
+            trace_.WriteFmt(TracePrefix::Fake,
+                "load_done source=synthetic mode=%s tick=%llu",
+                liveSyntheticSource_ ? "live" : "static",
+                static_cast<unsigned long long>(tick));
             return true;
         }
 
@@ -613,6 +626,7 @@ private:
     std::vector<StorageDriveCandidate> storageDrives_{};
     ResolvedNetworkCandidate resolvedNetwork_{};
     std::vector<std::string> resolvedStorageDrives_{};
+    bool liveSyntheticSource_ = false;
     Trace& trace_;
     std::chrono::steady_clock::time_point lastReload_{};
     uint64_t syntheticTick_ = 0;
@@ -620,8 +634,11 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
-    const FilePath& workingDirectory, const FilePath& configuredPath, TelemetryDumpLoader loadFakeDump, Trace& trace) {
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const FilePath& workingDirectory,
+    const FilePath& configuredPath,
+    TelemetryDumpLoader loadFakeDump,
+    bool liveSyntheticSource,
+    Trace& trace) {
     return std::make_unique<FakeTelemetryCollector>(
-        ResolveFakePath(workingDirectory, configuredPath), loadFakeDump, trace);
+        ResolveFakePath(workingDirectory, configuredPath), loadFakeDump, liveSyntheticSource, trace);
 }

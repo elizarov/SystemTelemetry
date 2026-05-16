@@ -146,6 +146,7 @@ using TelemetryDumpLoader = bool (*)(std::string_view input, TelemetryDump& dump
 
 struct TelemetryCollectorOptions {
     bool fake = false;
+    bool liveFake = false;
     FilePath fakePath;
     TelemetryDumpLoader loadFakeDump = nullptr;
 };

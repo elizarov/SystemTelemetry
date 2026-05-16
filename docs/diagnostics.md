@@ -67,6 +67,8 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - With `/elevate`, trace, dump, screenshot, layout-guide-sheet, app-icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
+- `/fake` without `/exit` advances the built-in synthetic source on the telemetry-owned refresh path so the dashboard exercises live fake values.
+- `/fake /exit` keeps the built-in synthetic source on its static baseline so deterministic diagnostics exports stay stable.
 - `/fake:<path>` reloads the selected fake file from the telemetry-owned refresh path while the process runs so manual edits affect a later telemetry-published snapshot.
 - Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior. Screenshot-style PNG exports are encoded as opaque 24-bit images because the rendered diagnostics surfaces include their own background.
 - App-icon exports use the same programmatic icon renderer as the live window, tray, and dialog icons, write compressed PNG files from the generated icon bitmap, use the current resolved theme colors including the dashboard card fill composited over the app background, and do not depend on dashboard render scale.
