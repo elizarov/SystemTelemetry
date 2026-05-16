@@ -43,17 +43,26 @@ if not exist "%BUILD_ROOT%" mkdir "%BUILD_ROOT%"
 if not exist "%VCPKG_DOWNLOADS%" mkdir "%VCPKG_DOWNLOADS%"
 if not exist "%X_VCPKG_REGISTRIES_CACHE%" mkdir "%X_VCPKG_REGISTRIES_CACHE%"
 set "CMAKE_GENERATOR=Ninja Multi-Config"
+set "NEED_CONFIGURE=0"
 if exist "%CMAKE_BUILD_ROOT%\CMakeCache.txt" (
     findstr /c:"CMAKE_GENERATOR:INTERNAL=%CMAKE_GENERATOR%" "%CMAKE_BUILD_ROOT%\CMakeCache.txt" >nul
     if errorlevel 1 (
         rmdir /s /q "%CMAKE_BUILD_ROOT%"
+        set "NEED_CONFIGURE=1"
     )
+) else (
+    set "NEED_CONFIGURE=1"
 )
 if not exist "%CMAKE_BUILD_ROOT%" mkdir "%CMAKE_BUILD_ROOT%"
+if "%NEED_CONFIGURE%"=="0" if not exist "%CMAKE_BUILD_ROOT%\build.ninja" set "NEED_CONFIGURE=1"
 
 set "CASEDASH_LINK_MAPS_OPTION=OFF"
 if defined CASEDASH_LINK_MAPS set "CASEDASH_LINK_MAPS_OPTION=%CASEDASH_LINK_MAPS%"
 set "CASEDASH_CMAKE_OPTIONS=-DCMAKE_EXPORT_COMPILE_COMMANDS=ON -DCASEDASH_LINK_MAPS=%CASEDASH_LINK_MAPS_OPTION%"
+if "%NEED_CONFIGURE%"=="0" (
+    findstr /b /e /c:"CASEDASH_LINK_MAPS:BOOL=%CASEDASH_LINK_MAPS_OPTION%" "%CMAKE_BUILD_ROOT%\CMakeCache.txt" >nul
+    if errorlevel 1 set "NEED_CONFIGURE=1"
+)
 if /I not "%CASEDASH_LINK_MAPS_OPTION%"=="ON" (
     del /q "%REPO_ROOT%\build\CaseDash.map" "%REPO_ROOT%\build\CaseDash.map.summary.txt" >nul 2>nul
     del /q "%REPO_ROOT%\build\CaseDashBenchmarks.map" "%REPO_ROOT%\build\CaseDashBenchmarks.map.summary.txt" >nul 2>nul
@@ -96,12 +105,18 @@ if exist "%REPO_ROOT%\vcpkg.json" if not defined CMAKE_TOOLCHAIN_FILE if not def
     exit /b 1
 )
 
-if defined VCPKG_TOOLCHAIN_FILE (
-    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS% -DVCPKG_TARGET_TRIPLET=x64-windows "-DVCPKG_INSTALLED_DIR=%REPO_VCPKG_INSTALLED_DIR%" "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN_FILE%"
+if defined CASEDASH_FORCE_CONFIGURE set "NEED_CONFIGURE=1"
+
+if "%NEED_CONFIGURE%"=="1" (
+    if defined VCPKG_TOOLCHAIN_FILE (
+        cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS% -DVCPKG_TARGET_TRIPLET=x64-windows "-DVCPKG_INSTALLED_DIR=%REPO_VCPKG_INSTALLED_DIR%" "-DCMAKE_TOOLCHAIN_FILE=%VCPKG_TOOLCHAIN_FILE%"
+    ) else (
+        cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS%
+    )
+    if errorlevel 1 goto build_done
 ) else (
-    cmake -S "%REPO_ROOT%" -B "%CMAKE_BUILD_ROOT%" -G "%CMAKE_GENERATOR%" %CASEDASH_CMAKE_OPTIONS%
+    echo -- CMake configure skipped; using existing build\cmake cache.
 )
-if errorlevel 1 goto build_done
 
 set "BUILD_CONFIG=Release"
 set "BUILD_BENCHMARKS=0"
