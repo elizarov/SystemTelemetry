@@ -9,7 +9,7 @@
 - String trimming, splitting, case folding, and whitespace normalization.
 - Enum string conversion.
 - UTF-8 and UTF-16 boundary conversion helpers.
-- Embedded resource loading and generated text-atlas resource string lookup.
+- Embedded resource loading and generated text-atlas resource string hash-id lookup.
 - Localization catalog access.
 - Numeric safety helpers, DPI scale conversion, and domain-neutral numeric text formatting.
 - High-precision timer and trace-scoped timing aggregation helpers for low-overhead runtime profiling.

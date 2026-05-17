@@ -10,6 +10,8 @@ MAGIC = b"CDLZ"
 MAX_OFFSET = 4095
 MIN_MATCH = 3
 MAX_MATCH = 18
+RESOURCE_STRING_HASH_SEED = 2166136261
+RESOURCE_STRING_HASH_PRIME = 16777619
 
 
 def lzss_compress(data: bytes) -> bytes:
@@ -190,24 +192,25 @@ def collect_resource_strings(source_root: Path) -> list[str]:
     return sorted(strings)
 
 
-def cpp_string_literal(text: str) -> str:
-    output = ['"']
-    for ch in text:
-        if ch == "\\":
-            output.append("\\\\")
-        elif ch == '"':
-            output.append('\\"')
-        elif ch == "\t":
-            output.append("\\t")
-        elif ord(ch) < 0x20 or ord(ch) == 0x7F:
-            output.append(f"\\x{ord(ch):02X}")
-        else:
-            output.append(ch)
-    output.append('"')
-    return "".join(output)
+def resource_string_hash(text: str, seed: int) -> int:
+    value = seed
+    for byte in text.encode("utf-8"):
+        value ^= byte
+        value = (value * RESOURCE_STRING_HASH_PRIME) & 0xFFFFFFFF
+    return value
+
+
+def find_resource_string_hash_seed(strings: list[str]) -> int:
+    for attempt in range(4096):
+        seed = (RESOURCE_STRING_HASH_SEED + attempt * 0x9E3779B1) & 0xFFFFFFFF
+        hashes = {resource_string_hash(value, seed) for value in strings}
+        if len(hashes) == len(strings):
+            return seed
+    raise SystemExit("RES_STR hash ids collided for every generated seed attempt")
 
 
 def build_resource_string_header(strings: list[str]) -> str:
+    hash_seed = find_resource_string_hash_seed(strings)
     lines = [
         "#pragma once",
         "",
@@ -216,40 +219,28 @@ def build_resource_string_header(strings: list[str]) -> str:
         "",
         "namespace resource_strings_detail {",
         "",
-        "template <std::size_t RightSize>",
-        "constexpr bool ResourceStringEquals(const char* left, std::size_t leftLength, const char (&right)[RightSize]) {",
-        "    if (leftLength + 1 != RightSize) {",
-        "        return false;",
+        f"constexpr std::uint32_t ResourceStringHashSeed = 0x{hash_seed:08X}u;",
+        f"constexpr std::uint32_t ResourceStringHashPrime = {RESOURCE_STRING_HASH_PRIME}u;",
+        "",
+        "constexpr std::uint32_t ResourceStringHash(const char* text, std::size_t length) {",
+        "    std::uint32_t hash = ResourceStringHashSeed;",
+        "    for (std::size_t index = 0; index < length; ++index) {",
+        "        hash ^= static_cast<std::uint8_t>(text[index]);",
+        "        hash *= ResourceStringHashPrime;",
         "    }",
-        "    for (std::size_t index = 0; index < leftLength; ++index) {",
-        "        if (left[index] != right[index]) {",
-        "            return false;",
-        "        }",
-        "    }",
-        "    return true;",
+        "    return hash;",
         "}",
         "",
         "template <std::size_t Size>",
         "consteval ResourceStringId MakeResourceStringId(const char (&text)[Size]) {",
-        "    constexpr std::size_t length = Size - 1;",
+        "    return static_cast<ResourceStringId>(ResourceStringHash(text, Size - 1));",
+        "}",
+        "",
+        "}  // namespace resource_strings_detail",
+        "",
+        "#define RES_STR(text) (::resource_strings_detail::MakeResourceStringId(text))",
+        "",
     ]
-
-    for index, value in enumerate(strings):
-        lines.append(f"    if (ResourceStringEquals(text, length, {cpp_string_literal(value)})) {{")
-        lines.append(f"        return static_cast<ResourceStringId>({index}u);")
-        lines.append("    }")
-
-    lines.extend(
-        [
-            "    return static_cast<ResourceStringId>(0xFFFFFFFFu);",
-            "}",
-            "",
-            "}  // namespace resource_strings_detail",
-            "",
-            "#define RES_STR(text) (::resource_strings_detail::MakeResourceStringId(text))",
-            "",
-        ]
-    )
     return "\n".join(lines)
 
 
