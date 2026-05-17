@@ -11,6 +11,7 @@
 #include "dashboard_renderer/impl/animation_timeline.h"
 #include "renderer/renderer.h"
 #include "util/lightweight_mutex.h"
+#include "util/resource_strings.h"
 #include "widget/animation.h"
 
 class Trace;
@@ -145,7 +146,9 @@ private:
     void ThreadMain();
     static DWORD WINAPI ThreadProc(void* context);
     void WriteTrace(std::string text) const;
+    void WriteTrace(ResourceStringId text) const;
     void WriteTraceFmt(const char* format, ...) const;
+    void WriteTraceFmt(ResourceStringId format, ...) const;
     void SetLastError(std::string error);
     bool EventsReady() const;
 

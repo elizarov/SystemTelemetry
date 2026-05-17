@@ -29,7 +29,7 @@ public:
         WSADATA wsaData{};
         const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-        state_->trace_.Write(TracePrefix::Telemetry, "initialize_begin");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("initialize_begin"));
         state_->trace_.Write(TracePrefix::Telemetry,
             FormatText("wsa_startup result=%d version=%u.%u",
                 wsaStartupResult,
@@ -48,7 +48,7 @@ public:
         UpdateGpuMetrics(*state_);
         GetLocalTime(&state_->snapshot_.now);
         ++state_->snapshot_.revision;
-        state_->trace_.Write(TracePrefix::Telemetry, "initialize_done");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("initialize_done"));
         return true;
     }
 
@@ -146,7 +146,7 @@ public:
     }
 
     void UpdateSnapshot() override {
-        state_->trace_.Write(TracePrefix::Telemetry, "update_snapshot_begin");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("update_snapshot_begin"));
         UpdateBoardMetrics(*state_);
         UpdateCpuMetrics(*state_);
         UpdateGpuMetrics(*state_);
@@ -154,7 +154,7 @@ public:
         UpdateStorageMetrics(*state_, false);
         GetLocalTime(&state_->snapshot_.now);
         ++state_->snapshot_.revision;
-        state_->trace_.Write(TracePrefix::Telemetry, "update_snapshot_done");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("update_snapshot_done"));
     }
 
 private:

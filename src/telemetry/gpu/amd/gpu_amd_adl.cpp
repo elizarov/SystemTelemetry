@@ -148,45 +148,48 @@ public:
     }
 
     bool Initialize() override {
-        trace().Write(TracePrefix::AmdAdlx, "initialize_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("initialize_begin"));
         ADLX_RESULT result = helper_.Initialize();
-        trace().WriteFmt(TracePrefix::AmdAdlx, "helper_initialize result=%d", static_cast<int>(result));
+        trace().WriteFmt(TracePrefix::AmdAdlx, RES_STR("helper_initialize result=%d"), static_cast<int>(result));
         if (ADLX_FAILED(result)) {
-            trace().WriteFmt(
-                TracePrefix::AmdAdlx, "helper_initialize_incompatible_begin result=%d", static_cast<int>(result));
+            trace().WriteFmt(TracePrefix::AmdAdlx,
+                RES_STR("helper_initialize_incompatible_begin result=%d"),
+                static_cast<int>(result));
             result = helper_.InitializeWithIncompatibleDriver();
-            trace().WriteFmt(
-                TracePrefix::AmdAdlx, "helper_initialize_incompatible_done result=%d", static_cast<int>(result));
+            trace().WriteFmt(TracePrefix::AmdAdlx,
+                RES_STR("helper_initialize_incompatible_done result=%d"),
+                static_cast<int>(result));
         }
         if (ADLX_FAILED(result) || helper_.GetSystemServices() == nullptr) {
             diagnostics_ = FormatText("ADLX initialization failed: init=%d", static_cast<int>(result));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "initialize_failed %s", diagnostics_.c_str());
+            trace().WriteFmt(TracePrefix::AmdAdlx, RES_STR("initialize_failed %s"), diagnostics_.c_str());
             return false;
         }
 
-        trace().Write(TracePrefix::AmdAdlx, "get_performance_monitoring_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("get_performance_monitoring_begin"));
         result = helper_.GetSystemServices()->GetPerformanceMonitoringServices(&performanceMonitoring_);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_performance_monitoring_done result=%d available=%s",
+            RES_STR("get_performance_monitoring_done result=%d available=%s"),
             static_cast<int>(result),
             Trace::BoolText(performanceMonitoring_ != nullptr));
         if (ADLX_FAILED(result) || !performanceMonitoring_) {
             diagnostics_ =
                 FormatText("Failed to get ADLX performance monitoring services: perf=%d", static_cast<int>(result));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "get_performance_monitoring_failed %s", diagnostics_.c_str());
+            trace().WriteFmt(
+                TracePrefix::AmdAdlx, RES_STR("get_performance_monitoring_failed %s"), diagnostics_.c_str());
             return false;
         }
 
         IADLXGPUListPtr gpus;
-        trace().Write(TracePrefix::AmdAdlx, "get_gpus_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("get_gpus_begin"));
         result = helper_.GetSystemServices()->GetGPUs(&gpus);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_gpus_done result=%d available=%s",
+            RES_STR("get_gpus_done result=%d available=%s"),
             static_cast<int>(result),
             Trace::BoolText(gpus != nullptr));
         if (ADLX_FAILED(result) || !gpus || gpus->Empty()) {
             diagnostics_ = FormatText("Failed to get AMD GPU list: gpus=%d", static_cast<int>(result));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "get_gpus_failed %s", diagnostics_.c_str());
+            trace().WriteFmt(TracePrefix::AmdAdlx, RES_STR("get_gpus_failed %s"), diagnostics_.c_str());
             return false;
         }
 
@@ -201,23 +204,23 @@ public:
         adlx_uint totalVramMb = 0;
         const ADLX_RESULT totalVramResult = gpu_->TotalVRAM(&totalVramMb);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_total_vram result=%d mb=%u",
+            RES_STR("get_total_vram result=%d mb=%u"),
             static_cast<int>(totalVramResult),
             static_cast<unsigned>(totalVramMb));
         if (ADLX_SUCCEEDED(totalVramResult) && totalVramMb > 0) {
             totalVramGb_ = static_cast<double>(totalVramMb) / 1024.0;
         }
 
-        trace().Write(TracePrefix::AmdAdlx, "get_supported_metrics_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("get_supported_metrics_begin"));
         result = performanceMonitoring_->GetSupportedGPUMetrics(gpu_, &metricsSupport_);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_supported_metrics_done result=%d available=%s",
+            RES_STR("get_supported_metrics_done result=%d available=%s"),
             static_cast<int>(result),
             Trace::BoolText(metricsSupport_ != nullptr));
         if (ADLX_FAILED(result) || !metricsSupport_) {
             diagnostics_ =
                 FormatText("Failed to query supported AMD GPU metrics: support=%d", static_cast<int>(result));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "get_supported_metrics_failed %s", diagnostics_.c_str());
+            trace().WriteFmt(TracePrefix::AmdAdlx, RES_STR("get_supported_metrics_failed %s"), diagnostics_.c_str());
             return false;
         }
 
@@ -260,14 +263,14 @@ public:
         }
         initialized_ = true;
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "initialize_done diagnostics=\"%s\" fps=\"%s\"",
+            RES_STR("initialize_done diagnostics=\"%s\" fps=\"%s\""),
             diagnostics_.c_str(),
             fpsDiagnostics_.c_str());
         return true;
     }
 
     GpuVendorTelemetrySample Sample() override {
-        trace().Write(TracePrefix::AmdAdlx, "sample_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("sample_begin"));
         GpuVendorTelemetrySample sample;
         sample.providerName = "AMD ADLX";
         sample.name = gpuName_;
@@ -280,28 +283,29 @@ public:
         }
 
         IADLXGPUMetricsPtr metrics;
-        trace().Write(TracePrefix::AmdAdlx, "get_current_metrics_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("get_current_metrics_begin"));
         const ADLX_RESULT metricsResult = performanceMonitoring_->GetCurrentGPUMetrics(gpu_, &metrics);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_current_metrics_done result=%d available=%s",
+            RES_STR("get_current_metrics_done result=%d available=%s"),
             static_cast<int>(metricsResult),
             Trace::BoolText(metrics != nullptr));
         if (ADLX_FAILED(metricsResult) || !metrics) {
             sample.diagnostics =
                 FormatText("%s current_metrics=%d", diagnostics_.c_str(), static_cast<int>(metricsResult));
             sample.available = false;
-            trace().WriteFmt(
-                TracePrefix::AmdAdlx, "get_current_metrics_failed diagnostics=\"%s\"", sample.diagnostics.c_str());
+            trace().WriteFmt(TracePrefix::AmdAdlx,
+                RES_STR("get_current_metrics_failed diagnostics=\"%s\""),
+                sample.diagnostics.c_str());
             return sample;
         }
         bool hasAnyMetric = false;
 
         if (usageSupported_) {
             adlx_double usage = 0.0;
-            trace().Write(TracePrefix::AmdAdlx, "get_usage_begin");
+            trace().Write(TracePrefix::AmdAdlx, RES_STR("get_usage_begin"));
             const ADLX_RESULT result = metrics->GPUUsage(&usage);
             trace().WriteFmt(
-                TracePrefix::AmdAdlx, "get_usage_done result=%d value=%.1f", static_cast<int>(result), usage);
+                TracePrefix::AmdAdlx, RES_STR("get_usage_done result=%d value=%.1f"), static_cast<int>(result), usage);
             if (ADLX_SUCCEEDED(result)) {
                 sample.loadPercent = usage;
                 hasAnyMetric = true;
@@ -310,10 +314,10 @@ public:
 
         if (temperatureSupported_) {
             adlx_double temperature = 0.0;
-            trace().Write(TracePrefix::AmdAdlx, "get_temperature_begin");
+            trace().Write(TracePrefix::AmdAdlx, RES_STR("get_temperature_begin"));
             const ADLX_RESULT result = metrics->GPUTemperature(&temperature);
             trace().WriteFmt(TracePrefix::AmdAdlx,
-                "get_temperature_done result=%d value=%.1f",
+                RES_STR("get_temperature_done result=%d value=%.1f"),
                 static_cast<int>(result),
                 temperature);
             if (ADLX_SUCCEEDED(result)) {
@@ -324,10 +328,10 @@ public:
 
         if (clockSupported_) {
             adlx_int clockMhz = 0;
-            trace().Write(TracePrefix::AmdAdlx, "get_clock_begin");
+            trace().Write(TracePrefix::AmdAdlx, RES_STR("get_clock_begin"));
             const ADLX_RESULT result = metrics->GPUClockSpeed(&clockMhz);
             trace().WriteFmt(TracePrefix::AmdAdlx,
-                "get_clock_done result=%d value=%d",
+                RES_STR("get_clock_done result=%d value=%d"),
                 static_cast<int>(result),
                 static_cast<int>(clockMhz));
             if (ADLX_SUCCEEDED(result)) {
@@ -338,10 +342,10 @@ public:
 
         if (fanSupported_) {
             adlx_int fanRpm = 0;
-            trace().Write(TracePrefix::AmdAdlx, "get_fan_begin");
+            trace().Write(TracePrefix::AmdAdlx, RES_STR("get_fan_begin"));
             const ADLX_RESULT result = metrics->GPUFanSpeed(&fanRpm);
             trace().WriteFmt(TracePrefix::AmdAdlx,
-                "get_fan_done result=%d value=%d",
+                RES_STR("get_fan_done result=%d value=%d"),
                 static_cast<int>(result),
                 static_cast<int>(fanRpm));
             if (ADLX_SUCCEEDED(result)) {
@@ -352,10 +356,10 @@ public:
 
         if (vramSupported_) {
             adlx_int usedVramMb = 0;
-            trace().Write(TracePrefix::AmdAdlx, "get_vram_begin");
+            trace().Write(TracePrefix::AmdAdlx, RES_STR("get_vram_begin"));
             const ADLX_RESULT result = metrics->GPUVRAM(&usedVramMb);
             trace().WriteFmt(TracePrefix::AmdAdlx,
-                "get_vram_done result=%d value=%d",
+                RES_STR("get_vram_done result=%d value=%d"),
                 static_cast<int>(result),
                 static_cast<int>(usedVramMb));
             if (ADLX_SUCCEEDED(result) && usedVramMb >= 0) {
@@ -384,7 +388,8 @@ public:
                 const std::string fpsText =
                     fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
                 trace().WriteFmt(TracePrefix::AmdAdlx,
-                    "get_presented_fps available=%s permission_required=%s value=%s process=\"%s\" diagnostics=\"%s\"",
+                    RES_STR("get_presented_fps available=%s permission_required=%s value=%s process=\"%s\" "
+                            "diagnostics=\"%s\""),
                     Trace::BoolText(fpsSample.fps.has_value()),
                     Trace::BoolText(fpsSample.permissionRequired),
                     fpsText.c_str(),
@@ -396,7 +401,7 @@ public:
         sample.available = hasAnyMetric;
         AppendFormat(sample.diagnostics, " fps=%s", fpsDiagnostics_.c_str());
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "sample_done available=%s diagnostics=\"%s\"",
+            RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
             sample.diagnostics.c_str());
         return sample;
@@ -417,8 +422,8 @@ private:
             const int rank = candidate != nullptr && adapter_.has_value() ? AmdDeviceMatchRank(*adapter_, identity)
                                                                           : (candidate != nullptr ? 0 : -1);
             trace().WriteFmt(TracePrefix::AmdAdlx,
-                "gpu_candidate index=%u result=%d vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "
-                "revision=0x%02X match_rank=%d name=\"%s\" pnp=\"%s\"",
+                RES_STR("gpu_candidate index=%u result=%d vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "
+                        "revision=0x%02X match_rank=%d name=\"%s\" pnp=\"%s\""),
                 static_cast<unsigned>(index),
                 static_cast<int>(result),
                 identity.vendorId,
@@ -442,14 +447,14 @@ private:
                        ? adapter_->adapterName
                        : bestName;
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "gpu_selected match=\"%s\" rank=%d display_name=\"%s\" selected_adapter=\"%s\"",
+            RES_STR("gpu_selected match=\"%s\" rank=%d display_name=\"%s\" selected_adapter=\"%s\""),
             bestMatch.c_str(),
             bestRank,
             gpuName_.c_str(),
             adapter_.has_value() ? adapter_->adapterName.c_str() : "");
         if (!gpu_) {
             diagnostics_ = FormatText("Failed to open selected AMD GPU: gpu=%d", static_cast<int>(bestResult));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "get_gpu_failed %s", diagnostics_.c_str());
+            trace().WriteFmt(TracePrefix::AmdAdlx, RES_STR("get_gpu_failed %s"), diagnostics_.c_str());
             return false;
         }
         return true;
@@ -457,10 +462,10 @@ private:
 
     std::optional<double> ReadNativeAmdFps() {
         IADLXFPSPtr fpsMetric;
-        trace().Write(TracePrefix::AmdAdlx, "get_native_fps_begin");
+        trace().Write(TracePrefix::AmdAdlx, RES_STR("get_native_fps_begin"));
         const ADLX_RESULT fpsMetricResult = performanceMonitoring_->GetCurrentFPS(&fpsMetric);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_native_fps_metric_done result=%d available=%s",
+            RES_STR("get_native_fps_metric_done result=%d available=%s"),
             static_cast<int>(fpsMetricResult),
             Trace::BoolText(fpsMetric != nullptr));
         if (ADLX_FAILED(fpsMetricResult) || !fpsMetric) {
@@ -470,7 +475,7 @@ private:
         adlx_int fps = 0;
         const ADLX_RESULT fpsResult = fpsMetric->FPS(&fps);
         trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_native_fps_done result=%d value=%d",
+            RES_STR("get_native_fps_done result=%d value=%d"),
             static_cast<int>(fpsResult),
             static_cast<int>(fps));
         return ADLX_SUCCEEDED(fpsResult) && fps >= 0 ? std::optional<double>{static_cast<double>(fps)} : std::nullopt;

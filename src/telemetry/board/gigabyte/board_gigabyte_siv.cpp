@@ -94,32 +94,32 @@ public:
     void TraceAssemblyPreload(const wchar_t* path) override {
         if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
             const std::string pathText = Utf8FromNullableWide(path);
-            trace_.WriteFmt(TracePrefix::GigabyteSiv, "assembly_preload path=\"%s\"", pathText.c_str());
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, RES_STR("assembly_preload path=\"%s\""), pathText.c_str());
         }
     }
 
     void TraceMonitorCreated(const wchar_t* typeName) override {
         if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
             const std::string typeText = Utf8FromNullableWide(typeName);
-            trace_.WriteFmt(TracePrefix::GigabyteSiv, "monitor_created type=\"%s\"", typeText.c_str());
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, RES_STR("monitor_created type=\"%s\""), typeText.c_str());
         }
     }
 
     void TraceInitializeSuccess() override {
-        trace_.Write(TracePrefix::GigabyteSiv, "initialize_success source=HwRegister");
+        trace_.Write(TracePrefix::GigabyteSiv, RES_STR("initialize_success source=HwRegister"));
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
             const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
-            trace_.WriteFmt(TracePrefix::GigabyteSiv, "initialize_exception %s", diagnosticsText.c_str());
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, RES_STR("initialize_exception %s"), diagnosticsText.c_str());
         }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::GigabyteSiv)) {
             const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
-            trace_.WriteFmt(TracePrefix::GigabyteSiv, "snapshot_exception %s", diagnosticsText.c_str());
+            trace_.WriteFmt(TracePrefix::GigabyteSiv, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
         }
     }
 
@@ -130,7 +130,7 @@ public:
                 snapshot_.fans.size(),
                 snapshot_.temperatures.size());
         trace_.WriteFmt(TracePrefix::GigabyteSiv,
-            "snapshot_done fan_count=%zu temp_count=%zu",
+            RES_STR("snapshot_done fan_count=%zu temp_count=%zu"),
             snapshot_.fans.size(),
             snapshot_.temperatures.size());
         return std::move(snapshot_);
@@ -151,12 +151,12 @@ public:
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
-        trace().Write(TracePrefix::GigabyteSiv, "initialize_begin");
+        trace().Write(TracePrefix::GigabyteSiv, RES_STR("initialize_begin"));
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
         trace().WriteFmt(TracePrefix::GigabyteSiv,
-            "board manufacturer=\"%s\" product=\"%s\"",
+            RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
 

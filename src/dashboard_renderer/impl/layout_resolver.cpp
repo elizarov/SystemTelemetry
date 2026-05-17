@@ -739,7 +739,7 @@ int DashboardLayoutResolver::PreferredNodeHeight(
             }
         }
         if (writeTrace) {
-            renderer.WriteTraceFmt("layout_preferred_height node=\"%s\" value=%d", node.name.c_str(), total);
+            renderer.WriteTraceFmt(RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), total);
         }
         return total;
     }
@@ -749,14 +749,15 @@ int DashboardLayoutResolver::PreferredNodeHeight(
             tallest = (std::max)(tallest, PreferredNodeHeight(renderer, child, 0));
         }
         if (writeTrace) {
-            renderer.WriteTraceFmt("layout_preferred_height node=\"%s\" value=%d", node.name.c_str(), tallest);
+            renderer.WriteTraceFmt(RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), tallest);
         }
         return tallest;
     }
     const ParsedWidgetInfo* widget = FindParsedWidgetInfo(renderer, node);
     const int preferredHeight = widget != nullptr ? widget->preferredHeight : 0;
     if (writeTrace) {
-        renderer.WriteTraceFmt("layout_preferred_height node=\"%s\" value=%d", node.name.c_str(), preferredHeight);
+        renderer.WriteTraceFmt(
+            RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), preferredHeight);
     }
     return preferredHeight;
 }
@@ -824,7 +825,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     bool instantiateWidgets) {
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
     if (writeTrace) {
-        renderer.WriteTraceFmt("layout_resolve_node name=\"%s\" weight=%d rect=(%d,%d,%d,%d) children=%zu",
+        renderer.WriteTraceFmt(RES_STR("layout_resolve_node name=\"%s\" weight=%d rect=(%d,%d,%d,%d) children=%zu"),
             node.name.c_str(),
             node.weight,
             rect.left,
@@ -836,19 +837,19 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     if (node.cardReference) {
         if (ContainsCardReference(cardReferenceStack, node.name)) {
             if (writeTrace) {
-                renderer.WriteTraceFmt("layout_card_ref_cycle id=\"%s\"", node.name.c_str());
+                renderer.WriteTraceFmt(RES_STR("layout_card_ref_cycle id=\"%s\""), node.name.c_str());
             }
             return;
         }
         const LayoutCardConfig* referencedCard = renderer.FindCardConfigById(node.name);
         if (referencedCard == nullptr) {
             if (writeTrace) {
-                renderer.WriteTraceFmt("layout_card_ref_missing id=\"%s\"", node.name.c_str());
+                renderer.WriteTraceFmt(RES_STR("layout_card_ref_missing id=\"%s\""), node.name.c_str());
             }
             return;
         }
         if (writeTrace) {
-            renderer.WriteTraceFmt("layout_card_ref id=\"%s\" rect=(%d,%d,%d,%d)",
+            renderer.WriteTraceFmt(RES_STR("layout_card_ref id=\"%s\" rect=(%d,%d,%d,%d)"),
                 node.name.c_str(),
                 rect.left,
                 rect.top,
@@ -881,14 +882,14 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
                                                    ? std::string(EnumToString(widget.widgetClass))
                                                    : std::string();
             if (widgetTypeName.empty()) {
-                renderer.WriteTraceFmt("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d)",
+                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d)"),
                     node.name.c_str(),
                     widget.rect.left,
                     widget.rect.top,
                     widget.rect.right,
                     widget.rect.bottom);
             } else {
-                renderer.WriteTraceFmt("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d) type=\"%s\"",
+                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d) type=\"%s\""),
                     node.name.c_str(),
                     widget.rect.left,
                     widget.rect.top,
@@ -984,7 +985,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
 
         if (writeTrace) {
             renderer.WriteTraceFmt(
-                "layout_weighted_child parent=\"%s\" child=\"%s\" weight=%d gap=%d size=%d rect=(%d,%d,%d,%d)",
+                RES_STR("layout_weighted_child parent=\"%s\" child=\"%s\" weight=%d gap=%d size=%d rect=(%d,%d,%d,%d)"),
                 node.name.c_str(),
                 child.name.c_str(),
                 childWeight,
@@ -1052,7 +1053,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     }
 
     if (writeTrace) {
-        renderer.WriteTraceFmt("layout_begin window=%dx%d rect=(%d,%d,%d,%d) cards_root=\"%s\"",
+        renderer.WriteTraceFmt(RES_STR("layout_begin window=%dx%d rect=(%d,%d,%d,%d) cards_root=\"%s\""),
             resolvedLayout_.windowWidth,
             resolvedLayout_.windowHeight,
             dashboardRect.left,
@@ -1104,8 +1105,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
 
         if (writeTrace) {
-            renderer.WriteTraceFmt("layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "
-                                   "icon=rect=(%d,%d,%d,%d) content=rect=(%d,%d,%d,%d)",
+            renderer.WriteTraceFmt(RES_STR("layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "
+                                           "icon=rect=(%d,%d,%d,%d) content=rect=(%d,%d,%d,%d)"),
                 card.id.c_str(),
                 card.rect.left,
                 card.rect.top,
@@ -1184,8 +1185,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             }
 
             if (writeTrace) {
-                renderer.WriteTraceFmt(
-                    "layout_dashboard_child parent=\"%s\" child=\"%s\" weight=%d gap=%d size=%d rect=(%d,%d,%d,%d)",
+                renderer.WriteTraceFmt(RES_STR("layout_dashboard_child parent=\"%s\" child=\"%s\" weight=%d gap=%d "
+                                               "size=%d rect=(%d,%d,%d,%d)"),
                     node.name.c_str(),
                     child.name.c_str(),
                     childWeight,
@@ -1260,7 +1261,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     }
 
     if (writeTrace) {
-        renderer.WriteTraceFmt("layout_done cards=%zu", resolvedLayout_.cards.size());
+        renderer.WriteTraceFmt(RES_STR("layout_done cards=%zu"), resolvedLayout_.cards.size());
     }
     return true;
 }

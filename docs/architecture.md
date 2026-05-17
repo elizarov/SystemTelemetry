@@ -23,7 +23,7 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 
 Other top-level areas:
 
-- `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon.
+- `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
 - `tools/` contains shared formatting, lint, tidy, profiling, generated asset, and source dependency graph helper scripts.
 - `.agents/skills/` contains reusable agent or automation skills.
@@ -66,7 +66,7 @@ Other top-level areas:
 
 ## Resources And Build Graph
 
-- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded config/localization text atlas resource.
+- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded text atlas resource from config, localization, and the sorted `RES_STR` trace string catalog.
 - `resources/resource.h` owns resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.

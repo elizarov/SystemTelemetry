@@ -129,14 +129,15 @@ public:
         if (!sample.has_value()) {
             diagnostics_ = diagnostics.empty() ? "FPS service did not return a sample." : diagnostics;
             trace_.WriteFmt(
-                TracePrefix::FpsServiceClient, "initialize_failed diagnostics=\"%s\"", diagnostics_.c_str());
+                TracePrefix::FpsServiceClient, RES_STR("initialize_failed diagnostics=\"%s\""), diagnostics_.c_str());
             return false;
         }
 
         cachedSample_ = *sample;
         diagnostics_ = sample->diagnostics.empty() ? "FPS service provider active." : sample->diagnostics;
         initialized_ = true;
-        trace_.WriteFmt(TracePrefix::FpsServiceClient, "initialize_done diagnostics=\"%s\"", diagnostics_.c_str());
+        trace_.WriteFmt(
+            TracePrefix::FpsServiceClient, RES_STR("initialize_done diagnostics=\"%s\""), diagnostics_.c_str());
         return true;
     }
 
@@ -195,7 +196,7 @@ public:
         if (serviceRetrySample_ >= kServiceRetrySampleInterval) {
             serviceRetrySample_ = 0;
             if (TryInitializeServiceProvider()) {
-                trace_.Write(TracePrefix::FpsProvider, "service_recovered");
+                trace_.Write(TracePrefix::FpsProvider, RES_STR("service_recovered"));
                 return serviceProvider_->Sample();
             }
         }
@@ -217,7 +218,7 @@ private:
             return true;
         }
 
-        trace_.Write(TracePrefix::FpsProvider, "service_unavailable fallback=local_etw");
+        trace_.Write(TracePrefix::FpsProvider, RES_STR("service_unavailable fallback=local_etw"));
         return false;
     }
 

@@ -143,7 +143,7 @@ void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
     }
     liveAnimationEnabled_ = enabled;
     if (!liveAnimationEnabled_) {
-        WriteTrace("animation_timeline_reset_request reason=live_animation_disabled");
+        WriteTrace(RES_STR("animation_timeline_reset_request reason=live_animation_disabled"));
         presentation_->ResetTimeline();
     }
 }
@@ -1426,7 +1426,25 @@ void DashboardRenderer::WriteTrace(const std::string& text) const {
     trace_.Write(TracePrefix::Renderer, text);
 }
 
+void DashboardRenderer::WriteTrace(ResourceStringId text) const {
+    if (!ShouldWriteRendererTrace()) {
+        return;
+    }
+    trace_.Write(TracePrefix::Renderer, text);
+}
+
 void DashboardRenderer::WriteTraceFmt(const char* format, ...) const {
+    if (!ShouldWriteRendererTrace()) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    trace_.WriteVFmt(TracePrefix::Renderer, format, args);
+    va_end(args);
+}
+
+void DashboardRenderer::WriteTraceFmt(ResourceStringId format, ...) const {
     if (!ShouldWriteRendererTrace()) {
         return;
     }

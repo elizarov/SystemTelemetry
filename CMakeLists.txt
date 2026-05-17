@@ -78,24 +78,39 @@ endif()
 
 set(CASEDASH_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashCompressedResources.rc")
 set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources")
+set(CASEDASH_RESOURCE_STRING_HEADER "${CASEDASH_GENERATED_DIR}/resource_strings.generated.h")
+file(GLOB_RECURSE CASEDASH_RESOURCE_STRING_SCAN_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+)
 add_custom_command(
     OUTPUT
         "${CASEDASH_COMPRESSED_RESOURCE_RC}"
         "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+        "${CASEDASH_RESOURCE_STRING_HEADER}"
     COMMAND
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
         --output-dir "${CASEDASH_COMPRESSED_RESOURCE_DIR}"
         --output-rc "${CASEDASH_COMPRESSED_RESOURCE_RC}"
         --resource-root "${CMAKE_SOURCE_DIR}/resources"
+        --resource-string-header "${CASEDASH_RESOURCE_STRING_HEADER}"
+        --source-root "${CMAKE_SOURCE_DIR}"
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
         "${CMAKE_SOURCE_DIR}/resources/localization.ini"
+        ${CASEDASH_RESOURCE_STRING_SCAN_SOURCES}
     VERBATIM
 )
 set_source_files_properties("${CASEDASH_COMPRESSED_RESOURCE_RC}" PROPERTIES
     OBJECT_DEPENDS "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+)
+add_custom_target(CaseDashGeneratedResources DEPENDS
+    "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+    "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+    "${CASEDASH_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+    "${CASEDASH_RESOURCE_STRING_HEADER}"
 )
 
 add_executable(CaseDash WIN32
@@ -122,6 +137,7 @@ add_executable(CaseDash WIN32
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/paths.cpp
+    src/util/resource_strings.cpp
     src/util/scale.cpp
     src/util/lightweight_mutex.cpp
     src/util/strings.cpp
@@ -451,6 +467,7 @@ target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDash CaseDashGeneratedResources)
 
 target_compile_definitions(CaseDash PRIVATE
     UNICODE
@@ -603,6 +620,7 @@ add_executable(CaseDashTests
     src/util/text_format.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
@@ -666,7 +684,9 @@ add_executable(CaseDashTests
 target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
+    "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDashTests CaseDashGeneratedResources)
 target_compile_definitions(CaseDashTests PRIVATE
     UNICODE
     _UNICODE
@@ -827,6 +847,7 @@ add_executable(CaseDashBenchmarks
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
     src/util/high_precision_timer.cpp
     src/util/utf8.cpp
@@ -855,7 +876,9 @@ target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
+    "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources)
 target_compile_definitions(CaseDashBenchmarks PRIVATE
     UNICODE
     _UNICODE

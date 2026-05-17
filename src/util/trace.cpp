@@ -69,11 +69,25 @@ void Trace::Write(TracePrefix prefix, const char* text) const {
     WriteTraceLine(output_, PrefixName(prefix), text);
 }
 
+void Trace::Write(TracePrefix prefix, ResourceStringId text) const {
+    if (!Enabled(prefix)) {
+        return;
+    }
+    WriteTraceLine(output_, PrefixName(prefix), ResourceStringText(text));
+}
+
 void Trace::Write(TracePrefix prefix, const std::string& text) const {
     Write(prefix, text.c_str());
 }
 
 void Trace::WriteFmt(TracePrefix prefix, const char* format, ...) const {
+    va_list args;
+    va_start(args, format);
+    WriteVFmt(prefix, format, args);
+    va_end(args);
+}
+
+void Trace::WriteFmt(TracePrefix prefix, ResourceStringId format, ...) const {
     va_list args;
     va_start(args, format);
     WriteVFmt(prefix, format, args);
@@ -86,6 +100,15 @@ void Trace::WriteVFmt(TracePrefix prefix, const char* format, va_list args) cons
     }
 
     const std::string text = FormatTextV(format, args);
+    WriteTraceLine(output_, PrefixName(prefix), text.c_str());
+}
+
+void Trace::WriteVFmt(TracePrefix prefix, ResourceStringId format, va_list args) const {
+    if (!Enabled(prefix)) {
+        return;
+    }
+
+    const std::string text = FormatTextV(ResourceStringText(format), args);
     WriteTraceLine(output_, PrefixName(prefix), text.c_str());
 }
 
@@ -216,7 +239,7 @@ void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::st
         return;
     }
     trace.WriteFmt(TracePrefix::Renderer,
-        "error stage=\"%.*s\" detail=\"%s\"",
+        RES_STR("error stage=\"%.*s\" detail=\"%s\""),
         static_cast<int>(stage.size()),
         stage.data(),
         error.c_str());

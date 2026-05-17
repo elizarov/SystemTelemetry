@@ -11,7 +11,7 @@ namespace {
 
 constexpr uint32_t kCompressedResourceMagic = 0x5A4C4443u;
 constexpr size_t kCompressedResourceHeaderSize = 8;
-constexpr size_t kTextAtlasHeaderSize = 4;
+constexpr size_t kTextAtlasHeaderSize = 8;
 constexpr int kMinMatchLength = 3;
 
 uint32_t ReadLittleEndianUint32(const char* data) {
@@ -56,20 +56,13 @@ std::string DecompressResourceData(std::string_view data) {
     return output.size() == decompressedSize ? output : std::string{};
 }
 
-}  // namespace
-
-std::string LoadUtf8ResourceData(TextResourceId resourceId) {
-    const bool localization = resourceId == TextResourceId::LocalizationCatalog;
-    if (resourceId != TextResourceId::ConfigTemplate && !localization) {
-        return {};
-    }
-
+std::string LoadCompressedResourceData(int resourceId) {
     HMODULE module = GetModuleHandleW(nullptr);
     if (module == nullptr) {
         return {};
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(IDR_TEXT_RESOURCE_ATLAS), RT_RCDATA);
+    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
     if (resource == nullptr) {
         return {};
     }
@@ -89,26 +82,46 @@ std::string LoadUtf8ResourceData(TextResourceId resourceId) {
         return {};
     }
 
-    std::string_view atlasData(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
-    if (atlasData.size() < kCompressedResourceHeaderSize ||
-        ReadLittleEndianUint32(atlasData.data()) != kCompressedResourceMagic) {
+    const std::string_view compressedData(static_cast<const char*>(resourceData), static_cast<size_t>(resourceSize));
+    if (compressedData.size() < kCompressedResourceHeaderSize ||
+        ReadLittleEndianUint32(compressedData.data()) != kCompressedResourceMagic) {
         return {};
     }
-    std::string atlas = DecompressResourceData(atlasData);
+    return DecompressResourceData(compressedData);
+}
+
+}  // namespace
+
+std::string LoadUtf8ResourceData(TextResourceId resourceId) {
+    if (resourceId != TextResourceId::ConfigTemplate && resourceId != TextResourceId::LocalizationCatalog &&
+        resourceId != TextResourceId::ResourceStringCatalog) {
+        return {};
+    }
+
+    std::string atlas = LoadCompressedResourceData(IDR_TEXT_RESOURCE_ATLAS);
     if (atlas.size() < kTextAtlasHeaderSize) {
         return {};
     }
 
     const size_t configLength = ReadLittleEndianUint32(atlas.data());
-    const size_t offset = kTextAtlasHeaderSize + (localization ? configLength : 0);
-    if (atlas.size() < offset) {
+    const size_t localizationLength = ReadLittleEndianUint32(atlas.data() + sizeof(uint32_t));
+    if (atlas.size() - kTextAtlasHeaderSize < configLength) {
         return {};
     }
-    const size_t length = localization ? atlas.size() - offset : configLength;
-    if (atlas.size() - offset < length) {
+    const size_t localizationOffset = kTextAtlasHeaderSize + configLength;
+    if (atlas.size() - localizationOffset < localizationLength) {
         return {};
     }
 
+    size_t offset = kTextAtlasHeaderSize;
+    size_t length = configLength;
+    if (resourceId == TextResourceId::LocalizationCatalog) {
+        offset = localizationOffset;
+        length = localizationLength;
+    } else if (resourceId == TextResourceId::ResourceStringCatalog) {
+        offset = localizationOffset + localizationLength;
+        length = atlas.size() - offset;
+    }
     std::string text(atlas.data() + offset, length);
     return text;
 }

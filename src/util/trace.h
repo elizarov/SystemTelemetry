@@ -7,6 +7,7 @@
 #include <string>
 #include <string_view>
 
+#include "util/resource_strings.h"
 #include "util/trace_timing.h"
 
 enum class TracePrefix : unsigned char {
@@ -52,9 +53,12 @@ public:
     TraceTimingCollector& Timings() const;
 
     void Write(TracePrefix prefix, const char* text) const;
+    void Write(TracePrefix prefix, ResourceStringId text) const;
     void Write(TracePrefix prefix, const std::string& text) const;
     void WriteFmt(TracePrefix prefix, const char* format, ...) const;
+    void WriteFmt(TracePrefix prefix, ResourceStringId format, ...) const;
     void WriteVFmt(TracePrefix prefix, const char* format, va_list args) const;
+    void WriteVFmt(TracePrefix prefix, ResourceStringId format, va_list args) const;
 
     template <typename Builder> void WriteLazy(TracePrefix prefix, Builder&& builder) const {
         if (!Enabled(prefix)) {

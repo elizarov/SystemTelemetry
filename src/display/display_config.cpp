@@ -32,15 +32,16 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
         return true;
     }
     if (config.display.monitorName.empty()) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper, "skipped_missing_monitor wallpaper=\"%s\"", config.display.wallpaper.c_str());
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("skipped_missing_monitor wallpaper=\"%s\""),
+            config.display.wallpaper.c_str());
         return false;
     }
 
     const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
         trace.WriteFmt(TracePrefix::Wallpaper,
-            "monitor_unresolved monitor=\"%s\" wallpaper=\"%s\"",
+            RES_STR("monitor_unresolved monitor=\"%s\" wallpaper=\"%s\""),
             config.display.monitorName.c_str(),
             config.display.wallpaper.c_str());
         return false;
@@ -48,7 +49,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
 
     const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(config.display.wallpaper));
     if (wallpaperPath.empty()) {
-        trace.WriteFmt(TracePrefix::Wallpaper, "path_empty monitor=\"%s\"", config.display.monitorName.c_str());
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("path_empty monitor=\"%s\""), config.display.monitorName.c_str());
         return false;
     }
 
@@ -56,7 +58,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const bool shouldUninitialize = initStatus == S_OK || initStatus == S_FALSE;
     if (FAILED(initStatus) && initStatus != RPC_E_CHANGED_MODE) {
         trace.WriteFmt(
-            TracePrefix::Wallpaper, "coinitialize_failed hr=0x%08lX", static_cast<unsigned long>(initStatus));
+            TracePrefix::Wallpaper, RES_STR("coinitialize_failed hr=0x%08lX"), static_cast<unsigned long>(initStatus));
         return false;
     }
 
@@ -64,7 +66,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT createStatus =
         CoCreateInstance(CLSID_DesktopWallpaper, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&desktopWallpaper));
     if (FAILED(createStatus) || desktopWallpaper == nullptr) {
-        trace.WriteFmt(TracePrefix::Wallpaper, "create_failed hr=0x%08lX", static_cast<unsigned long>(createStatus));
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("create_failed hr=0x%08lX"), static_cast<unsigned long>(createStatus));
         if (shouldUninitialize) {
             CoUninitialize();
         }
@@ -76,8 +79,9 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     UINT monitorCount = 0;
     const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
     if (FAILED(countStatus)) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper, "monitor_count_failed hr=0x%08lX", static_cast<unsigned long>(countStatus));
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("monitor_count_failed hr=0x%08lX"),
+            static_cast<unsigned long>(countStatus));
     } else {
         for (UINT index = 0; index < monitorCount; ++index) {
             LPWSTR monitorId = nullptr;
@@ -95,7 +99,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
                 applied = SUCCEEDED(setStatus);
                 const std::string pathText = wallpaperPath.string();
                 trace.WriteFmt(TracePrefix::Wallpaper,
-                    "apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX",
+                    RES_STR("apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX"),
                     applied ? "done" : "failed",
                     config.display.monitorName.c_str(),
                     pathText.c_str(),
@@ -110,7 +114,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     if (!targetFound) {
         const std::string pathText = wallpaperPath.string();
         trace.WriteFmt(TracePrefix::Wallpaper,
-            "target_not_found monitor=\"%s\" path=\"%s\"",
+            RES_STR("target_not_found monitor=\"%s\" path=\"%s\""),
             config.display.monitorName.c_str(),
             pathText.c_str());
     }

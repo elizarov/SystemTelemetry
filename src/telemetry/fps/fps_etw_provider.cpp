@@ -158,7 +158,7 @@ public:
         LARGE_INTEGER frequency{};
         if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
             diagnostics_ = "QueryPerformanceFrequency failed.";
-            trace_.WriteFmt(TracePrefix::FpsEtw, "initialize_failed diagnostics=\"%s\"", diagnostics_.c_str());
+            trace_.WriteFmt(TracePrefix::FpsEtw, RES_STR("initialize_failed diagnostics=\"%s\""), diagnostics_.c_str());
             return false;
         }
         qpcFrequency_ = frequency.QuadPart;
@@ -176,13 +176,14 @@ public:
 
         ULONG status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
         if (trace_.Enabled(TracePrefix::FpsEtw)) {
-            trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace status=%s", FormatWin32Error(status).c_str());
+            trace_.WriteFmt(TracePrefix::FpsEtw, RES_STR("start_trace status=%s"), FormatWin32Error(status).c_str());
         }
         if (status == ERROR_ALREADY_EXISTS) {
             ControlTraceW(0, sessionName_.c_str(), &sessionProps.properties, EVENT_TRACE_CONTROL_STOP);
             status = StartTraceW(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
             if (trace_.Enabled(TracePrefix::FpsEtw)) {
-                trace_.WriteFmt(TracePrefix::FpsEtw, "start_trace_retry status=%s", FormatWin32Error(status).c_str());
+                trace_.WriteFmt(
+                    TracePrefix::FpsEtw, RES_STR("start_trace_retry status=%s"), FormatWin32Error(status).c_str());
             }
         }
         if (status != ERROR_SUCCESS) {
@@ -203,7 +204,7 @@ public:
             const std::string d3d9Text = FormatWin32Error(d3d9Status);
             const std::string dxgkrnlText = FormatWin32Error(dxgkrnlStatus);
             trace_.WriteFmt(TracePrefix::FpsEtw,
-                "enable dxgi=%s d3d9=%s dxgkrnl=%s",
+                RES_STR("enable dxgi=%s d3d9=%s dxgkrnl=%s"),
                 dxgiText.c_str(),
                 d3d9Text.c_str(),
                 dxgkrnlText.c_str());
@@ -244,7 +245,7 @@ public:
         permissionRequired_ = false;
         initialized_ = true;
         trace_.WriteFmt(TracePrefix::FpsEtw,
-            "initialize_done dxgi=%s d3d9=%s dxgkrnl=%s",
+            RES_STR("initialize_done dxgi=%s d3d9=%s dxgkrnl=%s"),
             Trace::BoolText(dxgiEnabled_),
             Trace::BoolText(d3d9Enabled_),
             Trace::BoolText(dxgkrnlEnabled_));
@@ -827,7 +828,7 @@ private:
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
             trace_.WriteFmt(TracePrefix::FpsEtw,
-                "present source=%s pid=%lu event_id=%u source_events=%llu",
+                RES_STR("present source=%s pid=%lu event_id=%u source_events=%llu"),
                 PresentEventSourceName(source),
                 static_cast<unsigned long>(header.ProcessId),
                 static_cast<unsigned>(header.EventDescriptor.Id),
@@ -854,7 +855,8 @@ private:
             handle = traceHandle_;
         }
         const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
-        trace_.WriteFmt(TracePrefix::FpsEtw, "process_trace_done status=%s", FormatWin32Error(processStatus).c_str());
+        trace_.WriteFmt(
+            TracePrefix::FpsEtw, RES_STR("process_trace_done status=%s"), FormatWin32Error(processStatus).c_str());
     }
 
     Trace& trace_;

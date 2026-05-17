@@ -89,25 +89,26 @@ public:
     void TraceAssemblyLoaded(const wchar_t* path) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
             const std::string pathText = Utf8FromNullableWide(path);
-            trace_.WriteFmt(TracePrefix::MsiCenter, "assembly_loaded path=\"%s\"", pathText.c_str());
+            trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("assembly_loaded path=\"%s\""), pathText.c_str());
         }
     }
 
     void TraceQuerySuccess(int fanCount, int temperatureCount) override {
-        trace_.WriteFmt(TracePrefix::MsiCenter, "snapshot_done fan_count=%d temp_count=%d", fanCount, temperatureCount);
+        trace_.WriteFmt(
+            TracePrefix::MsiCenter, RES_STR("snapshot_done fan_count=%d temp_count=%d"), fanCount, temperatureCount);
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
             const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
-            trace_.WriteFmt(TracePrefix::MsiCenter, "initialize_exception %s", diagnosticsText.c_str());
+            trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("initialize_exception %s"), diagnosticsText.c_str());
         }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
             const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
-            trace_.WriteFmt(TracePrefix::MsiCenter, "snapshot_exception %s", diagnosticsText.c_str());
+            trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
         }
     }
 
@@ -134,12 +135,12 @@ public:
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
-        trace().Write(TracePrefix::MsiCenter, "initialize_begin");
+        trace().Write(TracePrefix::MsiCenter, RES_STR("initialize_begin"));
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
         trace().WriteFmt(TracePrefix::MsiCenter,
-            "board manufacturer=\"%s\" product=\"%s\"",
+            RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
 

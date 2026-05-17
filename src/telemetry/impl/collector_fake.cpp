@@ -565,16 +565,16 @@ public:
         selectionSettings_ = settings.selection;
         if (useSyntheticSource_) {
             trace_.WriteFmt(TracePrefix::Fake,
-                "initialize_begin source=synthetic mode=%s",
+                RES_STR("initialize_begin source=synthetic mode=%s"),
                 liveSyntheticSource_ ? "live" : "static");
         } else {
-            trace_.WriteFmt(TracePrefix::Fake, "initialize_begin path=\"%s\"", fakePath_.string().c_str());
+            trace_.WriteFmt(TracePrefix::Fake, RES_STR("initialize_begin path=\"%s\""), fakePath_.string().c_str());
         }
         if (!ReloadFakeDump(true, errorText)) {
-            trace_.Write(TracePrefix::Fake, "initialize_failed");
+            trace_.Write(TracePrefix::Fake, RES_STR("initialize_failed"));
             return false;
         }
-        trace_.Write(TracePrefix::Fake, "initialize_done");
+        trace_.Write(TracePrefix::Fake, RES_STR("initialize_done"));
         return true;
     }
 
@@ -636,7 +636,7 @@ public:
                 dump_ = sourceDump_;
                 RefreshSelectionsAndSnapshot();
                 trace_.WriteFmt(TracePrefix::Fake,
-                    "load_done source=synthetic mode=live tick=%llu",
+                    RES_STR("load_done source=synthetic mode=live tick=%llu"),
                     static_cast<unsigned long long>(tick));
             }
             return;
@@ -701,7 +701,7 @@ private:
             RefreshSelectionsAndSnapshot();
             lastReload_ = std::chrono::steady_clock::now();
             trace_.WriteFmt(TracePrefix::Fake,
-                "load_done source=synthetic mode=%s tick=%llu",
+                RES_STR("load_done source=synthetic mode=%s tick=%llu"),
                 liveSyntheticSource_ ? "live" : "static",
                 static_cast<unsigned long long>(tick));
             return true;
@@ -709,7 +709,8 @@ private:
 
         const std::string input = ReadBinaryFile(fakePath_);
         if (input.empty()) {
-            trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=open path=\"%s\"", fakePath_.string().c_str());
+            trace_.WriteFmt(
+                TracePrefix::Fake, RES_STR("load_failed reason=open path=\"%s\""), fakePath_.string().c_str());
             if (required && errorText != nullptr) {
                 *errorText = FormatText("Failed to open fake telemetry file:\n%s", fakePath_.string().c_str());
             }
@@ -717,7 +718,7 @@ private:
         }
 
         if (loadFakeDump_ == nullptr) {
-            trace_.Write(TracePrefix::Fake, "load_failed reason=loader_unavailable");
+            trace_.Write(TracePrefix::Fake, RES_STR("load_failed reason=loader_unavailable"));
             if (required && errorText != nullptr) {
                 *errorText = "Fake telemetry dump loading is unavailable.";
             }
@@ -727,7 +728,7 @@ private:
         TelemetryDump loaded;
         std::string error;
         if (!loadFakeDump_(input, loaded, &error)) {
-            trace_.WriteFmt(TracePrefix::Fake, "load_failed reason=parse error=\"%s\"", error.c_str());
+            trace_.WriteFmt(TracePrefix::Fake, RES_STR("load_failed reason=parse error=\"%s\""), error.c_str());
             if (required && errorText != nullptr) {
                 *errorText = FormatText("Failed to parse fake telemetry file:\n%s", error.c_str());
             }
@@ -738,7 +739,7 @@ private:
         dump_ = sourceDump_;
         RefreshSelectionsAndSnapshot();
         lastReload_ = std::chrono::steady_clock::now();
-        trace_.WriteFmt(TracePrefix::Fake, "load_done path=\"%s\"", fakePath_.string().c_str());
+        trace_.WriteFmt(TracePrefix::Fake, RES_STR("load_done path=\"%s\""), fakePath_.string().c_str());
         return true;
     }
 

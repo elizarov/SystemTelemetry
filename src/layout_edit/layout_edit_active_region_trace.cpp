@@ -322,7 +322,7 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
         const std::string path = FormatActiveRegionPath(config, region);
         const std::string detail = FormatActiveRegionDetail(config, region);
         trace.WriteFmt(TracePrefix::Diagnostics,
-            "active_region box=(%d,%d,%d,%d) visual_type=\"%s\" path=\"%s\" detail=\"%s\"",
+            RES_STR("active_region box=(%d,%d,%d,%d) visual_type=\"%s\" path=\"%s\" detail=\"%s\""),
             region.box.left,
             region.box.top,
             region.box.right,
@@ -333,7 +333,7 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
     }
 
     trace.WriteFmt(TracePrefix::Diagnostics,
-        "active_regions count=%zu layout_edit=%s",
+        RES_STR("active_regions count=%zu layout_edit=%s"),
         regions.Size(),
         Trace::BoolText(overlayState.showLayoutEditGuides));
 }

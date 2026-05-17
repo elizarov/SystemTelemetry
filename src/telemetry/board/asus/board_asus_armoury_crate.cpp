@@ -159,8 +159,9 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
     if (!device.Valid()) {
         const DWORD error = GetLastError();
         snapshot.diagnostics = FormatText("ASUS ATKACPI device open failed: %lu", static_cast<unsigned long>(error));
-        trace.WriteFmt(
-            TracePrefix::AsusArmouryCrate, "atk_driver_open_failed error=%lu", static_cast<unsigned long>(error));
+        trace.WriteFmt(TracePrefix::AsusArmouryCrate,
+            RES_STR("atk_driver_open_failed error=%lu"),
+            static_cast<unsigned long>(error));
         return snapshot;
     }
 
@@ -173,7 +174,7 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
         snapshot.fans.size(),
         snapshot.temperatures.size());
     trace.WriteFmt(TracePrefix::AsusArmouryCrate,
-        "atk_driver_snapshot_done fan_count=%zu temp_count=%zu",
+        RES_STR("atk_driver_snapshot_done fan_count=%zu temp_count=%zu"),
         snapshot.fans.size(),
         snapshot.temperatures.size());
     return snapshot;
@@ -186,12 +187,12 @@ public:
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
-        trace_.Write(TracePrefix::AsusArmouryCrate, "initialize_begin");
+        trace_.Write(TracePrefix::AsusArmouryCrate, RES_STR("initialize_begin"));
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
         trace_.WriteFmt(TracePrefix::AsusArmouryCrate,
-            "board manufacturer=\"%s\" product=\"%s\"",
+            RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
 

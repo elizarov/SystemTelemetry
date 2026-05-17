@@ -80,6 +80,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/display/monitor.h|scale.h',
     'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
     'src/widget/layout_edit_parameter_id.h|config.h',
+    'src/util/resource_strings.h|resource_strings.generated.h',
     'src/util/resource_loader.cpp|windows.h',
     'src/util/utf8.cpp|windows.h',
     'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'

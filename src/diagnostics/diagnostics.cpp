@@ -344,8 +344,10 @@ void WriteValidationFailureTrace(
     }
 
     Trace trace(traceFile);
-    trace.WriteFmt(
-        TracePrefix::Diagnostics, "validation_failed reason=\"%s\" message=\"%s\"", reason.c_str(), message.c_str());
+    trace.WriteFmt(TracePrefix::Diagnostics,
+        RES_STR("validation_failed reason=\"%s\" message=\"%s\""),
+        reason.c_str(),
+        message.c_str());
     fclose(traceFile);
 }
 
@@ -944,7 +946,8 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             return false;
         }
         overlayState.SetPreviewWidget(*widget);
-        trace.WriteFmt(TracePrefix::Diagnostics, "edit_layout_widget name=\"%s\"", editLayoutWidgetName.c_str());
+        trace.WriteFmt(
+            TracePrefix::Diagnostics, RES_STR("edit_layout_widget name=\"%s\""), editLayoutWidgetName.c_str());
     }
     if (hasHoverPoint) {
         if (!renderer.PrimeLayoutEditDynamicRegions(snapshot, overlayState)) {
@@ -967,7 +970,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
                 BuildLayoutEditTooltipTextForPayload(config, target.payload, tooltipText, &tooltipError);
             if (hasTooltipText) {
                 trace.WriteFmt(TracePrefix::Diagnostics,
-                    "hover point=\"%d,%d\" target=\"%s\" tooltip=\"%s\"",
+                    RES_STR("hover point=\"%d,%d\" target=\"%s\" tooltip=\"%s\""),
                     hoverPoint.x,
                     hoverPoint.y,
                     LayoutEditTooltipPayloadTraceKind(target.payload),
@@ -975,7 +978,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             } else {
                 const char* tooltipErrorText = tooltipError.empty() ? "unsupported_target" : tooltipError.c_str();
                 trace.WriteFmt(TracePrefix::Diagnostics,
-                    "hover point=\"%d,%d\" target=\"%s\" tooltip_error=\"%s\"",
+                    RES_STR("hover point=\"%d,%d\" target=\"%s\" tooltip_error=\"%s\""),
                     hoverPoint.x,
                     hoverPoint.y,
                     LayoutEditTooltipPayloadTraceKind(target.payload),
@@ -983,7 +986,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             }
         } else {
             trace.WriteFmt(
-                TracePrefix::Diagnostics, "hover point=\"%d,%d\" target=\"none\"", hoverPoint.x, hoverPoint.y);
+                TracePrefix::Diagnostics, RES_STR("hover point=\"%d,%d\" target=\"none\""), hoverPoint.x, hoverPoint.y);
         }
     }
     const bool saved = renderer.SaveSnapshotPng(imagePath, snapshot, overlayState);

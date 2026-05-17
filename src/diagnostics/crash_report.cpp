@@ -162,7 +162,7 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const std::string dumpText = dumpPath.string();
     Trace trace(traceFile);
     trace.WriteFmt(TracePrefix::Crash,
-        "unhandled_exception code=\"%s\" address=\"%s\" report=\"%s\" minidump=\"%s\"",
+        RES_STR("unhandled_exception code=\"%s\" address=\"%s\" report=\"%s\" minidump=\"%s\""),
         code.c_str(),
         address.c_str(),
         reportText.c_str(),
