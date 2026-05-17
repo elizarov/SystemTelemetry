@@ -1,14 +1,18 @@
 #include "telemetry/gpu/amd/gpu_amd_adl.h"
 
+#include <cstdlib>
 #include <memory>
 #include <optional>
 #include <string>
+#include <utility>
 
 #include "vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.h"
 #include "vendor/adlx/SDK/Include/IPerformanceMonitoring.h"
+#include "vendor/adlx/SDK/Include/ISystem.h"
 
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
+#include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -45,9 +49,96 @@ void SetSupportDiagnostics(std::string& diagnostics,
         static_cast<int>(vramResult));
 }
 
+std::string AdlxString(const char* value) {
+    return value != nullptr && value[0] != '\0' ? Utf8FromAnsi(value) : std::string();
+}
+
+std::optional<unsigned int> ParseHexText(std::string text) {
+    if (text.size() > 2 && text[0] == '0' && (text[1] == 'x' || text[1] == 'X')) {
+        text.erase(0, 2);
+    }
+    if (text.empty()) {
+        return std::nullopt;
+    }
+    char* end = nullptr;
+    const unsigned long value = std::strtoul(text.c_str(), &end, 16);
+    return end != nullptr && *end == '\0' ? std::optional<unsigned int>{static_cast<unsigned int>(value)}
+                                          : std::nullopt;
+}
+
+std::optional<unsigned int> ParsePnpHexField(const std::string& text, const char* key) {
+    const size_t pos = text.find(key);
+    if (pos == std::string::npos) {
+        return std::nullopt;
+    }
+    const size_t start = pos + std::string(key).size();
+    size_t end = start;
+    while (end < text.size() && ((text[end] >= '0' && text[end] <= '9') || (text[end] >= 'a' && text[end] <= 'f') ||
+                                    (text[end] >= 'A' && text[end] <= 'F'))) {
+        ++end;
+    }
+    return ParseHexText(text.substr(start, end - start));
+}
+
+struct AdlxGpuIdentity {
+    std::string name;
+    std::string pnpString;
+    unsigned int deviceId = 0;
+    unsigned int vendorId = 0;
+    unsigned int subSysId = 0;
+    unsigned int revision = 0;
+};
+
+AdlxGpuIdentity ReadAdlxGpuIdentity(IADLXGPUPtr gpu) {
+    AdlxGpuIdentity identity;
+    const char* text = nullptr;
+    if (gpu->Name(&text) == ADLX_OK) {
+        identity.name = AdlxString(text);
+    }
+    if (gpu->PNPString(&text) == ADLX_OK) {
+        identity.pnpString = AdlxString(text);
+    }
+    if (gpu->DeviceId(&text) == ADLX_OK) {
+        identity.deviceId = ParseHexText(AdlxString(text)).value_or(0);
+    }
+    if (gpu->VendorId(&text) == ADLX_OK) {
+        identity.vendorId = ParseHexText(AdlxString(text)).value_or(0);
+    }
+
+    if (!identity.pnpString.empty()) {
+        identity.vendorId = ParsePnpHexField(identity.pnpString, "VEN_").value_or(identity.vendorId);
+        identity.deviceId = ParsePnpHexField(identity.pnpString, "DEV_").value_or(identity.deviceId);
+        identity.subSysId = ParsePnpHexField(identity.pnpString, "SUBSYS_").value_or(identity.subSysId);
+        identity.revision = ParsePnpHexField(identity.pnpString, "REV_").value_or(identity.revision);
+    }
+    return identity;
+}
+
+int AmdDeviceMatchRank(const GpuVendorInfo& adapter, const AdlxGpuIdentity& identity) {
+    if (identity.vendorId == adapter.vendorId && identity.deviceId == adapter.deviceId &&
+        (adapter.subSysId == 0 || identity.subSysId == adapter.subSysId) &&
+        (adapter.revision == 0 || identity.revision == adapter.revision)) {
+        return 4;
+    }
+    if (identity.vendorId == adapter.vendorId && identity.deviceId == adapter.deviceId) {
+        return 3;
+    }
+    if (!adapter.adapterName.empty()) {
+        if (EqualsInsensitive(identity.name, adapter.adapterName)) {
+            return 2;
+        }
+        if (ContainsInsensitive(identity.name, adapter.adapterName) ||
+            ContainsInsensitive(adapter.adapterName, identity.name)) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    explicit AmdAdlxGpuTelemetryProvider(Trace& trace) : trace_(trace) {}
+    AmdAdlxGpuTelemetryProvider(Trace& trace, std::optional<GpuVendorInfo> adapter)
+        : trace_(trace), adapter_(std::move(adapter)) {}
 
     ~AmdAdlxGpuTelemetryProvider() override {
         metricsSupport_ = nullptr;
@@ -99,27 +190,10 @@ public:
             return false;
         }
 
-        trace().Write(TracePrefix::AmdAdlx, "get_first_gpu_begin");
-        result = gpus->At(gpus->Begin(), &gpu_);
-        trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_first_gpu_done result=%d available=%s",
-            static_cast<int>(result),
-            Trace::BoolText(gpu_ != nullptr));
-        if (ADLX_FAILED(result) || !gpu_) {
-            diagnostics_ = FormatText("Failed to open first AMD GPU: gpu=%d", static_cast<int>(result));
-            trace().WriteFmt(TracePrefix::AmdAdlx, "get_first_gpu_failed %s", diagnostics_.c_str());
+        if (!SelectGpu(gpus)) {
             return false;
         }
 
-        const char* name = nullptr;
-        const ADLX_RESULT nameResult = gpu_->Name(&name);
-        trace().WriteFmt(TracePrefix::AmdAdlx,
-            "get_gpu_name result=%d has_name=%s",
-            static_cast<int>(nameResult),
-            Trace::BoolText(name != nullptr && name[0] != '\0'));
-        if (ADLX_SUCCEEDED(nameResult)) {
-            gpuName_ = Utf8FromAnsi(name);
-        }
         if (gpuName_.empty()) {
             gpuName_ = "AMD GPU";
         }
@@ -329,6 +403,58 @@ public:
     }
 
 private:
+    bool SelectGpu(const IADLXGPUListPtr& gpus) {
+        int bestRank = -1;
+        IADLXGPUPtr bestGpu;
+        std::string bestName;
+        std::string bestMatch = "fallback";
+        ADLX_RESULT bestResult = ADLX_FAIL;
+
+        for (adlx_uint index = gpus->Begin(); index < gpus->End(); ++index) {
+            IADLXGPUPtr candidate;
+            const ADLX_RESULT result = gpus->At(index, &candidate);
+            const AdlxGpuIdentity identity = candidate != nullptr ? ReadAdlxGpuIdentity(candidate) : AdlxGpuIdentity{};
+            const int rank = candidate != nullptr && adapter_.has_value() ? AmdDeviceMatchRank(*adapter_, identity)
+                                                                          : (candidate != nullptr ? 0 : -1);
+            trace().WriteFmt(TracePrefix::AmdAdlx,
+                "gpu_candidate index=%u result=%d vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "
+                "revision=0x%02X match_rank=%d name=\"%s\" pnp=\"%s\"",
+                static_cast<unsigned>(index),
+                static_cast<int>(result),
+                identity.vendorId,
+                identity.deviceId,
+                identity.subSysId,
+                identity.revision,
+                rank,
+                identity.name.c_str(),
+                identity.pnpString.c_str());
+            if (candidate != nullptr && rank > bestRank) {
+                bestRank = rank;
+                bestGpu = candidate;
+                bestName = identity.name;
+                bestResult = result;
+                bestMatch = rank >= 3 ? "device_id" : (rank >= 1 ? "name" : "fallback");
+            }
+        }
+
+        gpu_ = bestGpu;
+        gpuName_ = bestMatch == "device_id" && adapter_.has_value() && !adapter_->adapterName.empty()
+                       ? adapter_->adapterName
+                       : bestName;
+        trace().WriteFmt(TracePrefix::AmdAdlx,
+            "gpu_selected match=\"%s\" rank=%d display_name=\"%s\" selected_adapter=\"%s\"",
+            bestMatch.c_str(),
+            bestRank,
+            gpuName_.c_str(),
+            adapter_.has_value() ? adapter_->adapterName.c_str() : "");
+        if (!gpu_) {
+            diagnostics_ = FormatText("Failed to open selected AMD GPU: gpu=%d", static_cast<int>(bestResult));
+            trace().WriteFmt(TracePrefix::AmdAdlx, "get_gpu_failed %s", diagnostics_.c_str());
+            return false;
+        }
+        return true;
+    }
+
     std::optional<double> ReadNativeAmdFps() {
         IADLXFPSPtr fpsMetric;
         trace().Write(TracePrefix::AmdAdlx, "get_native_fps_begin");
@@ -359,6 +485,7 @@ private:
     IADLXPerformanceMonitoringServicesPtr performanceMonitoring_;
     IADLXGPUMetricsSupportPtr metricsSupport_;
     Trace& trace_;
+    std::optional<GpuVendorInfo> adapter_;
     std::string gpuName_;
     std::string diagnostics_ = "ADLX provider not initialized.";
     std::string fpsDiagnostics_ = "Presented FPS ETW provider not initialized.";
@@ -374,6 +501,7 @@ private:
 
 }  // namespace
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(Trace& trace) {
-    return std::make_unique<AmdAdlxGpuTelemetryProvider>(trace);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(
+    Trace& trace, std::optional<GpuVendorInfo> adapter) {
+    return std::make_unique<AmdAdlxGpuTelemetryProvider>(trace, std::move(adapter));
 }

@@ -11,6 +11,7 @@
 
 enum class TracePrefix : unsigned char {
     AmdAdlx,
+    AsusArmouryCrate,
     BoardVendor,
     Crash,
     Diagnostics,
@@ -20,6 +21,7 @@ enum class TracePrefix : unsigned char {
     FpsServiceClient,
     GigabyteSiv,
     GpuVendor,
+    IntelLevelZero,
     LayoutEditDialog,
     LayoutEditDrag,
     LayoutEditHover,

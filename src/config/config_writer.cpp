@@ -186,8 +186,12 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
     }
 
     if (appendWhenMissing) {
-        lines.insert(
-            lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), FormatText("%s = %s", key.c_str(), value.c_str()));
+        size_t appendIndex = sectionEnd;
+        while (appendIndex > sectionStart + 1 && Trim(lines[appendIndex - 1]).empty()) {
+            --appendIndex;
+        }
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(appendIndex),
+            FormatText("%s = %s", key.c_str(), value.c_str()));
     }
 }
 
@@ -318,7 +322,9 @@ std::string BuildSavedConfigText(
 
     const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
-        size_t sectionStart = sectionName == "[storage]"   ? ensureSectionAfter(sectionName, "[network]")
+        size_t sectionStart = sectionName == "[gpu]"       ? ensureSectionAfter(sectionName, "[display]")
+                              : sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]")
+                              : sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
                               : sectionName == "[board]"   ? ensureSectionAfter(sectionName, "[storage]")
                               : sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]")
                                                            : ensureSection(sectionName);

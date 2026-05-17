@@ -6,12 +6,12 @@
 #include <commdlg.h>
 
 #include "build_version.h"
+#include "config/metric_board_binding.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
 #include "dashboard/dashboard_menu_format.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
-#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
@@ -631,8 +631,16 @@ const AppConfig& DashboardShellUi::CurrentConfig() const {
     return app_.controller_.State().config;
 }
 
+bool DashboardShellUi::ShouldShowMetricBoardBinding(const LayoutMetricEditKey& key) const {
+    const auto& state = app_.controller_.State();
+    return ShouldExposeMetricBoardBinding(key.metricId, state.telemetryUpdate.dump.activeMetricBoardBindings);
+}
+
 std::vector<std::string> DashboardShellUi::AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const {
-    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    if (!ShouldShowMetricBoardBinding(key)) {
+        return {};
+    }
+    const auto target = ResolveMetricBoardBindingTarget(key.metricId);
     if (!target.has_value()) {
         return {};
     }
@@ -707,7 +715,7 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
         definition->unit = unit;
     }
     definition->label = label;
-    if (const auto target = ParseBoardMetricBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
+    if (const auto target = ResolveMetricBoardBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
         auto& bindings = target->kind == BoardMetricBindingKind::Temperature
                              ? updatedConfig.layout.board.temperatureSensorNames
                              : updatedConfig.layout.board.fanSensorNames;
@@ -951,6 +959,14 @@ void DashboardShellUi::ExecuteCommand(
                 }
                 break;
             }
+            if (selected >= kCommandGpuAdapterBase && selected <= kCommandGpuAdapterMax) {
+                const size_t index = selected - kCommandGpuAdapterBase;
+                const auto& candidates = state.telemetryUpdate.gpuAdapterCandidates;
+                if (index < candidates.size()) {
+                    app_.controller_.SelectGpuAdapter(app_, candidates[index].adapterName);
+                }
+                break;
+            }
             if (selected >= kCommandThemeBase && selected <= kCommandThemeMax) {
                 const size_t index = selected - kCommandThemeBase;
                 if (index < state.config.layout.themes.size()) {
@@ -1006,6 +1022,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU menu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU themeMenu = CreatePopupMenu();
+    HMENU gpuMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
     HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
@@ -1039,6 +1056,17 @@ void DashboardShellUi::ShowContextMenu(
             const std::string label = FormatNamedMenuLabel(theme.name, theme.description);
             AppendMenuUtf8(themeMenu, flags, commandId, label);
             SetMenuItemRadioStyle(themeMenu, commandId);
+        }
+    }
+    const auto& gpuCandidates = state.telemetryUpdate.gpuAdapterCandidates;
+    if (gpuCandidates.empty()) {
+        AppendMenuUtf8(gpuMenu, MF_STRING | MF_GRAYED, kCommandGpuAdapterBase, "No adapters found");
+    } else {
+        for (size_t i = 0; i < gpuCandidates.size() && (kCommandGpuAdapterBase + i) <= kCommandGpuAdapterMax; ++i) {
+            const UINT commandId = kCommandGpuAdapterBase + static_cast<UINT>(i);
+            const UINT flags = MF_STRING | (gpuCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuUtf8(gpuMenu, flags, commandId, gpuCandidates[i].adapterName);
+            SetMenuItemRadioStyle(gpuMenu, commandId);
         }
     }
     const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
@@ -1108,6 +1136,7 @@ void DashboardShellUi::ShowContextMenu(
     }
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
+    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), "Network");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), "Storage Drives");
     AppendMenuUtf8(editLayoutMenu,

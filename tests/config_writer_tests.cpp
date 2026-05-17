@@ -78,17 +78,66 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedNetworkAdapterAgainstEmptySourceCo
     EXPECT_THAT(output, testing::HasSubstr("[network]\r\nadapter_name = Ethernet\r\n"));
 }
 
+TEST(ConfigWriter, MinimalSavePersistsGpuAdapterAgainstEmptySourceConfig) {
+    AppConfig compareConfig;
+    compareConfig.gpu.adapterName.clear();
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("[gpu]\r\nadapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\r\n"));
+}
+
+TEST(ConfigWriter, MinimalSaveInsertsMissingGpuSectionWithKeyBeforeSectionSeparator) {
+    AppConfig compareConfig;
+    compareConfig.gpu.adapterName.clear();
+    compareConfig.network.adapterName = "Wi-Fi";
+    compareConfig.storage.drives = {"C"};
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
+
+    const std::string initialText = "[display]\r\n"
+                                    "monitor_name = TL160ADMP03-0\r\n"
+                                    "position = 258,117\r\n"
+                                    "scale = 2\r\n"
+                                    "\r\n"
+                                    "[network]\r\n"
+                                    "adapter_name = Wi-Fi\r\n"
+                                    "\r\n"
+                                    "[storage]\r\n"
+                                    "drives = C\r\n";
+
+    const std::string output = BuildSavedConfigText(initialText, currentConfig, &compareConfig);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("[display]\r\n"
+                           "monitor_name = TL160ADMP03-0\r\n"
+                           "position = 258,117\r\n"
+                           "scale = 2\r\n"
+                           "\r\n"
+                           "[gpu]\r\n"
+                           "adapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\r\n"
+                           "\r\n"
+                           "[network]\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("[gpu]\r\n\r\nadapter_name")));
+}
+
 TEST(ConfigWriter, MinimalSavePersistsResolvedBoardBindingsAgainstEmptySourceConfig) {
     AppConfig compareConfig;
     compareConfig.layout.board.requestedTemperatureNames = {"cpu"};
-    compareConfig.layout.board.requestedFanNames = {"cpu", "system"};
+    compareConfig.layout.board.requestedFanNames = {"cpu", "gpu", "system"};
     compareConfig.layout.board.temperatureSensorNames["cpu"] = "";
     compareConfig.layout.board.fanSensorNames["cpu"] = "";
+    compareConfig.layout.board.fanSensorNames["gpu"] = "";
     compareConfig.layout.board.fanSensorNames["system"] = "";
 
     AppConfig currentConfig = compareConfig;
     currentConfig.layout.board.temperatureSensorNames["cpu"] = "CPU";
     currentConfig.layout.board.fanSensorNames["cpu"] = "CPU";
+    currentConfig.layout.board.fanSensorNames["gpu"] = "GPU Fan";
     currentConfig.layout.board.fanSensorNames["system"] = "System 1";
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
@@ -96,6 +145,7 @@ TEST(ConfigWriter, MinimalSavePersistsResolvedBoardBindingsAgainstEmptySourceCon
     EXPECT_THAT(output, testing::HasSubstr("[board]\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("board.temp.cpu = CPU\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("board.fan.cpu = CPU\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("board.fan.gpu = GPU Fan\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("board.fan.system = System 1\r\n"));
 }
 

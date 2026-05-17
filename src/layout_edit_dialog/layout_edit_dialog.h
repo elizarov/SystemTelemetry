@@ -42,6 +42,7 @@ public:
     virtual bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) = 0;
     virtual bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) = 0;
 
+    virtual bool ShouldShowMetricBoardBinding(const LayoutMetricEditKey& key) const = 0;
     virtual std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const = 0;
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
     virtual void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const = 0;

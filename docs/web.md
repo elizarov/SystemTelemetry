@@ -64,15 +64,7 @@ Each feature item uses short copy and, where useful, a small cropped screenshot 
 
 ## Hardware Section
 
-The hardware section lists currently supported providers and telemetry families:
-
-- AMD Radeon GPU telemetry through ADLX.
-- NVIDIA GPU telemetry through NVML.
-- Presented-FPS capture through ETW via the CaseDash service.
-- MSI board temperature and fan telemetry through MSI Center SDK.
-- Gigabyte board temperature and fan telemetry through SIV.
-
-The website keeps this section concise; [docs/hardware.md](hardware.md) owns provider requirements and troubleshooting details.
+The hardware section gives visitors a concise support overview with one-line provider mentions and sends them to [docs/hardware.md](hardware.md) for the canonical supported-provider list, runtime requirements, provider-specific telemetry behavior, and troubleshooting details.
 
 ## Layout Section
 
@@ -96,7 +88,7 @@ It includes:
 - The `Contributions` eyebrow.
 - The heading `Bring your hardware and ideas`.
 - Short copy inviting code, issues, sketches, ideas, themes, layouts, telemetry providers, localization, and practical feedback.
-- Copy explaining that provider work needs owners with matching hardware, SDKs, and patience.
+- Copy explaining that the most useful code contributions are new hardware providers, and that new hardware support is especially valuable when it comes from the owners of real machines and from someone who can test the result.
 - Repository and Issues links.
 
 ## Design System

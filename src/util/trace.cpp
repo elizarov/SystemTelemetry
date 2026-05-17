@@ -93,6 +93,10 @@ const char* Trace::PrefixName(TracePrefix prefix) {
     switch (prefix) {
         case TracePrefix::AmdAdlx:
             return "amd_adlx";
+        case TracePrefix::AsusArmouryCrate:
+            return "asus_armoury_crate";
+        case TracePrefix::BoardVendor:
+            return "board_vendor";
         case TracePrefix::Crash:
             return "crash";
         case TracePrefix::Diagnostics:
@@ -109,6 +113,8 @@ const char* Trace::PrefixName(TracePrefix prefix) {
             return "gigabyte_siv";
         case TracePrefix::GpuVendor:
             return "gpu_vendor";
+        case TracePrefix::IntelLevelZero:
+            return "intel_level_zero";
         case TracePrefix::LayoutEditDialog:
             return "layout_edit_dialog";
         case TracePrefix::LayoutEditDrag:

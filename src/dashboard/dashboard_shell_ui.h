@@ -90,6 +90,7 @@ private:
     bool ApplyLayoutEditPreview(const LayoutEditFocusKey& key, const LayoutEditValue& value) override;
     bool ApplyMetricListAddRowPreview(const LayoutEditController::TooltipTarget& target);
     bool ApplyWeightPreview(const LayoutWeightEditKey& key, int firstWeight, int secondWeight) override;
+    bool ShouldShowMetricBoardBinding(const LayoutMetricEditKey& key) const override;
     void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) override;
     void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const override;
     void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override;

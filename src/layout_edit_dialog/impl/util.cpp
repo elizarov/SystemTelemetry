@@ -7,7 +7,7 @@
 #include <cwchar>
 
 #include "config/color_math.h"
-#include "layout_edit/board_metric_binding.h"
+#include "config/metric_board_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
@@ -189,7 +189,7 @@ void SetRgbColorDialogChannels(HWND hwnd, unsigned int color) {
 }  // namespace
 
 std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key) {
-    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    const auto target = ResolveMetricBoardBindingTarget(key.metricId);
     if (!target.has_value()) {
         return {};
     }

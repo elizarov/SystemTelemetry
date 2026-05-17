@@ -105,8 +105,10 @@
         <h2>Supported vendors</h2>
         <div class="hardware-list">
           <div><strong>AMD</strong><span>Radeon GPU telemetry through AMD ADLX.</span></div>
+          <div><strong>Intel</strong><span>GPU telemetry through Level Zero Sysman.</span></div>
           <div><strong>NVIDIA</strong><span>GPU telemetry through NVML.</span></div>
           <div><strong>FPS</strong><span>Presented-FPS capture through ETW via the CaseDash service.</span></div>
+          <div><strong>ASUS</strong><span>Board temperature and fan telemetry through Armoury Crate ATKACPI.</span></div>
           <div><strong>MSI</strong><span>Board temperature and fan telemetry through MSI Center SDK.</span></div>
           <div><strong>Gigabyte</strong><span>Board temperature and fan telemetry through Gigabyte SIV.</span></div>
         </div>
@@ -138,9 +140,8 @@
             themes, layouts, telemetry providers, localization, and practical feedback.
           </p>
           <p>
-            The most useful code contributions are new hardware providers. CaseDash currently has
-            board telemetry for Gigabyte and MSI, and GPU telemetry for AMD and NVIDIA. More board
-            vendors and GPU vendors need owners with the hardware, SDKs, and patience to wire them in.
+            The most useful code contributions are new hardware providers. New hardware support is
+            especially valuable when it comes from the owners of real machines and from someone who can test the result.
           </p>
         </div>
         <div class="link-stack">

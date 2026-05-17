@@ -2320,11 +2320,6 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         case LayoutEditEditorKind::GlobalFontFamily:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
             break;
-        case LayoutEditEditorKind::Metric:
-            if (showBinding) {
-                BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
-            }
-            break;
         case LayoutEditEditorKind::DateTimeFormat:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
             break;

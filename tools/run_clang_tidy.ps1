@@ -46,8 +46,11 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/renderer/impl/d2d_renderer.h|dwrite.h',
     'src/renderer/renderer.h|windows.h',
     'src/util/elevated_process.h|windows.h',
+    'src/telemetry/board/asus/board_asus_armoury_crate.cpp|windows.h',
     'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
     'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
+    'src/telemetry/gpu/gpu_vendor.cpp|windows.h',
+    'src/telemetry/gpu/intel/gpu_intel_level_zero.cpp|windows.h',
     'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',
     'src/telemetry/impl/collector_state.h|winsock2.h',
     'src/telemetry/impl/collector_state.h|ws2tcpip.h',
@@ -602,6 +605,10 @@ function Complete-TidyProcess {
         }
 
         if ($text -match '^Error while processing .+\.$') {
+            continue
+        }
+
+        if ($text -match '^\[\d+/\d+\] \(\d+/\d+\) Processing file .+\.$') {
             continue
         }
 

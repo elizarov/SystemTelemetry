@@ -68,6 +68,7 @@ const MetricDefinitionConfig* FindEffectiveMetricDefinition(const MetricsSection
 TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config) {
     TelemetrySelectionSettings settings;
     settings.preferredAdapterName = config.network.adapterName;
+    settings.preferredGpuAdapterName = config.gpu.adapterName;
     settings.configuredDrives = config.storage.drives;
     return settings;
 }
@@ -85,6 +86,9 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
 void ApplyResolvedTelemetrySelections(AppConfig& config, const ResolvedTelemetrySelections& resolvedSelections) {
     if (!resolvedSelections.adapterName.empty()) {
         config.network.adapterName = resolvedSelections.adapterName;
+    }
+    if (!config.gpu.adapterName.empty() && !resolvedSelections.gpuAdapterName.empty()) {
+        config.gpu.adapterName = resolvedSelections.gpuAdapterName;
     }
     config.storage.drives = resolvedSelections.drives;
     for (const auto& [logicalName, sensorName] : resolvedSelections.boardTemperatureSensorNames) {

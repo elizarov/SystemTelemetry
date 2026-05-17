@@ -141,7 +141,7 @@ add_executable(CaseDash WIN32
     src/layout_edit_dialog/impl/trace.cpp
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
-    src/layout_edit/board_metric_binding.cpp
+    src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_controller.cpp
@@ -197,10 +197,12 @@ add_executable(CaseDash WIN32
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
@@ -307,6 +309,7 @@ set(casedash_release_speed_sources
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
@@ -316,6 +319,7 @@ set(casedash_release_speed_sources
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -544,6 +548,7 @@ add_executable(CaseDashTests
     tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
+    tests/board_metric_binding_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -581,6 +586,7 @@ add_executable(CaseDashTests
     src/layout_model/layout_edit_layout_target.cpp
     src/layout_model/layout_edit_service.cpp
     src/layout_model/dashboard_overlay_state.cpp
+    src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
@@ -727,6 +733,7 @@ add_executable(CaseDashBenchmarks
     src/config/config_parser.cpp
     src/config/config_runtime_fields.cpp
     src/config/config_resolution.cpp
+    src/config/metric_board_binding.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
@@ -749,10 +756,12 @@ add_executable(CaseDashBenchmarks
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp

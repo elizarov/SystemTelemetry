@@ -34,6 +34,7 @@ TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
     TelemetryUpdate update;
     update.dump = collector.Dump();
     update.resolvedSelections = collector.ResolvedSelections();
+    update.gpuAdapterCandidates = collector.GpuAdapterCandidates();
     update.networkAdapterCandidates = collector.NetworkAdapterCandidates();
     update.storageDriveCandidates = collector.StorageDriveCandidates();
     return update;
@@ -102,6 +103,13 @@ public:
         RunSynchronized([&] {
             collector_->SetPreferredNetworkAdapterName(std::move(adapterName));
             UpdateSnapshotTimed();
+        });
+    }
+
+    void SetPreferredGpuAdapterName(std::string adapterName) override {
+        RunSynchronized([&] {
+            collector_->SetPreferredGpuAdapterName(std::move(adapterName));
+            collector_->UpdateSnapshot();
         });
     }
 
