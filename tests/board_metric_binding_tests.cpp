@@ -2,29 +2,37 @@
 
 #include "config/metric_board_binding.h"
 
-TEST(BoardMetricBinding, ParsesBoardTemperatureAndFanMetrics) {
-    const auto temperature = ResolveMetricBoardBindingTarget("board.temp.cpu");
-    ASSERT_TRUE(temperature.has_value());
-    EXPECT_EQ(temperature->kind, BoardMetricBindingKind::Temperature);
-    EXPECT_EQ(temperature->logicalName, "cpu");
+namespace {
 
-    const auto fan = ResolveMetricBoardBindingTarget("board.fan.system");
-    ASSERT_TRUE(fan.has_value());
-    EXPECT_EQ(fan->kind, BoardMetricBindingKind::Fan);
-    EXPECT_EQ(fan->logicalName, "system");
+BoardMetricBindingTarget RequireMetricBoardBindingTarget(const char* metricId) {
+    auto target = ResolveMetricBoardBindingTarget(metricId);
+    if (!target.has_value()) {
+        ADD_FAILURE() << "expected board binding target for " << metricId;
+        return {};
+    }
+    return *target;
+}
+
+}  // namespace
+
+TEST(BoardMetricBinding, ParsesBoardTemperatureAndFanMetrics) {
+    const BoardMetricBindingTarget temperature = RequireMetricBoardBindingTarget("board.temp.cpu");
+    EXPECT_EQ(temperature.kind, BoardMetricBindingKind::Temperature);
+    EXPECT_EQ(temperature.logicalName, "cpu");
+
+    const BoardMetricBindingTarget fan = RequireMetricBoardBindingTarget("board.fan.system");
+    EXPECT_EQ(fan.kind, BoardMetricBindingKind::Fan);
+    EXPECT_EQ(fan.logicalName, "system");
 }
 
 TEST(BoardMetricBinding, MapsGpuProviderFallbackMetricsToBoardBindings) {
-    const auto temperature = ResolveMetricBoardBindingTarget("gpu.temp");
-    ASSERT_TRUE(temperature.has_value());
-    EXPECT_EQ(temperature->kind, BoardMetricBindingKind::Temperature);
-    EXPECT_EQ(temperature->logicalName, "cpu");
+    const BoardMetricBindingTarget temperature = RequireMetricBoardBindingTarget("gpu.temp");
+    EXPECT_EQ(temperature.kind, BoardMetricBindingKind::Temperature);
+    EXPECT_EQ(temperature.logicalName, "cpu");
 
-    const auto target = ResolveMetricBoardBindingTarget("gpu.fan");
-
-    ASSERT_TRUE(target.has_value());
-    EXPECT_EQ(target->kind, BoardMetricBindingKind::Fan);
-    EXPECT_EQ(target->logicalName, "gpu");
+    const BoardMetricBindingTarget target = RequireMetricBoardBindingTarget("gpu.fan");
+    EXPECT_EQ(target.kind, BoardMetricBindingKind::Fan);
+    EXPECT_EQ(target.logicalName, "gpu");
 }
 
 TEST(BoardMetricBinding, IgnoresMetricsWithoutBoardBindingEditors) {
@@ -38,10 +46,9 @@ TEST(BoardMetricBinding, ExposesDirectBoardBindingsWithoutRuntimeFallbackUse) {
 }
 
 TEST(BoardMetricBinding, ExposesFallbackBindingsOnlyWhenRuntimeUsesThem) {
-    const auto gpuFan = ResolveMetricBoardBindingTarget("gpu.fan");
-    ASSERT_TRUE(gpuFan.has_value());
+    const BoardMetricBindingTarget gpuFan = RequireMetricBoardBindingTarget("gpu.fan");
 
     EXPECT_FALSE(ShouldExposeMetricBoardBinding("gpu.fan", {}));
-    EXPECT_FALSE(ShouldExposeMetricBoardBinding("gpu.temp", {MetricBoardBindingUse{"gpu.fan", *gpuFan}}));
-    EXPECT_TRUE(ShouldExposeMetricBoardBinding("gpu.fan", {MetricBoardBindingUse{"gpu.fan", *gpuFan}}));
+    EXPECT_FALSE(ShouldExposeMetricBoardBinding("gpu.temp", {MetricBoardBindingUse{"gpu.fan", gpuFan}}));
+    EXPECT_TRUE(ShouldExposeMetricBoardBinding("gpu.fan", {MetricBoardBindingUse{"gpu.fan", gpuFan}}));
 }

@@ -25,6 +25,7 @@ using NtStatus = LONG;
 using D3DkmtHandle = UINT;
 
 constexpr int kD3DkmtQueryAdapterAddress = 6;
+constexpr wchar_t kGdi32LibraryName[] = L"gdi32.dll";  // Win32 module loading requires a UTF-16 DLL name.
 
 struct D3DkmtOpenAdapterFromLuid {
     LUID adapterLuid;
@@ -145,9 +146,9 @@ double DedicatedVideoMemoryGb(std::uint64_t bytes) {
 }
 
 void PopulateAdapterPciAddress(GpuVendorInfo& info, LUID adapterLuid) {
-    HMODULE gdi = GetModuleHandleW(L"gdi32.dll");
+    HMODULE gdi = GetModuleHandleW(kGdi32LibraryName);
     if (gdi == nullptr) {
-        gdi = LoadLibraryW(L"gdi32.dll");
+        gdi = LoadLibraryW(kGdi32LibraryName);
     }
     if (gdi == nullptr) {
         return;

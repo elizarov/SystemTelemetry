@@ -44,6 +44,7 @@ Use this skill to investigate a failed workflow from the failing run outward, th
 - Clang-tidy can emit `Processing file ...` progress lines before returning a non-zero code for otherwise filtered include-cleaner diagnostics. Those progress lines are not reportable diagnostics; filter them before deciding the result still failed.
 - Visual Studio LLVM clang-format versions can disagree on C++/CLI managed handles and `for each` syntax. Keep mixed-mode bridge `.cpp` formatter exclusions narrow and filename-based instead of rewriting managed bridge source to satisfy one runner version.
 - A docs-only or website-only commit can still fail the benchmark build when earlier source-list drift is latent. If `CaseDashBenchmarks` links a source that calls newly factored production helpers, verify the helper `.cpp` is also listed in that benchmark target, not only in the app or test target.
+- `lint.cmd tidy changed` runs the normal lint gates before the changed-file clang-tidy slice. If source-policy failures appear there, fix them even when the downloaded CI artifact only reports clang-tidy diagnostics.
 
 ## Local Validation
 

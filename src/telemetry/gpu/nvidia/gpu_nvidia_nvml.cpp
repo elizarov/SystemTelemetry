@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <array>
-#include <cstdint>
 #include <cstdio>
 #include <memory>
 #include <optional>
@@ -454,7 +453,7 @@ private:
 
     static std::string HexId(unsigned int value, int width) {
         char buffer[16];
-        sprintf_s(buffer, "%0*X", width, value);
+        std::snprintf(buffer, sizeof(buffer), "%0*X", width, value);
         return buffer;
     }
 
