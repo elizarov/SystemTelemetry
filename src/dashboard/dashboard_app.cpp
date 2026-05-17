@@ -1461,7 +1461,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             UnregisterSessionNotifications();
             DestroyLayoutEditTooltip();
             if (state.diagnostics != nullptr) {
-                state.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "ui_done");
+                state.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("ui_done"));
             }
             RemoveTrayIcon();
             ReleaseFonts();

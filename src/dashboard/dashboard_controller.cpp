@@ -254,8 +254,8 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         if (state_.diagnostics == nullptr) {
             return false;
         }
-        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "ui_start");
-        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialize_begin");
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("ui_start"));
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("telemetry_initialize_begin"));
     }
 
     std::string telemetryError;
@@ -275,7 +275,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
 
     state_.telemetryUpdate = state_.telemetry->Latest();
     if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialized");
+        state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("telemetry_initialized"));
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
     }
 
@@ -310,9 +310,10 @@ bool DashboardController::WriteDiagnosticsOutputs() {
     if (state_.diagnostics == nullptr || state_.telemetry == nullptr) {
         return true;
     }
-    state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "write_outputs_begin");
+    state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_begin"));
     const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump, state_.config);
-    state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, ok ? "write_outputs_done" : "write_outputs_failed");
+    state_.diagnostics->WriteTraceMarker(
+        TracePrefix::Diagnostics, ok ? RES_STR("write_outputs_done") : RES_STR("write_outputs_failed"));
     return ok;
 }
 
@@ -337,7 +338,7 @@ bool DashboardController::ReloadConfigFromDisk(
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_failed");
+            state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
         }
         return false;
     }
@@ -486,7 +487,7 @@ bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
     if (state_.diagnostics != nullptr) {
         state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-            "begin current_layout=\"%s\" requested_layout=\"%s\"",
+            RES_STR("begin current_layout=\"%s\" requested_layout=\"%s\""),
             state_.config.display.layout.c_str(),
             layoutName.c_str());
     }
@@ -494,7 +495,7 @@ bool DashboardController::SwitchLayout(
     if (!SelectLayout(state_.config, layoutName)) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarkerFmt(
-                TracePrefix::LayoutSwitch, "select_failed requested_layout=\"%s\"", layoutName.c_str());
+                TracePrefix::LayoutSwitch, RES_STR("select_failed requested_layout=\"%s\""), layoutName.c_str());
         }
         return false;
     }
@@ -503,7 +504,7 @@ bool DashboardController::SwitchLayout(
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
             state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-                "sync_failed requested_layout=\"%s\" renderer_error=\"%s\"",
+                RES_STR("sync_failed requested_layout=\"%s\" renderer_error=\"%s\""),
                 layoutName.c_str(),
                 shell.Renderer().LastError().c_str());
         }
@@ -519,7 +520,7 @@ bool DashboardController::SwitchLayout(
     RefreshLayoutEditSessionDirtyFlag();
     if (state_.diagnostics != nullptr) {
         state_.diagnostics->WriteTraceMarkerFmt(
-            TracePrefix::LayoutSwitch, "done active_layout=\"%s\"", state_.config.display.layout.c_str());
+            TracePrefix::LayoutSwitch, RES_STR("done active_layout=\"%s\""), state_.config.display.layout.c_str());
     }
     return true;
 }

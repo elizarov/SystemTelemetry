@@ -44,5 +44,6 @@ const char* ResourceStringText(ResourceStringId id) {
     if (index >= catalog.strings.size()) {
         return "";
     }
+    // Size: keep the loaded index so trace formatting stays O(1); this catalog is queried from runtime paths too.
     return catalog.strings[index];
 }
