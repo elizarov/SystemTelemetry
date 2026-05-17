@@ -14,6 +14,7 @@ constexpr uint32_t kCompressedResourceMagic = 0x5A4C4443u;
 constexpr size_t kCompressedResourceHeaderSize = 8;
 constexpr size_t kTextAtlasHeaderSize = 8;
 constexpr int kMinMatchLength = 3;
+constexpr size_t kExtendedMatchLength = kMinMatchLength + 15;
 constexpr size_t kTextResourceCount = static_cast<size_t>(TextResourceId::Count);
 
 struct TextAtlas {
@@ -52,7 +53,14 @@ std::string DecompressResourceData(std::string_view data) {
                                    (static_cast<uint16_t>(static_cast<unsigned char>(data[input + 1])) << 8);
             input += 2;
             const size_t offset = static_cast<size_t>(token >> 4) + 1;
-            const size_t length = static_cast<size_t>(token & 0x0F) + kMinMatchLength;
+            size_t length = static_cast<size_t>(token & 0x0F) + kMinMatchLength;
+            // Length code 15 carries one extra byte for 18-byte and longer matches.
+            if (length == kExtendedMatchLength) {
+                if (input >= data.size()) {
+                    return {};
+                }
+                length += static_cast<unsigned char>(data[input++]);
+            }
             if (offset > output.size() || output.size() + length > decompressedSize) {
                 return {};
             }
