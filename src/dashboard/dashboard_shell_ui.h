@@ -51,9 +51,11 @@ private:
         StopEditing,
         ExitApplication,
         ReloadConfig,
+        RunAsAdministrator,
     };
 
     std::optional<UnsavedLayoutEditAction> PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt prompt) const;
+    bool HandleRunAsAdministrator();
     bool HandleReloadConfig();
     bool HandleConfigureDisplay(const DisplayMenuOption& option);
     void ShowAboutDialog() const;
