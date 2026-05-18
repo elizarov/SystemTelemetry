@@ -345,7 +345,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
     const ComApartment com;
     if (!com.Ready()) {
         snapshot.diagnostics = FormatText(
-            "Lenovo GameZone WMI fan fallback COM initialization failed: %s", FormatHresult(com.Status()).c_str());
+            "Lenovo GameZone WMI fan query COM initialization failed: %s", FormatHresult(com.Status()).c_str());
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_failed stage=co_initialize status=%s"),
             FormatHresult(com.Status()).c_str());
@@ -363,7 +363,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
         nullptr);
     if (FAILED(securityHr) && securityHr != RPC_E_TOO_LATE) {
         snapshot.diagnostics =
-            FormatText("Lenovo GameZone WMI fan fallback COM security failed: %s", FormatHresult(securityHr).c_str());
+            FormatText("Lenovo GameZone WMI fan query COM security failed: %s", FormatHresult(securityHr).c_str());
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_failed stage=co_initialize_security status=%s"),
             FormatHresult(securityHr).c_str());
@@ -472,7 +472,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
     }
 
     snapshot.success = true;
-    snapshot.diagnostics = FormatText("Lenovo GameZone WMI fan fallback completed. instance_count=%d fan_count=%zu",
+    snapshot.diagnostics = FormatText("Lenovo GameZone WMI fan query completed. instance_count=%d fan_count=%zu",
         instanceCount,
         snapshot.fans.size());
     trace.WriteFmt(TracePrefix::LenovoHardwareScan,
@@ -502,17 +502,13 @@ void AppendFanReadings(std::vector<BoardSensorReading>& target, const std::vecto
     }
 }
 
-void AppendLenovoGameZoneWmiFansIfNeeded(Trace& trace, LenovoHardwareScanSnapshot& snapshot) {
-    if (HasAvailableFanReading(snapshot)) {
+void AppendLenovoGameZoneWmiFans(Trace& trace, LenovoHardwareScanSnapshot& snapshot) {
+    LenovoHardwareScanSnapshot gameZone = CaptureLenovoGameZoneWmiFans(trace);
+    AppendDiagnosticsSuffix(snapshot.diagnostics, "gamezone_fans", gameZone.diagnostics);
+    if (!gameZone.success) {
         return;
     }
-
-    LenovoHardwareScanSnapshot fallback = CaptureLenovoGameZoneWmiFans(trace);
-    AppendDiagnosticsSuffix(snapshot.diagnostics, "fan_fallback", fallback.diagnostics);
-    if (!fallback.success) {
-        return;
-    }
-    AppendFanReadings(snapshot.fans, fallback.fans);
+    AppendFanReadings(snapshot.fans, gameZone.fans);
 }
 
 std::vector<NamedScalarMetric> CreateRawMetrics(
@@ -551,8 +547,12 @@ LenovoHardwareScanCaptureOptions CaptureOptionsForSettings(const BoardTelemetryS
                                             HasLogicalName(temperatures, "system") ||
                                             HasLogicalName(temperatures, "board") || unknownTemperature;
     options.includeBatteryTemperature = HasLogicalName(temperatures, "battery") || unknownTemperature;
-    options.includeFans = !settings.requestedFanNames.empty();
     return options;
+}
+
+bool HasRequestedHardwareScanModule(const LenovoHardwareScanCaptureOptions& options) {
+    return options.includeCpuTemperature || options.includeGpuTemperature || options.includeStorageTemperature ||
+           options.includeMotherboardTemperature || options.includeBatteryTemperature;
 }
 
 std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& diagnostics) {
@@ -624,10 +624,6 @@ class LenovoHardwareScanCapture final : public LenovoHardwareScanCaptureSink {
 public:
     explicit LenovoHardwareScanCapture(Trace& trace) : trace_(trace) {}
 
-    void AddFanReading(const wchar_t* title, double rpm) override {
-        snapshot_.fans.push_back(BoardSensorReading{Utf8FromNullableWide(title), rpm});
-    }
-
     void AddTemperatureReading(const wchar_t* title, double celsius) override {
         snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromNullableWide(title), celsius});
     }
@@ -683,16 +679,12 @@ public:
 
     LenovoHardwareScanSnapshot FinishSuccess() {
         snapshot_.success = true;
-        snapshot_.diagnostics = FormatText("Lenovo Hardware Scan query completed. fan_count=%zu temp_count=%zu",
-            snapshot_.fans.size(),
-            snapshot_.temperatures.size());
-        const std::vector<std::string> fanNames = ExtractBoardSensorNames(snapshot_.fans);
+        snapshot_.diagnostics = FormatText(
+            "Lenovo Hardware Scan temperature query completed. temp_count=%zu", snapshot_.temperatures.size());
         const std::vector<std::string> temperatureNames = ExtractBoardSensorNames(snapshot_.temperatures);
         trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
-            RES_STR("snapshot_done fan_count=%zu temp_count=%zu fan_names=\"%s\" temp_names=\"%s\""),
-            snapshot_.fans.size(),
+            RES_STR("snapshot_done temp_count=%zu temp_names=\"%s\""),
             snapshot_.temperatures.size(),
-            JoinNames(fanNames).c_str(),
             JoinNames(temperatureNames).c_str());
         return std::move(snapshot_);
     }
@@ -751,6 +743,7 @@ public:
 
         settings_ = settings;
         captureOptions_ = CaptureOptionsForSettings(settings_);
+        wantsGameZoneFans_ = !settings_.requestedFanNames.empty();
         trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("initialize_begin"));
 
         boardManufacturer_ = info_.manufacturer;
@@ -811,7 +804,7 @@ public:
         std::string serviceDiagnostics;
         LenovoHardwareScanSnapshot serviceSnapshot = CaptureServiceSnapshot(serviceDiagnostics);
         if (serviceSnapshot.success) {
-            MaybeAppendWmiFanFallback(serviceSnapshot);
+            AppendGameZoneFans(serviceSnapshot);
             ApplySnapshotToSample(serviceSnapshot, sample);
             return sample;
         }
@@ -832,22 +825,22 @@ public:
         if (directDiagnostics.empty()) {
             directDiagnostics = "Direct Lenovo Hardware Scan refresh is waiting.";
         }
-        std::string wmiDiagnostics;
-        LenovoHardwareScanSnapshot wmiSnapshot = CaptureWmiFanSnapshot(wmiDiagnostics);
-        if (wmiSnapshot.success && HasAvailableFanReading(wmiSnapshot)) {
-            wmiSnapshot.diagnostics =
-                FormatText("Lenovo Hardware Scan fan fallback active. service=\"%s\" direct=\"%s\" wmi=\"%s\"",
+        std::string gameZoneDiagnostics;
+        LenovoHardwareScanSnapshot gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
+            gameZoneSnapshot.diagnostics =
+                FormatText("Lenovo GameZone WMI fan query active. service=\"%s\" direct=\"%s\" gamezone=\"%s\"",
                     serviceDiagnostics.c_str(),
                     directDiagnostics.c_str(),
-                    wmiSnapshot.diagnostics.c_str());
-            ApplySnapshotToSample(wmiSnapshot, sample);
+                    gameZoneSnapshot.diagnostics.c_str());
+            ApplySnapshotToSample(gameZoneSnapshot, sample);
             return sample;
         }
 
         diagnostics_ = FormatText("Lenovo Hardware Scan unavailable. service=\"%s\" direct=\"%s\"",
             serviceDiagnostics.c_str(),
             directDiagnostics.c_str());
-        AppendDiagnosticsSuffix(diagnostics_, "fan_fallback", wmiDiagnostics);
+        AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
         sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
@@ -929,7 +922,7 @@ private:
         LenovoHardwareScanSnapshot snapshot = pendingDirectSnapshot_.get();
         diagnostics = snapshot.diagnostics;
         if (snapshot.success) {
-            MaybeAppendWmiFanFallback(snapshot);
+            AppendGameZoneFans(snapshot);
             diagnostics = snapshot.diagnostics;
             cachedDirectSnapshot_ = std::move(snapshot);
             hasCachedDirectSnapshot_ = true;
@@ -940,6 +933,10 @@ private:
 
     void MaybeStartDirectSnapshot(std::string& diagnostics) {
         if (pendingDirectSnapshot_.valid() || !hardwareScanDirectory_.has_value()) {
+            return;
+        }
+        if (!HasRequestedHardwareScanModule(captureOptions_)) {
+            diagnostics = "No Lenovo Hardware Scan temperature modules were requested.";
             return;
         }
 
@@ -969,50 +966,50 @@ private:
         return ResolveMappedBoardSensorName(settings_.fanSensorNames, logicalName);
     }
 
-    LenovoHardwareScanSnapshot CaptureWmiFanSnapshot(std::string& diagnostics) {
+    LenovoHardwareScanSnapshot CaptureGameZoneFanSnapshot(std::string& diagnostics) {
         diagnostics.clear();
-        if (!captureOptions_.includeFans) {
+        if (!wantsGameZoneFans_) {
             return {};
         }
-        if (!wmiFanUsable_) {
-            ++wmiFanRetrySample_;
-            if (wmiFanRetrySample_ < kSensorRetrySampleInterval) {
-                diagnostics = "Lenovo GameZone WMI fan fallback is waiting for retry.";
+        if (!gameZoneFanUsable_) {
+            ++gameZoneFanRetrySample_;
+            if (gameZoneFanRetrySample_ < kSensorRetrySampleInterval) {
+                diagnostics = "Lenovo GameZone WMI fan query is waiting for retry.";
                 return {};
             }
-            wmiFanRetrySample_ = 0;
+            gameZoneFanRetrySample_ = 0;
         }
 
         LenovoHardwareScanSnapshot snapshot = CaptureLenovoGameZoneWmiFans(trace_);
         diagnostics = snapshot.diagnostics;
         if (!snapshot.success) {
-            wmiFanUsable_ = false;
-            wmiFanRetrySample_ = 0;
+            gameZoneFanUsable_ = false;
+            gameZoneFanRetrySample_ = 0;
             return {};
         }
         if (!HasAvailableFanReading(snapshot)) {
-            wmiFanUsable_ = false;
-            wmiFanRetrySample_ = 0;
+            gameZoneFanUsable_ = false;
+            gameZoneFanRetrySample_ = 0;
             return snapshot;
         }
 
-        wmiFanUsable_ = true;
-        wmiFanRetrySample_ = kSensorRetrySampleInterval;
+        gameZoneFanUsable_ = true;
+        gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
         return snapshot;
     }
 
-    void MaybeAppendWmiFanFallback(LenovoHardwareScanSnapshot& snapshot) {
-        if (!captureOptions_.includeFans || HasAvailableFanReading(snapshot)) {
+    void AppendGameZoneFans(LenovoHardwareScanSnapshot& snapshot) {
+        if (!wantsGameZoneFans_ || HasAvailableFanReading(snapshot)) {
             return;
         }
 
         std::string diagnostics;
-        LenovoHardwareScanSnapshot fallback = CaptureWmiFanSnapshot(diagnostics);
-        AppendDiagnosticsSuffix(snapshot.diagnostics, "fan_fallback", diagnostics);
-        if (!fallback.success) {
+        LenovoHardwareScanSnapshot gameZone = CaptureGameZoneFanSnapshot(diagnostics);
+        AppendDiagnosticsSuffix(snapshot.diagnostics, "gamezone_fans", diagnostics);
+        if (!gameZone.success) {
             return;
         }
-        AppendFanReadings(snapshot.fans, fallback.fans);
+        AppendFanReadings(snapshot.fans, gameZone.fans);
     }
 
     Trace& trace_;
@@ -1036,9 +1033,10 @@ private:
     std::future<LenovoHardwareScanSnapshot> pendingDirectSnapshot_;
     std::optional<std::chrono::steady_clock::time_point> lastDirectSnapshotStart_;
     int serviceRetrySample_ = kSensorRetrySampleInterval;
-    int wmiFanRetrySample_ = kSensorRetrySampleInterval;
+    int gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
     bool serviceUsable_ = true;
-    bool wmiFanUsable_ = true;
+    bool gameZoneFanUsable_ = true;
+    bool wantsGameZoneFans_ = false;
     bool hasCachedDirectSnapshot_ = false;
     bool initialized_ = false;
 };
@@ -1069,7 +1067,7 @@ BoardVendorTelemetrySample CaptureLenovoHardwareScanServiceSample(Trace& trace, 
     LenovoHardwareScanRuntime runtime;
     LenovoHardwareScanCaptureOptions options;
     LenovoHardwareScanSnapshot snapshot = CaptureLenovoHardwareScanSensors(trace, runtime, *addinDirectory, options);
-    AppendLenovoGameZoneWmiFansIfNeeded(trace, snapshot);
+    AppendLenovoGameZoneWmiFans(trace, snapshot);
     return CreateRawLenovoSampleFromSnapshot(info, snapshot);
 }
 

@@ -6,7 +6,6 @@ class LenovoHardwareScanCaptureSink {
 public:
     virtual ~LenovoHardwareScanCaptureSink() = default;
 
-    virtual void AddFanReading(const wchar_t* title, double rpm) = 0;
     virtual void AddTemperatureReading(const wchar_t* title, double celsius) = 0;
     virtual void SetDiagnostics(const wchar_t* diagnostics) = 0;
     virtual void TraceAssemblyLoaded(const wchar_t* path) = 0;
@@ -23,7 +22,6 @@ struct LenovoHardwareScanCaptureOptions {
     bool includeStorageTemperature = true;
     bool includeMotherboardTemperature = true;
     bool includeBatteryTemperature = true;
-    bool includeFans = true;
 };
 
 class LenovoHardwareScanRuntime {

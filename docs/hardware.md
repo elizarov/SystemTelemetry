@@ -12,7 +12,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - [ASUS](#asus) - board CPU temperature and fan telemetry through Armoury Crate or ASUS System Control Interface ATKACPI.
 - [MSI](#msi) - board temperature and fan telemetry through MSI Center SDK.
 - [Gigabyte](#gigabyte) - board temperature and fan telemetry through Gigabyte SIV.
-- [Lenovo](#lenovo) - board temperature and fan telemetry through Lenovo Vantage Hardware Scan.
+- [Lenovo](#lenovo) - board temperature telemetry through Lenovo Vantage Hardware Scan and fan telemetry through Lenovo GameZone WMI.
 
 ## Provider Model
 
@@ -141,11 +141,11 @@ Troubleshooting:
 ## Lenovo
 
 - Supported hardware family: Lenovo board telemetry on systems with the Lenovo Vantage Hardware Scan addin installed under `ProgramData\Lenovo\Vantage\Addins\LenovoHardwareScanAddin`.
-- Runtime dependency: Lenovo Vantage Hardware Scan and its LdeApi diagnostics modules, including `LdeApi.Client.dll`, `LdeApi.Server.exe`, and the Lenovo diagnostics driver components installed by Lenovo platform software. Fan RPM can also use Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods as a last-resort Lenovo-only fallback when Hardware Scan reports no fan devices.
-- Metrics include requested Hardware Scan temperature telemetry from the storage, CPU, fan, motherboard, video-card, and battery modules. Fan telemetry comes from Lenovo's Hardware Scan fan module when it reports devices with sane non-zero RPM; otherwise CaseDash falls back to `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class. CaseDash names those readings as `Disk Temperature`, `CPU Temperature`, `Motherboard Temperature`, `GPU Temperature`, `Battery Temperature`, `Fan`, `CPU Fan`, and `GPU Fan`.
+- Runtime dependency: Lenovo Vantage Hardware Scan and its LdeApi diagnostics modules, including `LdeApi.Client.dll`, `LdeApi.Server.exe`, and the Lenovo diagnostics driver components installed by Lenovo platform software. Fan RPM uses Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods.
+- Metrics include requested Hardware Scan temperature telemetry from the storage, CPU, motherboard, video-card, and battery modules. Fan telemetry comes from `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class. CaseDash names those readings as `Disk Temperature`, `CPU Temperature`, `Motherboard Temperature`, `GPU Temperature`, `Battery Temperature`, `Fan`, `CPU Fan`, and `GPU Fan`.
 - The unelevated dashboard asks `CashDashService` for `board_sensors_sample` first so the LocalSystem service can run the Lenovo diagnostics addin with the same privilege boundary Lenovo uses for hardware access. When the service is absent or unreachable, the provider refreshes the same Hardware Scan LdeApi path in the dashboard process in the background, reuses the last successful direct sample, and keeps startup responsive while a slow direct scan is running.
 - Lenovo Vantage's UI reaches the same diagnostics stack through the trusted `SystemManagement.HardwareScan.General` private RPC contract with the `DoExecutionThermalTool` command. CaseDash does not depend on that private trusted Vantage RPC endpoint or the older firmware interface for board telemetry.
-- Trace output can include `lenovo_hardware_scan:*` provider details, `module_load_result` summaries for requested Lenovo modules, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for the last-resort fan fallback, and `unsupported_board` fallback markers. A fan module summary with `FAN:NoDevices` means Lenovo's native addin reported no fan RPM devices for that board state, so the GameZone WMI fan fallback is the next provider-specific path.
+- Trace output can include `lenovo_hardware_scan:*` provider details, `module_load_result` summaries for requested Lenovo temperature modules, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for fan queries, and `unsupported_board` markers.
 
 Troubleshooting:
 

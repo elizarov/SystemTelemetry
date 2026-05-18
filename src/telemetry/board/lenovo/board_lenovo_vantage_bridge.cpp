@@ -47,23 +47,19 @@ String ^ ToManagedString(Object ^ value) {
     return value != nullptr ? Convert::ToString(value, Globalization::CultureInfo::InvariantCulture) : String::Empty;
 }
 
-double ToDoubleOr(Object ^ value, double fallback) {
+double ToDoubleOr(Object ^ value, double defaultValue) {
     if (value == nullptr) {
-        return fallback;
+        return defaultValue;
     }
     try {
         return Convert::ToDouble(value, Globalization::CultureInfo::InvariantCulture);
     } catch (Exception ^) {
-        return fallback;
+        return defaultValue;
     }
 }
 
 bool IsSaneCelsius(double value) {
     return value > 0.0 && value <= 125.0;
-}
-
-bool IsSaneRpm(double value) {
-    return value > 0.0 && value < 30000.0;
 }
 
 Object ^ GetProperty(Object ^ owner, String ^ name) {
@@ -122,12 +118,6 @@ public:
     property Delegate ^ Callback {
         Delegate ^ get() {
             return callback_;
-        }
-    }
-
-    property int FanCount {
-        int get() {
-            return fanCount_;
         }
     }
 
@@ -207,21 +197,14 @@ private:
         dictionary->TryGetValue("temperatureCelsius", temperatureValue);
         double celsius = ToDoubleOr(temperatureValue, 0.0);
         if (!IsSaneCelsius(celsius)) {
-            celsius = CoreTemperatureFallback(dictionary);
+            celsius = MaximumCoreTemperature(dictionary);
         }
         if (IsSaneCelsius(celsius)) {
             AddTemperature(deviceName, moduleId, celsius);
         }
-
-        Object ^ rpmValue = nullptr;
-        dictionary->TryGetValue("rpm", rpmValue);
-        const double rpm = ToDoubleOr(rpmValue, 0.0);
-        if (IsSaneRpm(rpm)) {
-            AddFan(deviceName, moduleId, rpm);
-        }
     }
 
-    double CoreTemperatureFallback(Dictionary<String ^, Object ^> ^ dictionary) {
+    double MaximumCoreTemperature(Dictionary<String ^, Object ^> ^ dictionary) {
         Object ^ coresValue = nullptr;
         if (!dictionary->TryGetValue("temperatureCoresCelsius", coresValue) || coresValue == nullptr) {
             return 0.0;
@@ -248,13 +231,6 @@ private:
         ++temperatureCount_;
     }
 
-    void AddFan(String ^ deviceName, String ^ moduleId, double rpm) {
-        String ^ title = NormalizeFanName(deviceName, moduleId);
-        pin_ptr<const wchar_t> pinnedTitle = PtrToStringChars(title);
-        sink_->AddFanReading(pinnedTitle, rpm);
-        ++fanCount_;
-    }
-
     static String ^ NormalizeTemperatureName(String ^ deviceName, String ^ moduleId) {
         if (String::Equals(moduleId, "13", StringComparison::Ordinal)) {
             return "CPU Temperature";
@@ -279,23 +255,10 @@ private:
         return "Temperature";
     }
 
-    static String ^ NormalizeFanName(String ^ deviceName, String ^ moduleId) {
-        if (!String::IsNullOrWhiteSpace(deviceName)) {
-            return deviceName->IndexOf("fan", StringComparison::OrdinalIgnoreCase) >= 0
-                       ? deviceName
-                       : String::Concat(deviceName, " Fan");
-        }
-        if (String::Equals(moduleId, "11", StringComparison::Ordinal)) {
-            return "Fan";
-        }
-        return "Fan";
-    }
-
     LenovoHardwareScanCaptureSink* sink_ = nullptr;
     JavaScriptSerializer ^ serializer_ = nullptr;
     Type ^ callbackType_ = nullptr;
     Delegate ^ callback_ = nullptr;
-    int fanCount_ = 0;
     int temperatureCount_ = 0;
 };
 
@@ -362,9 +325,6 @@ array<String ^> ^
         }
         if (options.includeGpuTemperature) {
             modules->Add("lde_module_video_card");
-        }
-        if (options.includeFans) {
-            modules->Add("lde_module_fan");
         }
         if (options.includeStorageTemperature) {
             modules->Add("lde_module_storage");
@@ -544,11 +504,11 @@ bool CaptureLenovoSnapshot(LenovoRuntimeContext ^ context,
 
         Object ^ result = TaskResult(task);
         const bool executionStarted = result != nullptr && Convert::ToBoolean(result);
-        if (!executionStarted && capture->FanCount == 0 && capture->TemperatureCount == 0) {
+        if (!executionStarted && capture->TemperatureCount == 0) {
             SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan thermal execution returned no telemetry.");
             return false;
         }
-        return capture->FanCount > 0 || capture->TemperatureCount > 0;
+        return capture->TemperatureCount > 0;
     } catch (Exception ^ ex) {
         context->loadedModules = nullptr;
         context->loadedModuleSignature = nullptr;
