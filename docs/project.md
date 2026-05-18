@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy. `format.cmd` owns narrow exclusions for mixed-mode C++/CLI bridge `.cpp` files that clang-format versions do not format consistently.
-- `.github/workflows/validation.yml` is the single maintained source of truth for branch push and pull request build, test, format, lint, and tidy automation.
+- `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and tidy automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
 
@@ -43,7 +43,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
-- Keep pull request merge protection tied to the GitHub `Validation` job so pushed changes pass build, test, formatting, and tidy checks on the Windows runner before merge.
+- Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and tidy checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
 - Keep local `NOLINT` suppressions out of source files; maintained clang-tidy false positives live in the lint tool allowlist.
