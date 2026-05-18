@@ -8,12 +8,12 @@
 #include <vector>
 
 #include "config/metric_board_binding.h"
+#include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
 #include "util/resource_strings.h"
-#include "util/text_format.h"
 
 namespace {
 
@@ -31,12 +31,7 @@ std::wstring WidenAscii(std::string_view value) {
 }
 
 std::optional<std::string> SelectedGpuPdhLuidToken(const RealTelemetryCollectorState& state) {
-    if (!state.gpu_.selectedAdapter.has_value() || !state.gpu_.selectedAdapter->hasAdapterLuid) {
-        return std::nullopt;
-    }
-    return FormatText(RES_STR("luid_0x%08x_0x%08x"),
-        static_cast<unsigned int>(state.gpu_.selectedAdapter->adapterLuidHighPart),
-        static_cast<unsigned int>(state.gpu_.selectedAdapter->adapterLuidLowPart));
+    return state.gpu_.selectedAdapter.has_value() ? GpuAdapterPdhLuidToken(*state.gpu_.selectedAdapter) : std::nullopt;
 }
 
 bool MatchesPdhInstanceFilter(const wchar_t* instance, const std::wstring& filter) {
@@ -61,6 +56,10 @@ bool MatchesPdhInstanceFilter(const wchar_t* instance, const std::wstring& filte
         }
     }
     return false;
+}
+
+std::string FormatOptionalFps(std::optional<double> value) {
+    return value.has_value() ? Trace::FormatValueDouble("fps", *value, 1) : std::string("fps=N/A");
 }
 
 CounterArrayTotals ReadCounterArrayTotals(
@@ -285,7 +284,35 @@ void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
             RES_STR("gpu_provider_initialize_failed provider=%s diagnostics=\"%s\""),
             state.gpu_.providerName.c_str(),
             state.gpu_.providerDiagnostics.c_str());
+        state.gpu_.fallbackFpsProvider = CreatePresentedFpsProvider(state.trace_, state.gpu_.selectedAdapter);
+        if (state.gpu_.fallbackFpsProvider != nullptr) {
+            const bool fpsInitialized = state.gpu_.fallbackFpsProvider->Initialize();
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                RES_STR("gpu_fps_fallback_initialize initialized=%s"),
+                Trace::BoolText(fpsInitialized));
+        }
     }
+}
+
+void ApplyFallbackFpsSample(RealTelemetryCollectorState& state) {
+    if (state.snapshot_.gpu.fps.value.has_value() || state.gpu_.fallbackFpsProvider == nullptr) {
+        return;
+    }
+
+    const FpsTelemetrySample fpsSample = state.gpu_.fallbackFpsProvider->Sample();
+    state.snapshot_.gpu.fps.issue =
+        fpsSample.permissionRequired ? ScalarMetricIssue::PermissionRequired : ScalarMetricIssue::None;
+    state.snapshot_.gpu.fpsAppName = fpsSample.processName;
+    if (fpsSample.fps.has_value()) {
+        state.snapshot_.gpu.fps.value = *fpsSample.fps;
+        state.snapshot_.gpu.fps.unit = ScalarMetricUnit::Fps;
+    }
+    state.trace_.WriteFmt(TracePrefix::Telemetry,
+        RES_STR("gpu_fps_fallback_sample available=%s value=%s process=\"%s\" diagnostics=\"%s\""),
+        Trace::BoolText(fpsSample.fps.has_value()),
+        FormatOptionalFps(fpsSample.fps).c_str(),
+        fpsSample.processName.c_str(),
+        fpsSample.diagnostics.c_str());
 }
 
 }  // namespace
@@ -325,6 +352,7 @@ void ReconfigureGpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("gpu_provider_shutdown provider=%s"), state.gpu_.providerName.c_str());
     state.gpu_.provider.reset();
+    state.gpu_.fallbackFpsProvider.reset();
     ResetGpuProviderState(state);
     ResolveGpuSelection(state);
     InitializeGpuVendorProvider(state);
@@ -348,6 +376,7 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     }
     ApplyBoardGpuFanFallback(state);
     ApplyIntelCpuTemperatureFallback(state);
+    ApplyFallbackFpsSample(state);
 
     if (!hasVendorLoad && state.gpu_.query != nullptr) {
         const std::optional<std::string> filterToken = SelectedGpuPdhLuidToken(state);

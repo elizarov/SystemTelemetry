@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 
 enum class GpuVendor {
@@ -41,3 +42,4 @@ struct GpuAdapterCandidate {
 
 const char* GpuVendorName(GpuVendor vendor);
 GpuVendor SelectGpuVendor(const GpuVendorInfo& info);
+std::optional<std::string> GpuAdapterPdhLuidToken(const GpuAdapterInfo& info);

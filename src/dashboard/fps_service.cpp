@@ -320,7 +320,7 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider* fpsProvider, Trace& trac
         case CashDashServiceRequestId::PresentedFpsSample: {
             FpsTelemetrySample sample;
             if (fpsProvider != nullptr) {
-                sample = fpsProvider->Sample();
+                sample = fpsProvider->Sample(serviceRequest->fpsOptions);
             } else {
                 sample.diagnostics = "FPS service provider is unavailable.";
             }

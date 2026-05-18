@@ -11,7 +11,7 @@ constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;      // "CDRQ" lit
 constexpr uint32_t kCashDashServiceResponseMagic = 0x53524443;     // "CDRS" little-endian.
 constexpr uint32_t kFpsServicePayloadMagic = 0x31535046;           // "FPS1" little-endian.
 constexpr uint32_t kBoardSensorsServicePayloadMagic = 0x31534442;  // "BDS1" little-endian.
-constexpr uint32_t kFpsServiceProtocolVersion = 1;
+constexpr uint32_t kFpsServiceProtocolVersion = 2;
 constexpr uint32_t kFpsServiceFlagAvailable = 1u << 0u;
 constexpr uint32_t kFpsServiceFlagPermissionRequired = 1u << 1u;
 constexpr uint32_t kFpsServiceFlagHasFps = 1u << 2u;
@@ -28,6 +28,7 @@ struct CashDashServiceRequestHeader {
     uint32_t version = kFpsServiceProtocolVersion;
     uint32_t requestId = 0;
     uint32_t nameBytes = 0;
+    uint32_t fpsAdapterLuidTokenBytes = 0;
 };
 
 struct CashDashServiceResponseHeader {
@@ -201,18 +202,23 @@ bool IsKnownRequestId(uint32_t id) {
 
 }  // namespace
 
-std::vector<char> BuildCashDashServiceRequest(CashDashServiceRequestId id) {
+std::vector<char> BuildCashDashServiceRequest(
+    CashDashServiceRequestId id, const FpsTelemetrySampleOptions& fpsOptions) {
     const std::string name = RequestName(id);
     const uint32_t nameBytes = StringSizeOrMax(name);
+    const uint32_t adapterLuidTokenBytes =
+        id == CashDashServiceRequestId::PresentedFpsSample ? StringSizeOrMax(fpsOptions.gpuAdapterLuidToken) : 0;
 
     CashDashServiceRequestHeader header;
     header.requestId = static_cast<uint32_t>(id);
     header.nameBytes = nameBytes;
+    header.fpsAdapterLuidTokenBytes = adapterLuidTokenBytes;
 
     std::vector<char> output;
-    output.reserve(sizeof(header) + nameBytes);
+    output.reserve(sizeof(header) + nameBytes + adapterLuidTokenBytes);
     AppendBytes(output, &header, sizeof(header));
     AppendBytes(output, name.data(), nameBytes);
+    AppendStringPayload(output, fpsOptions.gpuAdapterLuidToken, adapterLuidTokenBytes);
     return output;
 }
 
@@ -242,7 +248,9 @@ std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
 
     CashDashServiceRequest request;
     request.id = static_cast<CashDashServiceRequestId>(header.requestId);
-    if (!ReadString(cursor, remaining, header.nameBytes, request.name) || remaining != 0) {
+    if (!ReadString(cursor, remaining, header.nameBytes, request.name) ||
+        !ReadString(cursor, remaining, header.fpsAdapterLuidTokenBytes, request.fpsOptions.gpuAdapterLuidToken) ||
+        remaining != 0) {
         diagnostics = ResourceStringText(RES_STR("CashDash service request payload is malformed."));
         return std::nullopt;
     }
@@ -250,11 +258,15 @@ std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
         diagnostics = ResourceStringText(RES_STR("CashDash service request name does not match its id."));
         return std::nullopt;
     }
+    if (request.id != CashDashServiceRequestId::PresentedFpsSample && !request.fpsOptions.gpuAdapterLuidToken.empty()) {
+        diagnostics = ResourceStringText(RES_STR("CashDash service request payload is malformed."));
+        return std::nullopt;
+    }
     return request;
 }
 
-std::vector<char> BuildFpsServiceRequest() {
-    return BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample);
+std::vector<char> BuildFpsServiceRequest(const FpsTelemetrySampleOptions& options) {
+    return BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample, options);
 }
 
 std::vector<char> BuildBoardSensorsServiceRequest() {

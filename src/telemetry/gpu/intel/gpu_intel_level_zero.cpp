@@ -562,7 +562,7 @@ public:
             deviceMemoryModuleCount_,
             Trace::BoolText(HasFanSpeedRpm()));
 
-        fpsProvider_ = CreatePresentedFpsProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         } else {

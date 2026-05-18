@@ -464,7 +464,7 @@ public:
             gpuName_.c_str(),
             nvapiClockAvailable_ ? "nvapi" : "unavailable",
             fanRpmSupported_ ? "yes" : "no");
-        fpsProvider_ = CreatePresentedFpsProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         } else {

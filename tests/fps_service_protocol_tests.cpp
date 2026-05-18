@@ -16,7 +16,10 @@ TEST(FpsServiceProtocol, RecognizesVersionedRequest) {
 }
 
 TEST(FpsServiceProtocol, ParsesGenericRequestEnvelope) {
-    const std::vector<char> request = BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample);
+    FpsTelemetrySampleOptions options;
+    options.gpuAdapterLuidToken = "luid_0x00000000_0x0000e089";
+    const std::vector<char> request =
+        BuildCashDashServiceRequest(CashDashServiceRequestId::PresentedFpsSample, options);
 
     std::string diagnostics;
     const std::optional<CashDashServiceRequest> parsed =
@@ -26,6 +29,7 @@ TEST(FpsServiceProtocol, ParsesGenericRequestEnvelope) {
     const CashDashServiceRequest& parsedRequest = *parsed;
     EXPECT_EQ(parsedRequest.id, CashDashServiceRequestId::PresentedFpsSample);
     EXPECT_EQ(parsedRequest.name, "presented_fps_sample");
+    EXPECT_EQ(parsedRequest.fpsOptions.gpuAdapterLuidToken, options.gpuAdapterLuidToken);
 }
 
 TEST(FpsServiceProtocol, ParsesBoardSensorRequestEnvelope) {

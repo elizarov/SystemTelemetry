@@ -65,7 +65,7 @@ public:
         sample_.available = false;
         sample_.diagnostics =
             ResourceStringText(RES_STR("No supported GPU telemetry provider matches the selected adapter vendor."));
-        fpsProvider_ = CreatePresentedFpsProvider(trace_);
+        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         } else {
