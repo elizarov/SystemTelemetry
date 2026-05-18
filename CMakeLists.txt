@@ -207,7 +207,6 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -331,7 +330,6 @@ set(casedash_release_speed_sources
     src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -808,7 +806,6 @@ add_executable(CaseDashBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -15,7 +16,6 @@
 #include <utility>
 #include <vector>
 
-#include "telemetry/fps/impl/gpu_raw_counter_map.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/lightweight_mutex.h"
 #include "util/resource_strings.h"
@@ -660,35 +660,6 @@ private:
         }
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
         SetGpuUsageStatusText(gpuUsageDiagnostics_, "gpu3d_collect", static_cast<long>(collectStatus));
-        CapturePreviousGpu3dRawValuesLocked();
-    }
-
-    void CapturePreviousGpu3dRawValuesLocked() {
-        previousGpuRawByInstance_.Clear();
-        if (gpuQuery_ == nullptr || gpu3dCounter_ == nullptr) {
-            return;
-        }
-
-        DWORD bufferSize = 0;
-        DWORD itemCount = 0;
-        PDH_STATUS status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
-        if (status != PDH_MORE_DATA) {
-            return;
-        }
-
-        gpuCounterArrayBuffer_.resize(bufferSize);
-        auto* items = reinterpret_cast<PDH_RAW_COUNTER_ITEM_W*>(gpuCounterArrayBuffer_.data());
-        status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, items);
-        if (status != ERROR_SUCCESS) {
-            return;
-        }
-
-        previousGpuRawByInstance_.Reserve(itemCount);
-        for (DWORD i = 0; i < itemCount; ++i) {
-            if (IsGpu3dEngineInstance(items[i].szName) && items[i].RawValue.CStatus == ERROR_SUCCESS) {
-                previousGpuRawByInstance_.Set(items[i].szName, items[i].RawValue);
-            }
-        }
     }
 
     void UpdateGpu3dUsageLocked(const FpsTelemetrySampleOptions& options) {
@@ -703,7 +674,8 @@ private:
         const PDH_STATUS collectStatus = PdhCollectQueryData(gpuQuery_);
         DWORD bufferSize = 0;
         DWORD itemCount = 0;
-        PDH_STATUS status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
+        PDH_STATUS status =
+            PdhGetFormattedCounterArrayW(gpu3dCounter_, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
         if (status != PDH_MORE_DATA) {
             SetGpuUsageTwoStatusText(
                 gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_prepare", static_cast<long>(status));
@@ -711,24 +683,21 @@ private:
         }
 
         gpuCounterArrayBuffer_.resize(bufferSize);
-        auto* items = reinterpret_cast<PDH_RAW_COUNTER_ITEM_W*>(gpuCounterArrayBuffer_.data());
-        status = PdhGetRawCounterArrayW(gpu3dCounter_, &bufferSize, &itemCount, items);
+        auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(gpuCounterArrayBuffer_.data());
+        status = PdhGetFormattedCounterArrayW(gpu3dCounter_, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
         if (status != ERROR_SUCCESS) {
             SetGpuUsageTwoStatusText(
                 gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_fetch", static_cast<long>(status));
             return;
         }
 
-        currentGpuRawByInstance_.Clear();
-        currentGpuRawByInstance_.Reserve(itemCount);
         const std::wstring instanceFilter = WidenAscii(options.gpuAdapterLuidToken);
         DWORD matchedInstances = 0;
         for (DWORD i = 0; i < itemCount; ++i) {
             const wchar_t* instance = items[i].szName;
-            if (!IsGpu3dEngineInstance(instance) || items[i].RawValue.CStatus != ERROR_SUCCESS) {
+            if (!IsGpu3dEngineInstance(instance) || items[i].FmtValue.CStatus != ERROR_SUCCESS) {
                 continue;
             }
-            currentGpuRawByInstance_.Set(instance, items[i].RawValue);
             if (!ContainsAsciiInsensitive(instance, instanceFilter)) {
                 continue;
             }
@@ -739,22 +708,8 @@ private:
                 continue;
             }
 
-            const PDH_RAW_COUNTER* previous = previousGpuRawByInstance_.Find(instance);
-            if (previous == nullptr) {
-                continue;
-            }
-
-            PDH_FMT_COUNTERVALUE formatted{};
-            PDH_RAW_COUNTER previousRaw = *previous;
-            PDH_RAW_COUNTER currentRaw = items[i].RawValue;
-            const PDH_STATUS formatStatus =
-                PdhCalculateCounterFromRawValue(gpu3dCounter_, PDH_FMT_DOUBLE, &previousRaw, &currentRaw, &formatted);
-            if (formatStatus != ERROR_SUCCESS || formatted.CStatus != ERROR_SUCCESS) {
-                continue;
-            }
-
-            const double value = formatted.doubleValue;
-            if (value <= 0.0) {
+            const double value = items[i].FmtValue.doubleValue;
+            if (!std::isfinite(value) || value <= 0.0) {
                 continue;
             }
             double& total = Gpu3dUsageSlot(processId);
@@ -764,7 +719,6 @@ private:
                 topGpu3dProcessId_ = processId;
             }
         }
-        previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
         AssignFormat(gpuUsageDiagnostics_,
             RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld gpu3d_filter=\"%s\" gpu3d_matched=%lu top_gpu3d_process="),
@@ -828,8 +782,6 @@ private:
             gpuQuery_ = nullptr;
             gpu3dCounter_ = nullptr;
             gpuQueryInitialized_ = false;
-            previousGpuRawByInstance_.Clear();
-            currentGpuRawByInstance_.Clear();
         }
         initialized_ = false;
     }
@@ -944,10 +896,6 @@ private:
     ProcessPresentEventBuckets kernelEventsByProcess_;
     std::vector<ProcessNameCacheEntry> processNames_;
     std::vector<ProcessGpuUsage> gpu3dUsageByProcess_;
-    // Size/perf: GPU Engine exposes hundreds of per-engine instances on process-heavy machines; use a narrow
-    // open-addressed table instead of general STL hash maps.
-    GpuRawCounterMap previousGpuRawByInstance_;
-    GpuRawCounterMap currentGpuRawByInstance_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
     PDH_HQUERY gpuQuery_ = nullptr;

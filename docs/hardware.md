@@ -44,7 +44,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Presented FPS comes from Windows present-event telemetry and selected-adapter process selection, with the machine-wide CaseDash service used when installed.
 - The dashboard asks the service for the `presented_fps_sample` request with the selected DXGI adapter LUID and falls back to local ETW collection when the service is absent or unreachable.
 - Local ETW collection may require elevation or membership in the local `Performance Log Users` group.
-- Process selection filters GPU Engine 3D usage to the selected adapter LUID, prefers a presenting process with dominant selected-adapter 3D usage over background presenters, and keeps the current presenter through brief count ties or near-ties.
+- Process selection filters formatted GPU Engine 3D usage to the selected adapter LUID using the same adapter-activity source as `gpu.load`, prefers a presenting process with dominant selected-adapter 3D usage over background presenters, and keeps the current presenter through brief count ties or near-ties.
 - When the selected adapter is idle or powered off, `gpu.fps` reports `0 FPS`. When a dominant 3D application is visible on the selected adapter but matching present events are not, `gpu.fps` reports unavailable for that adapter instead of showing another process's FPS.
 - The FPS sample includes the selected presenter's cleaned process name without path or extension when available.
 - If Windows denies process-name or ETW access, the dashboard marks the affected FPS display with the warning-colored `!admin` indicator when a value or permission state can still be shown.
