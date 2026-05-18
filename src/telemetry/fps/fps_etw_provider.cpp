@@ -318,6 +318,13 @@ public:
 
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
             ResetSelectionLocked();
+            if (requireSelectedGpuActivity && topGpu3dUsage_ < kGpu3dActiveThresholdPercent) {
+                sample.available = true;
+                sample.fps = 0.0;
+                sample.diagnostics = BuildDiagnosticsLocked(
+                    FormatText(RES_STR(" selected adapter idle/off; fps=value=0.0%s"), GpuUsageDiagnostics().c_str()));
+                return sample;
+            }
             sample.available = false;
             sample.diagnostics = BuildDiagnosticsLocked(
                 FormatText(RES_STR(" No presenting application selected.%s"), GpuUsageDiagnostics().c_str()));

@@ -45,7 +45,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - The dashboard asks the service for the `presented_fps_sample` request with the selected DXGI adapter LUID and falls back to local ETW collection when the service is absent or unreachable.
 - Local ETW collection may require elevation or membership in the local `Performance Log Users` group.
 - Process selection filters GPU Engine 3D usage to the selected adapter LUID, prefers a presenting process with dominant selected-adapter 3D usage over background presenters, and keeps the current presenter through brief count ties or near-ties.
-- When a dominant 3D application is visible but matching present events are not, or when present events exist but the selected adapter has no matching 3D activity for that presenter, `gpu.fps` reports unavailable for that adapter instead of showing another process's FPS.
+- When the selected adapter is idle or powered off, `gpu.fps` reports `0 FPS`. When a dominant 3D application is visible on the selected adapter but matching present events are not, `gpu.fps` reports unavailable for that adapter instead of showing another process's FPS.
 - The FPS sample includes the selected presenter's cleaned process name without path or extension when available.
 - If Windows denies process-name or ETW access, the dashboard marks the affected FPS display with the warning-colored `!admin` indicator when a value or permission state can still be shown.
 
@@ -84,7 +84,7 @@ Troubleshooting:
 
 - Supported hardware family: NVIDIA GPU telemetry.
 - Runtime dependency: NVIDIA display driver with NVML available.
-- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses Windows GPU Engine counters filtered to the selected DXGI adapter LUID because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI when the dGPU is powered; when NVAPI reports `GPU not powered`, the clock value is unavailable for that sample instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
+- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses Windows GPU Engine counters filtered to the selected DXGI adapter LUID because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI; when NVAPI reports `GPU not powered`, the clock value reports `0 MHz` instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because NVML has no native game-FPS metric.
 - Trace output can include `nvidia_nvml:*` provider details, including NVAPI clock-selection markers, and `unsupported_gpu` fallback markers.
 

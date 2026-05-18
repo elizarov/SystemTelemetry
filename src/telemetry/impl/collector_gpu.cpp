@@ -315,6 +315,22 @@ void ApplyFallbackFpsSample(RealTelemetryCollectorState& state) {
         fpsSample.diagnostics.c_str());
 }
 
+void ApplyPoweredOffGpuFpsZero(RealTelemetryCollectorState& state) {
+    if (state.snapshot_.gpu.fps.value.has_value()) {
+        return;
+    }
+    const std::optional<double> clockMhz = state.snapshot_.gpu.clock.value;
+    if (!clockMhz.has_value() || *clockMhz > 0.0 || state.snapshot_.gpu.loadPercent > 0.0) {
+        return;
+    }
+
+    state.snapshot_.gpu.fps.value = 0.0;
+    state.snapshot_.gpu.fps.unit = ScalarMetricUnit::Fps;
+    state.snapshot_.gpu.fps.issue = ScalarMetricIssue::None;
+    state.snapshot_.gpu.fpsAppName.clear();
+    state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_fps_powered_off_zero"));
+}
+
 }  // namespace
 
 void InitializeGpuCollector(RealTelemetryCollectorState& state) {
@@ -398,6 +414,7 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
             loadAll,
             state.snapshot_.gpu.loadPercent);
     }
+    ApplyPoweredOffGpuFpsZero(state);
     state.retainedHistoryStore_.PushSample(
         state.snapshot_, RetainedHistoryKey::GpuLoad, state.snapshot_.gpu.loadPercent);
 

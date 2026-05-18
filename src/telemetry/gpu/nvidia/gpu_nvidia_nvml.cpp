@@ -343,8 +343,12 @@ public:
         frequencies.version = kNvApiClockFrequenciesV3;
         frequencies.clockType = kNvApiClockFrequenciesCurrent;
         sample.status = gpuGetAllClockFrequencies_(physicalGpu_, &frequencies);
+        if (sample.status == kNvApiGpuNotPowered) {
+            sample.clockMhz = 0.0;
+            return sample;
+        }
         const NvApiClockDomain& graphics = frequencies.domain[kNvApiPublicClockGraphics];
-        if (sample.status == kNvApiOk && graphics.bIsPresent != 0 && graphics.frequency > 0) {
+        if (sample.status == kNvApiOk && graphics.bIsPresent != 0) {
             sample.clockMhz = static_cast<double>(graphics.frequency) / 1000.0;
         }
         return sample;
