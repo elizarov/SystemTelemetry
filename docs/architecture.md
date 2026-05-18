@@ -43,15 +43,8 @@ Other top-level areas:
 
 ## Package Dependency Rules
 
-- `util` may depend on `util` only; every other package may depend on `util`.
-- `config` may depend on `config` and `util`.
-- `telemetry` may depend on `telemetry`, `config`, and `util`.
-- `renderer` may depend on `renderer`, `config`, `util`, and the synthetic `d2d` package.
-- `widget` may depend on `widget`, `renderer`, `telemetry`, `config`, and `util`.
-- `layout_model` may depend on `layout_model`, `config`, `renderer`, `util`, and `widget`.
-- `dashboard_renderer` may depend on `dashboard_renderer`, `config`, `layout_model`, `renderer`, `telemetry`, `util`, and `widget`.
-- `layout_edit` may depend on `layout_edit`, `config`, `layout_model`, `util`, and `widget`.
-- `layout_edit_dialog` may depend on `layout_edit_dialog`, `config`, `layout_edit`, `layout_model`, `telemetry`, `util`, and `widget`.
+- `lint.cmd` is the maintained checker for package dependency rules and package-private boundaries.
+- Package-specific notes under [docs/architecture/](architecture/) list the allowed dependency shape for each package.
 - Application-facing packages such as `dashboard`, `diagnostics`, `display`, and `main` may compose lower-layer services but do not move reusable lower-layer logic upward into shell code.
 - Files below package subdirectories are package-private implementation modules. Dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 

@@ -277,11 +277,6 @@ Animation code follows the maintained package boundaries documented under [archi
 
 ## Validation
 
-Animation changes use the standard project validation flow:
-
-- `build.cmd`
-- `test.cmd`
-- `lint.cmd`
-- `format.cmd changed`
+Animation changes use the standard project validation entrypoints from [docs/build.md](build.md).
 
 Changes that affect live animation, layer construction, dirty composition, or frame handoff also build benchmarks with `build.cmd /benchmarks` and compare relevant benchmark output against [profile_benchmark.md](profile_benchmark.md).

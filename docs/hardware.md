@@ -28,6 +28,15 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
 - Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric. The CPU board temperature binding is requested by `gpu.temp` as the Intel fallback source.
 
+## Provider Validation
+
+Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics commands and validation recipes. The provider troubleshooting sections below list provider-specific runtime checks.
+
+- Run the smallest trace plus snapshot dump flow that exercises the selected GPU or board provider.
+- Inspect trace output for provider state, runtime-loading diagnostics, the provider-specific trace prefixes named below, and unsupported-provider fallback markers.
+- Inspect the snapshot dump for the resolved provider values. GPU providers populate the `gpu.*` values they expose, and board providers populate `board.*` values plus board-backed `gpu.temp` or `gpu.fan` fallbacks when configured.
+- For Intel GPUs, include Level Zero Sysman component counts in the trace review because missing components explain unavailable temperature, fan, or device-local memory values.
+
 ## Adding Hardware Support
 
 - Provider selection stays split into three steps: extract adapter identity, map vendor information to the vendor enum, and create the matching provider with the full adapter identity.
@@ -59,8 +68,6 @@ Troubleshooting:
 
 1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
-3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported snapshot dump and trace outputs for the provider state on that machine.
 
 ## Intel
 
@@ -75,8 +82,6 @@ Troubleshooting:
 
 1. Install or update the Intel graphics driver.
 2. Confirm `ze_loader.dll` is present in `C:\Windows\System32`.
-3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported snapshot dump and trace outputs for Level Zero Sysman component counts and provider state on that machine.
 
 ## NVIDIA
 
@@ -90,8 +95,6 @@ Troubleshooting:
 
 1. Install or update the NVIDIA display driver.
 2. Confirm `nvml.dll` is present in `C:\Windows\System32` or the NVIDIA NVSMI install directory.
-3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported snapshot dump and trace outputs for the provider state on that machine.
 
 ## ASUS
 
@@ -106,8 +109,6 @@ Troubleshooting:
 1. Install or update Armoury Crate or ASUS System Control Interface.
 2. Confirm Armoury Crate can show the machine's fan and temperature telemetry from a normal user session.
 3. Confirm the `\\.\ATKACPI` device opens for the current user; trace output reports `atk_driver_open_failed` when Windows blocks it.
-4. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
-5. Inspect the snapshot dump for `board.*` values and the trace for `asus_armoury_crate:*` diagnostics.
 
 ## MSI
 
@@ -119,8 +120,6 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install MSI Center with the SDK/runtime components that expose board sensors.
-2. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
-3. Inspect the snapshot dump for `board.*` values and the trace for `msi_center:*` diagnostics.
 
 ## Gigabyte
 
@@ -133,5 +132,3 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install Gigabyte SIV.
-2. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
-3. Inspect the snapshot dump for `board.*` values and the trace for `gigabyte_siv:*` diagnostics.
