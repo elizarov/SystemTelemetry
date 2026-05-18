@@ -1,3 +1,5 @@
+## v0.2
+
 - Added live dashboard animation for metric bars, gauges, drive activity, and throughput plots.
 - DXGI swap-chain vsync-paced animation spends less than 1 ms per frame.
 - Telemetry metrics update every 250 ms, and values interpolate smoothly between telemetry updates during animation.
