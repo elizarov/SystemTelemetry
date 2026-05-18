@@ -1,16 +1,15 @@
 #include "dashboard_renderer/impl/metric_lookup_cache.h"
 
-#include <functional>
-
 #include "config/config.h"
 #include "telemetry/metrics.h"
+#include "util/strings.h"
 
 namespace {
 
 constexpr size_t kMetricLookupCacheSlots = 128;
 
 size_t MetricLookupCacheSlot(std::string_view key) {
-    return std::hash<std::string_view>{}(key) % kMetricLookupCacheSlots;
+    return StableStringHash(key) % kMetricLookupCacheSlots;
 }
 
 }  // namespace

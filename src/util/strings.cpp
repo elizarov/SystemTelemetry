@@ -4,6 +4,8 @@
 #include <cctype>
 #include <utility>
 
+#include "util/text_format.h"
+
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -89,11 +91,20 @@ std::string JoinNames(const std::vector<std::string>& names) {
     std::string joined;
     for (size_t i = 0; i < names.size(); ++i) {
         if (i != 0) {
-            joined += ",";
+            AppendFormat(joined, ",");
         }
-        joined += names[i];
+        AppendFormat(joined, "%s", names[i].c_str());
     }
     return joined;
+}
+
+size_t StableStringHash(std::string_view value) {
+    size_t hash = static_cast<size_t>(14695981039346656037ull);
+    for (unsigned char ch : value) {
+        hash ^= ch;
+        hash *= static_cast<size_t>(1099511628211ull);
+    }
+    return hash;
 }
 
 void SortStrings(std::vector<std::string>& values) {

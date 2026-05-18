@@ -30,6 +30,7 @@ public:
     int PreferredHeight(const WidgetHost& renderer) const override;
     void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect) override;
     void Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
+    void DrawOverlay(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const override;
     void BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& widget) const override;
     void BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const override;
 

@@ -4,17 +4,15 @@
 #include <cstdint>
 
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "layout_model/dashboard_overlay_state.h"
+#include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/text_format.h"
 
 namespace {
 
 bool ContainsCardReference(const std::vector<std::string>& stack, const std::string& cardId) {
     return std::find(stack.begin(), stack.end(), cardId) != stack.end();
-}
-
-std::string FormatRect(const RenderRect& rect) {
-    return "rect=(" + std::to_string(rect.left) + "," + std::to_string(rect.top) + "," + std::to_string(rect.right) +
-           "," + std::to_string(rect.bottom) + ")";
 }
 
 RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
@@ -180,12 +178,24 @@ void DashboardLayoutResolver::Clear() {
     staticColorEditRegions_.clear();
     dynamicColorEditRegions_.clear();
     dynamicAnchorRegistrationEnabled_ = false;
+    ResetEditArtifactContext();
     parsedWidgetInfoCache_.clear();
 }
 
 void DashboardLayoutResolver::ClearDynamicEditArtifacts() {
     dynamicEditableAnchorRegions_.clear();
     dynamicColorEditRegions_.clear();
+}
+
+void DashboardLayoutResolver::SetEditArtifactContext(
+    const std::vector<LayoutEditOverlayOwner>& overlayOwners, LayoutEditOverlayAffordanceLayer layer) {
+    currentOverlayOwners_ = overlayOwners;
+    currentOverlayAffordanceLayer_ = layer;
+}
+
+void DashboardLayoutResolver::ResetEditArtifactContext() {
+    currentOverlayOwners_.clear();
+    currentOverlayAffordanceLayer_ = LayoutEditOverlayAffordanceLayer::Background;
 }
 
 void DashboardLayoutResolver::RegisterEditableAnchorRegion(
@@ -218,6 +228,8 @@ void DashboardLayoutResolver::RegisterEditableAnchorRegion(
     region.showWhenWidgetHovered = registration.visibility == LayoutEditAnchorVisibility::WhenWidgetHovered;
     region.drawTargetOutline = registration.targetOutline == LayoutEditTargetOutline::Visible;
     region.value = registration.value;
+    region.overlayOwners = currentOverlayOwners_;
+    region.overlayLayer = currentOverlayAffordanceLayer_;
     regions.push_back(std::move(region));
 }
 
@@ -361,7 +373,10 @@ void DashboardLayoutResolver::RegisterStaticColorEditRegion(
     if (!IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
         return;
     }
-    staticColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+    LayoutEditColorRegion region{parameter, targetRect};
+    region.overlayOwners = currentOverlayOwners_;
+    region.overlayLayer = currentOverlayAffordanceLayer_;
+    staticColorEditRegions_.push_back(std::move(region));
 }
 
 void DashboardLayoutResolver::RegisterDynamicColorEditRegion(
@@ -369,7 +384,10 @@ void DashboardLayoutResolver::RegisterDynamicColorEditRegion(
     if (!dynamicAnchorRegistrationEnabled_ || !IsColorEditParameter(parameter) || targetRect.IsEmpty()) {
         return;
     }
-    dynamicColorEditRegions_.push_back(LayoutEditColorRegion{parameter, targetRect});
+    LayoutEditColorRegion region{parameter, targetRect};
+    region.overlayOwners = currentOverlayOwners_;
+    region.overlayLayer = currentOverlayAffordanceLayer_;
+    dynamicColorEditRegions_.push_back(std::move(region));
 }
 
 void DashboardLayoutResolver::ResolveContainerAnchorCollisions() {
@@ -406,7 +424,89 @@ void DashboardLayoutResolver::ResolveDynamicEditArtifactCollisions() {
     ResolveContainerAnchorCollisions();
 }
 
+bool DashboardLayoutResolver::OverlayOwnerMatchesActiveDrag(
+    const std::vector<LayoutEditOverlayOwner>& owners, const DashboardOverlayState& overlayState) const {
+    if (!overlayState.activeContainerChildReorderDrag.has_value()) {
+        return false;
+    }
+    const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
+    return std::any_of(owners.begin(), owners.end(), [&](const LayoutEditOverlayOwner& owner) {
+        return owner.childIndex == drag.currentIndex &&
+               MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
+                   LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
+    });
+}
+
+bool DashboardLayoutResolver::AnchorMatchesActiveMetricListDrag(
+    const LayoutEditAnchorRegion& region, const DashboardOverlayState& overlayState) const {
+    if (!overlayState.activeMetricListReorderDrag.has_value()) {
+        return false;
+    }
+    const std::optional<LayoutNodeFieldEditKey> nodeFieldKey = LayoutEditAnchorNodeFieldKey(region.key);
+    if (!nodeFieldKey.has_value() || nodeFieldKey->widgetClass != WidgetClass::MetricList) {
+        return false;
+    }
+    const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
+    return region.key.anchorId == drag.currentIndex && ::MatchesWidgetIdentity(drag.widget, region.key.widget);
+}
+
+bool DashboardLayoutResolver::AnchorMatchesActiveContainerChildDrag(
+    const LayoutEditAnchorRegion& region, const DashboardOverlayState& overlayState) const {
+    if (!overlayState.activeContainerChildReorderDrag.has_value()) {
+        return false;
+    }
+    const std::optional<LayoutContainerChildOrderEditKey> orderKey = LayoutEditAnchorContainerChildOrderKey(region.key);
+    if (!orderKey.has_value()) {
+        return false;
+    }
+    const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
+    return region.key.anchorId == drag.currentIndex &&
+           MatchesLayoutContainerEditKey(LayoutContainerEditKey{orderKey->editCardId, orderKey->nodePath},
+               LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
+}
+
+void DashboardLayoutResolver::TagOverlayAffordanceLayers(const DashboardOverlayState& overlayState) {
+    const auto layerForOwners = [&](const std::vector<LayoutEditOverlayOwner>& owners) {
+        return OverlayOwnerMatchesActiveDrag(owners, overlayState) ? LayoutEditOverlayAffordanceLayer::Foreground
+                                                                   : LayoutEditOverlayAffordanceLayer::Background;
+    };
+    const auto tagAnchorRegions = [&](std::vector<LayoutEditAnchorRegion>& regions) {
+        for (LayoutEditAnchorRegion& region : regions) {
+            const bool foreground = AnchorMatchesActiveMetricListDrag(region, overlayState) ||
+                                    AnchorMatchesActiveContainerChildDrag(region, overlayState) ||
+                                    OverlayOwnerMatchesActiveDrag(region.overlayOwners, overlayState);
+            region.overlayLayer = foreground ? LayoutEditOverlayAffordanceLayer::Foreground
+                                             : LayoutEditOverlayAffordanceLayer::Background;
+        }
+    };
+    tagAnchorRegions(staticEditableAnchorRegions_);
+    tagAnchorRegions(dynamicEditableAnchorRegions_);
+    for (LayoutEditGuide& guide : layoutEditGuides_) {
+        guide.overlayLayer = layerForOwners(guide.overlayOwners);
+    }
+    for (LayoutEditWidgetGuide& guide : widgetEditGuides_) {
+        guide.overlayLayer = layerForOwners(guide.overlayOwners);
+    }
+    for (LayoutEditGapAnchor& anchor : gapEditAnchors_) {
+        anchor.overlayLayer = layerForOwners(anchor.overlayOwners);
+    }
+    for (LayoutEditColorRegion& region : staticColorEditRegions_) {
+        region.overlayLayer = layerForOwners(region.overlayOwners);
+    }
+    for (LayoutEditColorRegion& region : dynamicColorEditRegions_) {
+        region.overlayLayer = layerForOwners(region.overlayOwners);
+    }
+    for (ResolvedCardLayout& card : resolvedLayout_.cards) {
+        card.chrome.overlayLayer = layerForOwners(card.chrome.overlayOwners);
+        for (WidgetLayout& widget : card.widgets) {
+            widget.overlayLayer = layerForOwners(widget.overlayOwners);
+        }
+    }
+}
+
 void DashboardLayoutResolver::RegisterWidgetEditGuide(LayoutEditWidgetGuide guide) {
+    guide.overlayOwners = currentOverlayOwners_;
+    guide.overlayLayer = currentOverlayAffordanceLayer_;
     widgetEditGuides_.push_back(std::move(guide));
 }
 
@@ -416,22 +516,27 @@ void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
     std::vector<WidgetLayout>& widgets,
     bool instantiateWidgets) {
     std::vector<std::string> cardReferenceStack;
-    ResolveNodeWidgetsInternal(renderer, node, rect, widgets, cardReferenceStack, "", "", {}, instantiateWidgets);
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    ResolveNodeWidgetsInternal(
+        renderer, node, rect, widgets, cardReferenceStack, overlayOwners, "", "", {}, instantiateWidgets);
 }
 
 void DashboardLayoutResolver::BuildWidgetEditGuides(DashboardRenderer& renderer) {
     widgetEditGuides_.clear();
     for (const auto& card : resolvedLayout_.cards) {
         if (card.chrome.widget != nullptr) {
+            SetEditArtifactContext(card.chrome.overlayOwners, LayoutEditOverlayAffordanceLayer::Background);
             card.chrome.widget->BuildEditGuides(renderer, card.chrome);
         }
 
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {
+                SetEditArtifactContext(widget.overlayOwners, LayoutEditOverlayAffordanceLayer::Background);
                 widget.widget->BuildEditGuides(renderer, widget);
             }
         }
     }
+    ResetEditArtifactContext();
 }
 
 void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& renderer) {
@@ -439,14 +544,17 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
     staticColorEditRegions_.clear();
     for (const auto& card : resolvedLayout_.cards) {
         if (card.chrome.widget != nullptr) {
+            SetEditArtifactContext(card.chrome.overlayOwners, LayoutEditOverlayAffordanceLayer::Background);
             card.chrome.widget->BuildStaticAnchors(renderer, card.chrome);
         }
         for (const auto& widget : card.widgets) {
             if (widget.widget != nullptr) {
+                SetEditArtifactContext(widget.overlayOwners, LayoutEditOverlayAffordanceLayer::Background);
                 widget.widget->BuildStaticAnchors(renderer, widget);
             }
         }
     }
+    ResetEditArtifactContext();
 
     for (const ContainerChildReorderTarget& target : containerChildReorderTargets_) {
         if (target.childRects.size() < 2) {
@@ -486,6 +594,9 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 hitInset,
                 collisionStep,
                 occupiedAnchorHitRects);
+            const LayoutEditOverlayOwner childOwner{
+                LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath}, static_cast<int>(i)};
+            const size_t anchorIndex = staticEditableAnchorRegions_.size();
             RegisterStaticEditAnchor(
                 LayoutEditAnchorRegistration{.key = LayoutEditAnchorKey{widgetIdentity,
                                                  LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
@@ -497,8 +608,14 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                         horizontal ? AnchorDragAxis::Horizontal : AnchorDragAxis::Vertical, anchorRect.Center()),
                     .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
                     .targetOutline = LayoutEditTargetOutline::Hidden});
-            staticEditableAnchorRegions_.back().anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
-            occupiedAnchorHitRects.push_back(staticEditableAnchorRegions_.back().anchorHitRect);
+            if (staticEditableAnchorRegions_.size() == anchorIndex) {
+                continue;
+            }
+            LayoutEditAnchorRegion& registeredAnchor = staticEditableAnchorRegions_.back();
+            registeredAnchor.anchorHitRect = anchorRect.Inflate(hitInset, hitInset);
+            registeredAnchor.overlayOwners = {childOwner};
+            registeredAnchor.overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
+            occupiedAnchorHitRects.push_back(registeredAnchor.anchorHitRect);
         }
     }
 }
@@ -510,7 +627,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     int gap,
     const std::string& renderCardId,
     const std::string& editCardId,
-    const std::vector<size_t>& nodePath) {
+    const std::vector<size_t>& nodePath,
+    const std::vector<LayoutEditOverlayOwner>& overlayOwners) {
     if (!DashboardRenderer::IsContainerNode(node) || childRects.size() < 2) {
         return;
     }
@@ -559,6 +677,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
                                                 : renderer.Config().layout.cardStyle.rowGap;
         }
         anchor.hitRect = anchor.handleRect.Inflate(hitInset, hitInset);
+        anchor.overlayOwners = overlayOwners;
+        anchor.overlayLayer = currentOverlayAffordanceLayer_;
         gapEditAnchors_.push_back(std::move(anchor));
     }
 
@@ -591,6 +711,8 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
         }
         guide.childFixedExtents = childFixedExtents;
         guide.childRects = childRects;
+        guide.overlayOwners = overlayOwners;
+        guide.overlayLayer = currentOverlayAffordanceLayer_;
 
         if (horizontal) {
             const int x = childRects[i].right + (std::max)(0, gap / 2);
@@ -617,8 +739,7 @@ int DashboardLayoutResolver::PreferredNodeHeight(
             }
         }
         if (writeTrace) {
-            renderer.WriteTrace(
-                "renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(total));
+            renderer.WriteTraceFmt(RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), total);
         }
         return total;
     }
@@ -628,16 +749,15 @@ int DashboardLayoutResolver::PreferredNodeHeight(
             tallest = (std::max)(tallest, PreferredNodeHeight(renderer, child, 0));
         }
         if (writeTrace) {
-            renderer.WriteTrace(
-                "renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(tallest));
+            renderer.WriteTraceFmt(RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), tallest);
         }
         return tallest;
     }
     const ParsedWidgetInfo* widget = FindParsedWidgetInfo(renderer, node);
     const int preferredHeight = widget != nullptr ? widget->preferredHeight : 0;
     if (writeTrace) {
-        renderer.WriteTrace(
-            "renderer:layout_preferred_height node=\"" + node.name + "\" value=" + std::to_string(preferredHeight));
+        renderer.WriteTraceFmt(
+            RES_STR("layout_preferred_height node=\"%s\" value=%d"), node.name.c_str(), preferredHeight);
     }
     return preferredHeight;
 }
@@ -698,32 +818,43 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     const RenderRect& rect,
     std::vector<WidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
+    std::vector<LayoutEditOverlayOwner>& overlayOwners,
     const std::string& renderCardId,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath,
     bool instantiateWidgets) {
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
     if (writeTrace) {
-        renderer.WriteTrace("renderer:layout_resolve_node name=\"" + node.name +
-                            "\" weight=" + std::to_string(node.weight) + " " + FormatRect(rect) +
-                            " children=" + std::to_string(node.children.size()));
+        renderer.WriteTraceFmt(RES_STR("layout_resolve_node name=\"%s\" weight=%d rect=(%d,%d,%d,%d) children=%zu"),
+            node.name.c_str(),
+            node.weight,
+            rect.left,
+            rect.top,
+            rect.right,
+            rect.bottom,
+            node.children.size());
     }
     if (node.cardReference) {
         if (ContainsCardReference(cardReferenceStack, node.name)) {
             if (writeTrace) {
-                renderer.WriteTrace("renderer:layout_card_ref_cycle id=\"" + node.name + "\"");
+                renderer.WriteTraceFmt(RES_STR("layout_card_ref_cycle id=\"%s\""), node.name.c_str());
             }
             return;
         }
         const LayoutCardConfig* referencedCard = renderer.FindCardConfigById(node.name);
         if (referencedCard == nullptr) {
             if (writeTrace) {
-                renderer.WriteTrace("renderer:layout_card_ref_missing id=\"" + node.name + "\"");
+                renderer.WriteTraceFmt(RES_STR("layout_card_ref_missing id=\"%s\""), node.name.c_str());
             }
             return;
         }
         if (writeTrace) {
-            renderer.WriteTrace("renderer:layout_card_ref id=\"" + node.name + "\" " + FormatRect(rect));
+            renderer.WriteTraceFmt(RES_STR("layout_card_ref id=\"%s\" rect=(%d,%d,%d,%d)"),
+                node.name.c_str(),
+                rect.left,
+                rect.top,
+                rect.right,
+                rect.bottom);
         }
         cardReferenceStack.push_back(node.name);
         ResolveNodeWidgetsInternal(renderer,
@@ -731,6 +862,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
             rect,
             widgets,
             cardReferenceStack,
+            overlayOwners,
             renderCardId,
             node.name,
             {},
@@ -743,13 +875,28 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         widget.cardId = renderCardId;
         widget.editCardId = editCardId;
         widget.nodePath = nodePath;
+        widget.overlayOwners = overlayOwners;
+        widget.overlayLayer = currentOverlayAffordanceLayer_;
         if (writeTrace) {
             const std::string widgetTypeName = widget.widgetClass != WidgetClass::Unknown
                                                    ? std::string(EnumToString(widget.widgetClass))
                                                    : std::string();
-            renderer.WriteTrace("renderer:layout_widget_resolved kind=\"" + node.name + "\" " +
-                                FormatRect(widget.rect) +
-                                (widgetTypeName.empty() ? "" : " type=\"" + widgetTypeName + "\""));
+            if (widgetTypeName.empty()) {
+                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d)"),
+                    node.name.c_str(),
+                    widget.rect.left,
+                    widget.rect.top,
+                    widget.rect.right,
+                    widget.rect.bottom);
+            } else {
+                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d) type=\"%s\""),
+                    node.name.c_str(),
+                    widget.rect.left,
+                    widget.rect.top,
+                    widget.rect.right,
+                    widget.rect.bottom,
+                    widgetTypeName.c_str());
+            }
         }
         widgets.push_back(std::move(widget));
         return;
@@ -837,21 +984,33 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         }
 
         if (writeTrace) {
-            renderer.WriteTrace("renderer:layout_weighted_child parent=\"" + node.name + "\" child=\"" + child.name +
-                                "\" weight=" + std::to_string(childWeight) + " gap=" + std::to_string(gap) +
-                                " size=" + std::to_string(size) + " " + FormatRect(childRect));
+            renderer.WriteTraceFmt(
+                RES_STR("layout_weighted_child parent=\"%s\" child=\"%s\" weight=%d gap=%d size=%d rect=(%d,%d,%d,%d)"),
+                node.name.c_str(),
+                child.name.c_str(),
+                childWeight,
+                gap,
+                size,
+                childRect.left,
+                childRect.top,
+                childRect.right,
+                childRect.bottom);
         }
         childRects.push_back(childRect);
         childPath.push_back(i);
+        overlayOwners.push_back(
+            LayoutEditOverlayOwner{LayoutContainerChildOrderEditKey{editCardId, nodePath}, static_cast<int>(i)});
         ResolveNodeWidgetsInternal(renderer,
             child,
             childRect,
             widgets,
             cardReferenceStack,
+            overlayOwners,
             renderCardId,
             editCardId,
             childPath,
             instantiateWidgets);
+        overlayOwners.pop_back();
         childPath.pop_back();
         cursor += size + gap;
         if (verticalSpring) {
@@ -863,7 +1022,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         }
     }
     if (instantiateWidgets) {
-        AddLayoutEditGuide(renderer, node, rect, childRects, gap, renderCardId, editCardId, nodePath);
+        AddLayoutEditGuide(renderer, node, rect, childRects, gap, renderCardId, editCardId, nodePath, overlayOwners);
     }
 }
 
@@ -877,6 +1036,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     dynamicEditableAnchorRegions_.clear();
     staticColorEditRegions_.clear();
     dynamicColorEditRegions_.clear();
+    ResetEditArtifactContext();
     parsedWidgetInfoCache_.clear();
     resolvedLayout_.windowWidth = renderer.WindowWidth();
     resolvedLayout_.windowHeight = renderer.WindowHeight();
@@ -888,14 +1048,19 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
 
     if (renderer.config_.layout.structure.cardsLayout.name.empty()) {
-        renderer.lastError_ = "renderer:layout_missing_cards_root";
+        renderer.lastError_ = "layout_missing_cards_root";
         return false;
     }
 
     if (writeTrace) {
-        renderer.WriteTrace("renderer:layout_begin window=" + std::to_string(resolvedLayout_.windowWidth) + "x" +
-                            std::to_string(resolvedLayout_.windowHeight) + " " + FormatRect(dashboardRect) +
-                            " cards_root=\"" + renderer.config_.layout.structure.cardsLayout.name + "\"");
+        renderer.WriteTraceFmt(RES_STR("layout_begin window=%dx%d rect=(%d,%d,%d,%d) cards_root=\"%s\""),
+            resolvedLayout_.windowWidth,
+            resolvedLayout_.windowHeight,
+            dashboardRect.left,
+            dashboardRect.top,
+            dashboardRect.right,
+            dashboardRect.bottom,
+            renderer.config_.layout.structure.cardsLayout.name.c_str());
     }
 
     if (includeWidgetState && !renderer.layoutGuideDragActive_) {
@@ -914,52 +1079,73 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         gapEditAnchors_.push_back(std::move(anchor));
     }
 
-    const auto resolveCard =
-        [&](const LayoutNodeConfig& node, const RenderRect& rect, const std::vector<size_t>& nodePath) {
-            const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
-                renderer.config_.layout.cards.end(),
-                [&](const auto& card) { return card.id == node.name; });
-            if (cardIt == renderer.config_.layout.cards.end()) {
-                return;
-            }
+    const auto resolveCard = [&](const LayoutNodeConfig& node,
+                                 const RenderRect& rect,
+                                 const std::vector<size_t>& nodePath,
+                                 std::vector<LayoutEditOverlayOwner>& overlayOwners) {
+        const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
+            renderer.config_.layout.cards.end(),
+            [&](const auto& card) { return card.id == node.name; });
+        if (cardIt == renderer.config_.layout.cards.end()) {
+            return;
+        }
 
-            DashboardLayoutResolver::ResolvedCardLayout card;
-            card.id = cardIt->id;
-            card.title = cardIt->title;
-            card.iconName = cardIt->icon;
-            card.nodePath = nodePath;
-            card.rect = rect;
-            card.chromeLayout = ResolveCardChromeLayout(*cardIt, card.rect, ResolveCardChromeLayoutMetrics(renderer));
-            card.chrome.rect = card.rect;
-            card.chrome.cardId = card.id;
-            card.chrome.editCardId = card.id;
-            card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
+        DashboardLayoutResolver::ResolvedCardLayout card;
+        card.id = cardIt->id;
+        card.title = cardIt->title;
+        card.iconName = cardIt->icon;
+        card.nodePath = nodePath;
+        card.rect = rect;
+        card.chromeLayout = ResolveCardChromeLayout(*cardIt, card.rect, ResolveCardChromeLayoutMetrics(renderer));
+        card.chrome.rect = card.rect;
+        card.chrome.cardId = card.id;
+        card.chrome.editCardId = card.id;
+        card.chrome.overlayOwners = overlayOwners;
+        card.chrome.overlayLayer = currentOverlayAffordanceLayer_;
+        card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
 
-            if (writeTrace) {
-                renderer.WriteTrace("renderer:layout_card id=\"" + card.id + "\" " + FormatRect(card.rect) +
-                                    " title=" + FormatRect(card.chromeLayout.titleRect) +
-                                    " icon=" + FormatRect(card.chromeLayout.iconRect) +
-                                    " content=" + FormatRect(card.chromeLayout.contentRect));
-            }
-            std::vector<std::string> cardReferenceStack;
-            ResolveNodeWidgetsInternal(renderer,
-                cardIt->layout,
-                card.chromeLayout.contentRect,
-                card.widgets,
-                cardReferenceStack,
-                card.id,
-                card.id,
-                {},
-                includeWidgetState);
-            resolvedLayout_.cards.push_back(std::move(card));
-        };
+        if (writeTrace) {
+            renderer.WriteTraceFmt(RES_STR("layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "
+                                           "icon=rect=(%d,%d,%d,%d) content=rect=(%d,%d,%d,%d)"),
+                card.id.c_str(),
+                card.rect.left,
+                card.rect.top,
+                card.rect.right,
+                card.rect.bottom,
+                card.chromeLayout.titleRect.left,
+                card.chromeLayout.titleRect.top,
+                card.chromeLayout.titleRect.right,
+                card.chromeLayout.titleRect.bottom,
+                card.chromeLayout.iconRect.left,
+                card.chromeLayout.iconRect.top,
+                card.chromeLayout.iconRect.right,
+                card.chromeLayout.iconRect.bottom,
+                card.chromeLayout.contentRect.left,
+                card.chromeLayout.contentRect.top,
+                card.chromeLayout.contentRect.right,
+                card.chromeLayout.contentRect.bottom);
+        }
+        std::vector<std::string> cardReferenceStack;
+        ResolveNodeWidgetsInternal(renderer,
+            cardIt->layout,
+            card.chromeLayout.contentRect,
+            card.widgets,
+            cardReferenceStack,
+            overlayOwners,
+            card.id,
+            card.id,
+            {},
+            includeWidgetState);
+        resolvedLayout_.cards.push_back(std::move(card));
+    };
 
     const auto resolveDashboardNode = [&](const auto& resolveNode,
                                           const LayoutNodeConfig& node,
                                           const RenderRect& rect,
-                                          const std::vector<size_t>& nodePath) -> void {
+                                          const std::vector<size_t>& nodePath,
+                                          std::vector<LayoutEditOverlayOwner>& overlayOwners) -> void {
         if (!DashboardRenderer::IsContainerNode(node)) {
-            resolveCard(node, rect, nodePath);
+            resolveCard(node, rect, nodePath, overlayOwners);
             return;
         }
 
@@ -999,29 +1185,41 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             }
 
             if (writeTrace) {
-                renderer.WriteTrace("renderer:layout_dashboard_child parent=\"" + node.name + "\" child=\"" +
-                                    child.name + "\" weight=" + std::to_string(childWeight) +
-                                    " gap=" + std::to_string(gap) + " size=" + std::to_string(size) + " " +
-                                    FormatRect(childRect));
+                renderer.WriteTraceFmt(RES_STR("layout_dashboard_child parent=\"%s\" child=\"%s\" weight=%d gap=%d "
+                                               "size=%d rect=(%d,%d,%d,%d)"),
+                    node.name.c_str(),
+                    child.name.c_str(),
+                    childWeight,
+                    gap,
+                    size,
+                    childRect.left,
+                    childRect.top,
+                    childRect.right,
+                    childRect.bottom);
             }
             childRects.push_back(childRect);
             childPath.push_back(i);
-            resolveNode(resolveNode, child, childRect, childPath);
+            overlayOwners.push_back(
+                LayoutEditOverlayOwner{LayoutContainerChildOrderEditKey{"", nodePath}, static_cast<int>(i)});
+            resolveNode(resolveNode, child, childRect, childPath, overlayOwners);
+            overlayOwners.pop_back();
             childPath.pop_back();
             cursor += size + gap;
             remainingAvailable -= size;
             remainingWeight -= childWeight;
         }
         if (includeWidgetState) {
-            AddLayoutEditGuide(renderer, node, rect, childRects, gap, "", "", nodePath);
+            AddLayoutEditGuide(renderer, node, rect, childRects, gap, "", "", nodePath, overlayOwners);
         }
     };
 
-    resolveDashboardNode(resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {});
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    resolveDashboardNode(
+        resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {}, overlayOwners);
 
     if (resolvedLayout_.cards.empty()) {
-        renderer.lastError_ = "renderer:layout_resolve_failed cards=0 root=\"" +
-                              renderer.config_.layout.structure.cardsLayout.name + "\"";
+        renderer.lastError_ = FormatText(
+            "layout_resolve_failed cards=0 root=\"%s\"", renderer.config_.layout.structure.cardsLayout.name.c_str());
         return false;
     }
 
@@ -1063,7 +1261,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     }
 
     if (writeTrace) {
-        renderer.WriteTrace("renderer:layout_done cards=" + std::to_string(resolvedLayout_.cards.size()));
+        renderer.WriteTraceFmt(RES_STR("layout_done cards=%zu"), resolvedLayout_.cards.size());
     }
     return true;
 }

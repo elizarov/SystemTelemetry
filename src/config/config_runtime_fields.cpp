@@ -13,6 +13,7 @@
 #include "config/config_parser.h"
 #include "util/numeric_format.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -100,11 +101,11 @@ bool ColorConfigPersistedValueEquals(const ColorConfig& color, const ColorConfig
 }
 
 std::string FormatLogicalSize(const LogicalSizeConfig& size) {
-    return std::to_string(size.width) + "," + std::to_string(size.height);
+    return FormatText("%d,%d", size.width, size.height);
 }
 
 std::string FormatFontSpec(const UiFontConfig& font) {
-    return font.face + "," + std::to_string(font.size) + "," + std::to_string(font.weight);
+    return FormatText("%s,%d,%d", font.face.c_str(), font.size, font.weight);
 }
 
 template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
@@ -245,25 +246,18 @@ std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, 
     const void* address = FieldAddress(owner, field);
     switch (field.kind) {
         case RuntimeConfigFieldValueKind::Int:
-            return std::to_string(*reinterpret_cast<const int*>(address));
+            return FormatText("%d", *reinterpret_cast<const int*>(address));
         case RuntimeConfigFieldValueKind::Double:
             return FormatDoubleGeneral(*reinterpret_cast<const double*>(address));
         case RuntimeConfigFieldValueKind::String:
             return *reinterpret_cast<const std::string*>(address);
         case RuntimeConfigFieldValueKind::StringList: {
             const auto& values = *reinterpret_cast<const std::vector<std::string>*>(address);
-            std::string encoded;
-            for (size_t i = 0; i < values.size(); ++i) {
-                if (i > 0) {
-                    encoded += ",";
-                }
-                encoded += values[i];
-            }
-            return encoded;
+            return JoinNames(values);
         }
         case RuntimeConfigFieldValueKind::LogicalPoint: {
             const LogicalPointConfig& point = *reinterpret_cast<const LogicalPointConfig*>(address);
-            return std::to_string(point.x) + "," + std::to_string(point.y);
+            return FormatText("%d,%d", point.x, point.y);
         }
         case RuntimeConfigFieldValueKind::LogicalSize:
             return FormatLogicalSize(*reinterpret_cast<const LogicalSizeConfig*>(address));
@@ -313,19 +307,19 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     std::string text = node.name;
     if (node.weight != 1) {
-        text += ":" + std::to_string(node.weight);
+        AppendFormat(text, ":%d", node.weight);
     }
     if (!node.children.empty()) {
-        text += "(";
+        AppendFormat(text, "(");
         for (size_t i = 0; i < node.children.size(); ++i) {
             if (i > 0) {
-                text += ",";
+                AppendFormat(text, ",");
             }
-            text += FormatLayoutExpression(node.children[i]);
+            AppendFormat(text, "%s", FormatLayoutExpression(node.children[i]).c_str());
         }
-        text += ")";
+        AppendFormat(text, ")");
     } else if (!node.parameter.empty()) {
-        text += "(" + node.parameter + ")";
+        AppendFormat(text, "(%s)", node.parameter.c_str());
     }
     return text;
 }

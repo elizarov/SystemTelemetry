@@ -11,6 +11,6 @@
 
 ## Boundaries
 
-- `layout_model` may depend on `layout_model`, `config`, `renderer`, and `widget`.
-- It does not depend on dashboard, dashboard renderer, diagnostics, display, layout-edit interaction, layout-edit dialog, main, telemetry, util, or graphics implementation packages.
+- `layout_model` may depend on `layout_model`, `config`, `renderer`, `util`, and `widget`.
+- It does not depend on dashboard, dashboard renderer, diagnostics, display, layout-edit interaction, layout-edit dialog, main, telemetry, or graphics implementation packages.
 - Types in this package stay DTO-like and renderer-safe so they can cross package boundaries cleanly.

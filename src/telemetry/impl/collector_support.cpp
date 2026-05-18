@@ -1,12 +1,12 @@
 #include "telemetry/impl/collector_support.h"
 
 #include <array>
-#include <cstdio>
 #include <intrin.h>
 #include <string_view>
 
 #include "telemetry/impl/system_info_support.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -43,20 +43,11 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     if (!metric.value.has_value()) {
         return "N/A";
     }
-    char buffer[64];
     const std::string_view unit = EnumToString(metric.unit);
     if (unit.empty()) {
-        sprintf_s(buffer, "%.*f", precision, *metric.value);
-    } else {
-        sprintf_s(buffer, "%.*f %s", precision, *metric.value, std::string(unit).c_str());
+        return FormatText("%.*f", precision, *metric.value);
     }
-    return buffer;
-}
-
-std::string PdhStatusCodeString(PDH_STATUS status) {
-    char buffer[32];
-    sprintf_s(buffer, "%ld", static_cast<long>(status));
-    return buffer;
+    return FormatText("%.*f %.*s", precision, *metric.value, static_cast<int>(unit.size()), unit.data());
 }
 
 typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);

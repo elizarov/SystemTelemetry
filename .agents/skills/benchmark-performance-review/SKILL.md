@@ -28,16 +28,7 @@ Use this skill to verify that CaseDash performance still matches the maintained 
 .\build.cmd /benchmarks
 ```
 
-3. Run every maintained direct benchmark sequentially from the fresh build:
-
-```powershell
-.\build\CaseDashBenchmarks.exe edit-layout 240 2
-.\build\CaseDashBenchmarks.exe layout-guide-sheet 20 2
-.\build\CaseDashBenchmarks.exe layout-switch 240 2
-.\build\CaseDashBenchmarks.exe mouse-hover 240 2
-.\build\CaseDashBenchmarks.exe theme-change 240 2
-.\build\CaseDashBenchmarks.exe update-telemetry 240 2
-```
+3. Run every maintained direct benchmark listed in the `Benchmark Workflow` section of `docs/profile_benchmark.md` sequentially from the fresh build. Do not duplicate the command list here; `docs/profile_benchmark.md` is the owning source of truth.
 
 4. Compare direct-run timing lines with the `Current Known Baseline` section in `docs/profile_benchmark.md`. Compare like with like: primary loop metrics, named submetrics, same benchmark name, same iteration count, and same warmup count.
 5. Treat a single noisy run as inconclusive. When a metric looks slow, rerun the same direct benchmark at least twice and compare the median or the stable range.
@@ -53,16 +44,7 @@ Use this skill to verify that CaseDash performance still matches the maintained 
    - `Tested Hypotheses`
    - `Practical Guidance For Future Experiments`
 3. Do not retry experiments that the log rejects unless surrounding code changed enough to make the old result stale. Record why the retry is justified.
-4. Capture a benchmark-focused profile when direct runs show a material regression or when hotspot attribution is needed:
-
-```powershell
-.\profile_benchmark.cmd edit-layout 240 2
-.\profile_benchmark.cmd layout-guide-sheet 20 2
-.\profile_benchmark.cmd layout-switch 240 2
-.\profile_benchmark.cmd mouse-hover 240 2
-.\profile_benchmark.cmd theme-change 240 2
-.\profile_benchmark.cmd update-telemetry 240 2
-```
+4. Capture a benchmark-focused profile when direct runs show a material regression or when hotspot attribution is needed. Use the matching `profile_benchmark.cmd` command documented in the `Benchmark Workflow` section of `docs/profile_benchmark.md`.
 
 5. For repeated unattended profiling, start the elevated daemon once with `.\profile_benchmark.cmd /daemon-start`, then issue ordinary `profile_benchmark.cmd <benchmark> ...` requests.
 6. Prefer fixes that reduce real hot-path work, preserve the documented benchmark harness semantics, and keep benchmark-sensitive code on the maintained Release optimization profile.
@@ -82,7 +64,7 @@ Use this skill to verify that CaseDash performance still matches the maintained 
 
 - Run `.\format.cmd changed` after C++ edits; use `.\format.cmd fix changed` if formatting needs repair.
 - Run `.\build.cmd /benchmarks` after the final retained changes.
-- Rerun all direct benchmarks listed in `Baseline Review` after the final build.
+- Rerun all maintained direct benchmarks listed in `docs/profile_benchmark.md` after the final build.
 - Run `.\test.cmd` when production behavior, shared logic, or benchmark harness behavior changes.
 - Run the smallest headless diagnostics command from `docs/diagnostics.md` when a fix touches diagnostics, rendering exports, app icon generation, layout-edit output, provider behavior, config reload, or layout-guide-sheet behavior. Put explicit outputs under `build\` and add `/default-config` when exercising built-in config.
 

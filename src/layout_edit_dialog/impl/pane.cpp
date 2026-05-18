@@ -12,6 +12,7 @@
 #include "layout_edit_dialog/theme_preview.h"
 #include "resource.h"
 #include "util/localization_catalog.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 void ShowDialogControls(HWND hwnd, const int* controlIds, size_t controlCount, bool show);
@@ -362,8 +363,7 @@ constexpr const char* kLayoutEditControlTexts[] = {"",
     "Binding:",
     "Format:",
     "Revert Field",
-    "Changes preview live. Closing this window keeps Edit layout active. Use Save Config or turn off Edit layout to "
-    "finish the session.",
+    "",
     "Red:",
     "Green:",
     "Blue:",
@@ -374,6 +374,13 @@ constexpr const char* kLayoutEditControlTexts[] = {"",
     "Value:",
     "Add row"};
 static_assert(static_cast<size_t>(LayoutEditControlText::Count) == ARRAYSIZE(kLayoutEditControlTexts));
+
+const char* LayoutEditControlTextValue(LayoutEditControlText text) {
+    if (text == LayoutEditControlText::FooterHint) {
+        return FindLocalizedText(RES_STR("layout_edit.dialog.footer_hint"));
+    }
+    return kLayoutEditControlTexts[static_cast<size_t>(text)];
+}
 
 constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_FILTER_LABEL, 8, 10, 26, 8, LayoutEditControlKind::Label, LayoutEditControlText::Filter},
@@ -771,7 +778,7 @@ WPARAM LayoutEditDialogFont(HWND hwnd) {
 
 HWND CreateLayoutEditControl(HWND hwnd, const LayoutEditControlSpec& spec, WPARAM font) {
     const size_t kind = static_cast<size_t>(spec.kind);
-    const char* text = kLayoutEditControlTexts[static_cast<size_t>(spec.text)];
+    const char* text = LayoutEditControlTextValue(spec.text);
     std::wstring wideText;
     if (text[0] != '\0') {
         wideText = WideFromUtf8(text);
@@ -1452,8 +1459,7 @@ void SetColorSamplePreview(LayoutEditDialogState* state, HWND hwnd, unsigned int
     }
     state->previewColor = RGB((color >> 24) & 0xFFu, (color >> 16) & 0xFFu, (color >> 8) & 0xFFu);
     SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE, "Sample text in the selected color");
-    std::string derivedHexText = "Hex: ";
-    derivedHexText += FormatDialogColorHex(color);
+    const std::string derivedHexText = FormatText("Hex: %s", FormatDialogColorHex(color).c_str());
     SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL, derivedHexText);
     InvalidateDialogControls(hwnd, kColorPreviewInvalidationControls, ARRAYSIZE(kColorPreviewInvalidationControls));
 }
@@ -2320,11 +2326,6 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         case LayoutEditEditorKind::GlobalFontFamily:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT);
             break;
-        case LayoutEditEditorKind::Metric:
-            if (showBinding) {
-                BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT);
-            }
-            break;
         case LayoutEditEditorKind::DateTimeFormat:
             BringDialogControlToTop(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO);
             break;
@@ -2405,12 +2406,14 @@ std::string LayoutEditConfiguredSectionDescription(const LayoutEditDialogState* 
 
 void SetLayoutEditDescription(LayoutEditDialogState* state, HWND hwnd, const LayoutEditTreeNode* node) {
     if (node == nullptr) {
-        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_TITLE, "No matching setting");
+        SetDialogControlTextUtf8(
+            hwnd, IDC_LAYOUT_EDIT_TITLE, FindLocalizedText(RES_STR("layout_edit.dialog.no_match_title")));
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_LOCATION, "");
         SetDialogControlTextUtf8(
-            hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, "Try a different filter or clear it to see the full tree.");
+            hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, FindLocalizedText(RES_STR("layout_edit.dialog.no_match_description")));
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_SUMMARY, "");
-        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_HINT, "Select a field to edit it here.");
+        SetDialogControlTextUtf8(
+            hwnd, IDC_LAYOUT_EDIT_HINT, FindLocalizedText(RES_STR("layout_edit.status.select_field")));
         return;
     }
 

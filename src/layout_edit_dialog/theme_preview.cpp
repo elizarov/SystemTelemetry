@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdint>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "config/color_math.h"
@@ -32,6 +33,28 @@ struct ThemeTriangleGeometry {
     double bottomX = 0.0;
     double bottomY = 0.0;
 };
+
+struct ThemePreviewPixelCacheKey {
+    int width = 0;
+    int height = 0;
+    int dpi = 0;
+    uint32_t systemFace = 0;
+    unsigned int background = 0;
+    unsigned int foreground = 0;
+    unsigned int accent = 0;
+
+    bool operator==(const ThemePreviewPixelCacheKey& other) const {
+        return width == other.width && height == other.height && dpi == other.dpi && systemFace == other.systemFace &&
+               background == other.background && foreground == other.foreground && accent == other.accent;
+    }
+};
+
+struct ThemePreviewPixelCacheEntry {
+    ThemePreviewPixelCacheKey key;
+    std::vector<uint32_t> pixels;
+};
+
+constexpr size_t kThemePreviewPixelCacheLimit = 24;
 
 int ScaledPreviewPixels(int dpi, int logicalPixels) {
     return MulDiv(logicalPixels, std::max(1, dpi), USER_DEFAULT_SCREEN_DPI);
@@ -64,8 +87,8 @@ int DeviceDpiY(HDC dc) {
     return dc != nullptr ? std::max(1, GetDeviceCaps(dc, LOGPIXELSY)) : USER_DEFAULT_SCREEN_DPI;
 }
 
-void FillThemePreviewPixels(std::vector<uint32_t>& pixels, int width, int height, int dpi, const ThemeConfig& theme) {
-    const uint32_t backgroundFill = ColorRefToDibPixel(GetSysColor(COLOR_3DFACE));
+void FillThemePreviewPixels(
+    std::vector<uint32_t>& pixels, int width, int height, int dpi, uint32_t backgroundFill, const ThemeConfig& theme) {
     std::fill(pixels.begin(), pixels.end(), backgroundFill);
 
     RECT localRect{0, 0, width, height};
@@ -112,6 +135,38 @@ void FillThemePreviewPixels(std::vector<uint32_t>& pixels, int width, int height
     }
 }
 
+std::vector<ThemePreviewPixelCacheEntry>& ThemePreviewPixelCache() {
+    thread_local std::vector<ThemePreviewPixelCacheEntry> cache;
+    return cache;
+}
+
+const std::vector<uint32_t>& CachedThemePreviewPixels(
+    int width, int height, int dpi, uint32_t systemFace, const ThemeConfig& theme) {
+    ThemePreviewPixelCacheKey key{
+        width, height, dpi, systemFace, theme.background.ToRgba(), theme.foreground.ToRgba(), theme.accent.ToRgba()};
+    std::vector<ThemePreviewPixelCacheEntry>& cache = ThemePreviewPixelCache();
+    auto found = std::find_if(
+        cache.begin(), cache.end(), [&](const ThemePreviewPixelCacheEntry& entry) { return entry.key == key; });
+    if (found != cache.end()) {
+        if (found != cache.begin()) {
+            ThemePreviewPixelCacheEntry entry = std::move(*found);
+            cache.erase(found);
+            cache.insert(cache.begin(), std::move(entry));
+        }
+        return cache.front().pixels;
+    }
+
+    ThemePreviewPixelCacheEntry entry;
+    entry.key = key;
+    entry.pixels.resize(static_cast<size_t>(width) * static_cast<size_t>(height));
+    FillThemePreviewPixels(entry.pixels, width, height, dpi, systemFace, theme);
+    cache.insert(cache.begin(), std::move(entry));
+    if (cache.size() > kThemePreviewPixelCacheLimit) {
+        cache.pop_back();
+    }
+    return cache.front().pixels;
+}
+
 }  // namespace
 
 const ThemeConfig* FindActiveThemeConfig(const AppConfig& config) {
@@ -131,8 +186,8 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     const int width = std::max(1, static_cast<int>(rect.right - rect.left));
     const int height = std::max(1, static_cast<int>(rect.bottom - rect.top));
     const int dpi = DeviceDpiY(dc);
-    std::vector<uint32_t> pixels(static_cast<size_t>(width) * static_cast<size_t>(height));
-    FillThemePreviewPixels(pixels, width, height, dpi, theme);
+    const uint32_t systemFace = ColorRefToDibPixel(GetSysColor(COLOR_3DFACE));
+    const std::vector<uint32_t>& pixels = CachedThemePreviewPixels(width, height, dpi, systemFace, theme);
 
     BITMAPINFO bitmapInfo{};
     bitmapInfo.bmiHeader.biSize = sizeof(bitmapInfo.bmiHeader);

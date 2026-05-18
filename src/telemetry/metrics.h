@@ -8,6 +8,7 @@
 #include "config/config.h"
 #include "config/metric_catalog.h"
 #include "telemetry/telemetry.h"
+#include "telemetry/timing.h"
 
 enum class MetricValueState {
     Unavailable,
@@ -32,10 +33,12 @@ struct ThroughputMetric {
     std::string valueText;
     double valueMbps = 0.0;
     std::vector<double> history;
+    double liveLeaderMbps = 0.0;
     double maxGraph = 10.0;
     double guideStepMbps = 5.0;
     double timeMarkerOffsetSamples = 0.0;
-    double timeMarkerIntervalSamples = 20.0;
+    double plotShiftSamples = 0.0;
+    double timeMarkerIntervalSamples = kThroughputTimeMarkerIntervalSamples;
 };
 
 struct DriveRow {
@@ -61,6 +64,8 @@ public:
         struct HistoryEntry {
             const char* metricRef = nullptr;
             std::vector<double> samples;
+            double liveLeaderMbps = 0.0;
+            double plotShiftSamples = 0.0;
         };
 
         HistoryEntry histories[4];

@@ -129,33 +129,62 @@ DashboardLayoutEditOverlayRenderer::DashboardLayoutEditOverlayRenderer(
     : renderer_(renderer), layoutResolver_(layoutResolver) {}
 
 void DashboardLayoutEditOverlayRenderer::Draw(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
-    DrawContainerChildReorderOverlay(metrics);
-    DrawSelectedColorEditHighlights(overlayState);
-    DrawSelectedTreeNodeHighlight(overlayState);
-    DrawHoveredWidgetHighlight(overlayState);
-    DrawHoveredEditableAnchorHighlight(overlayState);
-    DrawLayoutEditGuides(overlayState);
-    DrawGapEditAnchors(overlayState);
-    DrawWidgetEditGuides(overlayState);
-    DrawLayoutSimilarityIndicators(overlayState);
+    DrawBackgroundAffordances(overlayState);
+    DrawDraggedContent(metrics);
+    DrawForegroundAffordances(overlayState);
 }
 
-void DashboardLayoutEditOverlayRenderer::DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const {
+void DashboardLayoutEditOverlayRenderer::DrawBackgroundAffordances(const DashboardOverlayState& overlayState) const {
+    DrawAffordances(overlayState, LayoutEditOverlayAffordanceLayer::Background);
+}
+
+void DashboardLayoutEditOverlayRenderer::DrawDraggedContent(const MetricSource& metrics) {
+    DrawContainerChildReorderOverlay(metrics);
+}
+
+void DashboardLayoutEditOverlayRenderer::DrawForegroundAffordances(const DashboardOverlayState& overlayState) const {
+    if (!HasForegroundAffordanceLayer(overlayState)) {
+        return;
+    }
+    DrawAffordances(overlayState, LayoutEditOverlayAffordanceLayer::Foreground);
+}
+
+void DashboardLayoutEditOverlayRenderer::DrawAffordances(
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
+    DrawSelectedColorEditHighlights(overlayState, layer);
+    DrawSelectedTreeNodeHighlight(overlayState, layer);
+    DrawHoveredWidgetHighlight(overlayState, layer);
+    DrawHoveredEditableAnchorHighlight(overlayState, layer);
+    DrawLayoutEditGuides(overlayState, layer);
+    DrawGapEditAnchors(overlayState, layer);
+    DrawWidgetEditGuides(overlayState, layer);
+    DrawLayoutSimilarityIndicators(overlayState, layer);
+}
+
+void DashboardLayoutEditOverlayRenderer::DrawHoveredWidgetHighlight(
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
     if (!overlayState.ShouldDrawLayoutEditAffordances()) {
         return;
     }
-    const std::optional<RenderRect> hoveredRect = FindHoveredWidgetOutlineRect(overlayState);
-    if (!hoveredRect.has_value() || hoveredRect->IsEmpty()) {
+    const std::optional<OverlayAffordanceRect> hoveredRect = FindHoveredWidgetOutlineRect(overlayState);
+    if (!hoveredRect.has_value() || hoveredRect->rect.IsEmpty()) {
         return;
     }
-    renderer_.Renderer().DrawSolidRect(*hoveredRect, RenderStroke::Solid(RenderColorId::LayoutGuide));
+    if (!ShouldDrawAffordanceLayer(hoveredRect->layer, layer)) {
+        return;
+    }
+    const std::vector<LayoutEditOverlayOwner> noOwners;
+    const std::vector<LayoutEditOverlayOwner>& owners =
+        hoveredRect->owners != nullptr ? *hoveredRect->owners : noOwners;
+    renderer_.Renderer().DrawSolidRect(ApplyOverlayDragOffset(overlayState, hoveredRect->rect, owners),
+        RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
 void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
-    const DashboardOverlayState& overlayState) const {
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
@@ -256,50 +285,21 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
     if (highlights.empty()) {
         return;
     }
-    const auto moveActiveReorderHighlight = [&](LayoutEditAnchorRegion& region) {
-        bool movedByActiveAnchor = false;
-        if (const auto nodeFieldKey = LayoutEditAnchorNodeFieldKey(region.key);
-            nodeFieldKey.has_value() && nodeFieldKey->widgetClass == WidgetClass::MetricList &&
-            overlayState.activeMetricListReorderDrag.has_value()) {
-            const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
-            if (drag.currentIndex == region.key.anchorId && ::MatchesWidgetIdentity(drag.widget, region.key.widget)) {
-                const int dy = drag.mouseY - drag.dragOffsetY - region.targetRect.top;
-                region.targetRect = OffsetRect(region.targetRect, 0, dy);
-                region.anchorRect = OffsetRect(region.anchorRect, 0, dy);
-                region.anchorHitRect = OffsetRect(region.anchorHitRect, 0, dy);
-                movedByActiveAnchor = true;
-            }
-            return;
-        }
-        if (const auto orderKey = LayoutEditAnchorContainerChildOrderKey(region.key);
-            orderKey.has_value() && overlayState.activeContainerChildReorderDrag.has_value()) {
-            const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
-            if (drag.currentIndex == region.key.anchorId &&
-                MatchesLayoutContainerEditKey(LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath},
-                    LayoutContainerEditKey{orderKey->editCardId, orderKey->nodePath})) {
-                const int childStart = drag.horizontal ? region.targetRect.left : region.targetRect.top;
-                const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
-                const int dx = drag.horizontal ? offset : 0;
-                const int dy = drag.horizontal ? 0 : offset;
-                region.targetRect = OffsetRect(region.targetRect, dx, dy);
-                region.anchorRect = OffsetRect(region.anchorRect, dx, dy);
-                region.anchorHitRect = OffsetRect(region.anchorHitRect, dx, dy);
-                movedByActiveAnchor = true;
-            }
-        }
-        if (!movedByActiveAnchor) {
-            region.targetRect = ApplyContainerChildReorderOffset(region.targetRect);
-            region.anchorRect = ApplyContainerChildReorderOffset(region.anchorRect);
-            region.anchorHitRect = ApplyContainerChildReorderOffset(region.anchorHitRect);
-        }
-    };
-    const std::optional<RenderRect> hoveredWidgetOutlineRect = FindHoveredWidgetOutlineRect(overlayState);
+    std::optional<RenderRect> hoveredWidgetOutlineRect;
+    if (const auto hoveredOutline = FindHoveredWidgetOutlineRect(overlayState);
+        hoveredOutline.has_value() && ShouldDrawAffordanceLayer(hoveredOutline->layer, layer)) {
+        const std::vector<LayoutEditOverlayOwner> noOwners;
+        const std::vector<LayoutEditOverlayOwner>& owners =
+            hoveredOutline->owners != nullptr ? *hoveredOutline->owners : noOwners;
+        hoveredWidgetOutlineRect = ApplyOverlayDragOffset(overlayState, hoveredOutline->rect, owners);
+    }
     for (const auto& highlight : highlights) {
         LayoutEditAnchorRegion highlighted = highlight.first;
         const bool active = highlight.second;
-        if (active || overlayState.activeContainerChildReorderDrag.has_value()) {
-            moveActiveReorderHighlight(highlighted);
+        if (!ShouldDrawAffordanceLayer(highlighted.overlayLayer, layer)) {
+            continue;
         }
+        ApplyOverlayDragOffset(overlayState, highlighted);
         const RenderColorId outlineColor = active ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         const bool activeEmphasis = UseActiveEditEmphasis(overlayState, active);
         bool drawTargetOutline = highlighted.drawTargetOutline && !highlighted.targetRect.IsEmpty();
@@ -327,14 +327,14 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
     }
 }
 
-std::optional<RenderRect> DashboardLayoutEditOverlayRenderer::FindHoveredWidgetOutlineRect(
-    const DashboardOverlayState& overlayState) const {
+std::optional<DashboardLayoutEditOverlayRenderer::OverlayAffordanceRect>
+DashboardLayoutEditOverlayRenderer::FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const {
     if (overlayState.hoveredEditableWidget.has_value() &&
         overlayState.hoveredEditableWidget->kind == LayoutEditWidgetIdentity::Kind::Widget) {
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (renderer_.MatchesWidgetIdentity(widget, *overlayState.hoveredEditableWidget)) {
-                    return ApplyContainerChildReorderOffset(widget.rect);
+                    return OverlayAffordanceRect{widget.rect, &widget.overlayOwners, widget.overlayLayer};
                 }
             }
         }
@@ -350,7 +350,7 @@ std::optional<RenderRect> DashboardLayoutEditOverlayRenderer::FindHoveredWidgetO
                 const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty()
                                                  ? card.chromeLayout.titleRect
                                                  : UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
-                return ApplyContainerChildReorderOffset(titleRect);
+                return OverlayAffordanceRect{titleRect, &card.chrome.overlayOwners, card.chrome.overlayLayer};
             }
         }
     }
@@ -359,7 +359,7 @@ std::optional<RenderRect> DashboardLayoutEditOverlayRenderer::FindHoveredWidgetO
 }
 
 void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
-    const DashboardOverlayState& overlayState) const {
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
@@ -368,11 +368,14 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
     }
 
     std::vector<RenderRect> highlightedRects;
-    const auto appendRect = [&](const RenderRect& rect) {
-        if (rect.IsEmpty()) {
+    const auto appendRect = [&](const LayoutEditColorRegion& region) {
+        if (region.targetRect.IsEmpty()) {
             return;
         }
-        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
+        if (!ShouldDrawAffordanceLayer(region.overlayLayer, layer)) {
+            return;
+        }
+        const RenderRect adjustedRect = ApplyOverlayDragOffset(overlayState, region.targetRect, region.overlayOwners);
         const auto existing =
             std::find_if(highlightedRects.begin(), highlightedRects.end(), [&](const RenderRect& candidate) {
                 return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
@@ -385,7 +388,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
     const auto collect = [&](const std::vector<LayoutEditColorRegion>& regions) {
         for (const auto& region : regions) {
             if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region)) {
-                appendRect(region.targetRect);
+                appendRect(region);
             }
         }
     };
@@ -397,7 +400,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedColorEditHighlights(
 }
 
 void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
-    const DashboardOverlayState& overlayState) const {
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
@@ -407,13 +410,19 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
 
     const RenderColorId color = ActiveEditColor(overlayState);
     const bool activeEmphasis = !overlayState.forceHoverEquivalentAffordances;
+    const std::vector<LayoutEditOverlayOwner> noOwners;
     std::vector<RenderRect> selectedRects;
     bool drawDashboardBoundsOutline = false;
-    const auto appendRect = [&](const RenderRect& rect) {
+    const auto appendRect = [&](const RenderRect& rect,
+                                const std::vector<LayoutEditOverlayOwner>& owners,
+                                LayoutEditOverlayAffordanceLayer artifactLayer) {
         if (rect.IsEmpty()) {
             return;
         }
-        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
+        if (!ShouldDrawAffordanceLayer(artifactLayer, layer)) {
+            return;
+        }
+        const RenderRect adjustedRect = ApplyOverlayDragOffset(overlayState, rect, owners);
         const auto existing =
             std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
                 return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
@@ -428,7 +437,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             for (const auto& widget : card.widgets) {
                 const LayoutEditWidgetIdentity candidateIdentity{widget.cardId, widget.editCardId, widget.nodePath};
                 if (::MatchesWidgetIdentity(identity, candidateIdentity)) {
-                    appendRect(widget.rect);
+                    appendRect(widget.rect, widget.overlayOwners, widget.overlayLayer);
                 }
             }
         }
@@ -440,7 +449,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             }
             if (UseAllCardsSelectionOutline(*parameter)) {
                 for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
-                    appendRect(card.rect);
+                    appendRect(card.rect, card.chrome.overlayOwners, card.chrome.overlayLayer);
                 }
             }
         }
@@ -451,12 +460,12 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         const bool matchesContainer =
             containerKey != nullptr && MatchesLayoutContainerEditKey(*containerKey, {guide.editCardId, guide.nodePath});
         if (matchesFocus || matchesContainer) {
-            appendRect(guide.containerRect);
+            appendRect(guide.containerRect, guide.overlayOwners, guide.overlayLayer);
         }
     }
     for (const auto& guide : layoutResolver_.widgetEditGuides_) {
         if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide)) {
-            appendRect(guide.widgetRect);
+            appendRect(guide.widgetRect, guide.overlayOwners, guide.overlayLayer);
         }
     }
     const auto collectAnchorTargets = [&](const std::vector<LayoutEditAnchorRegion>& regions) {
@@ -469,13 +478,13 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                     IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
                 if (const auto parameter = LayoutEditAnchorParameter(region.key); parameter.has_value()) {
                     if (!SuppressAnchorTargetSelectionOutline(*parameter)) {
-                        appendRect(region.targetRect);
+                        appendRect(region.targetRect, region.overlayOwners, region.overlayLayer);
                     }
                     if (UseWholeWidgetSelectionOutline(*parameter)) {
                         appendWidgetRectsForIdentity(region.key.widget);
                     }
                 } else {
-                    appendRect(region.targetRect);
+                    appendRect(region.targetRect, region.overlayOwners, region.overlayLayer);
                 }
             }
         }
@@ -486,8 +495,11 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         DrawDottedHighlightRect(rect, color, activeEmphasis);
     }
     if (drawDashboardBoundsOutline) {
-        DrawDottedHighlightRect(
+        DrawDottedAffordanceRect(overlayState,
+            layer,
             RenderRect{0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
+            noOwners,
+            LayoutEditOverlayAffordanceLayer::Background,
             color,
             activeEmphasis,
             false);
@@ -497,7 +509,13 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (widget.widget != nullptr && widget.widgetClass == *widgetClass) {
-                    DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
+                    DrawDottedAffordanceRect(overlayState,
+                        layer,
+                        widget.rect,
+                        widget.overlayOwners,
+                        widget.overlayLayer,
+                        color,
+                        activeEmphasis);
                 }
             }
         }
@@ -506,25 +524,34 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
 
     if (const auto* widgetIdentity = std::get_if<LayoutEditWidgetIdentity>(&*overlayState.selectedTreeHighlight)) {
         if (widgetIdentity->kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
-            std::vector<RenderRect> embeddedInstanceRects;
-            const auto appendEmbeddedRect = [&](const RenderRect& rect) {
+            std::vector<OverlayAffordanceRect> embeddedInstanceRects;
+            const auto appendEmbeddedRect = [&](const RenderRect& rect,
+                                                const std::vector<LayoutEditOverlayOwner>* owners,
+                                                LayoutEditOverlayAffordanceLayer artifactLayer) {
                 if (rect.IsEmpty()) {
                     return;
                 }
                 const auto existing = std::find_if(
-                    embeddedInstanceRects.begin(), embeddedInstanceRects.end(), [&](const RenderRect& candidate) {
-                        return candidate.left == rect.left && candidate.top == rect.top &&
-                               candidate.right == rect.right && candidate.bottom == rect.bottom;
+                    embeddedInstanceRects.begin(), embeddedInstanceRects.end(), [&](const auto& candidate) {
+                        return candidate.rect.left == rect.left && candidate.rect.top == rect.top &&
+                               candidate.rect.right == rect.right && candidate.rect.bottom == rect.bottom &&
+                               candidate.layer == artifactLayer;
                     });
                 if (existing == embeddedInstanceRects.end()) {
-                    embeddedInstanceRects.push_back(rect);
+                    embeddedInstanceRects.push_back(OverlayAffordanceRect{rect, owners, artifactLayer});
                 }
             };
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 const LayoutEditWidgetIdentity cardIdentity{
                     card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
                 if (MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
-                    DrawDottedHighlightRect(card.rect, color, activeEmphasis);
+                    DrawDottedAffordanceRect(overlayState,
+                        layer,
+                        card.rect,
+                        card.chrome.overlayOwners,
+                        card.chrome.overlayLayer,
+                        color,
+                        activeEmphasis);
                 }
             }
             for (const auto& guide : layoutResolver_.layoutEditGuides_) {
@@ -534,11 +561,13 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                     !MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
                     continue;
                 }
-                appendEmbeddedRect(guide.containerRect);
+                appendEmbeddedRect(guide.containerRect, &guide.overlayOwners, guide.overlayLayer);
             }
             if (embeddedInstanceRects.empty()) {
                 for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                     RenderRect embeddedBounds{};
+                    const std::vector<LayoutEditOverlayOwner>* embeddedOwners = nullptr;
+                    LayoutEditOverlayAffordanceLayer embeddedLayer = LayoutEditOverlayAffordanceLayer::Background;
                     for (const auto& widget : card.widgets) {
                         const LayoutEditWidgetIdentity cardIdentity{
                             widget.cardId, widget.editCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
@@ -547,12 +576,20 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                             continue;
                         }
                         embeddedBounds = UnionRect(embeddedBounds, widget.rect);
+                        if (embeddedOwners == nullptr ||
+                            widget.overlayLayer == LayoutEditOverlayAffordanceLayer::Foreground) {
+                            embeddedOwners = &widget.overlayOwners;
+                            embeddedLayer = widget.overlayLayer;
+                        }
                     }
-                    appendEmbeddedRect(embeddedBounds);
+                    appendEmbeddedRect(embeddedBounds, embeddedOwners, embeddedLayer);
                 }
             }
-            for (const auto& rect : embeddedInstanceRects) {
-                DrawDottedHighlightRect(rect, color, activeEmphasis);
+            for (const auto& artifact : embeddedInstanceRects) {
+                const std::vector<LayoutEditOverlayOwner>& owners =
+                    artifact.owners != nullptr ? *artifact.owners : noOwners;
+                DrawDottedAffordanceRect(
+                    overlayState, layer, artifact.rect, owners, artifact.layer, color, activeEmphasis);
             }
             return;
         }
@@ -561,7 +598,13 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     if (const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight)) {
         if (*special == LayoutEditSelectionHighlightSpecial::AllCards) {
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
-                DrawDottedHighlightRect(card.rect, color, activeEmphasis);
+                DrawDottedAffordanceRect(overlayState,
+                    layer,
+                    card.rect,
+                    card.chrome.overlayOwners,
+                    card.chrome.overlayLayer,
+                    color,
+                    activeEmphasis);
             }
             return;
         }
@@ -569,15 +612,24 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 for (const auto& widget : card.widgets) {
                     if (widget.widget != nullptr && widget.widgetClass == WidgetClass::Text) {
-                        DrawDottedHighlightRect(widget.rect, color, activeEmphasis);
+                        DrawDottedAffordanceRect(overlayState,
+                            layer,
+                            widget.rect,
+                            widget.overlayOwners,
+                            widget.overlayLayer,
+                            color,
+                            activeEmphasis);
                     }
                 }
             }
         }
         if (*special == LayoutEditSelectionHighlightSpecial::DashboardBounds) {
-            DrawDottedHighlightRect(
+            DrawDottedAffordanceRect(overlayState,
+                layer,
                 RenderRect{
                     0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
+                noOwners,
+                LayoutEditOverlayAffordanceLayer::Background,
                 color,
                 activeEmphasis,
                 false);
@@ -586,17 +638,22 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     }
 }
 
-void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const {
+void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (!overlayState.ShouldDrawLayoutEditAffordances() || layoutResolver_.layoutEditGuides_.empty()) {
         return;
     }
 
     std::vector<std::pair<RenderRect, bool>> containerHighlights;
-    const auto appendContainerHighlight = [&](const RenderRect& rect, bool active) {
+    const auto appendContainerHighlight = [&](const LayoutEditGuide& guide, bool active) {
+        const RenderRect& rect = guide.containerRect;
         if (rect.IsEmpty()) {
             return;
         }
-        const RenderRect adjustedRect = ApplyContainerChildReorderOffset(rect);
+        if (!ShouldDrawAffordanceLayer(guide.overlayLayer, layer)) {
+            return;
+        }
+        const RenderRect adjustedRect = ApplyOverlayDragOffset(overlayState, rect, guide.overlayOwners);
         const auto existing =
             std::find_if(containerHighlights.begin(), containerHighlights.end(), [&](const auto& entry) {
                 return entry.first.left == adjustedRect.left && entry.first.top == adjustedRect.top &&
@@ -610,10 +667,10 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
     };
     if (!overlayState.suppressLayoutGuideContainerHighlights) {
         if (overlayState.hoveredLayoutEditGuide.has_value()) {
-            appendContainerHighlight(overlayState.hoveredLayoutEditGuide->containerRect, false);
+            appendContainerHighlight(*overlayState.hoveredLayoutEditGuide, false);
         }
         if (overlayState.activeLayoutEditGuide.has_value()) {
-            appendContainerHighlight(overlayState.activeLayoutEditGuide->containerRect, true);
+            appendContainerHighlight(*overlayState.activeLayoutEditGuide, true);
         }
         for (const auto& [rect, active] : containerHighlights) {
             const RenderColorId color = active ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
@@ -634,13 +691,16 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
         if (!emphasized && !hoveredGuide && !overlayState.hoverOnExposedDashboard) {
             continue;
         }
+        if (!ShouldDrawAffordanceLayer(guide.overlayLayer, layer)) {
+            continue;
+        }
         const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
-        const RenderPoint start =
-            ApplyContainerChildReorderOffset(RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.lineRect);
-        const RenderPoint end = ApplyContainerChildReorderOffset(
+        const RenderPoint start = ApplyOverlayDragOffset(
+            overlayState, RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.overlayOwners);
+        const RenderPoint end = ApplyOverlayDragOffset(overlayState,
             guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
                                                     : RenderPoint{guide.lineRect.right, guide.lineRect.top},
-            guide.lineRect);
+            guide.overlayOwners);
         renderer_.Renderer().DrawSolidLine(start,
             end,
             RenderStroke::Solid(color,
@@ -648,7 +708,8 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(const DashboardOve
     }
 }
 
-void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const {
+void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
@@ -686,6 +747,9 @@ void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(const DashboardOve
         if (!shouldDraw(guide)) {
             continue;
         }
+        if (!ShouldDrawAffordanceLayer(guide.overlayLayer, layer)) {
+            continue;
+        }
         const bool active = overlayState.activeWidgetEditGuide.has_value() &&
                             MatchesWidgetEditGuide(guide, *overlayState.activeWidgetEditGuide);
         const bool selected = !overlayState.activeWidgetEditGuide.has_value() &&
@@ -693,13 +757,14 @@ void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(const DashboardOve
                               MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
-        renderer_.Renderer().DrawSolidLine(ApplyContainerChildReorderOffset(guide.drawStart, guide.widgetRect),
-            ApplyContainerChildReorderOffset(guide.drawEnd, guide.widgetRect),
+        renderer_.Renderer().DrawSolidLine(ApplyOverlayDragOffset(overlayState, guide.drawStart, guide.overlayOwners),
+            ApplyOverlayDragOffset(overlayState, guide.drawEnd, guide.overlayOwners),
             RenderStroke::Solid(color, static_cast<float>(lineWidth)));
     }
 }
 
-void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverlayState& overlayState) const {
+void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (overlayState.IsContainerGuideDragActive()) {
         return;
     }
@@ -757,10 +822,12 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(const DashboardOverl
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         const float strokeWidth = static_cast<float>(lineWidth);
-        const RenderRect offsetSource = anchor.hitRect.IsEmpty() ? anchor.handleRect : anchor.hitRect;
-        const RenderPoint drawStart = ApplyContainerChildReorderOffset(anchor.drawStart, offsetSource);
-        const RenderPoint drawEnd = ApplyContainerChildReorderOffset(anchor.drawEnd, offsetSource);
-        const RenderRect handleRect = ApplyContainerChildReorderOffset(anchor.handleRect);
+        if (!ShouldDrawAffordanceLayer(anchor.overlayLayer, layer)) {
+            continue;
+        }
+        const RenderPoint drawStart = ApplyOverlayDragOffset(overlayState, anchor.drawStart, anchor.overlayOwners);
+        const RenderPoint drawEnd = ApplyOverlayDragOffset(overlayState, anchor.drawEnd, anchor.overlayOwners);
+        const RenderRect handleRect = ApplyOverlayDragOffset(overlayState, anchor.handleRect, anchor.overlayOwners);
 
         renderer_.Renderer().DrawSolidLine(drawStart, drawEnd, RenderStroke::Solid(color, strokeWidth));
         if (anchor.axis == LayoutGuideAxis::Vertical) {
@@ -822,8 +889,22 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
     drawVertical((std::max)(drawRect.left, drawRect.right - strokeWidth), drawRect.top, drawRect.bottom);
 }
 
+void DashboardLayoutEditOverlayRenderer::DrawDottedAffordanceRect(const DashboardOverlayState& overlayState,
+    LayoutEditOverlayAffordanceLayer layer,
+    const RenderRect& rect,
+    const std::vector<LayoutEditOverlayOwner>& owners,
+    LayoutEditOverlayAffordanceLayer artifactLayer,
+    RenderColorId color,
+    bool active,
+    bool outside) const {
+    if (!ShouldDrawAffordanceLayer(artifactLayer, layer)) {
+        return;
+    }
+    DrawDottedHighlightRect(ApplyOverlayDragOffset(overlayState, rect, owners), color, active, outside);
+}
+
 void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
-    const DashboardOverlayState& overlayState) const {
+    const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const {
     if (!overlayState.ShouldDrawLayoutEditAffordances()) {
         return;
     }
@@ -939,10 +1020,11 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             visible->exactTypeOrdinal = nextOrdinal++;
             // Perf: interactive drag traces intentionally drop renderer details, so avoid formatting them every paint.
             if (!renderer_.interactiveDragTraceActive_) {
-                renderer_.WriteTrace("renderer:layout_similarity_group axis=\"" + std::string(axisLabel) +
-                                     "\" class=" + std::to_string(static_cast<int>(visible->type.widgetClass)) +
-                                     " extent=" + std::to_string(visible->type.extent) +
-                                     " ordinal=" + std::to_string(visible->exactTypeOrdinal));
+                renderer_.WriteTraceFmt(RES_STR("layout_similarity_group axis=\"%s\" class=%d extent=%d ordinal=%d"),
+                    axisLabel,
+                    static_cast<int>(visible->type.widgetClass),
+                    visible->type.extent,
+                    visible->exactTypeOrdinal);
             }
         }
     }
@@ -959,8 +1041,11 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
         if (visible == visibleWidgets.end()) {
             continue;
         }
+        if (!ShouldDrawAffordanceLayer(widget->overlayLayer, layer)) {
+            continue;
+        }
         const int exactTypeOrdinal = visible->exactTypeOrdinal;
-        const RenderRect& rect = widget->rect;
+        const RenderRect rect = ApplyOverlayDragOffset(overlayState, widget->rect, widget->overlayOwners);
         if (axis == LayoutGuideAxis::Vertical) {
             const int y = rect.top + offset;
             const int left = rect.left + inset;
@@ -1007,52 +1092,88 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
     }
 }
 
-std::optional<RenderPoint> DashboardLayoutEditOverlayRenderer::ContainerChildReorderOffsetForRect(
-    const DashboardOverlayState& overlayState, const RenderRect& rect) const {
+bool DashboardLayoutEditOverlayRenderer::HasForegroundAffordanceLayer(const DashboardOverlayState& overlayState) const {
+    return overlayState.activeMetricListReorderDrag.has_value() ||
+           overlayState.activeContainerChildReorderDrag.has_value();
+}
+
+bool DashboardLayoutEditOverlayRenderer::ShouldDrawAffordanceLayer(
+    LayoutEditOverlayAffordanceLayer artifactLayer, LayoutEditOverlayAffordanceLayer drawLayer) const {
+    return artifactLayer == drawLayer;
+}
+
+std::optional<RenderPoint> DashboardLayoutEditOverlayRenderer::OverlayDragOffsetForOwners(
+    const DashboardOverlayState& overlayState, const std::vector<LayoutEditOverlayOwner>& owners) const {
     if (!overlayState.activeContainerChildReorderDrag.has_value()) {
         return std::nullopt;
     }
     const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
+    const auto matchesDrag = [&](const LayoutEditOverlayOwner& owner) {
+        return owner.childIndex == drag.currentIndex &&
+               MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
+                   LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
+    };
+    if (std::none_of(owners.begin(), owners.end(), matchesDrag)) {
+        return std::nullopt;
+    }
     if (drag.currentIndex < 0 || drag.currentIndex >= static_cast<int>(drag.childRects.size())) {
         return std::nullopt;
     }
     const RenderRect& childRect = drag.childRects[static_cast<size_t>(drag.currentIndex)];
-    if (!(rect.left >= childRect.left && rect.top >= childRect.top && rect.right <= childRect.right &&
-            rect.bottom <= childRect.bottom)) {
-        return std::nullopt;
-    }
-
     const int childStart = drag.horizontal ? childRect.left : childRect.top;
     const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
     return drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset};
 }
 
-RenderRect DashboardLayoutEditOverlayRenderer::ApplyContainerChildReorderOffset(const RenderRect& rect) const {
-    if (const auto offset = ContainerChildReorderOffsetForRect(*renderer_.activeOverlayState_, rect);
-        offset.has_value()) {
+std::optional<RenderPoint> DashboardLayoutEditOverlayRenderer::OverlayDragOffsetForAnchor(
+    const DashboardOverlayState& overlayState, const LayoutEditAnchorRegion& region) const {
+    if (overlayState.activeMetricListReorderDrag.has_value()) {
+        const std::optional<LayoutNodeFieldEditKey> nodeFieldKey = LayoutEditAnchorNodeFieldKey(region.key);
+        const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
+        if (nodeFieldKey.has_value() && nodeFieldKey->widgetClass == WidgetClass::MetricList &&
+            region.key.anchorId == drag.currentIndex && ::MatchesWidgetIdentity(drag.widget, region.key.widget)) {
+            return RenderPoint{0, drag.mouseY - drag.dragOffsetY - region.targetRect.top};
+        }
+    }
+    return OverlayDragOffsetForOwners(overlayState, region.overlayOwners);
+}
+
+RenderRect DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+    const RenderRect& rect,
+    const std::vector<LayoutEditOverlayOwner>& owners) const {
+    if (const auto offset = OverlayDragOffsetForOwners(overlayState, owners); offset.has_value()) {
         return OffsetRect(rect, offset->x, offset->y);
     }
     return rect;
 }
 
-RenderPoint DashboardLayoutEditOverlayRenderer::ApplyContainerChildReorderOffset(
-    RenderPoint point, const RenderRect& sourceRect) const {
-    if (const auto offset = ContainerChildReorderOffsetForRect(*renderer_.activeOverlayState_, sourceRect);
-        offset.has_value()) {
+RenderPoint DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+    RenderPoint point,
+    const std::vector<LayoutEditOverlayOwner>& owners) const {
+    if (const auto offset = OverlayDragOffsetForOwners(overlayState, owners); offset.has_value()) {
         point.x += offset->x;
         point.y += offset->y;
     }
     return point;
 }
 
-bool DashboardLayoutEditOverlayRenderer::ShouldSkipBaseWidget(
-    const DashboardOverlayState& overlayState, const RenderRect& rect) const {
-    return ContainerChildReorderOffsetForRect(overlayState, rect).has_value();
+void DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(
+    const DashboardOverlayState& overlayState, LayoutEditAnchorRegion& region) const {
+    if (const auto offset = OverlayDragOffsetForAnchor(overlayState, region); offset.has_value()) {
+        region.targetRect = OffsetRect(region.targetRect, offset->x, offset->y);
+        region.anchorRect = OffsetRect(region.anchorRect, offset->x, offset->y);
+        region.anchorHitRect = OffsetRect(region.anchorHitRect, offset->x, offset->y);
+    }
 }
 
-bool DashboardLayoutEditOverlayRenderer::ShouldSkipForContainerChildReorder(const RenderRect& rect) const {
+bool DashboardLayoutEditOverlayRenderer::ShouldSkipBaseWidget(
+    const DashboardOverlayState& overlayState, const WidgetLayout& widget) const {
+    return OverlayDragOffsetForOwners(overlayState, widget.overlayOwners).has_value();
+}
+
+bool DashboardLayoutEditOverlayRenderer::ShouldSkipForContainerChildReorder(const WidgetLayout& widget) const {
     return renderer_.activeOverlayState_ != nullptr &&
-           ContainerChildReorderOffsetForRect(*renderer_.activeOverlayState_, rect).has_value();
+           OverlayDragOffsetForOwners(*renderer_.activeOverlayState_, widget.overlayOwners).has_value();
 }
 
 void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const MetricSource& metrics) {
@@ -1070,15 +1191,13 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
     const int childStart = drag.horizontal ? childRect.left : childRect.top;
     const int offset = drag.mouseCoordinate - drag.dragOffset - childStart;
 
-    renderer_.Renderer().PushTranslation(drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset});
-    const bool previousDynamicRegistration = layoutResolver_.dynamicAnchorRegistrationEnabled_;
-    layoutResolver_.dynamicAnchorRegistrationEnabled_ = false;
+    renderer_.PushWidgetAnimationTranslation(drag.horizontal ? RenderPoint{offset, 0} : RenderPoint{0, offset});
     for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
-        if (ShouldSkipForContainerChildReorder(card.chrome.rect)) {
+        if (ShouldSkipForContainerChildReorder(card.chrome)) {
             renderer_.DrawResolvedWidget(card.chrome, metrics);
         }
         for (const auto& widget : card.widgets) {
-            if (ShouldSkipForContainerChildReorder(widget.rect)) {
+            if (ShouldSkipForContainerChildReorder(widget)) {
                 renderer_.DrawResolvedWidget(widget, metrics);
             }
         }
@@ -1088,6 +1207,5 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
             static_cast<float>(UseActiveEditEmphasis(*renderer_.activeOverlayState_, true)
                                    ? (std::max)(2, renderer_.ScaleLogical(2))
                                    : (std::max)(1, renderer_.ScaleLogical(1)))));
-    layoutResolver_.dynamicAnchorRegistrationEnabled_ = previousDynamicRegistration;
-    renderer_.Renderer().PopTranslation();
+    renderer_.PopWidgetAnimationTranslation();
 }

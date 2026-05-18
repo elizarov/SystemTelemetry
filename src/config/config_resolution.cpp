@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
+#include "config/metric_board_binding.h"
 #include "util/strings.h"
 
 namespace {
@@ -35,10 +36,12 @@ void CollectLayoutBindingsRecursive(
         if (!IsValidMetricId(metricRef)) {
             continue;
         }
-        if (metricRef.rfind("board.temp.", 0) == 0) {
-            AddUniqueValue(boardTemperatures, metricRef.substr(std::string("board.temp.").size()));
-        } else if (metricRef.rfind("board.fan.", 0) == 0) {
-            AddUniqueValue(boardFans, metricRef.substr(std::string("board.fan.").size()));
+        if (const auto target = ResolveMetricBoardBindingTarget(metricRef); target.has_value()) {
+            if (target->kind == BoardMetricBindingKind::Temperature) {
+                AddUniqueValue(boardTemperatures, target->logicalName);
+            } else {
+                AddUniqueValue(boardFans, target->logicalName);
+            }
         }
     }
 

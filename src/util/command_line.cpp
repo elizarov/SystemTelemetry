@@ -7,6 +7,7 @@
 #include <utility>
 
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -62,12 +63,7 @@ std::string NormalizeCommandPath(std::string value) {
 }
 
 std::string QuoteCommandLineArgument(std::string_view value) {
-    std::string quoted;
-    quoted.reserve(value.size() + 2);
-    quoted.push_back('"');
-    quoted.append(value);
-    quoted.push_back('"');
-    return quoted;
+    return FormatText("\"%.*s\"", static_cast<int>(value.size()), value.data());
 }
 
 std::string BuildCommandLineExcludingSwitch(const CommandLineArguments& arguments, std::string_view excludedSwitch) {
@@ -78,9 +74,9 @@ std::string BuildCommandLineExcludingSwitch(const CommandLineArguments& argument
             continue;
         }
         if (!parameters.empty()) {
-            parameters.push_back(' ');
+            AppendFormat(parameters, " ");
         }
-        parameters += QuoteCommandLineArgument(argument);
+        AppendFormat(parameters, "%s", QuoteCommandLineArgument(argument).c_str());
     }
     return parameters;
 }

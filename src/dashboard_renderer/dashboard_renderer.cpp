@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdarg>
 #include <cstdio>
 #include <limits>
 #include <memory>
@@ -11,15 +12,22 @@
 
 #include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
+#include "dashboard_renderer/impl/render_thread.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_service.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 
 DashboardRenderer::DashboardRenderer(Trace& trace)
     : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
-      layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)) {}
+      layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
+      layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()),
+      presentation_(std::make_unique<DashboardRenderThread>()) {
+    presentation_->SetTrace(&trace_);
+    presentation_->SetBitmapPool(layerBitmapPool_);
+}
 
 DashboardRenderer::~DashboardRenderer() {
     Shutdown();
@@ -63,18 +71,44 @@ long long RectArea(const RenderRect& rect) {
     return width * height;
 }
 
+class ScopedAnimationPresentationSuspension {
+public:
+    ScopedAnimationPresentationSuspension(DashboardRenderThread& presentation, bool active)
+        : presentation_(&presentation), active_(active) {
+        if (active_) {
+            presentation_->SetAnimationPresentationSuspended(true);
+        }
+    }
+
+    ScopedAnimationPresentationSuspension(const ScopedAnimationPresentationSuspension&) = delete;
+    ScopedAnimationPresentationSuspension& operator=(const ScopedAnimationPresentationSuspension&) = delete;
+
+    ~ScopedAnimationPresentationSuspension() {
+        if (active_) {
+            presentation_->SetAnimationPresentationSuspended(false);
+        }
+    }
+
+private:
+    DashboardRenderThread* presentation_ = nullptr;
+    bool active_ = false;
+};
+
 }  // namespace
 
 void DashboardRenderer::SetConfig(const AppConfig& config) {
     lastError_.clear();
+    ++configVersion_;
     const bool metricsChanged = config_.layout.metrics != config.layout.metrics;
     if (metricsChanged) {
         InvalidateMetricSourceCache();
         metricLookupCache_.Clear();
     }
     config_ = config;
-    if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:reconfigure_failed" : renderer_->LastError();
+    const RendererStyle nextStyle = BuildRendererStyle();
+    if (!renderer_->SetStyle(nextStyle) || !ResolveLayout()) {
+        lastError_ =
+            renderer_->LastError().empty() ? ResourceStringText(RES_STR("reconfigure_failed")) : renderer_->LastError();
     }
 }
 
@@ -85,17 +119,43 @@ void DashboardRenderer::SetRenderScale(double scale) {
         return;
     }
     renderScale_ = nextScale;
+    ++configVersion_;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:rescale_failed" : renderer_->LastError();
+        lastError_ =
+            renderer_->LastError().empty() ? ResourceStringText(RES_STR("rescale_failed")) : renderer_->LastError();
     }
 }
 
 void DashboardRenderer::SetImmediatePresent(bool enabled) {
+    if (immediatePresent_ == enabled) {
+        return;
+    }
+    immediatePresent_ = enabled;
+    snapshotLayerValid_ = false;
+    overlayLayerVisible_ = false;
+    renderer_->AttachWindow(immediatePresent_ ? presentationHwnd_ : nullptr);
     renderer_->SetImmediatePresent(enabled);
+    presentation_->Configure(presentationHwnd_, presentationHwnd_ != nullptr && !immediatePresent_, immediatePresent_);
+    ClearReusableLayerBitmaps();
+}
+
+void DashboardRenderer::SetLiveAnimationEnabled(bool enabled) {
+    if (liveAnimationEnabled_ == enabled) {
+        return;
+    }
+    liveAnimationEnabled_ = enabled;
+    if (!liveAnimationEnabled_) {
+        WriteTrace(RES_STR("animation_timeline_reset_request reason=live_animation_disabled"));
+        presentation_->ResetTimeline();
+    }
 }
 
 void DashboardRenderer::SetRenderMode(RenderMode mode) {
+    if (renderMode_ == mode) {
+        return;
+    }
     renderMode_ = mode;
+    snapshotLayerValid_ = false;
 }
 
 void DashboardRenderer::SetLayoutGuideDragActive(bool active) {
@@ -116,7 +176,15 @@ double DashboardRenderer::RenderScale() const {
 }
 
 const std::string& DashboardRenderer::LastError() const {
-    return lastError_.empty() ? renderer_->LastError() : lastError_;
+    if (!lastError_.empty()) {
+        return lastError_;
+    }
+    const std::string presentationError = presentation_->LastError();
+    if (!presentationError.empty()) {
+        lastError_ = presentationError;
+        return lastError_;
+    }
+    return renderer_->LastError();
 }
 
 ::Renderer& DashboardRenderer::Renderer() {
@@ -153,6 +221,19 @@ std::optional<MetricListReorderOverlayState> DashboardRenderer::ActiveMetricList
     return drag;
 }
 
+void DashboardRenderer::AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState) {
+    if (animation == nullptr || targetState == nullptr) {
+        return;
+    }
+    if (!widgetAnimationCollectionActive_) {
+        WidgetHost::AddWidgetAnimation(std::move(animation), std::move(targetState));
+        return;
+    }
+    WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
+        .push_back(DashboardPresentationAnimation{
+            std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_});
+}
+
 int DashboardRenderer::WindowWidth() const {
     return std::max(1, ScaleLogical(config_.layout.structure.window.width));
 }
@@ -184,8 +265,10 @@ void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     int gap,
     const std::string& renderCardId,
     const std::string& editCardId,
-    const std::vector<size_t>& nodePath) {
-    layoutResolver_->AddLayoutEditGuide(*this, node, rect, childRects, gap, renderCardId, editCardId, nodePath);
+    const std::vector<size_t>& nodePath,
+    const std::vector<LayoutEditOverlayOwner>& overlayOwners) {
+    layoutResolver_->AddLayoutEditGuide(
+        *this, node, rect, childRects, gap, renderCardId, editCardId, nodePath, overlayOwners);
 }
 
 void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
@@ -196,8 +279,17 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath,
     bool instantiateWidgets) {
-    layoutResolver_->ResolveNodeWidgetsInternal(
-        *this, node, rect, widgets, cardReferenceStack, renderCardId, editCardId, nodePath, instantiateWidgets);
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    layoutResolver_->ResolveNodeWidgetsInternal(*this,
+        node,
+        rect,
+        widgets,
+        cardReferenceStack,
+        overlayOwners,
+        renderCardId,
+        editCardId,
+        nodePath,
+        instantiateWidgets);
 }
 
 bool DashboardRenderer::ResolveLayout(bool includeWidgetState) {
@@ -241,15 +333,12 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const int titleHeight = (std::max)(1, Renderer().TextMetrics().label);
     const int bodyHeight = (std::max)(1, Renderer().TextMetrics().smallText);
 
-    char positionTextBuffer[96];
-    sprintf_s(positionTextBuffer, "Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
-    char scaleTextBuffer[96];
-    sprintf_s(scaleTextBuffer, "Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
-
     const std::string titleText = "Move Mode";
-    const std::string monitorText = "Monitor: " + overlayState.monitorName;
-    const std::string positionText = positionTextBuffer;
-    const std::string scaleText = scaleTextBuffer;
+    const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
+    const std::string positionText =
+        FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
+    const std::string scaleText =
+        FormatText("Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
     const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
 
     const int minContentWidth = ScaleLogical(220);
@@ -309,7 +398,20 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
     if (widget.widget == nullptr) {
         return;
     }
+    layoutResolver_->SetEditArtifactContext(widget.overlayOwners,
+        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ? LayoutEditOverlayAffordanceLayer::Foreground
+                                                                      : LayoutEditOverlayAffordanceLayer::Background);
     widget.widget->Draw(*this, widget, metrics);
+    layoutResolver_->ResetEditArtifactContext();
+}
+
+void DashboardRenderer::DrawResolvedWidgetOverlay(const WidgetLayout& widget, const MetricSource& metrics) {
+    if (widget.widget == nullptr) {
+        return;
+    }
+    layoutResolver_->SetEditArtifactContext(widget.overlayOwners, LayoutEditOverlayAffordanceLayer::Foreground);
+    widget.widget->DrawOverlay(*this, widget, metrics);
+    layoutResolver_->ResetEditArtifactContext();
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
@@ -317,34 +419,383 @@ bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot) {
 }
 
 bool DashboardRenderer::DrawWindow(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    return DrawWindowInternal(snapshot, overlayState, false);
+}
+
+bool DashboardRenderer::DrawWindowSynchronously(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    return DrawWindowInternal(snapshot, overlayState, true);
+}
+
+bool DashboardRenderer::DrawWindowInternal(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, bool waitForPresentation) {
     lastError_.clear();
-    renderer_->DrawWindow(WindowWidth(), WindowHeight(), [&] { DrawFrame(snapshot, overlayState); });
-    if (!renderer_->LastError().empty()) {
-        lastError_ = renderer_->LastError();
+    DashboardPresentationFrame frame;
+    {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_frame_build");
+        const PresentationBuildOptions options{
+            presentationHwnd_ != nullptr,
+            false,
+        };
+        if (!BuildPresentationFrame(snapshot, overlayState, frame, options)) {
+            return false;
+        }
     }
-    return lastError_.empty();
+    const bool presented = [&] {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_frame_publish");
+        if (immediatePresent_ && presentationHwnd_ != nullptr) {
+            return presentation_->PresentFrameSynchronously(*renderer_, std::move(frame));
+        }
+        if (presentationHwnd_ == nullptr) {
+            return presentation_->PresentFrameSynchronously(std::move(frame));
+        }
+        return waitForPresentation ? presentation_->PublishFrameAndWait(std::move(frame))
+                                   : presentation_->PublishFrame(std::move(frame));
+    }();
+    if (!presented) {
+        lastError_ = presentation_->LastError();
+    }
+    return presented && lastError_.empty();
+}
+
+bool DashboardRenderer::BuildPresentationFrame(const SystemSnapshot& snapshot,
+    const DashboardOverlayState& overlayState,
+    DashboardPresentationFrame& frame,
+    PresentationBuildOptions options) {
+    BeginWidgetAnimationCollection();
+    activeOverlayState_ = &overlayState;
+
+    frame = {};
+    frame.width = WindowWidth();
+    frame.height = WindowHeight();
+    frame.style = BuildRendererStyle();
+    const std::uint64_t surfaceVersion = ResolveSurfaceVersion();
+    const std::string overlaySignature = SnapshotOverlaySignature(overlayState);
+    const bool updateSnapshot =
+        options.forceCompleteLayers || ShouldUpdateSnapshotLayer(snapshot, overlayState, surfaceVersion);
+    const bool overlayVisible = overlayState.ShouldDrawOverlayLayer();
+    const bool updateOverlay = options.forceCompleteLayers || overlayVisible || overlayLayerVisible_;
+
+    frame.versions.surfaceVersion = surfaceVersion;
+    frame.versions.snapshotVersion = snapshotVersion_;
+    frame.versions.overlayVersion = overlayVersion_;
+    frame.versions.metricVersion = snapshot.revision;
+    frame.animate = liveAnimationEnabled_ && renderMode_ == RenderMode::Normal;
+    frame.snapshotLayerUpdated = updateSnapshot;
+    frame.overlayLayerUpdated = updateOverlay;
+
+    // Keep old animation-only frames off the shared D2D device while changed layer bitmaps are rebuilt.
+    const bool rebuildsLayerBitmap = updateSnapshot || overlayVisible;
+    const bool suspendAnimationPresentation =
+        frame.animate && presentationHwnd_ != nullptr && !immediatePresent_ && rebuildsLayerBitmap;
+    ScopedAnimationPresentationSuspension animationPresentationSuspension(*presentation_, suspendAnimationPresentation);
+
+    const MetricSource* metrics = nullptr;
+    {
+        auto timing = trace_.Timings().Measure(trace_, "presentation_resolve_metrics");
+        metrics = &ResolveMetrics(snapshot);
+    }
+    if (updateSnapshot) {
+        layoutResolver_->ClearDynamicEditArtifacts();
+        layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
+        BeginWidgetAnimationLayer(WidgetAnimationLayer::Snapshot);
+        if (CanReuseLiveLayerBitmaps(options)) {
+            frame.snapshotLayer = AcquireLiveLayerBitmap(frame.width, frame.height);
+        }
+        const bool snapshotDrawn = [&] {
+            auto timing = trace_.Timings().Measure(trace_, "snapshot_layer_bitmap");
+            return DrawLayerBitmap(
+                frame.snapshotLayer,
+                frame.width,
+                frame.height,
+                RenderBitmapClear::Background,
+                [&] {
+                    auto contentTiming = trace_.Timings().Measure(trace_, "snapshot_layer_content");
+                    DrawSnapshotLayer(overlayState, *metrics);
+                },
+                options);
+        }();
+        if (!snapshotDrawn) {
+            lastError_ = renderer_->LastError();
+            RecycleFrameLayers(std::move(frame));
+            EndWidgetAnimationCollection();
+            layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+            activeOverlayState_ = nullptr;
+            return false;
+        }
+        frame.versions.snapshotVersion = ++snapshotVersion_;
+        frame.snapshotAnimations = std::move(snapshotWidgetAnimations_);
+        MarkSnapshotLayerUpdated(snapshot, overlaySignature, surfaceVersion);
+        layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    }
+
+    {
+        auto timing = trace_.Timings().Measure(trace_, "dynamic_edit_collisions");
+        layoutResolver_->ResolveDynamicEditArtifactCollisions();
+    }
+    if (overlayVisible) {
+        layoutResolver_->TagOverlayAffordanceLayers(overlayState);
+        BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
+        RenderBitmap overlayBitmap;
+        if (CanReuseLiveLayerBitmaps(options)) {
+            overlayBitmap = AcquireLiveLayerBitmap(frame.width, frame.height);
+        }
+        const bool overlayDrawn = [&] {
+            auto timing = trace_.Timings().Measure(trace_, "overlay_layer_bitmap");
+            return DrawLayerBitmap(
+                overlayBitmap,
+                frame.width,
+                frame.height,
+                RenderBitmapClear::Transparent,
+                [&] {
+                    auto contentTiming = trace_.Timings().Measure(trace_, "overlay_layer_content");
+                    DrawOverlayLayerStatic(overlayState, *metrics);
+                },
+                options);
+        }();
+        if (!overlayDrawn) {
+            lastError_ = renderer_->LastError();
+            if (layerBitmapPool_ != nullptr) {
+                layerBitmapPool_->ReleaseLiveLayerBitmap(std::move(overlayBitmap));
+            }
+            RecycleFrameLayers(std::move(frame));
+            EndWidgetAnimationCollection();
+            layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+            activeOverlayState_ = nullptr;
+            return false;
+        }
+        frame.overlayLayer = std::move(overlayBitmap);
+        frame.versions.overlayVersion = ++overlayVersion_;
+        frame.overlayAnimations = std::move(overlayWidgetAnimations_);
+        overlayLayerVisible_ = true;
+    } else if (updateOverlay) {
+        frame.versions.overlayVersion = ++overlayVersion_;
+        frame.overlayLayer.reset();
+        frame.overlayAnimations.clear();
+        overlayLayerVisible_ = false;
+    }
+    if (updateSnapshot || updateOverlay) {
+        frame.versions.animationGeometryVersion = ++animationGeometryVersion_;
+    } else {
+        frame.versions.animationGeometryVersion = animationGeometryVersion_;
+    }
+
+    EndWidgetAnimationCollection();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    activeOverlayState_ = nullptr;
+    return true;
+}
+
+void DashboardRenderer::BeginWidgetAnimationCollection() {
+    snapshotWidgetAnimations_.clear();
+    overlayWidgetAnimations_.clear();
+    widgetAnimationTranslationStack_.clear();
+    widgetAnimationCollectionActive_ = true;
+    currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
+    currentWidgetAnimationTranslation_ = {};
+}
+
+void DashboardRenderer::BeginWidgetAnimationLayer(WidgetAnimationLayer layer) {
+    currentWidgetAnimationLayer_ = layer;
+}
+
+std::vector<DashboardPresentationAnimation>& DashboardRenderer::WidgetAnimationsForLayer(WidgetAnimationLayer layer) {
+    return layer == WidgetAnimationLayer::Overlay ? overlayWidgetAnimations_ : snapshotWidgetAnimations_;
+}
+
+std::uint64_t DashboardRenderer::ResolveSurfaceVersion() {
+    const int width = WindowWidth();
+    const int height = WindowHeight();
+    if (presentedWidth_ != width || presentedHeight_ != height || std::abs(presentedScale_ - renderScale_) >= 0.0001) {
+        presentedWidth_ = width;
+        presentedHeight_ = height;
+        presentedScale_ = renderScale_;
+        if (layerBitmapPool_ != nullptr) {
+            layerBitmapPool_->SetLiveLayerSize(width, height);
+        }
+        ++surfaceVersion_;
+    }
+    return surfaceVersion_;
+}
+
+std::string DashboardRenderer::SnapshotOverlaySignature(const DashboardOverlayState& overlayState) const {
+    std::string signature;
+    if (overlayState.activeMetricListReorderDrag.has_value()) {
+        const MetricListReorderOverlayState& drag = *overlayState.activeMetricListReorderDrag;
+        AppendFormat(signature, "metric:%s|%s|", drag.widget.renderCardId.c_str(), drag.widget.editCardId.c_str());
+        AppendFormat(signature, "%d", static_cast<int>(drag.widget.kind));
+        AppendFormat(signature, "|");
+        for (size_t pathIndex : drag.widget.nodePath) {
+            AppendFormat(signature, "%zu.", pathIndex);
+        }
+        AppendFormat(signature, ":");
+        AppendFormat(signature, "%d", drag.currentIndex);
+    }
+    if (overlayState.activeContainerChildReorderDrag.has_value()) {
+        const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
+        AppendFormat(signature, "container:%s|", drag.key.editCardId.c_str());
+        for (size_t pathIndex : drag.key.nodePath) {
+            AppendFormat(signature, "%zu.", pathIndex);
+        }
+        AppendFormat(signature, ":");
+        AppendFormat(signature, "%d", drag.currentIndex);
+    }
+    return signature;
+}
+
+bool DashboardRenderer::ShouldUpdateSnapshotLayer(
+    const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState, std::uint64_t surfaceVersion) const {
+    return !snapshotLayerValid_ || snapshotLayerMetricVersion_ != snapshot.revision ||
+           snapshotLayerConfigVersion_ != configVersion_ || snapshotLayerSurfaceVersion_ != surfaceVersion ||
+           snapshotLayerRenderMode_ != renderMode_ ||
+           snapshotLayerOverlaySignature_ != SnapshotOverlaySignature(overlayState);
+}
+
+void DashboardRenderer::MarkSnapshotLayerUpdated(
+    const SystemSnapshot& snapshot, const std::string& overlaySignature, std::uint64_t surfaceVersion) {
+    snapshotLayerValid_ = true;
+    snapshotLayerMetricVersion_ = snapshot.revision;
+    snapshotLayerConfigVersion_ = configVersion_;
+    snapshotLayerSurfaceVersion_ = surfaceVersion;
+    snapshotLayerRenderMode_ = renderMode_;
+    snapshotLayerOverlaySignature_ = overlaySignature;
+}
+
+bool DashboardRenderer::CanReuseLiveLayerBitmaps(PresentationBuildOptions options) const {
+    return options.useLiveLayerBitmaps && layerBitmapPool_ != nullptr;
+}
+
+bool DashboardRenderer::DrawLayerBitmap(RenderBitmap& bitmap,
+    int width,
+    int height,
+    RenderBitmapClear clear,
+    Renderer::DrawCallback draw,
+    PresentationBuildOptions options) {
+    if (options.useLiveLayerBitmaps) {
+        return renderer_->DrawToLiveLayerBitmap(bitmap, width, height, clear, draw);
+    }
+    return renderer_->DrawToBitmap(bitmap, width, height, clear, draw);
+}
+
+void DashboardRenderer::ClearReusableLayerBitmaps() {
+    if (layerBitmapPool_ != nullptr) {
+        layerBitmapPool_->Clear();
+    }
+}
+
+RenderBitmap DashboardRenderer::AcquireLiveLayerBitmap(int width, int height) const {
+    return layerBitmapPool_ != nullptr ? layerBitmapPool_->AcquireLiveLayerBitmap(width, height) : RenderBitmap{};
+}
+
+void DashboardRenderer::RecycleFrameLayers(DashboardPresentationFrame frame) const {
+    if (layerBitmapPool_ == nullptr) {
+        return;
+    }
+    layerBitmapPool_->ReleaseLiveLayerBitmap(std::move(frame.snapshotLayer));
+    if (frame.overlayLayer.has_value()) {
+        layerBitmapPool_->ReleaseLiveLayerBitmap(std::move(*frame.overlayLayer));
+    }
+}
+
+void DashboardRenderer::PushWidgetAnimationTranslation(RenderPoint offset) {
+    widgetAnimationTranslationStack_.push_back(currentWidgetAnimationTranslation_);
+    currentWidgetAnimationTranslation_.x += offset.x;
+    currentWidgetAnimationTranslation_.y += offset.y;
+    Renderer().PushTranslation(offset);
+}
+
+void DashboardRenderer::PopWidgetAnimationTranslation() {
+    Renderer().PopTranslation();
+    if (widgetAnimationTranslationStack_.empty()) {
+        currentWidgetAnimationTranslation_ = {};
+        return;
+    }
+    currentWidgetAnimationTranslation_ = widgetAnimationTranslationStack_.back();
+    widgetAnimationTranslationStack_.pop_back();
+}
+
+void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
+    std::vector<DashboardPresentationAnimation>& layerAnimations = WidgetAnimationsForLayer(layer);
+    if (layerAnimations.empty()) {
+        return;
+    }
+
+    std::vector<DashboardPresentationAnimation> animations;
+    animations.swap(layerAnimations);
+    const bool collectionWasActive = widgetAnimationCollectionActive_;
+    widgetAnimationCollectionActive_ = false;
+    for (DashboardPresentationAnimation& command : animations) {
+        const WidgetAnimationPtr& animation = command.animation;
+        if (animation == nullptr || command.targetState == nullptr) {
+            continue;
+        }
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            Renderer().PushTranslation(command.translation);
+        }
+        animation->Draw(Renderer(), *command.targetState);
+        if (command.translation.x != 0 || command.translation.y != 0) {
+            Renderer().PopTranslation();
+        }
+    }
+    widgetAnimationCollectionActive_ = collectionWasActive;
+}
+
+void DashboardRenderer::EndWidgetAnimationCollection() {
+    snapshotWidgetAnimations_.clear();
+    overlayWidgetAnimations_.clear();
+    widgetAnimationTranslationStack_.clear();
+    widgetAnimationCollectionActive_ = false;
+    currentWidgetAnimationLayer_ = WidgetAnimationLayer::Snapshot;
+    currentWidgetAnimationTranslation_ = {};
 }
 
 void DashboardRenderer::DrawFrame(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
+    BeginWidgetAnimationCollection();
     activeOverlayState_ = &overlayState;
     layoutResolver_->ClearDynamicEditArtifacts();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = overlayState.ShouldRegisterDynamicEditArtifacts();
     const MetricSource& metrics = ResolveMetrics(snapshot);
+
+    BeginWidgetAnimationLayer(WidgetAnimationLayer::Snapshot);
+    DrawSnapshotLayer(overlayState, metrics);
+    DrawAnimationTargets(WidgetAnimationLayer::Snapshot);
+    layoutResolver_->ResolveDynamicEditArtifactCollisions();
+    if (overlayState.ShouldDrawOverlayLayer()) {
+        layoutResolver_->TagOverlayAffordanceLayers(overlayState);
+        BeginWidgetAnimationLayer(WidgetAnimationLayer::Overlay);
+        DrawOverlayLayerStatic(overlayState, metrics);
+        DrawAnimationTargets(WidgetAnimationLayer::Overlay);
+    }
+
+    EndWidgetAnimationCollection();
+    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    activeOverlayState_ = nullptr;
+}
+
+void DashboardRenderer::DrawSnapshotLayer(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
     for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
-        if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, card.chrome.rect)) {
+        if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, card.chrome)) {
             DrawResolvedWidget(card.chrome, metrics);
         }
         for (const auto& widget : card.widgets) {
-            if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, widget.rect)) {
+            if (!layoutEditOverlayRenderer_->ShouldSkipBaseWidget(overlayState, widget)) {
                 DrawResolvedWidget(widget, metrics);
             }
         }
     }
-    layoutResolver_->ResolveDynamicEditArtifactCollisions();
-    layoutEditOverlayRenderer_->Draw(overlayState, metrics);
+}
+
+void DashboardRenderer::DrawOverlayLayerStatic(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
+    layoutEditOverlayRenderer_->DrawBackgroundAffordances(overlayState);
+    for (const auto& card : layoutResolver_->resolvedLayout_.cards) {
+        DrawResolvedWidgetOverlay(card.chrome, metrics);
+        for (const auto& widget : card.widgets) {
+            DrawResolvedWidgetOverlay(widget, metrics);
+        }
+    }
+    layoutEditOverlayRenderer_->DrawDraggedContent(metrics);
+    layoutEditOverlayRenderer_->DrawForegroundAffordances(overlayState);
     DrawMoveOverlay(overlayState.moveOverlay);
-    layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
-    activeOverlayState_ = nullptr;
 }
 
 bool DashboardRenderer::SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot) {
@@ -354,11 +805,21 @@ bool DashboardRenderer::SaveSnapshotPng(const FilePath& imagePath, const SystemS
 bool DashboardRenderer::SaveSnapshotPng(
     const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
-    const bool saved =
-        renderer_->SavePng(imagePath, WindowWidth(), WindowHeight(), [&] { DrawFrame(snapshot, overlayState); });
+    DashboardPresentationFrame frame;
+    const PresentationBuildOptions options{
+        false,
+        true,
+    };
+    if (!BuildPresentationFrame(snapshot, overlayState, frame, options)) {
+        return false;
+    }
+    frame.animate = false;
+    const bool saved = renderer_->SavePng(
+        imagePath, frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
+    RecycleFrameLayers(std::move(frame));
     return saved;
 }
 
@@ -499,16 +960,32 @@ LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCard
 bool DashboardRenderer::RenderSnapshotOffscreen(
     const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     lastError_.clear();
-    renderer_->DrawOffscreen(WindowWidth(), WindowHeight(), [&] { DrawFrame(snapshot, overlayState); });
+    DashboardPresentationFrame frame;
+    const PresentationBuildOptions options{
+        false,
+        true,
+    };
+    if (!BuildPresentationFrame(snapshot, overlayState, frame, options)) {
+        return false;
+    }
+    frame.animate = false;
+    renderer_->DrawOffscreen(
+        frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
-    return lastError_.empty();
+    const bool rendered = lastError_.empty();
+    RecycleFrameLayers(std::move(frame));
+    return rendered;
 }
 
 bool DashboardRenderer::PrimeLayoutEditDynamicRegions(
     const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState) {
     return RenderSnapshotOffscreen(snapshot, overlayState);
+}
+
+bool DashboardRenderer::HasActiveDashboardAnimation() const {
+    return liveAnimationEnabled_ && renderMode_ == RenderMode::Normal && presentation_->HasActiveAnimations();
 }
 
 LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
@@ -877,9 +1354,15 @@ std::optional<LayoutEditWidgetIdentity> DashboardRenderer::FindFirstLayoutEditPr
 
 bool DashboardRenderer::Initialize(HWND hwnd) {
     lastError_.clear();
-    renderer_->AttachWindow(hwnd);
+    presentationHwnd_ = hwnd;
+    snapshotLayerValid_ = false;
+    overlayLayerVisible_ = false;
+    ClearReusableLayerBitmaps();
+    renderer_->AttachWindow(immediatePresent_ ? hwnd : nullptr);
+    renderer_->SetImmediatePresent(immediatePresent_);
+    presentation_->Configure(hwnd, hwnd != nullptr && !immediatePresent_, immediatePresent_);
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "renderer:initialize_failed" : renderer_->LastError();
+        lastError_ = renderer_->LastError().empty() ? "initialize_failed" : renderer_->LastError();
         return false;
     }
     return true;
@@ -889,11 +1372,19 @@ void DashboardRenderer::Shutdown() {
     InvalidateMetricSourceCache();
     layoutResolver_->Clear();
     layoutResolver_->dynamicAnchorRegistrationEnabled_ = false;
+    presentation_->Shutdown();
+    presentationHwnd_ = nullptr;
+    snapshotLayerValid_ = false;
+    overlayLayerVisible_ = false;
+    ClearReusableLayerBitmaps();
     renderer_->Shutdown();
 }
 
 void DashboardRenderer::DiscardWindowRenderTarget(std::string_view reason) {
-    renderer_->DiscardWindowTarget(reason);
+    snapshotLayerValid_ = false;
+    overlayLayerVisible_ = false;
+    presentation_->DiscardWindowTarget(reason);
+    ClearReusableLayerBitmaps();
 }
 
 RendererStyle DashboardRenderer::BuildRendererStyle() const {
@@ -927,14 +1418,43 @@ void DashboardRenderer::InvalidateMetricSourceCache() {
 }
 
 bool DashboardRenderer::ShouldWriteRendererTrace() const {
-    return !interactiveDragTraceActive_;
+    return !interactiveDragTraceActive_ && trace_.Enabled(TracePrefix::Renderer);
 }
 
 void DashboardRenderer::WriteTrace(const std::string& text) const {
-    if (!ShouldWriteRendererTrace() && text.rfind("renderer:", 0) == 0) {
+    if (!ShouldWriteRendererTrace()) {
         return;
     }
-    trace_.Write(text);
+    trace_.Write(TracePrefix::Renderer, text);
+}
+
+void DashboardRenderer::WriteTrace(ResourceStringId text) const {
+    if (!ShouldWriteRendererTrace()) {
+        return;
+    }
+    trace_.Write(TracePrefix::Renderer, text);
+}
+
+void DashboardRenderer::WriteTraceFmt(const char* format, ...) const {
+    if (!ShouldWriteRendererTrace()) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    trace_.WriteVFmt(TracePrefix::Renderer, format, args);
+    va_end(args);
+}
+
+void DashboardRenderer::WriteTraceFmt(ResourceStringId format, ...) const {
+    if (!ShouldWriteRendererTrace()) {
+        return;
+    }
+
+    va_list args;
+    va_start(args, format);
+    trace_.WriteVFmt(TracePrefix::Renderer, format, args);
+    va_end(args);
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const {

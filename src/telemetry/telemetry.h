@@ -10,8 +10,10 @@
 #include <string_view>
 #include <vector>
 
+#include "config/metric_board_binding.h"
 #include "config/telemetry_settings.h"
 #include "telemetry/board/board_vendor.h"
+#include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/metric_types.h"
 #include "util/file_path.h"
 #include "util/trace.h"
@@ -43,6 +45,9 @@ struct StorageDriveCandidate {
 struct RetainedHistorySeries {
     std::string seriesRef;
     std::vector<double> samples;
+    std::vector<double> throughputLiveSamples;
+    double throughputBucketTotal = 0.0;
+    uint8_t throughputBucketSampleCount = 0;
 };
 
 struct SystemSnapshot;
@@ -68,6 +73,7 @@ constexpr size_t kRetainedHistoryKeyCount = static_cast<size_t>(RetainedHistoryK
 
 const char* RetainedHistorySeriesRef(RetainedHistoryKey key);
 bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key);
+bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key);
 
 struct ProcessorTelemetry {
     std::string name = "CPU";
@@ -129,11 +135,13 @@ struct TelemetryDump {
     SystemSnapshot snapshot;
     GpuProviderTelemetryState gpuProvider;
     BoardVendorTelemetrySample boardProvider;
+    std::vector<MetricBoardBindingUse> activeMetricBoardBindings;
 };
 
 struct TelemetryUpdate {
     TelemetryDump dump;
     ResolvedTelemetrySelections resolvedSelections;
+    std::vector<GpuAdapterCandidate> gpuAdapterCandidates;
     std::vector<NetworkAdapterCandidate> networkAdapterCandidates;
     std::vector<StorageDriveCandidate> storageDriveCandidates;
 };
@@ -142,6 +150,7 @@ using TelemetryDumpLoader = bool (*)(std::string_view input, TelemetryDump& dump
 
 struct TelemetryCollectorOptions {
     bool fake = false;
+    bool liveFake = false;
     FilePath fakePath;
     TelemetryDumpLoader loadFakeDump = nullptr;
 };
@@ -167,19 +176,24 @@ public:
     virtual void Shutdown() = 0;
 
     // Thread-safe. Blocks behind any active telemetry collection, applies settings on the telemetry-owned collector,
-    // publishes one fresh update, and leaves the 500 ms worker cadence running.
+    // publishes one fresh update, and leaves the telemetry worker cadence running.
     virtual void Reconfigure(const TelemetrySettings& settings) = 0;
 
     // Thread-safe. Blocks behind any active telemetry collection, changes the network selection on the telemetry-owned
-    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    // collector, publishes one fresh update, and leaves the telemetry worker cadence running.
     virtual void SetPreferredNetworkAdapterName(std::string adapterName) = 0;
 
+    // Thread-safe. Blocks behind any active telemetry collection, changes the GPU selection on the telemetry-owned
+    // collector, recreates the matching vendor provider, publishes one fresh update, and leaves the 500 ms worker
+    // cadence running.
+    virtual void SetPreferredGpuAdapterName(std::string adapterName) = 0;
+
     // Thread-safe. Blocks behind any active telemetry collection, changes the storage selection on the telemetry-owned
-    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    // collector, publishes one fresh update, and leaves the telemetry worker cadence running.
     virtual void SetSelectedStorageDrives(std::vector<std::string> driveLetters) = 0;
 
     // Thread-safe. Blocks behind any active telemetry collection, refreshes runtime selections on the telemetry-owned
-    // collector, publishes one fresh update, and leaves the 500 ms worker cadence running.
+    // collector, publishes one fresh update, and leaves the telemetry worker cadence running.
     virtual void RefreshSelections() = 0;
 
     // Thread-safe. Returns a copy of the latest published telemetry update without invoking the callback.

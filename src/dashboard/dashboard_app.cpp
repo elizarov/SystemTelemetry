@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <commctrl.h>
+#include <cstdarg>
 #include <cstring>
 #include <vector>
 #include <windowsx.h>
@@ -18,6 +19,7 @@
 #include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
@@ -35,6 +37,20 @@ constexpr double kScaleEpsilon = 0.0001;
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
+}
+
+const char* TraceTimingOperationName(LayoutEditHost::TracePhase phase) {
+    switch (phase) {
+        case LayoutEditHost::TracePhase::Snap:
+            return "snap";
+        case LayoutEditHost::TracePhase::Apply:
+            return "apply";
+        case LayoutEditHost::TracePhase::PaintTotal:
+            return "paint_total";
+        case LayoutEditHost::TracePhase::PaintDraw:
+            return "paint_draw";
+    }
+    return "unknown";
 }
 
 POINT ClampPointToWindowBounds(POINT point, int width, int height) {
@@ -91,7 +107,9 @@ HICON CreateThemedAppIcon(const AppConfig& config, int size) {
 
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions, bool bringToFrontOnRun)
     : renderer_(trace_), diagnosticsOptions_(diagnosticsOptions), layoutEditController_(*this),
-      shellUi_(std::make_unique<DashboardShellUi>(*this)), bringToFrontOnRun_(bringToFrontOnRun) {}
+      shellUi_(std::make_unique<DashboardShellUi>(*this)), bringToFrontOnRun_(bringToFrontOnRun) {
+    renderer_.SetLiveAnimationEnabled(true);
+}
 
 DashboardApp::~DashboardApp() = default;
 
@@ -140,6 +158,7 @@ LayoutEditActiveRegions DashboardApp::CollectLayoutEditActiveRegions() const {
 }
 
 LayoutEditHoverResolution DashboardApp::ResolveLayoutEditHover(RenderPoint clientPoint) const {
+    auto timing = trace_.Timings().Measure(trace_, "hover_hit_test");
     return renderer_.ResolveLayoutEditHover(rendererDashboardOverlayState_, clientPoint);
 }
 
@@ -280,7 +299,50 @@ void DashboardApp::ApplyConfigPlacement() {
         !ApplyWindowDpi(targetDpi)) {
         return;
     }
-    SetWindowPos(hwnd_, nullptr, left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE | SWP_NOZORDER);
+    SetDashboardWindowGeometry(
+        left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE | SWP_NOZORDER, "config_placement");
+}
+
+void DashboardApp::SetDashboardWindowGeometry(
+    int left, int top, int width, int height, UINT flags, std::string_view reason) {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    RECT windowRect{};
+    GetWindowRect(hwnd_, &windowRect);
+    const bool sizeChanged =
+        (windowRect.right - windowRect.left) != width || (windowRect.bottom - windowRect.top) != height;
+    if (sizeChanged) {
+        renderer_.DiscardWindowRenderTarget(reason);
+        // Surface changes render a fresh frame explicitly; do not let USER32 preserve old client pixels.
+        flags |= SWP_NOREDRAW | SWP_NOCOPYBITS;
+    }
+
+    SetWindowPos(hwnd_, nullptr, left, top, width, height, flags);
+    if (sizeChanged) {
+        RedrawDashboardSurfaceSynchronously();
+    }
+}
+
+void DashboardApp::RedrawDashboardSurfaceSynchronously() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    const auto paintStart = std::chrono::steady_clock::now();
+    const SystemSnapshot& snapshot = controller_.State().telemetryUpdate.dump.snapshot;
+    const auto drawStart = std::chrono::steady_clock::now();
+    SyncDashboardMoveOverlayState();
+    if (!renderer_.DrawWindowSynchronously(snapshot, rendererDashboardOverlayState_)) {
+        lastError_ = renderer_.LastError();
+    }
+    const auto drawEnd = std::chrono::steady_clock::now();
+    ValidateRect(hwnd_, nullptr);
+    KillTimer(hwnd_, kAnimationFrameTimerId);
+    const auto paintEnd = std::chrono::steady_clock::now();
+    RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
+    RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
 }
 
 bool DashboardApp::HandleRenderEnvironmentChange(const char* reason) {
@@ -425,9 +487,10 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
     }
 
     currentDpi_ = targetDpi;
-    ReleaseFonts();
     UpdateRendererScale(targetScale);
-    if (!InitializeFonts()) {
+    // Scale and DPI changes must preserve the presentation timeline; surfaceVersion handles target recreation.
+    if (!renderer_.LastError().empty()) {
+        lastError_ = renderer_.LastError();
         return false;
     }
 
@@ -438,8 +501,8 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
         const int height = HasExplicitDisplayScale(controller_.State().config.display.scale)
                                ? WindowHeight()
                                : suggestedRect->bottom - suggestedRect->top;
-        SetWindowPos(
-            hwnd_, nullptr, suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE);
+        SetDashboardWindowGeometry(
+            suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE, "dpi_change");
     }
     return true;
 }
@@ -547,7 +610,7 @@ void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint, POINT cursorAn
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
     SyncDashboardMoveOverlayState();
-    InvalidateRect(hwnd_, nullptr, FALSE);
+    RedrawMoveFrame();
 }
 
 void DashboardApp::StopMoveMode() {
@@ -734,61 +797,59 @@ void DashboardApp::TraceLayoutEditUiEvent(TracePrefix prefix, const char* event,
 
     std::string text = event;
     if (!details.empty()) {
-        text += " ";
-        text += details;
+        AppendFormat(text, " %s", details.c_str());
     }
     const std::string uiState = BuildLayoutEditUiTraceState();
     if (!uiState.empty()) {
-        text += " ";
-        text += uiState;
+        AppendFormat(text, " %s", uiState.c_str());
     }
     state.diagnostics->WriteTraceMarker(prefix, text);
 }
 
+void DashboardApp::TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* event, const char* format, ...) const {
+    va_list args;
+    va_start(args, format);
+    const std::string text = FormatTextV(format, args);
+    va_end(args);
+    TraceLayoutEditUiEvent(prefix, event, text);
+}
+
 std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
-    std::string trace = "layout=" + Trace::QuoteText(state.config.display.layout);
-    trace += " editing=";
-    trace += Trace::BoolText(state.isEditingLayout);
-    trace += " moving=";
-    trace += Trace::BoolText(state.isMoving);
-    trace += " modal_depth=" + std::to_string(layoutEditModalUiDepth_);
-    trace += " tooltip_visible=";
-    trace += Trace::BoolText(layoutEditTooltipVisible_);
-    trace += " tooltip_suppressed=";
-    trace += Trace::BoolText(layoutEditTooltipRefreshSuppressed_);
-    trace += " tooltip_rect_valid=";
-    trace += Trace::BoolText(layoutEditTooltipRectValid_);
-    trace += " mouse_tracking=";
-    trace += Trace::BoolText(layoutEditMouseTracking_);
-    trace += " drag_active=";
-    trace += Trace::BoolText(layoutEditController_.HasActiveDrag());
-
     const HWND capture = GetCapture();
-    trace += " capture=";
-    if (capture == nullptr) {
-        trace += Trace::QuoteText("none");
-    } else if (capture == hwnd_) {
-        trace += Trace::QuoteText("dashboard");
-    } else {
-        trace += Trace::QuoteText("other");
-    }
+    const char* captureText = capture == nullptr ? "none" : (capture == hwnd_ ? "dashboard" : "other");
+    std::string trace =
+        FormatText("layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
+                   "tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",
+            state.config.display.layout.c_str(),
+            Trace::BoolText(state.isEditingLayout),
+            Trace::BoolText(state.isMoving),
+            layoutEditModalUiDepth_,
+            Trace::BoolText(layoutEditTooltipVisible_),
+            Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
+            Trace::BoolText(layoutEditTooltipRectValid_),
+            Trace::BoolText(layoutEditMouseTracking_),
+            Trace::BoolText(layoutEditController_.HasActiveDrag()),
+            captureText);
 
     LayoutEditController::TooltipTarget target;
     if (const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget(target)) {
-        trace += " target=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload));
-        trace += " target_point=" + Trace::QuoteText(Trace::FormatPoint(target.clientPoint.x, target.clientPoint.y));
+        AppendFormat(trace,
+            " target=\"%s\" target_point=\"%d,%d\"",
+            LayoutEditTooltipPayloadTraceKind(target.payload),
+            target.clientPoint.x,
+            target.clientPoint.y);
     } else {
-        trace += " target=" + Trace::QuoteText("none");
+        AppendFormat(trace, " target=\"none\"");
     }
 
     POINT cursor{};
     if (GetCursorPos(&cursor) != FALSE) {
-        trace += " cursor_screen=" + Trace::QuoteText(Trace::FormatPoint(cursor.x, cursor.y));
+        AppendFormat(trace, " cursor_screen=\"%d,%d\"", cursor.x, cursor.y);
         if (hwnd_ != nullptr) {
             POINT clientPoint = cursor;
             ScreenToClient(hwnd_, &clientPoint);
-            trace += " cursor_client=" + Trace::QuoteText(Trace::FormatPoint(clientPoint.x, clientPoint.y));
+            AppendFormat(trace, " cursor_client=\"%d,%d\"", clientPoint.x, clientPoint.y);
         }
     }
     return trace;
@@ -816,7 +877,7 @@ void DashboardApp::SetLayoutEditTooltipRefreshSuppressed(bool suppressed) {
     }
     layoutEditTooltipRefreshSuppressed_ = suppressed;
     TraceLayoutEditUiEvent(
-        TracePrefix::LayoutEditTooltip, "suppression", "value=" + Trace::QuoteText(suppressed ? "true" : "false"));
+        TracePrefix::LayoutEditTooltip, "suppression", suppressed ? "value=\"true\"" : "value=\"false\"");
     if (suppressed) {
         HideLayoutEditTooltip();
     }
@@ -836,41 +897,37 @@ bool DashboardApp::ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool 
 void DashboardApp::SuspendCoveredLayoutEditHover() {
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
         shellUi_->IsLayoutEditModalUiActive() || layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, "suspend", "reason=" + Trace::QuoteText("inactive_or_drag"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "suspend", "reason=\"inactive_or_drag\"");
         HideLayoutEditTooltip();
         return;
     }
 
-    TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "suspend", "reason=" + Trace::QuoteText("covered_pointer"));
+    TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "suspend", "reason=\"covered_pointer\"");
     layoutEditController_.HandleMouseLeave();
     HideLayoutEditTooltip();
 }
 
 void DashboardApp::UpdateLayoutEditTooltip() {
     if (layoutEditTooltipRefreshSuppressed_) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, "update_skip", "reason=" + Trace::QuoteText("suppressed"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=\"suppressed\"");
         HideLayoutEditTooltip();
         return;
     }
     if (layoutEditTooltipHwnd_ == nullptr || !controller_.State().isEditingLayout || controller_.State().isMoving ||
         shellUi_->IsLayoutEditModalUiActive()) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=" + Trace::QuoteText("inactive"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=\"inactive\"");
         HideLayoutEditTooltip();
         return;
     }
     if (layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, "update_skip", "reason=" + Trace::QuoteText("active_drag"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=\"active_drag\"");
         HideLayoutEditTooltip();
         return;
     }
 
     POINT screenPoint{};
     if (GetCursorPos(&screenPoint) && ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, "update_skip", "reason=" + Trace::QuoteText("covered_pointer"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=\"covered_pointer\"");
         SuspendCoveredLayoutEditHover();
         return;
     }
@@ -881,8 +938,7 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     const bool previousRectValid = layoutEditTooltipRectValid_;
     LayoutEditController::TooltipTarget target;
     if (!layoutEditController_.CurrentTooltipTarget(target)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, "update_skip", "reason=" + Trace::QuoteText("no_target"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "update_skip", "reason=\"no_target\"");
         HideLayoutEditTooltip();
         return;
     }
@@ -891,9 +947,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     std::string tooltipError;
     std::string tooltipText;
     if (!BuildLayoutEditTooltipTextForPayload(controller_.State().config, target.payload, tooltipText, &tooltipError)) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip,
-            "update_abort",
-            "reason=" + Trace::QuoteText(tooltipError.empty() ? "unsupported_target" : tooltipError));
+        const char* reasonText = tooltipError.empty() ? "unsupported_target" : tooltipError.c_str();
+        TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditTooltip, "update_abort", "reason=\"%s\"", reasonText);
         HideLayoutEditTooltip();
         return;
     }
@@ -933,38 +988,37 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     if (!wasVisible || previousText != layoutEditTooltipText_ || previousRectValid != layoutEditTooltipRectValid_ ||
         !RectsEqual(previousRect, layoutEditTooltipRect_)) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip,
+        TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditTooltip,
             "show",
-            "payload=" + Trace::QuoteText(LayoutEditTooltipPayloadTraceKind(target.payload)) +
-                " client_point=" + Trace::QuoteText(Trace::FormatPoint(clientPoint.x, clientPoint.y)) +
-                " text=" + Trace::QuoteText(layoutEditTooltipText_));
+            "payload=\"%s\" client_point=\"%d,%d\" text=\"%s\"",
+            LayoutEditTooltipPayloadTraceKind(target.payload),
+            clientPoint.x,
+            clientPoint.y,
+            layoutEditTooltipText_.c_str());
     }
 }
 
 void DashboardApp::RefreshLayoutEditHoverFromCursor() {
     TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_begin");
     if (layoutEditTooltipRefreshSuppressed_) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, "refresh_skip", "reason=" + Trace::QuoteText("suppressed"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=\"suppressed\"");
         HideLayoutEditTooltip();
         return;
     }
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
         shellUi_->IsLayoutEditModalUiActive()) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=" + Trace::QuoteText("inactive"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=\"inactive\"");
         HideLayoutEditTooltip();
         return;
     }
     if (layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, "refresh_skip", "reason=" + Trace::QuoteText("active_drag"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=\"active_drag\"");
         return;
     }
 
     POINT screenPoint{};
     if (!GetCursorPos(&screenPoint) || ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, "refresh_skip", "reason=" + Trace::QuoteText("covered_or_no_cursor"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=\"covered_or_no_cursor\"");
         SuspendCoveredLayoutEditHover();
         return;
     }
@@ -974,8 +1028,7 @@ void DashboardApp::RefreshLayoutEditHoverFromCursor() {
     RECT clientRect{};
     GetClientRect(hwnd_, &clientRect);
     if (!PtInRect(&clientRect, clientPointWin32)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, "refresh_skip", "reason=" + Trace::QuoteText("cursor_outside_client"));
+        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, "refresh_skip", "reason=\"cursor_outside_client\"");
         layoutEditController_.HandleMouseLeave();
         HideLayoutEditTooltip();
         return;
@@ -983,9 +1036,8 @@ void DashboardApp::RefreshLayoutEditHoverFromCursor() {
 
     UpdateLayoutEditMouseTracking();
     layoutEditController_.HandleMouseMove(RenderPoint{clientPointWin32.x, clientPointWin32.y});
-    TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover,
-        "refresh_move",
-        "client_point=" + Trace::QuoteText(Trace::FormatPoint(clientPointWin32.x, clientPointWin32.y)));
+    TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditHover, "refresh_move", "client_point=\"%d,%d\"", clientPointWin32.x, clientPointWin32.y);
     UpdateLayoutEditTooltip();
 }
 
@@ -1011,6 +1063,15 @@ void DashboardApp::UpdateLayoutEditMouseTracking() {
     } else {
         TraceLayoutEditUiEvent(TracePrefix::LayoutEditMouseTracking, "start_failed");
     }
+}
+
+void DashboardApp::RedrawMoveFrame() {
+    if (hwnd_ == nullptr || !controller_.State().isMoving) {
+        return;
+    }
+
+    // WM_TIMER and WM_PAINT are low-priority; move feedback must present from pointer traffic.
+    RedrawWindow(hwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
 }
 
 void DashboardApp::RedrawLayoutEditDragFrame() {
@@ -1089,7 +1150,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_TIMER:
             if (wParam == kMoveTimerId) {
                 UpdateMoveTracking();
-                InvalidateRect(hwnd_, nullptr, FALSE);
+                RedrawMoveFrame();
+                return 0;
+            }
+            if (wParam == kAnimationFrameTimerId) {
+                KillTimer(hwnd_, kAnimationFrameTimerId);
                 return 0;
             }
             if (wParam == kPlacementTimerId) {
@@ -1109,9 +1174,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         }
         case WM_ACTIVATE:
             if (shellUi_ != nullptr) {
-                TraceLayoutEditUiEvent(TracePrefix::LayoutEditUi,
-                    "wm_activate",
-                    "active_state=" + Trace::QuoteText(std::to_string(static_cast<int>(LOWORD(wParam)))));
+                TraceLayoutEditUiEventFmt(
+                    TracePrefix::LayoutEditUi, "wm_activate", "active_state=\"%d\"", static_cast<int>(LOWORD(wParam)));
                 RefreshLayoutEditHoverFromCursor();
             }
             break;
@@ -1208,6 +1272,11 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
         case WM_MOUSEMOVE:
+            if (state.isMoving) {
+                UpdateMoveTracking();
+                RedrawMoveFrame();
+                return 0;
+            }
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 UpdateLayoutEditMouseTracking();
                 RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
@@ -1241,9 +1310,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                     RECT clientRect{};
                     GetClientRect(hwnd_, &clientRect);
                     if (PtInRect(&clientRect, clientPointWin32)) {
-                        TraceLayoutEditUiEvent(TracePrefix::LayoutEditUi,
-                            "wm_mouseleave_ignore",
-                            "reason=" + Trace::QuoteText("cursor_still_in_client"));
+                        TraceLayoutEditUiEvent(
+                            TracePrefix::LayoutEditUi, "wm_mouseleave_ignore", "reason=\"cursor_still_in_client\"");
                         return 0;
                     }
                 }
@@ -1294,13 +1362,13 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_CAPTURECHANGED:
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 const bool handled = layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam));
-                TraceLayoutEditUiEvent(TracePrefix::LayoutEditUi,
+                TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,
                     "wm_capturechanged",
-                    "new_owner=" +
-                        Trace::QuoteText(reinterpret_cast<HWND>(lParam) == nullptr
-                                             ? "none"
-                                             : (reinterpret_cast<HWND>(lParam) == hwnd_ ? "dashboard" : "other")) +
-                        " handled=" + Trace::QuoteText(handled ? "true" : "false"));
+                    "new_owner=\"%s\" handled=\"%s\"",
+                    reinterpret_cast<HWND>(lParam) == nullptr
+                        ? "none"
+                        : (reinterpret_cast<HWND>(lParam) == hwnd_ ? "dashboard" : "other"),
+                    handled ? "true" : "false");
                 if (handled) {
                     UpdateLayoutEditTooltip();
                     return 0;
@@ -1386,13 +1454,14 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_DESTROY:
             KillTimer(hwnd_, kMoveTimerId);
             KillTimer(hwnd_, kPlacementTimerId);
+            KillTimer(hwnd_, kAnimationFrameTimerId);
             if (state.telemetry != nullptr) {
                 state.telemetry->Shutdown();
             }
             UnregisterSessionNotifications();
             DestroyLayoutEditTooltip();
             if (state.diagnostics != nullptr) {
-                state.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "ui_done");
+                state.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("ui_done"));
             }
             RemoveTrayIcon();
             ReleaseFonts();
@@ -1422,6 +1491,7 @@ void DashboardApp::Paint() {
     renderer_.DrawWindow(snapshot, rendererDashboardOverlayState_);
     const auto drawEnd = std::chrono::steady_clock::now();
     EndPaint(hwnd_, &ps);
+    KillTimer(hwnd_, kAnimationFrameTimerId);
     const auto paintEnd = std::chrono::steady_clock::now();
     RecordLayoutEditTracePhase(TracePhase::PaintDraw, drawEnd - drawStart);
     RecordLayoutEditTracePhase(TracePhase::PaintTotal, paintEnd - paintStart);
@@ -1432,6 +1502,7 @@ void DashboardApp::BeginLayoutEditTraceSession(const char* kind, const std::stri
 }
 
 void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) {
+    trace_.Timings().Record(trace_, TraceTimingOperationName(phase), elapsed);
     layoutEditTraceSession_.Record(phase, elapsed);
 }
 

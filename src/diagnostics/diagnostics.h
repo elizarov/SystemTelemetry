@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <commdlg.h>
+#include <cstdarg>
 #include <cstdio>
 #include <memory>
 #include <optional>
@@ -51,16 +52,19 @@ public:
 
     bool Initialize();
     bool ShouldShowDialogs() const;
-    void WriteTraceMarker(const char* text);
-    void WriteTraceMarker(const std::string& text);
     void WriteTraceMarker(TracePrefix prefix, const char* text);
+    void WriteTraceMarker(TracePrefix prefix, ResourceStringId text);
     void WriteTraceMarker(TracePrefix prefix, const std::string& text);
+    void WriteTraceMarkerWithDetail(TracePrefix prefix, ResourceStringId text, std::string_view detail);
+    void WriteTraceMarkerFmt(TracePrefix prefix, const char* format, ...);
+    void WriteTraceMarkerFmt(TracePrefix prefix, ResourceStringId format, ...);
+    void WriteTraceMarkerVFmt(TracePrefix prefix, const char* format, va_list args);
+    void WriteTraceMarkerVFmt(TracePrefix prefix, ResourceStringId format, va_list args);
     bool WriteOutputs(const TelemetryDump& dump, const AppConfig& config);
 
 private:
-    void ReportError(const std::string& traceText, std::string_view message);
     void ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message);
-    bool ReportSaveError(const char* traceEvent,
+    bool ReportSaveError(ResourceStringId traceEvent,
         const char* messageAction,
         const FilePath& path,
         std::string_view detail = {},

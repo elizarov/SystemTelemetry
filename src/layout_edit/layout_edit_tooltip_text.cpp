@@ -10,14 +10,14 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/localization_catalog.h"
+#include "util/text_format.h"
 
 namespace {
 
 void AppendTooltipDescription(std::string& text, std::string_view descriptionText) {
     // Size: keep tooltip assembly UTF-8 until the Win32 tooltip boundary to limit wide-string helper code.
     if (!descriptionText.empty()) {
-        text += "\r\n";
-        text += descriptionText;
+        AppendFormat(text, "\r\n%.*s", static_cast<int>(descriptionText.size()), descriptionText.data());
     }
 }
 
@@ -47,10 +47,10 @@ std::string TooltipColorExpression(const ColorConfig& color) {
 
 std::string LayoutGuideTooltipSectionName(const AppConfig& config, const LayoutEditGuide& guide) {
     if (!guide.editCardId.empty()) {
-        return "card." + guide.editCardId;
+        return FormatText("card.%s", guide.editCardId.c_str());
     }
     if (!config.display.layout.empty()) {
-        return "layout." + config.display.layout;
+        return FormatText("layout.%s", config.display.layout.c_str());
     }
     return "layout";
 }
@@ -71,7 +71,7 @@ const LayoutCardConfig* FindCardById(const AppConfig& config, std::string_view c
 LayoutEditTooltipDescriptor CardTitleTooltipDescriptor(const LayoutCardTitleEditKey& key) {
     LayoutEditTooltipDescriptor descriptor;
     descriptor.configKey = "config.card.title";
-    descriptor.sectionName = "card." + key.cardId;
+    descriptor.sectionName = FormatText("card.%s", key.cardId.c_str());
     descriptor.memberName = "title";
     descriptor.valueFormat = configschema::ValueFormat::String;
     return descriptor;
@@ -90,23 +90,30 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
     const std::string configMember = LayoutGuideTooltipConfigMember(guide);
     const LayoutNodeConfig* node = FindLayoutGuideNode(config, guide);
     if (node == nullptr || node->children.size() < 2 || guide.separatorIndex + 1 >= node->children.size()) {
-        return "[" + sectionName + "] " + configMember;
+        return FormatText("[%s] %s", sectionName.c_str(), configMember.c_str());
     }
 
     const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
     const LayoutNodeConfig& rightChild = node->children[guide.separatorIndex + 1];
-    return "[" + sectionName + "] " + configMember + " = " + node->name + "(" + LayoutGuideChildName(leftChild) + ":" +
-           std::to_string((std::max)(1, leftChild.weight)) + ", " + LayoutGuideChildName(rightChild) + ":" +
-           std::to_string((std::max)(1, rightChild.weight)) + ")";
+    return FormatText("[%s] %s = %s(%s:%d, %s:%d)",
+        sectionName.c_str(),
+        configMember.c_str(),
+        node->name.c_str(),
+        LayoutGuideChildName(leftChild).c_str(),
+        (std::max)(1, leftChild.weight),
+        LayoutGuideChildName(rightChild).c_str(),
+        (std::max)(1, rightChild.weight));
 }
 
 std::string BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEditGuide& guide) {
-    return TooltipText(BuildLayoutGuideTooltipLine(config, guide), FindLocalizedText("layout_edit.layout_guide"));
+    return TooltipText(
+        BuildLayoutGuideTooltipLine(config, guide), FindLocalizedText(RES_STR("layout_edit.layout_guide")));
 }
 
 std::string BuildMetricTooltipText(const LayoutMetricEditKey& key, const MetricDefinitionConfig& definition) {
-    return TooltipText("[metrics] " + key.metricId + " = " + FormatMetricDefinitionValue(definition),
-        FindLocalizedText("layout_edit.metric_definition"));
+    return TooltipText(
+        FormatText("[metrics] %s = %s", key.metricId.c_str(), FormatMetricDefinitionValue(definition).c_str()),
+        FindLocalizedText(RES_STR("layout_edit.metric_definition")));
 }
 
 std::string BuildMetricListOrderTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex) {
@@ -114,7 +121,7 @@ std::string BuildMetricListOrderTooltipText(const AppConfig& config, const Layou
     if (!firstLine.has_value()) {
         return {};
     }
-    return TooltipText(*firstLine, FindLocalizedText("layout_edit.metric_list_reorder"));
+    return TooltipText(*firstLine, FindLocalizedText(RES_STR("layout_edit.metric_list_reorder")));
 }
 
 std::string BuildMetricListAddRowTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
@@ -122,7 +129,7 @@ std::string BuildMetricListAddRowTooltipText(const AppConfig& config, const Layo
     if (!firstLine.has_value()) {
         return {};
     }
-    return TooltipText(*firstLine, FindLocalizedText("layout_edit.metric_list_add_row"));
+    return TooltipText(*firstLine, FindLocalizedText(RES_STR("layout_edit.metric_list_add_row")));
 }
 
 std::string BuildContainerChildOrderTooltipText(const AppConfig& config, const LayoutEditAnchorRegion& anchor) {
@@ -134,9 +141,9 @@ std::string BuildContainerChildOrderTooltipText(const AppConfig& config, const L
     if (!firstLine.has_value()) {
         return {};
     }
-    const char* descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
-                                     ? "layout_edit.container_reorder_horizontal"
-                                     : "layout_edit.container_reorder_vertical";
+    const ResourceStringId descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
+                                                ? RES_STR("layout_edit.container_reorder_horizontal")
+                                                : RES_STR("layout_edit.container_reorder_vertical");
     return TooltipText(*firstLine, FindLocalizedText(descriptionKey));
 }
 
@@ -265,10 +272,11 @@ bool BuildLayoutEditTooltipTextForPayload(
             return AbortTooltipBuild(errorReason, "missing_node_field");
         }
         const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
-                                           ? std::string(EnumToString(nodeFieldKey->widgetClass)) + " format"
+                                           ? FormatText("%s format", EnumToString(nodeFieldKey->widgetClass))
                                            : std::string(EnumToString(nodeFieldKey->widgetClass));
-        std::string text = valueLabel + " = " + ReadLayoutNodeFieldValue(*node, nodeFieldKey->field);
-        AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionKey));
+        std::string text =
+            FormatText("%s = %s", valueLabel.c_str(), ReadLayoutNodeFieldValue(*node, nodeFieldKey->field).c_str());
+        AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionResourceKey));
         tooltipText = std::move(text);
         return true;
     }

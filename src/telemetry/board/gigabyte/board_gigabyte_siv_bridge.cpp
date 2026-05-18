@@ -18,25 +18,21 @@ namespace {
 constexpr char kEngineEnvironmentControlDll[] = "Gigabyte.Engine.EnvironmentControl.dll";
 constexpr char kEnvironmentControlCommonDll[] = "Gigabyte.EnvironmentControl.Common.dll";
 
-bool ManagedUnitEquals(String ^ unit, String ^ expected) {
-    return String::Equals(unit, expected, StringComparison::OrdinalIgnoreCase);
+String ^ ManagedStringFromUtf8(std::string_view text) {
+    const std::wstring wide = WideFromUtf8(text);
+    return gcnew String(wide.c_str());
 }
 
-String ^
-    ManagedStringFromUtf8(std::string_view text) {
-        const std::wstring wide = WideFromUtf8(text);
-        return gcnew String(wide.c_str());
-    }
-
-    void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
+void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
     const std::wstring wide = WideFromUtf8(text);
     sink.SetDiagnostics(wide.c_str());
 }
 
-String ^ CombinePath(String ^ directory,
-             const char* fileName) { return Path::Combine(directory, ManagedStringFromUtf8(fileName)); }
+String ^ CombinePath(String ^ directory, const char* fileName) {
+    return Path::Combine(directory, ManagedStringFromUtf8(fileName));
+}
 
-    ref class GigabyteAssemblyResolver abstract sealed {
+ref class GigabyteAssemblyResolver abstract sealed {
 public:
     static void EnsureInstalled(String ^ directory) {
         toolDirectory_ = directory;
@@ -49,22 +45,20 @@ public:
     }
 
 private:
-    static Assembly ^
-        ResolveAssembly(Object ^, ResolveEventArgs ^ args) {
-            if (String::IsNullOrWhiteSpace(toolDirectory_)) {
-                return nullptr;
-            }
-
-            AssemblyName ^ name = gcnew AssemblyName(args->Name);
-            String ^ candidate = Path::Combine(toolDirectory_, name->Name + ".dll");
-            if (!File::Exists(candidate)) {
-                return nullptr;
-            }
-            return Assembly::LoadFrom(candidate);
+    static Assembly ^ ResolveAssembly(Object ^, ResolveEventArgs ^ args) {
+        if (String::IsNullOrWhiteSpace(toolDirectory_)) {
+            return nullptr;
         }
 
-        static String
-        ^ toolDirectory_ = nullptr;
+        AssemblyName ^ name = gcnew AssemblyName(args->Name);
+        String ^ candidate = Path::Combine(toolDirectory_, String::Concat(name->Name, ".dll"));
+        if (!File::Exists(candidate)) {
+            return nullptr;
+        }
+        return Assembly::LoadFrom(candidate);
+    }
+
+    static String ^ toolDirectory_ = nullptr;
     static bool installed_ = false;
 };
 
@@ -84,16 +78,12 @@ public:
     MethodInfo ^ getCurrentMethod = nullptr;
     PropertyInfo ^ titleProperty = nullptr;
     PropertyInfo ^ valueProperty = nullptr;
-    PropertyInfo ^ unitProperty = nullptr;
     Object ^ monitor = nullptr;
     Object ^ sourceHwRegister = nullptr;
     Object ^ sensorFan = nullptr;
     Object ^ sensorTemperature = nullptr;
     array<Object ^> ^ fanArgs = nullptr;
     array<Object ^> ^ temperatureArgs = nullptr;
-    String ^ rpmUnit = nullptr;
-    String ^ celsiusUnit = nullptr;
-    String ^ degreeCUnit = nullptr;
     bool loaded = false;
 };
 
@@ -150,11 +140,9 @@ bool InitializeGigabyteRuntime(
                 gcnew array<Type ^>{context->sensorType, context->collectionType->MakeByRefType()});
             context->titleProperty = context->sensorDataType->GetProperty("Title");
             context->valueProperty = context->sensorDataType->GetProperty("Value");
-            context->unitProperty = context->sensorDataType->GetProperty("Unit");
 
             if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
-                context->titleProperty == nullptr || context->valueProperty == nullptr ||
-                context->unitProperty == nullptr) {
+                context->titleProperty == nullptr || context->valueProperty == nullptr) {
                 SetDiagnosticsUtf8(sink, "Gigabyte hardware-monitor reflection members were not found.");
                 return false;
             }
@@ -165,10 +153,6 @@ bool InitializeGigabyteRuntime(
             context->sensorTemperature = Enum::Parse(context->sensorType, "Temperature", false);
             context->fanArgs = gcnew array<Object ^>{context->sensorFan, nullptr};
             context->temperatureArgs = gcnew array<Object ^>{context->sensorTemperature, nullptr};
-            context->rpmUnit = ManagedStringFromUtf8("RPM");
-            context->celsiusUnit = ManagedStringFromUtf8("\xE2\x84\x83");
-            context->degreeCUnit = ManagedStringFromUtf8("\xC2\xB0"
-                                                         "C");
 
             pin_ptr<const wchar_t> pinnedTypeName = PtrToStringChars(context->monitor->GetType()->FullName);
             sink.TraceMonitorCreated(pinnedTypeName);
@@ -191,12 +175,7 @@ bool InitializeGigabyteRuntime(
 }
 
 void CollectManagedSensors(
-    GigabyteRuntimeContext ^ context, Object ^ sensorKind, bool collectFans, GigabyteSivCaptureSink& sink) {
-    array<Object ^> ^ args = collectFans ? context->fanArgs : context->temperatureArgs;
-    if (args == nullptr) {
-        args = gcnew array<Object ^>{sensorKind, nullptr};
-    }
-    args[0] = sensorKind;
+    GigabyteRuntimeContext ^ context, array<Object ^> ^ args, bool collectFans, GigabyteSivCaptureSink& sink) {
     // Gigabyte SIV expects a live collection instance here even though the
     // parameter is passed by reference; a null out value faults inside SIV.
     args[1] = Activator::CreateInstance(context->collectionType);
@@ -209,20 +188,13 @@ void CollectManagedSensors(
     for each (Object ^ sensor in enumerable) {
         String ^ title = dynamic_cast<String ^>(context->titleProperty->GetValue(sensor, nullptr));
         Object ^ valueObject = context->valueProperty->GetValue(sensor, nullptr);
-        String ^ unit = dynamic_cast<String ^>(context->unitProperty->GetValue(sensor, nullptr));
-        const double numericValue = Convert::ToDouble(valueObject, Globalization::CultureInfo::InvariantCulture);
+        const double numericValue = static_cast<double>(safe_cast<float>(valueObject));
 
         String ^ titleText = title != nullptr ? title : String::Empty;
         pin_ptr<const wchar_t> pinnedTitle = PtrToStringChars(titleText);
         if (collectFans) {
-            if (!ManagedUnitEquals(unit, context->rpmUnit)) {
-                continue;
-            }
             sink.AddFanReading(pinnedTitle, numericValue);
         } else {
-            if (!ManagedUnitEquals(unit, context->celsiusUnit) && !ManagedUnitEquals(unit, context->degreeCUnit)) {
-                continue;
-            }
             sink.AddTemperatureReading(pinnedTitle, numericValue);
         }
     }
@@ -235,8 +207,8 @@ bool CaptureGigabyteSnapshot(
     }
 
     try {
-        CollectManagedSensors(context, context->sensorFan, true, sink);
-        CollectManagedSensors(context, context->sensorTemperature, false, sink);
+        CollectManagedSensors(context, context->fanArgs, true, sink);
+        CollectManagedSensors(context, context->temperatureArgs, false, sink);
         return true;
     } catch (Exception ^ ex) {
         String ^ exceptionText = ex->ToString();

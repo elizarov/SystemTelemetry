@@ -6,6 +6,7 @@
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -21,13 +22,13 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
             const auto it = board.temperatureSensorNames.find(logicalName);
             const std::string sensorName =
                 it != board.temperatureSensorNames.end() && !it->second.empty() ? it->second : logicalName;
-            updateKey("[board]", "board.temp." + logicalName, sensorName);
+            updateKey("[board]", FormatText("board.temp.%s", logicalName.c_str()), sensorName);
         }
         for (const std::string& logicalName : board.requestedFanNames) {
             const auto it = board.fanSensorNames.find(logicalName);
             const std::string sensorName =
                 it != board.fanSensorNames.end() && !it->second.empty() ? it->second : logicalName;
-            updateKey("[board]", "board.fan." + logicalName, sensorName);
+            updateKey("[board]", FormatText("board.fan.%s", logicalName.c_str()), sensorName);
         }
     }
 
@@ -53,7 +54,7 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
                     compareValue = compareIt->second;
                 }
             }
-            saveBoardKey("board.temp." + logicalName, currentValue, compareValue);
+            saveBoardKey(FormatText("board.temp.%s", logicalName.c_str()), currentValue, compareValue);
         }
 
         for (const std::string& logicalName : board.requestedFanNames) {
@@ -68,7 +69,7 @@ template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardCo
                     compareValue = compareIt->second;
                 }
             }
-            saveBoardKey("board.fan." + logicalName, currentValue, compareValue);
+            saveBoardKey(FormatText("board.fan.%s", logicalName.c_str()), currentValue, compareValue);
         }
     }
 };
@@ -106,7 +107,8 @@ template <typename Section, typename CompareOwner, typename UpdateKeyFn>
 void SaveStructuredSectionDifferences(
     const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
     if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
-        const std::string sectionName = "[" + std::string(Section::name.view()) + "]";
+        const std::string sectionName =
+            FormatText("[%.*s]", static_cast<int>(Section::name.view().size()), Section::name.view().data());
         for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
             if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
                 updateKey(
@@ -178,13 +180,18 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
             continue;
         }
         if (Trim(trimmed.substr(0, eq)) == key) {
-            lines[i] = key + " = " + value;
+            lines[i] = FormatText("%s = %s", key.c_str(), value.c_str());
             return;
         }
     }
 
     if (appendWhenMissing) {
-        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(sectionEnd), key + " = " + value);
+        size_t appendIndex = sectionEnd;
+        while (appendIndex > sectionStart + 1 && Trim(lines[appendIndex - 1]).empty()) {
+            --appendIndex;
+        }
+        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(appendIndex),
+            FormatText("%s = %s", key.c_str(), value.c_str()));
     }
 }
 
@@ -212,8 +219,7 @@ std::vector<std::string> SplitConfigLines(const std::string& text) {
 std::string JoinConfigLines(const std::vector<std::string>& lines) {
     std::string output;
     for (const std::string& line : lines) {
-        output += line;
-        output += "\r\n";
+        AppendFormat(output, "%s\r\n", line.c_str());
     }
     return output;
 }
@@ -316,7 +322,9 @@ std::string BuildSavedConfigText(
 
     const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
-        size_t sectionStart = sectionName == "[storage]"   ? ensureSectionAfter(sectionName, "[network]")
+        size_t sectionStart = sectionName == "[gpu]"       ? ensureSectionAfter(sectionName, "[display]")
+                              : sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]")
+                              : sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
                               : sectionName == "[board]"   ? ensureSectionAfter(sectionName, "[storage]")
                               : sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]")
                                                            : ensureSection(sectionName);

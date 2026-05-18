@@ -3,7 +3,6 @@
 #include <windows.h>
 
 #include <cstdint>
-#include <cstdio>
 #include <dbghelp.h>
 #include <string>
 #include <string_view>
@@ -14,6 +13,7 @@
 #include "diagnostics/diagnostics.h"
 #include "util/file_path.h"
 #include "util/paths.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -27,9 +27,7 @@ constexpr wchar_t kWriteBinaryMode[] = L"wb";   // _wfopen_s mode string follows
 std::string CrashReportFileName() {
     SYSTEMTIME time{};
     GetLocalTime(&time);
-    char buffer[80];
-    sprintf_s(buffer,
-        "casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
+    return FormatText("casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
         time.wYear,
         time.wMonth,
         time.wDay,
@@ -38,12 +36,10 @@ std::string CrashReportFileName() {
         time.wSecond,
         time.wMilliseconds,
         static_cast<unsigned long>(GetCurrentProcessId()));
-    return buffer;
 }
 
 FilePath PathWithSuffix(const FilePath& path, std::string_view suffix) {
-    std::string text = path.string();
-    text += suffix;
+    std::string text = FormatText("%s%.*s", path.string().c_str(), static_cast<int>(suffix.size()), suffix.data());
     return FilePath(std::move(text));
 }
 
@@ -62,18 +58,13 @@ FilePath ResolveCrashOutputBase() {
 }
 
 std::string ExceptionCodeText(DWORD code) {
-    char buffer[16];
-    sprintf_s(buffer, "0x%08lX", static_cast<unsigned long>(code));
-    return buffer;
+    return FormatText("0x%08lX", static_cast<unsigned long>(code));
 }
 
 std::string PointerText(const void* address) {
-    char buffer[2 + sizeof(void*) * 2 + 1];
-    sprintf_s(buffer,
-        "0x%0*llX",
+    return FormatText("0x%0*llX",
         static_cast<int>(sizeof(void*) * 2),
         static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(address)));
-    return buffer;
 }
 
 std::string ModulePathForAddress(void* address) {
@@ -99,10 +90,7 @@ std::string ModulePathForAddress(void* address) {
 }
 
 void AppendLine(std::string& text, const char* key, const std::string& value) {
-    text += key;
-    text += ": ";
-    text += value;
-    text += "\r\n";
+    AppendFormat(text, "%s: %s\r\n", key, value.c_str());
 }
 
 std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* exceptionPointers) {
@@ -116,8 +104,8 @@ std::string BuildCrashReportText(const FilePath& dumpPath, EXCEPTION_POINTERS* e
     AppendLine(text, "build_kind", casedash::version::kBuildKind);
     AppendLine(text, "git_commit", casedash::version::kGitCommit);
     AppendLine(text, "git_dirty", casedash::version::kGitDirty ? "yes" : "no");
-    AppendLine(text, "process_id", std::to_string(GetCurrentProcessId()));
-    AppendLine(text, "thread_id", std::to_string(GetCurrentThreadId()));
+    AppendLine(text, "process_id", FormatText("%lu", GetCurrentProcessId()));
+    AppendLine(text, "thread_id", FormatText("%lu", GetCurrentThreadId()));
     AppendLine(text, "exception_code", record != nullptr ? ExceptionCodeText(record->ExceptionCode) : "unknown");
     AppendLine(text, "exception_address", PointerText(exceptionAddress));
     AppendLine(text, "faulting_module", ModulePathForAddress(const_cast<void*>(exceptionAddress)));
@@ -170,10 +158,15 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const EXCEPTION_RECORD* record = exceptionPointers != nullptr ? exceptionPointers->ExceptionRecord : nullptr;
     const std::string code = record != nullptr ? ExceptionCodeText(record->ExceptionCode) : "unknown";
     const std::string address = PointerText(record != nullptr ? record->ExceptionAddress : nullptr);
+    const std::string reportText = reportPath.string();
+    const std::string dumpText = dumpPath.string();
     Trace trace(traceFile);
-    trace.Write(TracePrefix::Crash,
-        "unhandled_exception code=" + Trace::QuoteText(code) + " address=" + Trace::QuoteText(address) +
-            " report=" + Trace::QuoteText(reportPath.string()) + " minidump=" + Trace::QuoteText(dumpPath.string()));
+    trace.WriteFmt(TracePrefix::Crash,
+        RES_STR("unhandled_exception code=\"%s\" address=\"%s\" report=\"%s\" minidump=\"%s\""),
+        code.c_str(),
+        address.c_str(),
+        reportText.c_str(),
+        dumpText.c_str());
     fclose(traceFile);
 }
 
@@ -190,7 +183,8 @@ LONG WINAPI HandleUnhandledException(EXCEPTION_POINTERS* exceptionPointers) {
     AppendLine(reportText, "minidump_written", dumpWritten ? "yes" : "no");
     WriteFileBinary(reportPath, reportText);
     AppendCrashTrace(reportPath, dumpPath, exceptionPointers);
-    const std::wstring debugText = WideFromUtf8("CaseDash crash report written to " + reportPath.string() + "\n");
+    const std::wstring debugText =
+        WideFromUtf8(FormatText("CaseDash crash report written to %s\n", reportPath.string().c_str()));
     OutputDebugStringW(debugText.c_str());
     return EXCEPTION_CONTINUE_SEARCH;
 }

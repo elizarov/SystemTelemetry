@@ -120,6 +120,14 @@ struct NetworkConfig {
     bool operator==(const NetworkConfig& other) const = default;
 };
 
+struct GpuConfig {
+    CONFIG_REFLECTED_STRUCT(GpuConfig)
+    CONFIG_VALUE(std::string, adapterName, "adapter_name");
+    CONFIG_SECTION("gpu");
+
+    bool operator==(const GpuConfig& other) const = default;
+};
+
 struct StorageConfig {
     CONFIG_REFLECTED_STRUCT(StorageConfig)
     CONFIG_VALUE(std::vector<std::string>, drives, "drives");
@@ -385,6 +393,7 @@ struct LayoutConfig {
 struct AppConfig {
     CONFIG_REFLECTED_BINDINGS(AppConfig)
     CONFIG_SECTION_VALUE(DisplayConfig, display);
+    CONFIG_SECTION_VALUE(GpuConfig, gpu);
     CONFIG_SECTION_VALUE(NetworkConfig, network);
     CONFIG_SECTION_VALUE(StorageConfig, storage);
     CONFIG_RECURSIVE_BINDING_VALUE(LayoutConfig, layout);

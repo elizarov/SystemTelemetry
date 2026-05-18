@@ -1,5 +1,6 @@
 #include <algorithm>
 #include <gtest/gtest.h>
+#include <memory>
 #include <optional>
 #include <span>
 #include <string>
@@ -12,6 +13,18 @@
 #include "widget/widget_host.h"
 
 namespace {
+
+const void* MetricListTestRenderBitmapResourceTypeToken() {
+    static const int token = 0;
+    return &token;
+}
+
+class MetricListTestRenderBitmapResource final : public RenderBitmapResource {
+public:
+    const void* TypeToken() const override {
+        return MetricListTestRenderBitmapResourceTypeToken();
+    }
+};
 
 struct DrawnText {
     RenderRect rect{};
@@ -115,7 +128,37 @@ public:
         return true;
     }
 
+    bool DrawWindowRetained(int, int, const DrawCallback& draw) override {
+        draw();
+        return true;
+    }
+
+    bool DrawWindowDirty(int, int, std::span<const RenderRect> dirtyRects, const DirtyDrawCallback& draw) override {
+        draw(dirtyRects);
+        return true;
+    }
+
     bool DrawOffscreen(int, int, const DrawCallback& draw) override {
+        draw();
+        return true;
+    }
+
+    bool DrawToBitmap(
+        RenderBitmap& bitmap, int width, int height, RenderBitmapClear, const DrawCallback& draw) override {
+        bitmap.width = width;
+        bitmap.height = height;
+        bitmap.storage = RenderBitmapStorage::Generic;
+        bitmap.resource = std::make_shared<MetricListTestRenderBitmapResource>();
+        draw();
+        return true;
+    }
+
+    bool DrawToLiveLayerBitmap(
+        RenderBitmap& bitmap, int width, int height, RenderBitmapClear, const DrawCallback& draw) override {
+        bitmap.width = width;
+        bitmap.height = height;
+        bitmap.storage = RenderBitmapStorage::LiveLayer;
+        bitmap.resource = std::make_shared<MetricListTestRenderBitmapResource>();
         draw();
         return true;
     }
@@ -178,6 +221,18 @@ public:
     void PushTranslation(RenderPoint) override {}
 
     void PopTranslation() override {}
+
+    bool DrawBitmap(const RenderBitmap&, RenderPoint) override {
+        return true;
+    }
+
+    bool DrawBitmapRegion(const RenderBitmap&, const RenderRect&, RenderPoint) override {
+        return true;
+    }
+
+    bool DrawBitmapRegions(const RenderBitmap&, std::span<const RenderRect>) override {
+        return true;
+    }
 
     bool DrawIcon(std::string_view, const RenderRect&) override {
         return true;

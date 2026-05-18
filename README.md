@@ -4,8 +4,6 @@ CaseDash is a compact dashboard for dedicated PC telemetry screens: small USB/HD
 
 It is not a generic hardware-monitoring suite. CaseDash is a polished sensor panel you place, configure, and mostly leave alone. There are no keyboard shortcuts or extra controls beyond what is needed to make the panel look right and stay put.
 
-Supported hardware-provider details live in [docs/hardware.md](docs/hardware.md). Contributions are welcome for additional providers.
-
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/image/casedash-screenshot-dark.png">
   <source media="(prefers-color-scheme: light)" srcset="docs/image/casedash-screenshot-light.png">
@@ -20,7 +18,8 @@ It's me, [Roman Elizarov](https://github.com/elizarov) &mdash; ex-project Lead f
 
 - Constraint-based layouts and a live editor.
 - Theme system that derives a full palette from a small set of key colors.
-- Small native executable: an `.exe` under 1 MB, with frame drawing measured in milliseconds.
+- Animated metric fills and throughput plots interpolate smoothly between telemetry snapshots.
+- Small native executable: an `.exe` under 1 MB, with vsync-paced animation that spends less than 1 ms per frame.
 - Layouts for small panels from 5-inch 800x480 screens up to wide 9-inch 1920x480 screens.
 - Built-in display setup that computes full-screen scale, remembers placement, and prepares a matching startup wallpaper.
 - Machine-wide auto-start setup works for all users out of the box.
@@ -51,7 +50,7 @@ Good areas to explore:
 
 Open an issue and write what you want to achieve.
 
-- **GPU telemetry and board sensor modules.** Do you have unsupported hardware? Open Codex or Claude, give it full access, tell it which provider software exposes fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the existing ones. Keep the vendor-selection mapping and known-machine test fixture described in [docs/hardware.md](docs/hardware.md) updated, grill the integration to keep it light, then send a detailed PR.
+- **GPU telemetry and board sensor modules.** Do you have unsupported hardware? Open Codex or Claude, give it full access, tell it which provider software exposes fan and temperature information on your machine, let it explore and write the corresponding telemetry provider similar to the existing ones. Keep the vendor-selection mapping and known-machine test fixture updated, grill the agent to keep integration light and elevation-free, then send a detailed PR.
 
 - **Linux users:** are you interested? What hardware do you have? A Linux port would be a cool project to undertake; write up your use cases.
 

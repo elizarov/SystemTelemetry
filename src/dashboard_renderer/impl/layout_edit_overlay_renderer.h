@@ -20,25 +20,58 @@ class DashboardLayoutEditOverlayRenderer {
 public:
     DashboardLayoutEditOverlayRenderer(DashboardRenderer& renderer, DashboardLayoutResolver& layoutResolver);
 
-    bool ShouldSkipBaseWidget(const DashboardOverlayState& overlayState, const RenderRect& rect) const;
+    bool ShouldSkipBaseWidget(const DashboardOverlayState& overlayState, const WidgetLayout& widget) const;
     void Draw(const DashboardOverlayState& overlayState, const MetricSource& metrics);
+    void DrawBackgroundAffordances(const DashboardOverlayState& overlayState) const;
+    void DrawDraggedContent(const MetricSource& metrics);
+    void DrawForegroundAffordances(const DashboardOverlayState& overlayState) const;
 
 private:
-    void DrawHoveredWidgetHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawHoveredEditableAnchorHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawSelectedColorEditHighlights(const DashboardOverlayState& overlayState) const;
-    void DrawSelectedTreeNodeHighlight(const DashboardOverlayState& overlayState) const;
-    void DrawLayoutEditGuides(const DashboardOverlayState& overlayState) const;
-    void DrawWidgetEditGuides(const DashboardOverlayState& overlayState) const;
-    void DrawGapEditAnchors(const DashboardOverlayState& overlayState) const;
-    std::optional<RenderRect> FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const;
+    struct OverlayAffordanceRect {
+        RenderRect rect{};
+        const std::vector<LayoutEditOverlayOwner>* owners = nullptr;
+        LayoutEditOverlayAffordanceLayer layer = LayoutEditOverlayAffordanceLayer::Background;
+    };
+
+    void DrawAffordances(const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawHoveredWidgetHighlight(
+        const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawHoveredEditableAnchorHighlight(
+        const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawSelectedColorEditHighlights(
+        const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawSelectedTreeNodeHighlight(
+        const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawLayoutEditGuides(const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawWidgetEditGuides(const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    void DrawGapEditAnchors(const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    std::optional<OverlayAffordanceRect> FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const;
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
-    void DrawLayoutSimilarityIndicators(const DashboardOverlayState& overlayState) const;
-    std::optional<RenderPoint> ContainerChildReorderOffsetForRect(
-        const DashboardOverlayState& overlayState, const RenderRect& rect) const;
-    RenderRect ApplyContainerChildReorderOffset(const RenderRect& rect) const;
-    RenderPoint ApplyContainerChildReorderOffset(RenderPoint point, const RenderRect& sourceRect) const;
-    bool ShouldSkipForContainerChildReorder(const RenderRect& rect) const;
+    void DrawDottedAffordanceRect(const DashboardOverlayState& overlayState,
+        LayoutEditOverlayAffordanceLayer layer,
+        const RenderRect& rect,
+        const std::vector<LayoutEditOverlayOwner>& owners,
+        LayoutEditOverlayAffordanceLayer artifactLayer,
+        RenderColorId color,
+        bool active,
+        bool outside = true) const;
+    void DrawLayoutSimilarityIndicators(
+        const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
+    std::optional<RenderPoint> OverlayDragOffsetForOwners(
+        const DashboardOverlayState& overlayState, const std::vector<LayoutEditOverlayOwner>& owners) const;
+    std::optional<RenderPoint> OverlayDragOffsetForAnchor(
+        const DashboardOverlayState& overlayState, const LayoutEditAnchorRegion& region) const;
+    bool ShouldDrawAffordanceLayer(
+        LayoutEditOverlayAffordanceLayer artifactLayer, LayoutEditOverlayAffordanceLayer drawLayer) const;
+    bool HasForegroundAffordanceLayer(const DashboardOverlayState& overlayState) const;
+    RenderRect ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+        const RenderRect& rect,
+        const std::vector<LayoutEditOverlayOwner>& owners) const;
+    RenderPoint ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+        RenderPoint point,
+        const std::vector<LayoutEditOverlayOwner>& owners) const;
+    void ApplyOverlayDragOffset(const DashboardOverlayState& overlayState, LayoutEditAnchorRegion& region) const;
+    bool ShouldSkipForContainerChildReorder(const WidgetLayout& widget) const;
     void DrawContainerChildReorderOverlay(const MetricSource& metrics);
 
     DashboardRenderer& renderer_;

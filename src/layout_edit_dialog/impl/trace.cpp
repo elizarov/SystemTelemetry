@@ -4,7 +4,7 @@
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit_dialog/impl/util.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
-#include "util/trace.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -46,10 +46,10 @@ struct DialogTraceField {
 std::string BuildDialogTraceValues(HWND hwnd, const DialogTraceField* fields, size_t fieldCount) {
     std::string text;
     for (size_t i = 0; i < fieldCount; ++i) {
-        text += ' ';
-        text += fields[i].label;
-        text += '=';
-        text += QuoteTraceText(ReadDialogControlTextUtf8(hwnd, fields[i].controlId));
+        AppendFormat(text,
+            " %s=%s",
+            fields[i].label,
+            QuoteTraceText(ReadDialogControlTextUtf8(hwnd, fields[i].controlId)).c_str());
     }
     return text;
 }
@@ -57,7 +57,7 @@ std::string BuildDialogTraceValues(HWND hwnd, const DialogTraceField* fields, si
 }  // namespace
 
 std::string QuoteTraceText(std::string_view text) {
-    return Trace::QuoteText(text);
+    return FormatText("\"%.*s\"", static_cast<int>(text.size()), text.data());
 }
 
 std::string FormatTraceColorHex(unsigned int color) {
@@ -68,9 +68,9 @@ std::string JoinNodePath(const std::vector<size_t>& path) {
     std::string text;
     for (size_t i = 0; i < path.size(); ++i) {
         if (i != 0) {
-            text += '.';
+            AppendFormat(text, ".");
         }
-        text += std::to_string(path[i]);
+        AppendFormat(text, "%zu", path[i]);
     }
     return text;
 }
@@ -82,26 +82,33 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     if (const auto* parameter = std::get_if<LayoutEditParameter>(&leaf->focusKey)) {
         const auto descriptor = FindLayoutEditTooltipDescriptor(*parameter);
         if (descriptor.has_value()) {
-            return "focus=" + QuoteTraceText(descriptor->configKey);
+            return FormatText("focus=%s", QuoteTraceText(descriptor->configKey).c_str());
         }
-        return "focus=" + QuoteTraceText(GetLayoutEditParameterDisplayName(*parameter));
+        return FormatText("focus=%s", QuoteTraceText(GetLayoutEditParameterDisplayName(*parameter)).c_str());
     }
     if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText(leaf->sectionName.empty() ? "weight" : leaf->sectionName + ".layout") +
-               " edit_card=" + QuoteTraceText(weightKey->editCardId) +
-               " node_path=" + QuoteTraceText(JoinNodePath(weightKey->nodePath)) +
-               " separator=" + std::to_string(weightKey->separatorIndex);
+        const std::string focus =
+            leaf->sectionName.empty() ? "weight" : FormatText("%s.layout", leaf->sectionName.c_str());
+        std::string text = FormatText("focus=%s edit_card=%s node_path=%s",
+            QuoteTraceText(focus).c_str(),
+            QuoteTraceText(weightKey->editCardId).c_str(),
+            QuoteTraceText(JoinNodePath(weightKey->nodePath)).c_str());
+        AppendFormat(text, " separator=%zu", weightKey->separatorIndex);
+        return text;
     }
     if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText("[metrics] " + metricKey->metricId);
+        const std::string focus = FormatText("[metrics] %s", metricKey->metricId.c_str());
+        return FormatText("focus=%s", QuoteTraceText(focus).c_str());
     }
     if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText("[card." + cardTitleKey->cardId + "] title");
+        const std::string focus = FormatText("[card.%s] title", cardTitleKey->cardId.c_str());
+        return FormatText("focus=%s", QuoteTraceText(focus).c_str());
     }
     if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&leaf->focusKey)) {
-        return "focus=" + QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName)) +
-               " edit_card=" + QuoteTraceText(nodeFieldKey->editCardId) +
-               " node_path=" + QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath));
+        return FormatText("focus=%s edit_card=%s node_path=%s",
+            QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName)).c_str(),
+            QuoteTraceText(nodeFieldKey->editCardId).c_str(),
+            QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath)).c_str());
     }
     return "focus=\"unknown\"";
 }
@@ -111,18 +118,29 @@ std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
         return "node=\"none\"";
     }
 
-    std::string text = "node_kind=" + QuoteTraceText(TreeNodeKindTraceName(node->kind));
-    text += " label=" + QuoteTraceText(node->label);
-    text += " location=" + QuoteTraceText(node->locationText);
+    std::string text = FormatText("node_kind=%s label=%s location=%s",
+        QuoteTraceText(TreeNodeKindTraceName(node->kind)).c_str(),
+        QuoteTraceText(node->label).c_str(),
+        QuoteTraceText(node->locationText).c_str());
     if (node->leaf.has_value()) {
-        text += ' ';
-        text += BuildTraceFocusKeyText(&*node->leaf);
+        AppendFormat(text, " %s", BuildTraceFocusKeyText(&*node->leaf).c_str());
         if (std::holds_alternative<LayoutMetricEditKey>(node->leaf->focusKey)) {
-            text += " value_format=\"metric\"";
+            AppendFormat(text, " value_format=\"metric\"");
         } else {
-            text += " value_format=" + QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat));
+            AppendFormat(
+                text, " value_format=%s", QuoteTraceText(ValueFormatTraceName(node->leaf->valueFormat)).c_str());
         }
     }
+    return text;
+}
+
+std::string BuildTraceNodeDetail(const LayoutEditTreeNode* node, const char* format, ...) {
+    std::string text = BuildTraceNodeText(node);
+    va_list args;
+    va_start(args, format);
+    const std::string detail = FormatTextV(format, args);
+    va_end(args);
+    AppendFormat(text, "%s", detail.c_str());
     return text;
 }
 

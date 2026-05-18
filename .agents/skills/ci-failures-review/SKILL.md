@@ -39,8 +39,13 @@ Use this skill to investigate a failed workflow from the failing run outward, th
 ## Lessons Learned
 
 - Some direct Windows SDK headers are not self-contained under the CaseDash build defines. For example, replacing `windows.h` with `sysinfoapi.h` for `SYSTEMTIME` and `GetLocalTime` can fail with `winnt.h` reporting `No Target Architecture`. In that case, keep `windows.h` in source and add a precise include-cleaner allowlist entry.
+- `profileapi.h` is also not self-contained for `LARGE_INTEGER`, `QueryPerformanceFrequency`, and `QueryPerformanceCounter` under the CaseDash build defines; keep `windows.h` and allowlist the include-cleaner finding when `windows.h` is the narrow working source include.
 - If a clang-tidy fix only changes `tools/run_clang_tidy.ps1`, `lint.cmd tidy changed` can legitimately report no eligible changed project source or header files. Treat that as validation of the lint entrypoint and script parsing, not as proof that a full tidy sweep ran.
 - When local `HEAD` is ahead of the failed run SHA, run `format.cmd` against the current worktree before treating the CI failure as isolated. `format.cmd fix changed` only repairs dirty changed files; use `format.cmd fix` when branch-ahead committed files also block the full format check.
+- Clang-tidy can emit `Processing file ...` progress lines before returning a non-zero code for otherwise filtered include-cleaner diagnostics. Those progress lines are not reportable diagnostics; filter them before deciding the result still failed.
+- Visual Studio LLVM clang-format versions can disagree on C++/CLI managed handles and `for each` syntax. Keep mixed-mode bridge `.cpp` formatter exclusions narrow and filename-based instead of rewriting managed bridge source to satisfy one runner version.
+- A docs-only or website-only commit can still fail the benchmark build when earlier source-list drift is latent. If `CaseDashBenchmarks` links a source that calls newly factored production helpers, verify the helper `.cpp` is also listed in that benchmark target, not only in the app or test target.
+- `lint.cmd tidy changed` runs the normal lint gates before the changed-file clang-tidy slice. If source-policy failures appear there, fix them even when the downloaded CI artifact only reports clang-tidy diagnostics.
 
 ## Local Validation
 

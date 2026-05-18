@@ -6,12 +6,12 @@
 #include <commdlg.h>
 
 #include "build_version.h"
+#include "config/metric_board_binding.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
 #include "dashboard/dashboard_menu_format.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
-#include "layout_edit/board_metric_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
@@ -21,8 +21,10 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "telemetry/metrics.h"
+#include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
@@ -210,8 +212,7 @@ bool IsPredefinedDisplayScale(double scale) {
 }
 
 std::string FormatScaleLabel(double scale) {
-    std::string value = FormatDoubleGeneral(scale * 100.0, 12);
-    return value + "%";
+    return FormatText("%s%%", FormatDoubleGeneral(scale * 100.0, 12).c_str());
 }
 
 std::string FormatScalePercentageValue(double scale) {
@@ -219,12 +220,12 @@ std::string FormatScalePercentageValue(double scale) {
 }
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
-    std::string label(name);
-    if (!description.empty()) {
-        label += " - ";
-        label += description;
-    }
-    return label;
+    return description.empty() ? std::string(name)
+                               : FormatText("%.*s - %.*s",
+                                     static_cast<int>(name.size()),
+                                     name.data(),
+                                     static_cast<int>(description.size()),
+                                     description.data());
 }
 
 size_t BuildScaleMenuEntries(double currentScale, double* entries, size_t capacity) {
@@ -257,27 +258,23 @@ void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
 }
 
 std::string BuildLayoutEditMenuLabel(std::string_view subject) {
-    std::string label = "Edit ";
-    label += subject;
-    label += " ...";
-    return label;
+    return FormatText("Edit %.*s ...", static_cast<int>(subject.size()), subject.data());
 }
 
 std::string BuildAboutText() {
-    std::string text = "CaseDash ";
-    text += casedash::version::kVersion;
-    text += "\n";
-    text += casedash::version::kOfficialRelease ? "Official release" : "Development build";
+    std::string text = FormatText("CaseDash %s\n%s",
+        casedash::version::kVersion,
+        casedash::version::kOfficialRelease ? "Official release" : "Development build");
     if (std::string_view(casedash::version::kGitCommitShort) != "unknown") {
-        text += "\nCommit ";
-        text += casedash::version::kGitCommitShort;
+        AppendFormat(text, "\nCommit %s", casedash::version::kGitCommitShort);
         if (casedash::version::kGitDirty) {
-            text += " (dirty)";
+            AppendFormat(text, " (dirty)");
         }
     }
-    text += "\n\nA compact dashboard for dedicated PC telemetry screens.";
-    text += "\nCopyright (c) Roman Elizarov.";
-    text += "\nLicensed under the Apache License 2.0.";
+    AppendFormat(text,
+        "\n\nA compact dashboard for dedicated PC telemetry screens."
+        "\nCopyright (c) Roman Elizarov."
+        "\nLicensed under the Apache License 2.0.");
     return text;
 }
 
@@ -324,7 +321,8 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
                     GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
                     const std::optional<double> percentage = TryParseScaleValue(Utf8FromWide(buffer));
                     if (!percentage.has_value()) {
-                        MessageBoxUtf8(hwnd, "Enter a positive percentage scale.", MB_ICONERROR);
+                        MessageBoxUtf8(
+                            hwnd, FindLocalizedText(RES_STR("dashboard.message.scale_positive_percent")), MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));
                         SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
                         return TRUE;
@@ -383,9 +381,10 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 
 void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
     if (layoutEditDialog_ != nullptr) {
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditDialog,
+        app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditDialog,
             "refresh_begin",
-            "preferred_focus=" + Trace::QuoteText(preferredFocus.has_value() ? "set" : "none"));
+            "preferred_focus=\"%s\"",
+            preferredFocus.has_value() ? "set" : "none");
         layoutEditDialog_->Refresh(preferredFocus);
         layoutEditDialog_->SetSelectionHighlightVisible(true);
         layoutEditDialog_->RestackAnchor();
@@ -402,7 +401,8 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
 void DashboardShellUi::SyncLayoutEditDialogSelection(
     const LayoutEditController::TooltipTarget* target, bool bringToFront) {
     if (layoutEditDialog_ != nullptr && !layoutEditDialog_->SyncSelection(target, bringToFront)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
     }
 }
 
@@ -413,18 +413,16 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
     state.app = &app_;
     switch (prompt) {
         case UnsavedLayoutEditPrompt::StopEditing:
-            state.mainInstruction = "Save modified changes before turning off layout edit mode?";
-            state.content = "You have unsaved changes made while editing the layout.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_stop_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_unsaved_content"));
             break;
         case UnsavedLayoutEditPrompt::ExitApplication:
-            state.mainInstruction = "Save modified changes before exiting?";
-            state.content =
-                "Unsaved changes made while editing the layout will be discarded if you exit without saving.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_content"));
             break;
         case UnsavedLayoutEditPrompt::ReloadConfig:
-            state.mainInstruction = "Save modified changes before reloading the config?";
-            state.content =
-                "Unsaved changes made while editing the layout will be discarded if you reload without saving.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_content"));
             break;
     }
 
@@ -461,7 +459,8 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
                 return false;
             }
         } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
-            MessageBoxUtf8(app_.hwnd_, "Failed to restore the saved layout edit state.", MB_ICONERROR);
+            MessageBoxUtf8(
+                app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_restore_failed")), MB_ICONERROR);
             return false;
         }
     }
@@ -493,7 +492,8 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
     return true;
@@ -511,7 +511,7 @@ bool DashboardShellUi::HandleReloadConfig() {
     }
 
     if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to reload config.ini.", MB_ICONERROR);
+        MessageBoxUtf8(app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), MB_ICONERROR);
         return false;
     }
     RefreshLayoutEditDialog();
@@ -554,9 +554,7 @@ void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::
     if (details.empty()) {
         state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, event);
     } else {
-        std::string text(event);
-        text += ' ';
-        text += details;
+        std::string text = FormatText("%s %s", event, details.c_str());
         state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, text);
     }
 }
@@ -577,9 +575,8 @@ void DashboardShellUi::ShowAboutDialog() const {
 }
 
 void DashboardShellUi::BeginLayoutEditModalUi() {
-    app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal,
-        "begin_request",
-        "depth_before=" + Trace::QuoteText(std::to_string(app_.layoutEditModalUiDepth_)));
+    app_.TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditModal, "begin_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
     ++app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 1 && app_.controller_.State().isEditingLayout) {
         app_.layoutEditController_.CancelInteraction();
@@ -587,9 +584,8 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     app_.HideLayoutEditTooltip();
     app_.layoutEditMouseTracking_ = false;
     SetCursor(LoadCursorW(nullptr, IDC_ARROW));
-    app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal,
-        "begin_done",
-        "depth_after=" + Trace::QuoteText(std::to_string(app_.layoutEditModalUiDepth_)));
+    app_.TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }
 
 void DashboardShellUi::EndLayoutEditModalUi() {
@@ -597,9 +593,8 @@ void DashboardShellUi::EndLayoutEditModalUi() {
         app_.layoutEditModalUiDepth_ = 0;
         return;
     }
-    app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal,
-        "end_request",
-        "depth_before=" + Trace::QuoteText(std::to_string(app_.layoutEditModalUiDepth_)));
+    app_.TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditModal, "end_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
     --app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 0) {
         ReleaseCapture();
@@ -607,9 +602,8 @@ void DashboardShellUi::EndLayoutEditModalUi() {
         app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal, "end_released_capture");
         app_.RefreshLayoutEditHoverFromCursor();
     }
-    app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal,
-        "end_done",
-        "depth_after=" + Trace::QuoteText(std::to_string(app_.layoutEditModalUiDepth_)));
+    app_.TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditModal, "end_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }
 
 HINSTANCE DashboardShellUi::DialogInstance() const {
@@ -640,8 +634,16 @@ const AppConfig& DashboardShellUi::CurrentConfig() const {
     return app_.controller_.State().config;
 }
 
+bool DashboardShellUi::ShouldShowMetricBoardBinding(const LayoutMetricEditKey& key) const {
+    const auto& state = app_.controller_.State();
+    return ShouldExposeMetricBoardBinding(key.metricId, state.telemetryUpdate.dump.activeMetricBoardBindings);
+}
+
 std::vector<std::string> DashboardShellUi::AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const {
-    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    if (!ShouldShowMetricBoardBinding(key)) {
+        return {};
+    }
+    const auto target = ResolveMetricBoardBindingTarget(key.metricId);
     if (!target.has_value()) {
         return {};
     }
@@ -716,7 +718,7 @@ bool DashboardShellUi::ApplyMetricPreview(const LayoutMetricEditKey& key,
         definition->unit = unit;
     }
     definition->label = label;
-    if (const auto target = ParseBoardMetricBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
+    if (const auto target = ResolveMetricBoardBindingTarget(key.metricId); target.has_value() && binding.has_value()) {
         auto& bindings = target->kind == BoardMetricBindingKind::Temperature
                              ? updatedConfig.layout.board.temperatureSensorNames
                              : updatedConfig.layout.board.fanSensorNames;
@@ -818,11 +820,13 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
     if (IsMetricListAddRowTarget(target) && !ApplyMetricListAddRowPreview(target)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to add a metric list row.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.metric_list_add_row_failed")), MB_ICONERROR);
         return false;
     }
     return true;
@@ -924,32 +928,32 @@ void DashboardShellUi::ExecuteCommand(
                 const size_t index = selected - kCommandLayoutBase;
                 if (index < state.config.layout.layouts.size()) {
                     const std::string& layoutName = state.config.layout.layouts[index].name;
-                    app_.TraceLayoutEditUiEvent(
-                        TracePrefix::LayoutSwitch, "menu_command", "selected_layout=" + Trace::QuoteText(layoutName));
+                    app_.TraceLayoutEditUiEventFmt(
+                        TracePrefix::LayoutSwitch, "menu_command", "selected_layout=\"%s\"", layoutName.c_str());
                     const bool suppressTooltipRefresh = app_.controller_.State().isEditingLayout;
                     if (suppressTooltipRefresh) {
                         app_.SetLayoutEditTooltipRefreshSuppressed(true);
                         app_.layoutEditController_.HandleMouseLeave();
                         app_.HideLayoutEditTooltip();
-                        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutSwitch,
-                            "menu_prepare",
-                            "tooltip_suppressed=" + Trace::QuoteText("true"));
+                        app_.TraceLayoutEditUiEvent(
+                            TracePrefix::LayoutSwitch, "menu_prepare", "tooltip_suppressed=\"true\"");
                     }
                     if (!app_.controller_.SwitchLayout(app_, layoutName, app_.diagnosticsOptions_.editLayout)) {
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutSwitch,
-                            "menu_failed",
-                            "selected_layout=" + Trace::QuoteText(layoutName));
-                        MessageBoxUtf8(app_.hwnd_, "Failed to switch layout.", MB_ICONERROR);
+                        app_.TraceLayoutEditUiEventFmt(
+                            TracePrefix::LayoutSwitch, "menu_failed", "selected_layout=\"%s\"", layoutName.c_str());
+                        MessageBoxUtf8(app_.hwnd_,
+                            FindLocalizedText(RES_STR("dashboard.message.switch_layout_failed")),
+                            MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEvent(
-                            TracePrefix::LayoutSwitch, "menu_done", "selected_layout=" + Trace::QuoteText(layoutName));
+                        app_.TraceLayoutEditUiEventFmt(
+                            TracePrefix::LayoutSwitch, "menu_done", "selected_layout=\"%s\"", layoutName.c_str());
                     }
                 }
                 break;
@@ -962,12 +966,22 @@ void DashboardShellUi::ExecuteCommand(
                 }
                 break;
             }
+            if (selected >= kCommandGpuAdapterBase && selected <= kCommandGpuAdapterMax) {
+                const size_t index = selected - kCommandGpuAdapterBase;
+                const auto& candidates = state.telemetryUpdate.gpuAdapterCandidates;
+                if (index < candidates.size()) {
+                    app_.controller_.SelectGpuAdapter(app_, candidates[index].adapterName);
+                }
+                break;
+            }
             if (selected >= kCommandThemeBase && selected <= kCommandThemeMax) {
                 const size_t index = selected - kCommandThemeBase;
                 if (index < state.config.layout.themes.size()) {
                     if (!app_.controller_.SwitchTheme(
                             app_, state.config.layout.themes[index].name, app_.diagnosticsOptions_.editLayout)) {
-                        MessageBoxUtf8(app_.hwnd_, "Failed to switch theme.", MB_ICONERROR);
+                        MessageBoxUtf8(app_.hwnd_,
+                            FindLocalizedText(RES_STR("dashboard.message.switch_theme_failed")),
+                            MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                     }
@@ -1017,6 +1031,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU menu = CreatePopupMenu();
     HMENU layoutMenu = CreatePopupMenu();
     HMENU themeMenu = CreatePopupMenu();
+    HMENU gpuMenu = CreatePopupMenu();
     HMENU networkMenu = CreatePopupMenu();
     HMENU scaleMenu = CreatePopupMenu();
     HMENU storageDrivesMenu = CreatePopupMenu();
@@ -1050,6 +1065,17 @@ void DashboardShellUi::ShowContextMenu(
             const std::string label = FormatNamedMenuLabel(theme.name, theme.description);
             AppendMenuUtf8(themeMenu, flags, commandId, label);
             SetMenuItemRadioStyle(themeMenu, commandId);
+        }
+    }
+    const auto& gpuCandidates = state.telemetryUpdate.gpuAdapterCandidates;
+    if (gpuCandidates.empty()) {
+        AppendMenuUtf8(gpuMenu, MF_STRING | MF_GRAYED, kCommandGpuAdapterBase, "No adapters found");
+    } else {
+        for (size_t i = 0; i < gpuCandidates.size() && (kCommandGpuAdapterBase + i) <= kCommandGpuAdapterMax; ++i) {
+            const UINT commandId = kCommandGpuAdapterBase + static_cast<UINT>(i);
+            const UINT flags = MF_STRING | (gpuCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
+            AppendMenuUtf8(gpuMenu, flags, commandId, gpuCandidates[i].adapterName);
+            SetMenuItemRadioStyle(gpuMenu, commandId);
         }
     }
     const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
@@ -1119,6 +1145,7 @@ void DashboardShellUi::ShowContextMenu(
     }
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
     AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
+    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), "Network");
     AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), "Storage Drives");
     AppendMenuUtf8(editLayoutMenu,
@@ -1146,7 +1173,7 @@ void DashboardShellUi::ShowContextMenu(
             const auto focusKey = TooltipPayloadFocusKey(layoutEditTarget->payload);
             if (label.empty() && focusKey.has_value()) {
                 if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey); metricKey != nullptr) {
-                    label = BuildLayoutEditMenuLabel(metricKey->metricId + " metric");
+                    label = BuildLayoutEditMenuLabel(FormatText("%s metric", metricKey->metricId.c_str()));
                 }
             }
             if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
@@ -1154,7 +1181,7 @@ void DashboardShellUi::ShowContextMenu(
             } else if (label.empty() && focusKey.has_value() &&
                        std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr) {
                 const auto& nodeFieldKey = *std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
-                const std::string subject = LayoutNodeFieldEditMenuSubject(nodeFieldKey);
+                const std::string_view subject = LayoutNodeFieldEditMenuSubject(nodeFieldKey);
                 if (!subject.empty()) {
                     label = BuildLayoutEditMenuLabel(subject);
                 }

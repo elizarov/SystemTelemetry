@@ -43,10 +43,14 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/main/main.cpp|windows.h',
     'src/renderer/png_export.cpp|windows.h',
     'src/renderer/impl/d2d_renderer.h|windows.h',
+    'src/renderer/impl/d2d_renderer.h|dwrite.h',
     'src/renderer/renderer.h|windows.h',
     'src/util/elevated_process.h|windows.h',
+    'src/telemetry/board/asus/board_asus_armoury_crate.cpp|windows.h',
     'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
     'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
+    'src/telemetry/gpu/gpu_vendor.cpp|windows.h',
+    'src/telemetry/gpu/intel/gpu_intel_level_zero.cpp|windows.h',
     'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',
     'src/telemetry/impl/collector_state.h|winsock2.h',
     'src/telemetry/impl/collector_state.h|ws2tcpip.h',
@@ -60,12 +64,14 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/telemetry/telemetry.h|windows.h',
     'src/util/file_path.cpp|windows.h',
     'src/util/command_line.cpp|windows.h',
+    'src/util/high_precision_timer.cpp|windows.h',
     'src/util/message_box.cpp|windows.h',
     'src/util/scale.h|windows.h',
     'src/util/lightweight_mutex.cpp|windows.h',
     'src/util/strings.h|windows.h',
     'src/util/temp_file.cpp|windows.h',
     'src/util/trace.cpp|windows.h',
+    'src/util/win32_format.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
     'src/dashboard/dashboard_app.h|constants.h',
     'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',
@@ -74,6 +80,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/display/monitor.h|scale.h',
     'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
     'src/widget/layout_edit_parameter_id.h|config.h',
+    'src/util/resource_strings.h|resource_strings.generated.h',
     'src/util/resource_loader.cpp|windows.h',
     'src/util/utf8.cpp|windows.h',
     'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'
@@ -599,6 +606,10 @@ function Complete-TidyProcess {
         }
 
         if ($text -match '^Error while processing .+\.$') {
+            continue
+        }
+
+        if ($text -match '^\[\d+/\d+\] \(\d+/\d+\) Processing file .+\.$') {
             continue
         }
 

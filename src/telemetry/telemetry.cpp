@@ -3,12 +3,12 @@
 #include <chrono>
 
 #include "telemetry/impl/collector.h"
+#include "telemetry/timing.h"
 #include "util/lightweight_mutex.h"
 
 namespace {
 
 using Clock = std::chrono::steady_clock;
-constexpr auto kTelemetryRefreshInterval = std::chrono::milliseconds(500);
 constexpr const char* kRetainedHistorySeriesRefs[] = {
     "cpu.ram",
     "cpu.load",
@@ -34,6 +34,7 @@ TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
     TelemetryUpdate update;
     update.dump = collector.Dump();
     update.resolvedSelections = collector.ResolvedSelections();
+    update.gpuAdapterCandidates = collector.GpuAdapterCandidates();
     update.networkAdapterCandidates = collector.NetworkAdapterCandidates();
     update.storageDriveCandidates = collector.StorageDriveCandidates();
     return update;
@@ -41,8 +42,8 @@ TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
 
 class ThreadedTelemetryRuntime final : public TelemetryRuntime {
 public:
-    ThreadedTelemetryRuntime(std::unique_ptr<TelemetryCollector> collector, TelemetryUpdateSink* callback)
-        : collector_(std::move(collector)), callback_(callback) {}
+    ThreadedTelemetryRuntime(std::unique_ptr<TelemetryCollector> collector, Trace& trace, TelemetryUpdateSink* callback)
+        : collector_(std::move(collector)), trace_(trace), callback_(callback) {}
 
     ~ThreadedTelemetryRuntime() override {
         Shutdown();
@@ -94,13 +95,20 @@ public:
     void Reconfigure(const TelemetrySettings& settings) override {
         RunSynchronized([&] {
             collector_->ApplySettings(settings);
-            collector_->UpdateSnapshot();
+            UpdateSnapshotTimed();
         });
     }
 
     void SetPreferredNetworkAdapterName(std::string adapterName) override {
         RunSynchronized([&] {
             collector_->SetPreferredNetworkAdapterName(std::move(adapterName));
+            UpdateSnapshotTimed();
+        });
+    }
+
+    void SetPreferredGpuAdapterName(std::string adapterName) override {
+        RunSynchronized([&] {
+            collector_->SetPreferredGpuAdapterName(std::move(adapterName));
             collector_->UpdateSnapshot();
         });
     }
@@ -108,12 +116,15 @@ public:
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters) override {
         RunSynchronized([&] {
             collector_->SetSelectedStorageDrives(std::move(driveLetters));
-            collector_->UpdateSnapshot();
+            UpdateSnapshotTimed();
         });
     }
 
     void RefreshSelections() override {
-        RunSynchronized([&] { collector_->RefreshSelectionsAndSnapshot(); });
+        RunSynchronized([&] {
+            auto timing = trace_.Timings().Measure(trace_, "telemetry_update");
+            collector_->RefreshSelectionsAndSnapshot();
+        });
     }
 
     TelemetryUpdate Latest() const override {
@@ -149,7 +160,7 @@ private:
                 return;
             }
             nextCollection += kTelemetryRefreshInterval;
-            collector_->UpdateSnapshot();
+            UpdateSnapshotTimed();
             PublishLocked();
         }
     }
@@ -170,7 +181,13 @@ private:
         }
     }
 
+    void UpdateSnapshotTimed() {
+        auto timing = trace_.Timings().Measure(trace_, "telemetry_update");
+        collector_->UpdateSnapshot();
+    }
+
     std::unique_ptr<TelemetryCollector> collector_;
+    Trace& trace_;
     TelemetryUpdateSink* callback_ = nullptr;
     mutable LightweightMutex latestLock_;
     TelemetryUpdate latest_;
@@ -197,6 +214,18 @@ bool TryRetainedHistoryKey(std::string_view seriesRef, RetainedHistoryKey& key) 
     return false;
 }
 
+bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key) {
+    switch (key) {
+        case RetainedHistoryKey::NetworkUpload:
+        case RetainedHistoryKey::NetworkDownload:
+        case RetainedHistoryKey::StorageRead:
+        case RetainedHistoryKey::StorageWrite:
+            return true;
+        default:
+            return false;
+    }
+}
+
 std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
@@ -210,7 +239,7 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     if (collector == nullptr) {
         return nullptr;
     }
-    auto runtime = std::make_unique<ThreadedTelemetryRuntime>(std::move(collector), callback);
+    auto runtime = std::make_unique<ThreadedTelemetryRuntime>(std::move(collector), trace, callback);
     if (!runtime->Initialize(settings, errorText)) {
         return nullptr;
     }

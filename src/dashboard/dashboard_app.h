@@ -63,6 +63,8 @@ private:
     void BringOnTop();
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
+    void SetDashboardWindowGeometry(int left, int top, int width, int height, UINT flags, std::string_view reason);
+    void RedrawDashboardSurfaceSynchronously();
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
     bool IsLayoutEditMode() const;
@@ -84,9 +86,11 @@ private:
     bool ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool allowDuringDrag) const;
     void SuspendCoveredLayoutEditHover();
     void UpdateLayoutEditMouseTracking();
+    void RedrawMoveFrame();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void TraceLayoutEditUiEvent(TracePrefix prefix, const char* event, const std::string& details = {}) const;
+    void TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* event, const char* format, ...) const;
     std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();

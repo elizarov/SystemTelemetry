@@ -11,6 +11,7 @@
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -978,17 +979,17 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         *errorText = dashboardRenderer_.LastError();
     }
     if (saved && traceDetails != nullptr) {
-        traceDetails->push_back("canvas=\"" + std::to_string(sheetWidth) + "x" + std::to_string(sheetHeight) + "\"");
+        traceDetails->push_back(FormatText("canvas=\"%dx%d\"", sheetWidth, sheetHeight));
         std::string selectedCards = "cards=\"";
         for (size_t i = 0; i < cardPlacements.size(); ++i) {
             if (i > 0) {
-                selectedCards += ",";
+                AppendFormat(selectedCards, ",");
             }
-            selectedCards += cardPlacements[i].id;
+            AppendFormat(selectedCards, "%s", cardPlacements[i].id.c_str());
         }
-        selectedCards += "\"";
+        AppendFormat(selectedCards, "\"");
         traceDetails->push_back(selectedCards);
-        traceDetails->push_back("callouts=" + std::to_string(callouts.size()));
+        traceDetails->push_back(FormatText("callouts=%zu", callouts.size()));
     }
     return saved;
 }

@@ -2,6 +2,7 @@
 
 #include "config/color_format.h"
 #include "util/numeric_format.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -67,6 +68,7 @@ const MetricDefinitionConfig* FindEffectiveMetricDefinition(const MetricsSection
 TelemetrySelectionSettings ExtractTelemetrySelectionSettings(const AppConfig& config) {
     TelemetrySelectionSettings settings;
     settings.preferredAdapterName = config.network.adapterName;
+    settings.preferredGpuAdapterName = config.gpu.adapterName;
     settings.configuredDrives = config.storage.drives;
     return settings;
 }
@@ -84,6 +86,9 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
 void ApplyResolvedTelemetrySelections(AppConfig& config, const ResolvedTelemetrySelections& resolvedSelections) {
     if (!resolvedSelections.adapterName.empty()) {
         config.network.adapterName = resolvedSelections.adapterName;
+    }
+    if (!config.gpu.adapterName.empty() && !resolvedSelections.gpuAdapterName.empty()) {
+        config.gpu.adapterName = resolvedSelections.gpuAdapterName;
     }
     config.storage.drives = resolvedSelections.drives;
     for (const auto& [logicalName, sensorName] : resolvedSelections.boardTemperatureSensorNames) {
@@ -106,15 +111,8 @@ AppConfig BuildEffectiveRuntimeConfig(
 }
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
-    std::string text;
-    if (definition.telemetryScale) {
-        text = "*";
-    } else {
-        text = FormatDoubleGeneral(definition.scale);
-    }
-    text += ",";
-    text += definition.unit;
-    text += ",";
-    text += definition.label;
-    return text;
+    return FormatText("%s,%s,%s",
+        definition.telemetryScale ? "*" : FormatDoubleGeneral(definition.scale).c_str(),
+        definition.unit.c_str(),
+        definition.label.c_str());
 }

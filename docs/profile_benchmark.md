@@ -11,21 +11,25 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
 - Build the benchmark executable with `build.cmd /benchmarks` for direct benchmark runs; normal `build.cmd` and release or validation builds do not build `CaseDashBenchmarks.exe`.
+- Measure the animation presenter benchmark with `build\CaseDashBenchmarks.exe animation 240 2`; this benchmark uses fake metrics, builds one no-overlay snapshot layer plus animation list, hands the frame to a benchmark render worker, and then repeatedly requests stored-frame presentation through the same bitmap composition and animation timeline path used by the render thread. It measures short active-transition chunks so every reported frame includes main-to-render-thread request handoff and `WidgetAnimationTransition::Sample()` work, but it uses immediate non-vsynced presentation so monitor cadence is not part of the result.
+- Measure the snapshot handoff benchmark with `build\CaseDashBenchmarks.exe snapshot-handoff 20 2`; this benchmark uses the telemetry package's live fake provider, where each explicit update advances one logical 250 ms fake telemetry sample through the normal retained-history path. It keeps a visible render-thread window presenting on vsync, rebuilds the no-overlay snapshot layer into pooled hardware-backed layer bitmaps, publishes the complete frame through the live asynchronous handoff, and reports frame-build cost separately from publish cost. The benchmark uses a 200 ms loop cadence so the next snapshot build starts while the previous 250 ms animation is still active; cadence waits are excluded from the reported timing totals, and animation-only render-thread frames are suspended only while a changed layer bitmap is rebuilt.
 - Measure the repeatable layout-edit benchmark with `build\CaseDashBenchmarks.exe edit-layout 240 2`.
 - Measure the in-memory layout-guide-sheet generation benchmark with `build\CaseDashBenchmarks.exe layout-guide-sheet 20 2`.
 - Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable mouse-hover benchmark with `build\CaseDashBenchmarks.exe mouse-hover 240 2`.
 - Measure the repeatable theme-change benchmark with `build\CaseDashBenchmarks.exe theme-change 240 2`.
 - Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler.
-- `CaseDashBenchmarks` accepts the supported benchmark names `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- `CaseDashBenchmarks` accepts the supported benchmark names `animation`, `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `snapshot-handoff`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
+- Real `/trace-prefixes:profile` runs emit only `profile:timing` summaries every 10 seconds for comparable runtime operation names such as `telemetry_update`, `paint_draw`, `presentation_frame_build`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `presentation_frame_publish`, and `animation_frame`; `animation_frame` covers animation sampling and composition work and excludes the live DXGI vsync wait. Use those summaries to check whether direct benchmark timings match the interactive app on the same machine without paying verbose provider-trace overhead.
 - Speed optimizations that replace `std::unordered_map` with a custom hash-based table keep the hash table in a separate owning `.h`/`.cpp` module and record the benchmark result here; large provider, renderer, or controller files do not carry local hashing and probing implementations.
 - The mouse-hover benchmark moves the layout-edit cursor path from the dashboard's top-left corner to bottom-right corner, resolving hover hits and drawing the resulting overlay state on every step.
 - The theme-change benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
 - The edit-layout drag benchmark mirrors the app's drag path by applying layout mutations through the app-style config tail, refreshing layout dirty tracking, and forcing one redraw for each synthetic pointer move.
-- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- The animation benchmark keeps layout, telemetry, and layer painting out of the timed loop. It keeps the shipped target state fixed between synthetic telemetry updates and times the handoff plus render-thread side of each animation frame: request wakeup, retained dirty-window bitmap-region composition, active `WidgetAnimationTransition::Sample()` work between old and target state, timeline state lookup, and widget animation drawing.
+- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd animation 2400 2`, `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd snapshot-handoff 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed. The longer animation run keeps benchmark setup noise below the per-frame presenter work in the profiler call tree.
 - Capture a layout-guide-sheet CPU profile with `profile_benchmark.cmd layout-guide-sheet 20 2`; the benchmark renders the sheet to an in-memory offscreen surface and deliberately excludes PNG encoding and file I/O.
-- The benchmark host forces Direct2D immediate-present mode so direct benchmark runs measure renderer work instead of blocking on desktop-compositor refresh pacing.
+- The layout, hover, theme, telemetry, and guide-sheet benchmark hosts force the dashboard renderer's immediate-present path. Direct benchmark runs for those paint paths stay single-threaded, but paint timings include snapshot and overlay bitmap construction plus the final bitmap-and-animation composition step that the live render thread performs in production. The `animation` benchmark builds one threaded-style layer frame, then drives a benchmark render worker around the stored frame so the timed loop includes request handoff without waiting for vsync. The `snapshot-handoff` benchmark keeps snapshot layer construction in the main-thread renderer while the render thread presents a visible HWND on vsync, then publishes updates asynchronously like the app; it excludes cadence waits from timing totals.
 - Treat the timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline; compare regressions against the direct `build\CaseDashBenchmarks.exe` runs instead.
 - Daemon-backed and one-shot elevated runs persist the benchmark stdout and hotspot summary in the request directory and replay both in the caller window after the request finishes, so the requesting shell sees the same timing lines and top hotspots that the elevated process produced.
 - Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `CaseDashBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
@@ -44,57 +48,77 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
   - `apply avg_ms=0.05`
   - `paint_draw avg_ms=1.99`
 - Current repeatable `edit-layout` result on the current tree:
-  - `drag_loop per_iter_ms=2.15`
-  - `snap avg_ms=0.06`
-  - `apply avg_ms=0.05`
-  - `paint_draw avg_ms=2.02`
+  - `drag_loop per_iter_ms=2.60`
+  - `snap avg_ms=0.09`
+  - `apply avg_ms=0.06`
+  - `paint_draw avg_ms=2.43`
+- Current repeatable `animation` result on the current tree:
+  - `animation_loop per_iter_ms=0.53`
+  - `animation_frame avg_ms=0.53`
+  - `snapshot_animations=28`
+  - `overlay_animations=0`
+  - `active_chunk_frames=120`
+- Current repeatable `snapshot-handoff` result on the current tree:
+  - `snapshot_loop per_iter_ms=8.16`
+  - `presentation_frame_build avg_ms=8.15`
+  - `presentation_frame_publish avg_ms=0.00`
 - Current repeatable `update-telemetry` result on the current tree:
-  - `update_loop per_iter_ms=4.46`
-  - `telemetry_update avg_ms=2.38`
-  - `paint_total avg_ms=2.08`
-  - `paint_draw avg_ms=2.08`
+  - `update_loop per_iter_ms=4.85`
+  - `telemetry_update avg_ms=2.65`
+  - `paint_total avg_ms=2.20`
+  - `paint_draw avg_ms=2.20`
 - Current repeatable `layout-switch` result on the current tree:
-  - `switch_loop per_iter_ms=3.52`
-  - `switch_apply avg_ms=0.88`
-  - `dialog_refresh avg_ms=0.26`
-  - `switch_paint avg_ms=2.37`
+  - `switch_loop per_iter_ms=4.08`
+  - `switch_apply avg_ms=0.97`
+  - `dialog_refresh avg_ms=0.24`
+  - `switch_paint avg_ms=2.84`
 - Current repeatable `theme-change` result on the current tree:
-  - `theme_loop per_iter_ms=4.02`
+  - `theme_loop per_iter_ms=3.86`
   - `config_copy avg_ms=0.01`
   - `color_resolve avg_ms=0.05`
-  - `dashboard_config avg_ms=0.82`
-  - `edit_tree avg_ms=0.24`
-  - `theme_preview avg_ms=0.80`
-  - `theme_paint avg_ms=2.08`
+  - `dashboard_config avg_ms=0.83`
+  - `edit_tree avg_ms=0.25`
+  - `theme_preview avg_ms=0.40`
+  - `theme_paint avg_ms=2.30`
 - Current repeatable `mouse-hover` result on the current tree:
-  - `hover_loop per_iter_ms=2.13`
-  - `hover_hit_test avg_ms=0.08`
-  - `paint_total avg_ms=2.05`
-  - `paint_draw avg_ms=2.05`
+  - `hover_loop per_iter_ms=1.06`
+  - `hover_hit_test avg_ms=0.37`
+  - `paint_total avg_ms=0.70`
+  - `paint_draw avg_ms=0.70`
 - Current repeatable `layout-guide-sheet` result on the current tree:
-  - `sheet_loop per_iter_ms=116.62`
-  - `active_regions avg_ms=4.89`
-  - `sheet_plan avg_ms=1.09`
-  - `sheet_measure avg_ms=4.50`
-  - `sheet_place avg_ms=75.93`
-  - `sheet_draw avg_ms=30.14`
+  - `sheet_loop per_iter_ms=125.66`
+  - `active_regions avg_ms=9.19`
+  - `sheet_plan avg_ms=0.91`
+  - `sheet_measure avg_ms=8.44`
+  - `sheet_place avg_ms=76.40`
+  - `sheet_draw avg_ms=30.51`
 
 ## Current Confirmed Hotspots
 
 Current useful benchmark and hotspot signals from the latest direct runs and daemon-backed WPR captures on the full-D2D tree:
 
+- The snapshot/overlay animation pipeline now builds layer bitmaps through a dashboard-renderer pool. The main thread acquires writable snapshot and overlay bitmaps by size, and the render thread returns superseded active or pending frame layers to that pool. `D2DRenderer` uses shared Direct2D device bitmaps for live layer storage, keeps WIC-backed layer bitmaps for deterministic export, caches target-local bitmap brushes for repeated animation-frame composition until the pooled bitmap is redrawn, restores non-coalesced dirty regions inside the retained back buffer, and presents animation-capable full redraws plus dirty animation frames through the same DXGI flip-model swap chain.
+- The direct `animation` benchmark builds one fake-metric, no-overlay dashboard frame with `28` snapshot animations, hands it to a benchmark render worker, and repeatedly requests stored-frame presentation through the render-thread presenter path. The current direct rerun reports `animation_frame avg_ms=0.53` after the 250 ms telemetry cadence change; throughput charts now ship 30 compact one-second body points plus a live leader while scalar ghosts keep 120 raw samples. This includes request handoff to the worker and immediate DXGI/device-context composition, but the benchmark present path uses sync interval `0` so monitor cadence is excluded. The renderer primes every physical flip-chain back buffer with a full composition after retained full redraws so dirty-only animation frames do not alternate between stale buffer histories. The remaining cost is in Direct2D/DXGI draw submission, retained dirty-region restore, timeline sampling, and widget animation drawing rather than vsync wait.
+- The direct `snapshot-handoff` benchmark rebuilds a fake-metric, no-overlay snapshot frame every iteration while a visible benchmark HWND presents active animations on vsync, uses the dashboard layer-bitmap pool, and publishes through the live asynchronous render-thread mailbox. The render thread now skips old animation-only frames while the main thread rebuilds changed layer bitmaps, which keeps the shared Direct2D device available for the snapshot build without changing vsynced presentation cadence. The current direct run reports `snapshot_loop per_iter_ms=8.16`, split into `presentation_frame_build avg_ms=8.15` and `presentation_frame_publish avg_ms=0.00`; the daemon-backed verification under `build\profile_benchmark_daemon\requests\638_4871_2319\` reports `snapshot_loop per_iter_ms=7.89` under profiling overhead. The previous daemon-backed capture under `build\profile_benchmark_daemon\requests\31979_26410_27228\` showed the bottleneck before the suspension: `presentation_frame_build avg_ms=11.40`, with `DashboardRenderer::BuildPresentationFrame` feeding almost entirely into `D2DRenderer::DrawToLiveLayerBitmap`.
+- The daemon-backed `animation` capture under `build\profile_benchmark_daemon\requests\23068_11347_26552\` showed the dirty-present regression before the presentation fix: `animation_frame avg_ms=0.70`, `D2DRenderer::DrawWindowDirty` was `72.42%` inclusive, `D2DRenderer::EndWindowDraw` was `66.89%`, `D2DRenderer::PresentDxgiWindow` was `36.87%`, and app-side `DashboardRenderThread::DrawPreparedDirtyAnimations` was only `5.13%`.
+- The daemon-backed `animation` capture under `build\profile_benchmark_daemon\requests\23845_13564_18385\` after the presentation fix reports `animation_frame avg_ms=0.43`; `D2DRenderer::PresentDxgiWindow` drops to `13.67%` inclusive while `D2DRenderer::EndDirect2DDraw` is `34.56%`, `DashboardRenderThread::DrawPreparedDirtyAnimations` is `9.37%`, and `ThroughputChartAnimationTransition::Sample()` appears only as a `0.31%` exclusive leaf.
+- The daemon-backed `animation` capture under `build\profile_benchmark_daemon\requests\16104_12574_23322\` used the previous retained-HWND-target path for `2400` frames and reported `animation_frame avg_ms=0.36` with `active_chunk_frames=120`. The hotspot shape was almost entirely Direct2D present work: `D2DRenderer::DrawWindowDirty` was `73.78%` inclusive and `D2DRenderer::EndDirect2DDraw` was `63.99%` inclusive. App-side work dropped to `DashboardRenderThread::DrawFrameDirty` at `9.79%`, `DashboardRenderThread::DrawPreparedDirtyAnimations` at `8.30%`, and throughput chart drawing at `5.07%`. Dirty animation presentation keeps non-coalesced dirty regions, batches bitmap-region restores, prepares dirty bounds and sampled states in one pass per frame, and draws each prepared animation once.
+- The daemon-backed `theme-change` capture under `build\profile_benchmark_daemon\requests\24489_1080_31451\` exposed the repeated theme-preview regression before caching: `theme_preview avg_ms=1.51`, `DrawThemePreviewTriangle` was `24.70%` inclusive, and `FillThemePreviewPixels` was `19.22%` inclusive. After caching generated preview triangle pixels by size, DPI, system face color, and resolved theme colors, the capture under `build\profile_benchmark_daemon\requests\25220_16659_2561\` reports `theme_preview avg_ms=0.31`, and `FillThemePreviewPixels` falls to a `0.16%` exclusive leaf.
+- A pre-pool daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21261_462_9464\` reported `drag_loop per_iter_ms=7.51`, `paint_draw avg_ms=7.30`, `D2DRenderer::DrawToBitmap` at `35.25%` inclusive hits, and heavy `D3D10Warp.dll` plus `WindowsCodecs.dll` module weight from CPU/WIC-backed layer bitmap churn.
+- The daemon-backed `edit-layout` capture after the layer bitmap pool under `build\profile_benchmark_daemon\requests\25725_13470_17626\` reports `drag_loop per_iter_ms=2.37`, `snap avg_ms=0.08`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; remaining app-inclusive weight sits in `DashboardRenderer::BuildPresentationFrame`, `D2DRenderer::DrawToLiveLayerBitmap`, `DashboardRenderer::DrawSnapshotLayer`, and Direct2D/DirectWrite text drawing. Layout drags still redraw snapshot and overlay layers by design, so this benchmark carries the intentional layer-build plus final-composition cost.
+- The final direct benchmark refresh after the layer bitmap pool lands at `edit-layout drag_loop per_iter_ms=2.36`, `update-telemetry update_loop per_iter_ms=4.89`, `layout-switch switch_loop per_iter_ms=3.52`, `theme-change theme_loop per_iter_ms=4.15`, `mouse-hover hover_loop per_iter_ms=1.32`, and `layout-guide-sheet sheet_loop per_iter_ms=114.00`. The overlay-only hover path is faster than the old direct-paint baseline because the retained snapshot layer is reused and only overlay plus composition work runs per hover step.
 - The latest daemon-backed `update-telemetry` captures under `build\profile_benchmark_daemon\requests\18014_1564_22035\` and `build\profile_benchmark_daemon\requests\18154_4993_3762\` report `update_loop per_iter_ms=5.42` to `5.84`, `telemetry_update avg_ms=3.08` to `3.46`, and `paint_draw avg_ms=2.34` to `2.37`; `FindRetainedHistory` appears only as a tiny exclusive leaf in one capture at `0.12%`, while the app-inclusive weight stays in `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, `UpdateGpuMetrics`, and Direct2D/DirectWrite paint.
 - The latest daemon-backed `update-telemetry` capture under `build\profile_benchmark_daemon\requests\10827_2817_24593\` reports `update_loop per_iter_ms=4.85`, `telemetry_update avg_ms=2.72`, and `paint_draw avg_ms=2.13`; the app-inclusive call tree keeps `RealTelemetryCollector::UpdateSnapshot`, `AmdAdlxGpuTelemetryProvider::Sample`, and `UpdateGpuMetrics` visible while `PresentedFpsEtwProvider::Sample` is only `0.79%` exclusive hits and the GPU raw-counter hash lookup is `0.40%` exclusive hits. The benchmark-process inclusive module weight remains centered on Direct2D, DirectWrite, PDH, Win32, kernel, and AMD driver work rather than app-side process-cache scans.
 - A direct idle-process stress run with `300` hidden `timeout.exe` processes alive reported `process_count=927`, `gpu_engine_counters=632`, and `gpu_engine_pids=28`; `build\CaseDashBenchmarks.exe update-telemetry 240 2` still landed at `update_loop per_iter_ms=4.78`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.14`.
 - The latest direct `update-telemetry` rerun after extracting `GpuRawCounterMap` into `telemetry/fps/impl/` landed at `update_loop per_iter_ms=4.80`, `telemetry_update avg_ms=2.63`, and `paint_draw avg_ms=2.17`.
 - The direct reruns after the telemetry metric row-storage size pass landed at `update_loop per_iter_ms=4.76`, `telemetry_update avg_ms=2.57`, `paint_draw avg_ms=2.18`, and `edit-layout paint_draw avg_ms=2.18`; keep the fixed-slot metric and drive-row caches because a single borrowed row slot without fixed reuse made repeated paint noticeably slower in direct reruns.
-- The latest full direct benchmark refresh after the size-optimization work lands at or better than the previous maintained baselines: `edit-layout drag_loop per_iter_ms=2.15`, `update-telemetry update_loop per_iter_ms=4.46`, `layout-switch switch_loop per_iter_ms=3.52`, `theme-change theme_loop per_iter_ms=4.02`, `mouse-hover hover_loop per_iter_ms=2.13`, and `layout-guide-sheet sheet_loop per_iter_ms=116.62`; retain this current-tree code shape unless a future direct benchmark suite shows the improvement was noise.
+- The previous full direct benchmark refresh after the size-optimization work landed at `edit-layout drag_loop per_iter_ms=2.15`, `update-telemetry update_loop per_iter_ms=4.46`, `layout-switch switch_loop per_iter_ms=3.52`, `theme-change theme_loop per_iter_ms=4.02`, `mouse-hover hover_loop per_iter_ms=2.13`, and `layout-guide-sheet sheet_loop per_iter_ms=116.62`; keep those numbers as the pre-snapshot-layer comparison point.
 - The latest direct `edit-layout` rerun after the panel-icon mask-atlas pass landed at `drag_loop per_iter_ms=2.24`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.11`; the benchmark includes the app-style layout mutation tail and one forced redraw per pointer move.
 - The latest direct `theme-change` rerun after the same pass landed at `theme_loop per_iter_ms=4.11`, `dashboard_config avg_ms=0.85`, `theme_preview avg_ms=0.84`, and `theme_paint avg_ms=2.18`.
 - The real traced drag in `build\casedash_trace.txt` reported `elapsed_ms=6909.736`, `snap_samples=687`, `apply_samples=687`, but only `paint_total_samples=25`; the measured paint cost was acceptable, but queued `WM_PAINT` delivery was starved by continuous mouse input.
 - The latest daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\29824_11608_6003\` reports `drag_loop per_iter_ms=2.36`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.22`; the string-construction leaves from renderer trace formatting are gone, and the remaining inclusive app weight is in `D2DRenderer::DrawTextBlock`, `D2DRenderer::FillSolidRect`, and `DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect`.
-- The latest direct `edit-layout` rerun after changing the D2D solid-brush cache to palette-id slots landed at `drag_loop per_iter_ms=2.34`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.19`; a preceding noisy run landed at `2.65 ms`/`2.50 ms`, so keep comparing this path through repeat direct runs.
-- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=116.62`, with `sheet_place avg_ms=75.93` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=30.14`.
+- The earlier direct `edit-layout` rerun after changing the D2D solid-brush cache to palette-id slots landed at `drag_loop per_iter_ms=2.34`, `snap avg_ms=0.07`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.19`; a preceding noisy run landed at `2.65 ms`/`2.50 ms`, so keep comparing this path through repeat direct runs.
+- The latest direct `layout-guide-sheet` run splits generation into `sheet_measure`, `sheet_place`, and `sheet_draw`; it reports `sheet_loop per_iter_ms=125.66`, with `sheet_place avg_ms=76.40` dominating and actual offscreen drawing isolated at `sheet_draw avg_ms=30.51`.
 - The latest usable daemon-backed `edit-layout` capture under `build\profile_benchmark_daemon\requests\21425_18089_27400\` keeps the benchmark-process inclusive module weight centered on `d2d1.dll`, `DWrite.dll`, `TextShaping.dll`, `amdxx64.dll`, and `D3D11.dll`; the exported call tree still under-symbolizes most app-owned leaf functions and does not surface a new dominant geometry-builder hotspot inside the benchmark process.
 - The latest daemon-backed `edit-layout` timing capture under `build\profile_benchmark_daemon\requests\18269_30044_21338\` reports `drag_loop per_iter_ms=2.54`, `snap avg_ms=0.18`, `apply avg_ms=0.08`, and `paint_draw avg_ms=2.27`; its WPR ETL is present, but the exported text summary and call-tree HTML are empty, so it does not replace the latest usable hotspot attribution above.
 - The current uncached capture is mildly collector-bound again on this machine: `TelemetryCollector::UpdateSnapshot()` now lands slightly above repaint in both the direct and daemon-backed runs after restoring the live Gigabyte collection allocation required for real board samples.
@@ -107,12 +131,12 @@ Interpretation:
 - Snap-path work is no longer the main limiter after the latest preview-resolve optimization.
 - The remaining cost in the benchmarked live window path is now mostly in the Direct2D, DirectWrite, text-shaping, and driver stack rather than in any remaining app-side GDI or GDI+ icon work.
 - Snap and apply work are no longer the main limiter on this tree; the benchmark now splits mostly between the real collector path and the HWND-backed Direct2D/DirectWrite frame.
-- The direct `update-telemetry` benchmark now measures the real collector path instead of a synthetic snapshot-mutation loop, and the current split lands at roughly `2.38 ms` in telemetry update versus `2.08 ms` in repaint on this machine.
-- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.37 ms` of the `3.52 ms` loop while the dialog refresh work stays around `0.26 ms`.
+- The direct `update-telemetry` benchmark measures the real collector path instead of a synthetic snapshot-mutation loop, and the current split lands at roughly `2.65 ms` in telemetry update versus `2.23 ms` in repaint on this machine.
+- The direct `layout-switch` benchmark remains paint-bound on this machine after restoring incremental renderer style updates: repaint sits around `2.43 ms` of the `3.52 ms` loop while the dialog refresh work stays around `0.23 ms`.
 - The direct `layout-guide-sheet` benchmark remains placement-score bound after removing the pathological exhaustive stack-order search: measured callout preparation and offscreen drawing are separate timing buckets, and the remaining cost is mostly leader intersection scoring inside `sheet_place`.
-- The direct `edit-layout` benchmark remains paint-bound on this tree after the app-style drag harness update: current reruns land around `drag_loop per_iter_ms=2.15`, `snap avg_ms=0.06`, `apply avg_ms=0.05`, and `paint_draw avg_ms=2.02`, so the remaining measured frame cost sits mostly in the Direct2D, DirectWrite, and driver frame rather than in widget-local layout math.
+- The direct `edit-layout` benchmark remains paint-bound on this tree after the snapshot/overlay layer split: current reruns land around `drag_loop per_iter_ms=2.60`, `snap avg_ms=0.09`, `apply avg_ms=0.06`, and `paint_draw avg_ms=2.43`, so the remaining measured frame cost sits mostly in Direct2D and DirectWrite layer drawing plus final composition rather than in widget-local layout math.
 - Suppressing layout-edit tooltip refresh while a drag is active avoids trace-enabled per-move tooltip work, and immediate drag redraw fixes the real app responsiveness issue that the old benchmark did not expose.
-- The current direct `mouse-hover` benchmark remains paint-bound overall after the direct renderer hover resolver: hover hit testing stays around `0.08 ms` per step while repaint sits around `2.05 ms`.
+- The current direct `mouse-hover` benchmark benefits from retained snapshot layers: hover hit testing stays around `0.37 ms` per step while repaint lands around `0.70 ms`.
 - Disabling benchmark trace output by constructing a trace without an output stream does not regress the maintained direct benchmark set; the latest repeatable runs remain in the established current-tree range.
 - Future hotspot confirmation for this tree should prefer the call-tree HTML or a richer symbolized WPA view instead of the flat text export, because the flat export is now too coarse to attribute the remaining app-side draw cost precisely inside `PDH.DLL`, the board CLR path, the AMD vendor-provider path, and the Direct2D plus DirectWrite stack.
 
@@ -129,7 +153,7 @@ These changes produced real wins and remain in the codebase:
 - Build only the one live gauge usage-fill path that the current metric needs instead of prebuilding every cumulative gauge fill path during each relayout.
 - Resolve snap-preview guide probes through an extent-only layout pass that skips widget instantiation, widget layout-state caching, and edit-artifact rebuilds.
 - Reuse draw-time text layout results for dynamic text anchors and keep all text-anchor measurement on the renderer's shared DirectWrite layout path.
-- Reuse one cached `MetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse smoothed throughput history and formatted metric payloads until telemetry publishes a newer snapshot.
+- Reuse one cached `MetricSource` across successive paints while the resolved `SystemSnapshot` revision stays unchanged, so drag frames reuse compact throughput histories, live leader values, and formatted metric payloads until telemetry publishes a newer snapshot.
 - Fix the title-hover regression introduced during optimization work so card title text highlights correctly again.
 - Remove the legacy renderer GDI fallback path and keep both live repaint and screenshot export on the same Direct2D and DirectWrite scene.
 - Decode the embedded 8-bit grayscale panel-icon mask atlas through WIC and crop fixed 64 x 64 slots through a target-local Direct2D alpha mask, so the renderer no longer depends on GDI+ for icon resources.
@@ -137,8 +161,36 @@ These changes produced real wins and remain in the codebase:
 - Keep project-owned render-space geometry, color, stroke, and text-style types across the renderer and widget pipeline instead of passing Win32 `RECT`, `POINT`, `HFONT`, `COLORREF`, or `DT_*` contracts through the hot path.
 - Keep renderer style updates incremental so layout-only config changes do not rebuild DirectWrite text formats, palette state, or the panel-icon mask atlas during edit-layout drag apply and layout switching.
 - Read presented-FPS GPU Engine 3D usage as raw PDH counter arrays and calculate per-instance percentages from previous/current raw values, so process selection still favors the highest GPU consumer while avoiding the heavier formatted wildcard array path.
+- Keep snapshot and overlay layers behind the dashboard layer bitmap pool. The main thread reuses returned layer bitmaps instead of allocating from scratch, and the render thread returns superseded frame-owned layers when active and pending frames are replaced.
+- Keep dirty animation frames non-coalesced while batching snapshot and overlay region restores, preparing dirty bounds and sampled animation states together once per frame, and drawing each prepared animation once within its conservative dirty bounds.
+- Keep DXGI swap-chain presentation on the simple `Present()` path for animation frames. The renderer already restores dirty regions into retained back buffers, primes every physical flip-chain buffer after retained full redraws, and avoids passing the same regions as DXGI dirty-present metadata because that increases present cost on the measured flip-model path.
+- Keep throughput graph max labels in the snapshot layer only; per-frame throughput chart animation draws guides, axes, plot, and leader without repeating DirectWrite label drawing.
+- Cache generated layout-edit theme preview triangle pixels by size, DPI, system face color, and resolved theme colors, so repeated preview paints reuse the expensive Oklab per-pixel mix and still redraw live labels and guide outlines.
 
 ## Tested Hypotheses
+
+### Hypothesis: Reuse a throughput chart render-point scratch buffer during animation
+
+- Change:
+  - Temporarily collapsed throughput chart animation drawing from separate floating plot-point and clipped render-point vectors into one chart-owned render-point scratch buffer.
+- Result:
+  - Rejected and reverted because it did not produce a stable direct animation benchmark win after the 250 ms cadence and 120-sample retained-history change.
+- Observed effect:
+  - Before the experiment, direct `build\CaseDashBenchmarks.exe animation 240 2` reruns landed around `animation_frame avg_ms=0.53`.
+  - With the scratch-buffer experiment, direct reruns landed at `0.52`, `0.62`, and `0.57 ms`, so the result was neutral to worse and noisier than the original shape.
+- Conclusion:
+  - Keep the simpler existing chart point construction until a profile shows a larger app-side point-building cost. The current isolated animation cost remains dominated by Direct2D/DXGI submission and drawing work, not vector ownership.
+
+### Hypothesis: Batch Direct2D polyline geometry points through `AddLines`
+
+- Change:
+  - Temporarily changed `D2DRenderer::DrawPolyline()` to collect line points into an inline buffer and call `ID2D1GeometrySink::AddLines()` once instead of calling `AddLine()` for each point.
+- Result:
+  - Rejected and reverted because it did not improve the direct animation benchmark on the longer 120-sample throughput charts.
+- Observed effect:
+  - Direct `build\CaseDashBenchmarks.exe animation 240 2` reruns with the experiment landed at `animation_frame avg_ms=0.59` and `0.61`, which stayed in the same slow range as the unmodified current tree.
+- Conclusion:
+  - Keep the simpler per-point geometry sink path. The current chart-animation cost is dominated by Direct2D/DXGI draw and present work rather than the app-side geometry-sink call shape.
 
 ### Hypothesis: Retained histories can avoid a string-key hash index
 
@@ -187,9 +239,9 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Cache the presented-FPS GPU Engine cross-check within one telemetry cadence
 
 - Change:
-  - Temporarily cached the FPS ETW provider's GPU Engine 3D PDH cross-check for 0.5 seconds while leaving ETW event ingestion and present-event selection active.
+  - Temporarily cached the FPS ETW provider's GPU Engine 3D PDH cross-check for one telemetry cadence while leaving ETW event ingestion and present-event selection active.
 - Result:
-  - Rejected and reverted because it made the tight-loop benchmark hide cost that the real app pays on each 0.5 second telemetry sample.
+  - Rejected and reverted because it made the tight-loop benchmark hide cost that the real app pays on each telemetry sample.
 - Observed effect:
   - With the cache, `build\CaseDashBenchmarks.exe update-telemetry 240 2` appeared to improve to about `update_loop per_iter_ms=4.14`, `telemetry_update avg_ms=2.10`, and `paint_draw avg_ms=2.04`, and the daemon-backed profile no longer showed `PresentedFpsEtwProvider::Sample` as a top app-inclusive function.
   - After reverting the cache, `build\CaseDashBenchmarks.exe update-telemetry 240 2` landed at `update_loop per_iter_ms=5.25`, `telemetry_update avg_ms=3.09`, and `paint_draw avg_ms=2.16`.
@@ -339,6 +391,23 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping, but `GetCurrentMonitoredData` still requires a live collection instance even on its by-reference parameter, so that specific null-out shortcut must stay reverted.
 
+### Hypothesis: Trim Gigabyte SIV typed-sample row processing without reducing samples
+
+- Change:
+  - Keep the Gigabyte SIV provider on one fan capture and one temperature capture every telemetry update, but remove per-row `Unit` property reflection, unit string comparisons, generic culture-aware value conversion, and duplicate success-path sample prefill work. The bridge now trusts the typed SIV `Fan` and `Temperature` queries on this validated SIV installation and unboxes the `Single` `Value` property directly.
+- Result:
+  - Kept.
+- Observed effect:
+  - After reverting the rejected sample-reuse experiment, a fresh direct `build\CaseDashBenchmarks.exe update-telemetry 240 2` run landed at `update_loop per_iter_ms=5.86`, `telemetry_update avg_ms=3.29`, and `paint_draw avg_ms=2.56`.
+  - The retained row-processing cleanup produced repeat direct runs at `update_loop per_iter_ms=4.88` to `5.00`, `telemetry_update avg_ms=2.64` to `2.72`, and `paint_draw avg_ms=2.22` to `2.27`.
+  - The final full direct benchmark refresh landed at `update_loop per_iter_ms=5.00`, `telemetry_update avg_ms=2.76`, and `paint_draw avg_ms=2.24`.
+  - The daemon-backed capture under `build\profile_benchmark_daemon\requests\3303_30022_15221\` landed at `update_loop per_iter_ms=5.21`, `telemetry_update avg_ms=2.88`, and `paint_draw avg_ms=2.33`; CLR and mscorlib remain visible, but the top app-inclusive functions are again dominated by benchmark control and Direct2D/DirectWrite drawing.
+  - The SIV all-sensor overload was rejected because even `build\CaseDashBenchmarks.exe update-telemetry 20 2` timed out after 15 seconds, so that overload is much more expensive than the two typed queries on this machine.
+  - Caching the SIV collection constructor was rejected because repeat direct runs stayed neutral at `telemetry_update avg_ms=2.70` to `2.71` while adding extra reflection state.
+  - Headless diagnostics with `CaseDash.exe /trace:build\gigabyte_siv_typed_trace.txt /trace-prefixes:telemetry,gigabyte_siv,board_vendor /dump:build\gigabyte_siv_typed_dump.txt /default-config /exit` kept a real `gigabyte_siv:snapshot_done fan_count=3 temp_count=4` on each telemetry update and preserved CPU temperature plus CPU and system fan RPM in the dump.
+- Conclusion:
+  - Keep the typed two-call SIV shape and the lean per-row extraction. Do not use the all-sensor SIV overload, sample reuse, persistent collection reuse, or constructor caching for this provider path.
+
 ### Hypothesis: Compute both GPU PDH engine totals from one wildcard fetch
 
 - Change:
@@ -444,7 +513,7 @@ These changes produced real wins and remain in the codebase:
 ### Hypothesis: Reuse resolved widget metrics across unchanged snapshots
 
 - Change:
-  - Keep one renderer-owned `MetricSource` alive across draw calls and invalidate it only when the incoming `SystemSnapshot` revision changes, instead of rebuilding throughput smoothing and per-widget metric caches on every drag repaint.
+  - Keep one renderer-owned `MetricSource` alive across draw calls and invalidate it only when the incoming `SystemSnapshot` revision changes, instead of rebuilding compact throughput metric state and per-widget metric caches on every drag repaint.
 - Result:
   - Helped modestly.
 - Observed effect:

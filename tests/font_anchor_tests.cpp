@@ -60,7 +60,7 @@ TEST(FontAnchors, BuiltInLayoutRegistersActiveRegionForEveryFontsSectionRole) {
 
     Trace trace;
     std::unique_ptr<TelemetryCollector> telemetry =
-        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, trace);
+        CreateFakeTelemetryCollector(CurrentDirectoryPath(), {}, nullptr, false, trace);
     ASSERT_NE(telemetry, nullptr);
     std::string telemetryError;
     ASSERT_TRUE(telemetry->Initialize(ExtractTelemetrySettings(config), &telemetryError)) << telemetryError;

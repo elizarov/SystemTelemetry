@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 #include <optional>
+#include <utility>
+#include <vector>
 
 #include "diagnostics/snapshot_dump.h"
 
@@ -41,7 +43,7 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
 }
 
 TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
-    const std::string input = "format=casedash_snapshot_v11\n"
+    const std::string input = "format=casedash_snapshot_v12\n"
                               "cpu.name=\"CPU\"\n"
                               "cpu.load_percent=0\n"
                               "cpu.clock.value=null\n"
@@ -92,7 +94,13 @@ TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {
 TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
     TelemetryDump dump;
     dump.snapshot.retainedHistories.push_back({"cpu.load", std::vector<double>{20.0, 91.0, 63.0}});
-    dump.snapshot.retainedHistories.push_back({"board.temp.cpu", std::vector<double>{10.0, 55.0, 40.0}});
+    RetainedHistorySeries throughput;
+    throughput.seriesRef = "network.upload";
+    throughput.samples = {10.0, 55.0, 40.0};
+    throughput.throughputLiveSamples = {1.0, 2.0, 3.0, 4.0};
+    throughput.throughputBucketTotal = 9.0;
+    throughput.throughputBucketSampleCount = 2;
+    dump.snapshot.retainedHistories.push_back(std::move(throughput));
 
     std::string output;
     ASSERT_TRUE(WriteTelemetryDumpText(output, dump));
@@ -103,10 +111,13 @@ TEST(SnapshotDump, RoundTripsRawRetainedHistorySamples) {
     ASSERT_EQ(loaded.snapshot.retainedHistories.size(), 2u);
     EXPECT_EQ(loaded.snapshot.retainedHistories[0].samples, (std::vector<double>{20.0, 91.0, 63.0}));
     EXPECT_EQ(loaded.snapshot.retainedHistories[1].samples, (std::vector<double>{10.0, 55.0, 40.0}));
+    EXPECT_EQ(loaded.snapshot.retainedHistories[1].throughputLiveSamples, (std::vector<double>{1.0, 2.0, 3.0, 4.0}));
+    EXPECT_DOUBLE_EQ(loaded.snapshot.retainedHistories[1].throughputBucketTotal, 9.0);
+    EXPECT_EQ(loaded.snapshot.retainedHistories[1].throughputBucketSampleCount, 2u);
 }
 
 TEST(SnapshotDump, RejectsPreviousNormalizedHistoryFormatVersion) {
-    const std::string input = "format=casedash_snapshot_v10\n";
+    const std::string input = "format=casedash_snapshot_v11\n";
 
     TelemetryDump loaded;
     std::string error;

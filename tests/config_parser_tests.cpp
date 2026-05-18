@@ -74,6 +74,17 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
     RemoveFileIfExists(path);
 }
 
+TEST(ConfigParser, ParsesGpuAdapterSelection) {
+    const FilePath path = WriteTestConfig("[gpu]\n"
+                                          "adapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.gpu.adapterName, "NVIDIA GeForce RTX 4070 Laptop GPU");
+
+    RemoveFileIfExists(path);
+}
+
 TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
     const FilePath path = WriteTestConfig("[colors]\n"
                                           "accent_color = #12345678\n"

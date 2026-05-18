@@ -15,6 +15,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/impl/dashboard_renderer_benchmark.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
@@ -28,14 +29,17 @@
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
+#include "util/lightweight_mutex.h"
 #include "util/trace.h"
 #include "util/utf8.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
+    X(Animation, "animation")                                                                                          \
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
     X(MouseHover, "mouse-hover")                                                                                       \
+    X(SnapshotHandoff, "snapshot-handoff")                                                                             \
     X(ThemeChange, "theme-change")                                                                                     \
     X(UpdateTelemetry, "update-telemetry")
 
@@ -47,6 +51,9 @@ namespace {
 
 using Clock = std::chrono::steady_clock;
 using Duration = std::chrono::duration<double, std::milli>;
+
+constexpr size_t kAnimationBenchmarkActiveTransitionChunkFrames = 120;
+constexpr auto kSnapshotHandoffBenchmarkCadence = kTelemetryRefreshInterval - std::chrono::milliseconds(50);
 
 enum class BenchPhase {
     TelemetryUpdate = 0,
@@ -227,6 +234,7 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
 std::unique_ptr<TelemetryCollector> CreateBenchmarkFakeTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
     options.fake = true;
+    options.liveFake = true;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
@@ -312,6 +320,42 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
     return path;
 }
 
+void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
+    while (Clock::now() < deadline) {
+        MSG message{};
+        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+            TranslateMessage(&message);
+            DispatchMessageW(&message);
+        }
+        const auto now = Clock::now();
+        if (now >= deadline) {
+            break;
+        }
+        const auto remaining = deadline - now;
+        const auto maxSleep = std::chrono::milliseconds(5);
+        const auto sleepDuration = remaining < maxSleep ? remaining : maxSleep;
+        const auto sleepMs = std::chrono::duration_cast<std::chrono::milliseconds>(sleepDuration).count();
+        Sleep(sleepMs > 0 ? static_cast<DWORD>(sleepMs) : 1);
+    }
+}
+
+HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
+    const std::wstring staticClass = WideFromUtf8("STATIC");
+    const std::wstring windowTitle = WideFromUtf8(title);
+    return CreateWindowExW(WS_EX_TOOLWINDOW,
+        staticClass.c_str(),
+        windowTitle.c_str(),
+        WS_POPUP,
+        0,
+        0,
+        width,
+        height,
+        nullptr,
+        nullptr,
+        GetModuleHandleW(nullptr),
+        nullptr);
+}
+
 class BenchmarkHost : private LayoutEditHost {
 public:
     BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
@@ -330,20 +374,7 @@ public:
     }
 
     bool Initialize() {
-        const std::wstring staticClass = WideFromUtf8("STATIC");
-        const std::wstring windowTitle = WideFromUtf8("CaseDashBenchmarkHost");
-        hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
-            staticClass.c_str(),
-            windowTitle.c_str(),
-            WS_POPUP,
-            0,
-            0,
-            renderer_.WindowWidth(),
-            renderer_.WindowHeight(),
-            nullptr,
-            nullptr,
-            GetModuleHandleW(nullptr),
-            nullptr);
+        hwnd_ = CreateBenchmarkWindow(renderer_.WindowWidth(), renderer_.WindowHeight(), "CaseDashBenchmarkHost");
         if (hwnd_ == nullptr) {
             return false;
         }
@@ -622,6 +653,188 @@ struct LayoutGuideSheetBenchTotals {
     bool succeeded = true;
 };
 
+struct AnimationBenchTotals {
+    BenchResult animationLoop;
+    PhaseStats frame;
+    std::string errorText;
+    size_t snapshotAnimations = 0;
+    size_t overlayAnimations = 0;
+    bool succeeded = true;
+};
+
+struct SnapshotHandoffBenchTotals {
+    BenchResult handoffLoop;
+    PhaseStats frameBuild;
+    PhaseStats framePublish;
+    std::string errorText;
+    bool succeeded = true;
+};
+
+class AnimationBenchmarkRenderWorker {
+public:
+    explicit AnimationBenchmarkRenderWorker(HWND hwnd)
+        : hwnd_(hwnd), requestEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
+          responseEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {}
+
+    ~AnimationBenchmarkRenderWorker() {
+        Shutdown();
+        if (requestEvent_ != nullptr) {
+            CloseHandle(requestEvent_);
+        }
+        if (responseEvent_ != nullptr) {
+            CloseHandle(responseEvent_);
+        }
+    }
+
+    bool Start(DashboardPresentationFrame frame) {
+        if (thread_ != nullptr || requestEvent_ == nullptr || responseEvent_ == nullptr) {
+            return false;
+        }
+        thread_ = CreateThread(nullptr, 0, &AnimationBenchmarkRenderWorker::ThreadProc, this, 0, nullptr);
+        if (thread_ == nullptr) {
+            return false;
+        }
+        return Send(RequestKind::Initialize, std::move(frame));
+    }
+
+    bool ResetTimeline() {
+        return Send(RequestKind::ResetTimeline);
+    }
+
+    bool PresentStoredFrame() {
+        return Send(RequestKind::PresentStoredFrame);
+    }
+
+    void Shutdown() {
+        if (thread_ == nullptr) {
+            return;
+        }
+        Send(RequestKind::Shutdown);
+        WaitForSingleObject(thread_, INFINITE);
+        CloseHandle(thread_);
+        thread_ = nullptr;
+    }
+
+    const std::string& LastError() const {
+        return lastError_;
+    }
+
+private:
+    enum class RequestKind {
+        Initialize,
+        ResetTimeline,
+        PresentStoredFrame,
+        Shutdown,
+    };
+
+    bool Send(RequestKind kind) {
+        return Send(kind, std::nullopt);
+    }
+
+    bool Send(RequestKind kind, std::optional<DashboardPresentationFrame> frame) {
+        {
+            const LightweightMutexLock lock(mutex_);
+            if (requestPending_ && !responseReady_) {
+                return false;
+            }
+            requestKind_ = kind;
+            requestFrame_ = std::move(frame);
+            requestPending_ = true;
+            responseReady_ = false;
+            ResetEvent(responseEvent_);
+        }
+        SetEvent(requestEvent_);
+
+        for (;;) {
+            WaitForSingleObject(responseEvent_, INFINITE);
+            const LightweightMutexLock lock(mutex_);
+            if (responseReady_) {
+                const bool ok = responseOk_;
+                lastError_ = responseError_;
+                requestPending_ = false;
+                ResetEvent(requestEvent_);
+                return ok;
+            }
+        }
+    }
+
+    void CompleteRequest(bool ok, std::string error) {
+        {
+            const LightweightMutexLock lock(mutex_);
+            responseOk_ = ok;
+            responseError_ = std::move(error);
+            responseReady_ = true;
+        }
+        SetEvent(responseEvent_);
+    }
+
+    void ThreadMain() {
+        DashboardRenderThread presenter;
+        presenter.Configure(hwnd_, false, true);
+
+        for (;;) {
+            RequestKind kind = RequestKind::Shutdown;
+            std::optional<DashboardPresentationFrame> frame;
+            for (;;) {
+                {
+                    const LightweightMutexLock lock(mutex_);
+                    if (requestPending_ && !responseReady_) {
+                        kind = requestKind_;
+                        frame = std::move(requestFrame_);
+                        ResetEvent(requestEvent_);
+                        break;
+                    }
+                }
+                WaitForSingleObject(requestEvent_, INFINITE);
+            }
+
+            bool ok = true;
+            std::string error;
+            switch (kind) {
+                case RequestKind::Initialize:
+                    if (!frame.has_value()) {
+                        ok = false;
+                        error = "animation benchmark worker missing initial frame";
+                    } else {
+                        ok = presenter.PresentFrameSynchronously(std::move(*frame));
+                        error = presenter.LastError();
+                    }
+                    break;
+                case RequestKind::ResetTimeline:
+                    presenter.ResetTimeline();
+                    break;
+                case RequestKind::PresentStoredFrame:
+                    ok = presenter.PresentStoredFrameSynchronously();
+                    error = presenter.LastError();
+                    break;
+                case RequestKind::Shutdown:
+                    presenter.Shutdown();
+                    CompleteRequest(true, {});
+                    return;
+            }
+            CompleteRequest(ok, std::move(error));
+        }
+    }
+
+    static DWORD WINAPI ThreadProc(void* context) {
+        static_cast<AnimationBenchmarkRenderWorker*>(context)->ThreadMain();
+        return 0;
+    }
+
+    HWND hwnd_ = nullptr;
+    HANDLE thread_ = nullptr;
+    HANDLE requestEvent_ = nullptr;
+    HANDLE responseEvent_ = nullptr;
+    mutable LightweightMutex mutex_;
+    RequestKind requestKind_ = RequestKind::Shutdown;
+    std::optional<DashboardPresentationFrame> requestFrame_;
+    bool requestPending_ = false;
+    bool responseReady_ = false;
+    bool responseOk_ = false;
+    std::string responseError_;
+    std::string lastError_;
+};
+
 void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
     stats.total += elapsed;
     ++stats.samples;
@@ -665,6 +878,95 @@ LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
     }
     totals.switchLoop.total = Clock::now() - switchLoopStart;
     totals.switchLoop.perIteration = totals.switchLoop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame, HWND hwnd, size_t iterations) {
+    AnimationBenchTotals totals{};
+    totals.snapshotAnimations = frame.snapshotAnimations.size();
+    totals.overlayAnimations = frame.overlayAnimations.size();
+    if (iterations == 0) {
+        return totals;
+    }
+
+    AnimationBenchmarkRenderWorker presenter(hwnd);
+    if (!presenter.Start(std::move(frame))) {
+        totals.succeeded = false;
+        totals.errorText = "initial animation frame present failed: " + presenter.LastError();
+        return totals;
+    }
+
+    size_t remainingFrames = iterations;
+    while (remainingFrames > 0) {
+        if (!presenter.ResetTimeline() || !presenter.PresentStoredFrame()) {
+            totals.succeeded = false;
+            totals.errorText = "animation frame seed failed: " + presenter.LastError();
+            break;
+        }
+
+        const size_t chunkFrames = std::min(kAnimationBenchmarkActiveTransitionChunkFrames, remainingFrames);
+        for (size_t iteration = 0; iteration < chunkFrames; ++iteration) {
+            const auto frameStart = Clock::now();
+            if (!presenter.PresentStoredFrame()) {
+                totals.succeeded = false;
+                totals.errorText = "animation frame present failed: " + presenter.LastError();
+                break;
+            }
+            RecordPhase(totals.frame, Clock::now() - frameStart);
+        }
+        if (!totals.succeeded) {
+            break;
+        }
+        remainingFrames -= chunkFrames;
+    }
+    totals.animationLoop.total = totals.frame.total;
+    if (totals.frame.samples > 0) {
+        totals.animationLoop.perIteration = totals.animationLoop.total / static_cast<double>(totals.frame.samples);
+    }
+    return totals;
+}
+
+SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
+    DashboardRenderer& renderer, TelemetryCollector& telemetry, size_t iterations) {
+    SnapshotHandoffBenchTotals totals{};
+    if (iterations == 0) {
+        return totals;
+    }
+
+    telemetry.UpdateSnapshot();
+    DashboardPresentationFrame warmupFrame;
+    if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), warmupFrame) ||
+        !DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(warmupFrame))) {
+        totals.succeeded = false;
+        totals.errorText = "snapshot handoff warmup failed: " + renderer.LastError();
+        return totals;
+    }
+    PumpBenchmarkMessagesUntil(Clock::now() + kSnapshotHandoffBenchmarkCadence);
+
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const auto iterationStart = Clock::now();
+        telemetry.UpdateSnapshot();
+
+        DashboardPresentationFrame frame;
+        const auto buildStart = Clock::now();
+        if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), frame)) {
+            totals.succeeded = false;
+            totals.errorText = "snapshot frame build failed: " + renderer.LastError();
+            return totals;
+        }
+        RecordPhase(totals.frameBuild, Clock::now() - buildStart);
+
+        const auto publishStart = Clock::now();
+        if (!DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(frame))) {
+            totals.succeeded = false;
+            totals.errorText = "snapshot frame publish failed: " + renderer.LastError();
+            return totals;
+        }
+        RecordPhase(totals.framePublish, Clock::now() - publishStart);
+        PumpBenchmarkMessagesUntil(iterationStart + kSnapshotHandoffBenchmarkCadence);
+    }
+    totals.handoffLoop.total = Duration(totals.frameBuild.total + totals.framePublish.total);
+    totals.handoffLoop.perIteration = totals.handoffLoop.total / static_cast<double>(iterations);
     return totals;
 }
 
@@ -920,6 +1222,104 @@ int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& 
     return 0;
 }
 
+int RunAnimationBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(runtimeConfig);
+    renderer.SetRenderScale(renderScale);
+    renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
+    renderer.SetLiveAnimationEnabled(true);
+    if (!renderer.Initialize()) {
+        std::cerr << "renderer init failed: " << renderer.LastError() << "\n";
+        return 1;
+    }
+
+    DashboardPresentationFrame frame;
+    if (!DashboardRendererBenchmarkAccess::BuildAnimationFrame(renderer, telemetry->Snapshot(), frame)) {
+        std::cerr << "animation frame build failed: " << renderer.LastError() << "\n";
+        renderer.Shutdown();
+        return 1;
+    }
+
+    HWND hwnd = CreateBenchmarkWindow(frame.width, frame.height, "CaseDashAnimationBenchmark");
+    if (hwnd == nullptr) {
+        std::cerr << "benchmark window creation failed\n";
+        renderer.Shutdown();
+        return 1;
+    }
+
+    std::cout << "animation_benchmark iterations=" << iterations << " render_scale=" << renderScale
+              << " window=" << frame.width << "x" << frame.height
+              << " snapshot_animations=" << frame.snapshotAnimations.size()
+              << " overlay_animations=" << frame.overlayAnimations.size()
+              << " active_chunk_frames=" << kAnimationBenchmarkActiveTransitionChunkFrames << "\n";
+    const AnimationBenchTotals totals = RunAnimationFrameBenchmark(std::move(frame), hwnd, iterations);
+    DestroyWindow(hwnd);
+    renderer.Shutdown();
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+
+    PrintBenchLoopResult("animation_loop", totals.animationLoop);
+    PrintPhaseResult("animation_frame", totals.frame);
+    return 0;
+}
+
+int RunSnapshotHandoffBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+    std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
+    if (telemetry == nullptr) {
+        std::cerr << "fake telemetry init failed\n";
+        return 1;
+    }
+
+    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(runtimeConfig);
+    renderer.SetRenderScale(renderScale);
+    renderer.SetRenderMode(DashboardRenderer::RenderMode::Normal);
+    renderer.SetLiveAnimationEnabled(true);
+
+    HWND hwnd =
+        CreateBenchmarkWindow(renderer.WindowWidth(), renderer.WindowHeight(), "CaseDashSnapshotHandoffBenchmark");
+    if (hwnd == nullptr) {
+        std::cerr << "benchmark window creation failed\n";
+        return 1;
+    }
+    ShowWindow(hwnd, SW_SHOWNOACTIVATE);
+    UpdateWindow(hwnd);
+    if (!renderer.Initialize(hwnd)) {
+        std::cerr << "renderer init failed: " << renderer.LastError() << "\n";
+        DestroyWindow(hwnd);
+        return 1;
+    }
+
+    std::cout << "snapshot_handoff_benchmark mode=threaded_vsync telemetry_cadence_ms="
+              << kSnapshotHandoffBenchmarkCadence.count() << " iterations=" << iterations
+              << " render_scale=" << renderScale << " window=" << renderer.WindowWidth() << "x"
+              << renderer.WindowHeight() << "\n";
+    const SnapshotHandoffBenchTotals totals = RunSnapshotHandoffBenchmark(renderer, *telemetry, iterations);
+    renderer.Shutdown();
+    DestroyWindow(hwnd);
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+
+    PrintBenchLoopResult("snapshot_loop", totals.handoffLoop);
+    PrintPhaseResult("presentation_frame_build", totals.frameBuild);
+    PrintPhaseResult("presentation_frame_publish", totals.framePublish);
+    return 0;
+}
+
 int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkFakeTelemetryCollector(config, trace);
@@ -1091,6 +1491,8 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
 
 int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
     switch (commandLine.benchmark) {
+        case Benchmark::Animation:
+            return RunAnimationBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::EditLayout:
             return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LayoutGuideSheet:
@@ -1099,6 +1501,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::MouseHover:
             return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::SnapshotHandoff:
+            return RunSnapshotHandoffBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::ThemeChange:
             return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:

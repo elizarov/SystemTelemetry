@@ -11,6 +11,7 @@
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/collector_storage.h"
 #include "telemetry/impl/collector_storage_selection.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -28,16 +29,12 @@ public:
         WSADATA wsaData{};
         const int wsaStartupResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 
-        state_->trace_.Write(TracePrefix::Telemetry, "initialize_begin");
-        {
-            char buffer[128];
-            sprintf_s(buffer,
-                "wsa_startup result=%d version=%u.%u",
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("initialize_begin"));
+        state_->trace_.Write(TracePrefix::Telemetry,
+            FormatText("wsa_startup result=%d version=%u.%u",
                 wsaStartupResult,
                 LOBYTE(wsaData.wVersion),
-                HIBYTE(wsaData.wVersion));
-            state_->trace_.Write(TracePrefix::Telemetry, buffer);
-        }
+                HIBYTE(wsaData.wVersion)));
         InitializeBoardCollector(*state_, settings.board);
         InitializeCpuCollector(*state_);
         InitializeGpuCollector(*state_);
@@ -51,7 +48,7 @@ public:
         UpdateGpuMetrics(*state_);
         GetLocalTime(&state_->snapshot_.now);
         ++state_->snapshot_.revision;
-        state_->trace_.Write(TracePrefix::Telemetry, "initialize_done");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("initialize_done"));
         return true;
     }
 
@@ -77,11 +74,16 @@ public:
         dump.boardProvider.providerName = state_->board_.providerName;
         dump.boardProvider.diagnostics = state_->board_.providerDiagnostics;
         dump.boardProvider.available = state_->board_.providerAvailable;
+        dump.activeMetricBoardBindings = state_->activeMetricBoardBindings_;
         return dump;
     }
 
     const ResolvedTelemetrySelections& ResolvedSelections() const override {
         return state_->resolvedSelections_;
+    }
+
+    const std::vector<GpuAdapterCandidate>& GpuAdapterCandidates() const override {
+        return state_->gpu_.adapterCandidates;
     }
 
     const std::vector<NetworkAdapterCandidate>& NetworkAdapterCandidates() const override {
@@ -94,14 +96,22 @@ public:
 
     void ApplySettings(const TelemetrySettings& settings) override {
         const bool boardChanged = state_->settings_.board != settings.board;
-        const bool selectionChanged = state_->settings_.selection != settings.selection;
+        const TelemetrySelectionSettings previousSelection = state_->settings_.selection;
+        const bool selectionChanged = previousSelection != settings.selection;
         state_->settings_ = settings;
         state_->resolvedSelections_.boardTemperatureSensorNames.clear();
         state_->resolvedSelections_.boardFanSensorNames.clear();
 
         if (selectionChanged) {
-            SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
-            SetSelectedStorageDrives(settings.selection.configuredDrives);
+            if (previousSelection.preferredAdapterName != settings.selection.preferredAdapterName) {
+                SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
+            }
+            if (previousSelection.preferredGpuAdapterName != settings.selection.preferredGpuAdapterName) {
+                SetPreferredGpuAdapterName(settings.selection.preferredGpuAdapterName);
+            }
+            if (previousSelection.configuredDrives != settings.selection.configuredDrives) {
+                SetSelectedStorageDrives(settings.selection.configuredDrives);
+            }
         }
 
         if (boardChanged) {
@@ -115,6 +125,12 @@ public:
         ++state_->snapshot_.revision;
     }
 
+    void SetPreferredGpuAdapterName(std::string adapterName) override {
+        state_->settings_.selection.preferredGpuAdapterName = std::move(adapterName);
+        ReconfigureGpuCollector(*state_);
+        ++state_->snapshot_.revision;
+    }
+
     void SetSelectedStorageDrives(std::vector<std::string> driveLetters) override {
         state_->settings_.selection.configuredDrives = NormalizeConfiguredStorageDriveLetters(driveLetters);
         ResolveStorageSelection(*state_);
@@ -122,6 +138,7 @@ public:
     }
 
     void RefreshSelectionsAndSnapshot() override {
+        ReconfigureGpuCollector(*state_);
         ResolveNetworkSelection(*state_);
         ResolveStorageSelection(*state_);
         ++state_->snapshot_.revision;
@@ -129,7 +146,7 @@ public:
     }
 
     void UpdateSnapshot() override {
-        state_->trace_.Write(TracePrefix::Telemetry, "update_snapshot_begin");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("update_snapshot_begin"));
         UpdateBoardMetrics(*state_);
         UpdateCpuMetrics(*state_);
         UpdateGpuMetrics(*state_);
@@ -137,7 +154,7 @@ public:
         UpdateStorageMetrics(*state_, false);
         GetLocalTime(&state_->snapshot_.now);
         ++state_->snapshot_.revision;
-        state_->trace_.Write(TracePrefix::Telemetry, "update_snapshot_done");
+        state_->trace_.Write(TracePrefix::Telemetry, RES_STR("update_snapshot_done"));
     }
 
 private:

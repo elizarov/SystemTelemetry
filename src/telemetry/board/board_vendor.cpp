@@ -2,9 +2,11 @@
 
 #include <utility>
 
+#include "telemetry/board/asus/board_asus_armoury_crate.h"
 #include "telemetry/board/gigabyte/board_gigabyte_siv.h"
 #include "telemetry/board/msi/board_msi_center.h"
 #include "telemetry/impl/system_info_support.h"
+#include "util/resource_strings.h"
 #include "util/trace.h"
 
 namespace {
@@ -25,9 +27,12 @@ public:
         sample_.temperatures =
             CreateRequestedBoardMetrics(settings.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         sample_.available = false;
-        sample_.diagnostics = "No supported board telemetry provider matches the baseboard manufacturer.";
-        trace_.Write(TracePrefix::UnsupportedBoard,
-            "initialize manufacturer=\"" + info_.manufacturer + "\" product=\"" + info_.product + "\"");
+        sample_.diagnostics =
+            ResourceStringText(RES_STR("No supported board telemetry provider matches the baseboard manufacturer."));
+        trace_.WriteFmt(TracePrefix::UnsupportedBoard,
+            RES_STR("initialize manufacturer=\"%s\" product=\"%s\""),
+            info_.manufacturer.c_str(),
+            info_.product.c_str());
         return true;
     }
 
@@ -43,6 +48,9 @@ private:
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
     Trace& trace, BoardVendor vendor, BoardVendorInfo info) {
+    if (vendor == BoardVendor::Asus) {
+        return CreateAsusBoardTelemetryProvider(trace, std::move(info));
+    }
     if (vendor == BoardVendor::Msi) {
         return CreateMsiBoardTelemetryProvider(trace, std::move(info));
     }
@@ -65,8 +73,10 @@ BoardVendorInfo ExtractBoardVendorInfo() {
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
     BoardVendorInfo info = ExtractBoardVendorInfo();
     const BoardVendor vendor = SelectBoardVendor(info);
-    trace.Write(TracePrefix::BoardVendor,
-        std::string("create vendor=") + BoardVendorName(vendor) + " manufacturer=\"" + info.manufacturer +
-            "\" product=\"" + info.product + "\"");
+    trace.WriteFmt(TracePrefix::BoardVendor,
+        RES_STR("create vendor=%s manufacturer=\"%s\" product=\"%s\""),
+        BoardVendorName(vendor),
+        info.manufacturer.c_str(),
+        info.product.c_str());
     return CreateBoardProviderForVendor(trace, vendor, std::move(info));
 }

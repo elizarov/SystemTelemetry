@@ -4,13 +4,14 @@
 #include <optional>
 #include <string>
 
+#include "util/resource_strings.h"
 #include "util/trace.h"
 
 struct FpsTelemetrySample {
     std::optional<double> fps;
     unsigned long processId = 0;
     std::string processName;
-    std::string diagnostics = "FPS ETW provider not initialized.";
+    std::string diagnostics = ResourceStringText(RES_STR("FPS ETW provider not initialized."));
     bool available = false;
     bool permissionRequired = false;
 };

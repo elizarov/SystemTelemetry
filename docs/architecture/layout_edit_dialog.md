@@ -9,6 +9,7 @@
 - Preview and revert edits through the same config mutation path used by drag-based layout editing.
 - Keep focused helper modules under `src/layout_edit_dialog/impl/` when they are private to the dialog package.
 - Reuse config color math for RGB/LCH/HSV conversion instead of carrying dialog-local color-space logic.
+- Reuse the config-owned metric-to-board-binding resolver and runtime active-binding state for metric `Binding` rows, including provider fallback metrics.
 - Own construction and drawing of the theme selector's color-mix triangle in `theme_preview.*` so dialog painting and benchmark coverage use the same implementation.
 
 ## Boundaries

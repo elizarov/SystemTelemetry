@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 
@@ -34,10 +35,14 @@ struct DiagnosticsOptions {
     bool saveFullConfig = false;
     bool hasScaleOverride = false;
     bool hasAppIconSize = false;
+    bool hasTracePrefixFilter = false;
+    bool hasInvalidTracePrefixFilter = false;
     std::optional<DiagnosticsHoverPoint> hoverPoint;
     DiagnosticsLayoutSimilarityMode layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::None;
     double scale = 1.0;
     int appIconSize = 256;
+    std::uint64_t tracePrefixFilter = 0;
+    std::string invalidTracePrefixFilterName;
     std::string layoutName;
     std::string themeName;
     std::string editLayoutWidgetName;

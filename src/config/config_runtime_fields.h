@@ -43,6 +43,7 @@ template <typename Section> std::span<const RuntimeConfigFieldDescriptor> Runtim
 
 #define CASEDASH_CONFIG_FIELD_SECTIONS(X)                                                                              \
     X(DisplayConfig::Section)                                                                                          \
+    X(GpuConfig::Section)                                                                                              \
     X(NetworkConfig::Section)                                                                                          \
     X(StorageConfig::Section)                                                                                          \
     X(UiFontSetConfig::Section)                                                                                        \

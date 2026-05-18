@@ -8,6 +8,7 @@
 #include "config/config.h"
 #include "config/widget_class.h"
 #include "renderer/render_types.h"
+#include "widget/layout_edit_types.h"
 
 class MetricSource;
 class WidgetHost;
@@ -20,6 +21,8 @@ public:
     virtual int PreferredHeight(const WidgetHost& renderer) const = 0;
     virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
     virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
+    virtual void DrawOverlay(
+        WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
     virtual void BuildEditGuides(WidgetHost& renderer, const struct WidgetLayout& widget) const;
     virtual void BuildStaticAnchors(WidgetHost& renderer, const struct WidgetLayout& widget) const;
 };
@@ -30,6 +33,8 @@ struct WidgetLayout {
     std::string editCardId;
     std::vector<size_t> nodePath;
     WidgetClass widgetClass = WidgetClass::Unknown;
+    std::vector<LayoutEditOverlayOwner> overlayOwners;
+    LayoutEditOverlayAffordanceLayer overlayLayer = LayoutEditOverlayAffordanceLayer::Background;
     std::unique_ptr<Widget> widget;
 };
 

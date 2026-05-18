@@ -78,24 +78,39 @@ endif()
 
 set(CASEDASH_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashCompressedResources.rc")
 set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources")
+set(CASEDASH_RESOURCE_STRING_HEADER "${CASEDASH_GENERATED_DIR}/resource_strings.generated.h")
+file(GLOB_RECURSE CASEDASH_RESOURCE_STRING_SCAN_SOURCES CONFIGURE_DEPENDS
+    "${CMAKE_SOURCE_DIR}/src/*.cpp"
+)
 add_custom_command(
     OUTPUT
         "${CASEDASH_COMPRESSED_RESOURCE_RC}"
         "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+        "${CASEDASH_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+        "${CASEDASH_RESOURCE_STRING_HEADER}"
     COMMAND
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
         --output-dir "${CASEDASH_COMPRESSED_RESOURCE_DIR}"
         --output-rc "${CASEDASH_COMPRESSED_RESOURCE_RC}"
         --resource-root "${CMAKE_SOURCE_DIR}/resources"
+        --resource-string-header "${CASEDASH_RESOURCE_STRING_HEADER}"
+        --source-root "${CMAKE_SOURCE_DIR}"
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
         "${CMAKE_SOURCE_DIR}/resources/localization.ini"
+        ${CASEDASH_RESOURCE_STRING_SCAN_SOURCES}
     VERBATIM
 )
 set_source_files_properties("${CASEDASH_COMPRESSED_RESOURCE_RC}" PROPERTIES
     OBJECT_DEPENDS "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+)
+add_custom_target(CaseDashGeneratedResources DEPENDS
+    "${CASEDASH_COMPRESSED_RESOURCE_RC}"
+    "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+    "${CASEDASH_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+    "${CASEDASH_RESOURCE_STRING_HEADER}"
 )
 
 add_executable(CaseDash WIN32
@@ -120,7 +135,9 @@ add_executable(CaseDash WIN32
     src/util/file_path.cpp
     src/util/message_box.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/paths.cpp
+    src/util/resource_strings.cpp
     src/util/scale.cpp
     src/util/lightweight_mutex.cpp
     src/util/strings.cpp
@@ -140,7 +157,7 @@ add_executable(CaseDash WIN32
     src/layout_edit_dialog/impl/trace.cpp
     src/layout_edit_dialog/impl/tree.cpp
     src/layout_edit_dialog/impl/util.cpp
-    src/layout_edit/board_metric_binding.cpp
+    src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_controller.cpp
@@ -196,10 +213,12 @@ add_executable(CaseDash WIN32
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
@@ -213,11 +232,17 @@ add_executable(CaseDash WIN32
     src/renderer/impl/d2d_render_conversions.cpp
     src/layout_model/layout_edit_anchor_shape.cpp
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
+    src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
+    src/widget/animation.cpp
+    src/widget/animation_types.cpp
     src/widget/widget.cpp
+    src/widget/widget_host.cpp
     src/widget/layout_edit_types.cpp
+    src/widget/impl/animation_primitives.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
@@ -234,8 +259,10 @@ add_executable(CaseDash WIN32
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
+    src/util/high_precision_timer.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
+    src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
@@ -260,7 +287,9 @@ set(casedash_release_speed_sources
     src/dashboard_renderer/dashboard_renderer.cpp
     src/layout_model/layout_edit_anchor_shape.cpp
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
+    src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/layout_edit/layout_edit_active_region_trace.cpp
@@ -296,6 +325,7 @@ set(casedash_release_speed_sources
     src/renderer/impl/text_width_cache.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
@@ -305,6 +335,7 @@ set(casedash_release_speed_sources
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/impl/collector_board.cpp
@@ -320,9 +351,13 @@ set(casedash_release_speed_sources
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
     src/telemetry/telemetry.cpp
+    src/widget/animation.cpp
+    src/widget/animation_types.cpp
     src/widget/card_chrome_layout.cpp
     src/widget/layout_edit_types.cpp
     src/widget/widget.cpp
+    src/widget/widget_host.cpp
+    src/widget/impl/animation_primitives.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/pill_bar.cpp
     src/widget/impl/clock_date.cpp
@@ -432,6 +467,7 @@ target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDash CaseDashGeneratedResources)
 
 target_compile_definitions(CaseDash PRIVATE
     UNICODE
@@ -475,6 +511,7 @@ target_link_options(CaseDash PRIVATE
 target_link_libraries(CaseDash PRIVATE
     user32
     gdi32
+    d3d11
     d2d1
     dwrite
     pdh
@@ -528,6 +565,7 @@ add_executable(CaseDashTests
     tests/metric_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
+    tests/board_metric_binding_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -544,6 +582,9 @@ add_executable(CaseDashTests
     tests/fps_service_protocol_tests.cpp
     tests/telemetry_retained_history_tests.cpp
     tests/telemetry_runtime_tests.cpp
+    tests/animation_timeline_tests.cpp
+    tests/throughput_chart_widget_tests.cpp
+    tests/render_thread_tests.cpp
     src/config/config.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
@@ -562,6 +603,7 @@ add_executable(CaseDashTests
     src/layout_model/layout_edit_layout_target.cpp
     src/layout_model/layout_edit_service.cpp
     src/layout_model/dashboard_overlay_state.cpp
+    src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_model/layout_edit_parameter_metadata.cpp
     src/layout_edit/layout_edit_tooltip.cpp
@@ -575,9 +617,11 @@ add_executable(CaseDashTests
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/localization_catalog.cpp
-    src/util/resource_loader.cpp
+    src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
+    tests/resource_loader_test_stub.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
@@ -588,11 +632,15 @@ add_executable(CaseDashTests
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
     src/telemetry/metrics.cpp
+    src/widget/animation.cpp
+    src/widget/animation_types.cpp
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/renderer/png_export.cpp
     src/widget/widget.cpp
+    src/widget/widget_host.cpp
     src/widget/layout_edit_types.cpp
+    src/widget/impl/animation_primitives.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
@@ -613,7 +661,9 @@ add_executable(CaseDashTests
     src/renderer/impl/text_width_cache.cpp
     src/layout_model/layout_edit_anchor_shape.cpp
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
+    src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
@@ -625,14 +675,18 @@ add_executable(CaseDashTests
     src/telemetry/impl/collector_fake.cpp
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/retained_history.cpp
+    src/util/high_precision_timer.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
+    src/util/trace_timing.cpp
     src/telemetry/fps_service_protocol.cpp
   )
 target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
+    "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDashTests CaseDashGeneratedResources)
 target_compile_definitions(CaseDashTests PRIVATE
     UNICODE
     _UNICODE
@@ -662,6 +716,7 @@ target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
     gdi32
+    d3d11
     d2d1
     dwrite
     ole32
@@ -685,6 +740,7 @@ add_executable(CaseDashBenchmarks
     tests/benchmarks.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
+    src/util/text_format.cpp
     src/util/win32_format.cpp
     src/util/scale.cpp
     src/config/config.cpp
@@ -697,6 +753,7 @@ add_executable(CaseDashBenchmarks
     src/config/config_parser.cpp
     src/config/config_runtime_fields.cpp
     src/config/config_resolution.cpp
+    src/config/metric_board_binding.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
     src/telemetry/impl/collector.cpp
@@ -719,10 +776,12 @@ add_executable(CaseDashBenchmarks
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
     src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
     src/telemetry/gpu/amd/gpu_amd_adl.cpp
     src/telemetry/board/board_vendor.cpp
     src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp
@@ -756,11 +815,17 @@ add_executable(CaseDashBenchmarks
     src/renderer/impl/d2d_render_conversions.cpp
     src/layout_model/layout_edit_anchor_shape.cpp
     src/dashboard_renderer/impl/metric_lookup_cache.cpp
+    src/dashboard_renderer/impl/animation_timeline.cpp
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
     src/renderer/impl/palette.cpp
     src/renderer/impl/text_width_cache.cpp
+    src/widget/animation.cpp
+    src/widget/animation_types.cpp
     src/widget/widget.cpp
+    src/widget/widget_host.cpp
     src/widget/layout_edit_types.cpp
+    src/widget/impl/animation_primitives.cpp
     src/widget/impl/card_chrome.cpp
     src/widget/impl/pill_bar.cpp
     src/widget/impl/text.cpp
@@ -778,12 +843,16 @@ add_executable(CaseDashBenchmarks
     src/layout_guide_sheet/layout_guide_sheet.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
+    src/dashboard_renderer/impl/dashboard_renderer_benchmark.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
+    src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
+    src/util/high_precision_timer.cpp
     src/util/utf8.cpp
     src/util/trace.cpp
+    src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
     src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
 )
@@ -807,7 +876,9 @@ target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
     "${CMAKE_SOURCE_DIR}/resources"
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
+    "${CASEDASH_GENERATED_DIR}"
 )
+add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources)
 target_compile_definitions(CaseDashBenchmarks PRIVATE
     UNICODE
     _UNICODE
@@ -842,6 +913,7 @@ target_link_options(CaseDashBenchmarks PRIVATE
 target_link_libraries(CaseDashBenchmarks PRIVATE
     user32
     gdi32
+    d3d11
     d2d1
     dwrite
     pdh

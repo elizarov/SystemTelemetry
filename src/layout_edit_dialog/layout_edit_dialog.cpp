@@ -14,6 +14,7 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "util/scale.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -239,19 +240,20 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
             initialFocusTrace =
                 FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
         } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
-            initialFocusTrace = "[metrics] " + metricKey->metricId;
+            initialFocusTrace = FormatText("[metrics] %s", metricKey->metricId.c_str());
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
-            initialFocusTrace = "[card." + cardTitleKey->cardId + "] title";
+            initialFocusTrace = FormatText("[card.%s] title", cardTitleKey->cardId.c_str());
         } else if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey)) {
             initialFocusTrace =
                 nodeFieldKey->editCardId.empty()
-                    ? "[layout] " + std::string(EnumToString(nodeFieldKey->widgetClass))
-                    : "[card." + nodeFieldKey->editCardId + "] " + std::string(EnumToString(nodeFieldKey->widgetClass));
+                    ? FormatText("[layout] %s", EnumToString(nodeFieldKey->widgetClass))
+                    : FormatText(
+                          "[card.%s] %s", nodeFieldKey->editCardId.c_str(), EnumToString(nodeFieldKey->widgetClass));
         } else {
             initialFocusTrace = "weight";
         }
     }
-    host_.TraceLayoutEditDialogEvent("open", "initial_focus=" + QuoteTraceText(initialFocusTrace));
+    host_.TraceLayoutEditDialogEvent("open", FormatText("initial_focus=%s", QuoteTraceText(initialFocusTrace).c_str()));
 
     HWND dialog = CreateDialogParamW(host_.LayoutEditDialogInstance(),
         MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),

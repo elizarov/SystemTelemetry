@@ -8,6 +8,7 @@
 
 #include "util/numeric_format.h"
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -104,25 +105,26 @@ std::optional<ColorExpression> ParseColorExpression(const std::string& text) {
 std::string FormatColorExpression(const ColorExpression& expression) {
     std::vector<std::string> options;
     if (expression.rotateHue.has_value()) {
-        options.push_back("rotate_hue: " + FormatDouble(*expression.rotateHue));
+        options.push_back(FormatText("rotate_hue: %s", FormatDouble(*expression.rotateHue).c_str()));
     }
     if (expression.mix.has_value()) {
-        options.push_back("mix: " + FormatDouble(expression.mix->amount) + " " + expression.mix->target);
+        options.push_back(
+            FormatText("mix: %s %s", FormatDouble(expression.mix->amount).c_str(), expression.mix->target.c_str()));
     }
     if (expression.alpha.has_value()) {
-        options.push_back("alpha: " + FormatAlphaByte(*expression.alpha));
+        options.push_back(FormatText("alpha: %s", FormatAlphaByte(*expression.alpha).c_str()));
     }
     if (options.empty()) {
         return expression.base;
     }
 
-    std::string text = expression.base + "(";
+    std::string text = FormatText("%s(", expression.base.c_str());
     for (size_t i = 0; i < options.size(); ++i) {
         if (i > 0) {
-            text += ", ";
+            AppendFormat(text, ", ");
         }
-        text += options[i];
+        AppendFormat(text, "%s", options[i].c_str());
     }
-    text += ")";
+    AppendFormat(text, ")");
     return text;
 }

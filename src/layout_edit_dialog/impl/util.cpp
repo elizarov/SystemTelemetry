@@ -3,17 +3,18 @@
 #include <algorithm>
 #include <cmath>
 #include <commctrl.h>
-#include <cstdio>
 #include <cstring>
 #include <cwchar>
 
 #include "config/color_math.h"
-#include "layout_edit/board_metric_binding.h"
+#include "config/metric_board_binding.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "telemetry/metrics.h"
+#include "util/localization_catalog.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -85,16 +86,14 @@ double RoundToStep(double value, double step) {
 }
 
 void SetDialogControlRoundedDecimal(HWND hwnd, int controlId, double value, int decimalPlaces) {
-    char buffer[64] = {};
-    sprintf_s(buffer, "%.*f", decimalPlaces, value);
-    size_t length = std::char_traits<char>::length(buffer);
-    while (length > 0 && buffer[length - 1] == '0') {
-        buffer[--length] = '\0';
+    std::string text = FormatText("%.*f", decimalPlaces, value);
+    while (!text.empty() && text.back() == '0') {
+        text.pop_back();
     }
-    if (length > 0 && buffer[length - 1] == '.') {
-        buffer[--length] = '\0';
+    if (!text.empty() && text.back() == '.') {
+        text.pop_back();
     }
-    SetDialogControlTextUtf8(hwnd, controlId, length == 0 || strcmp(buffer, "-0") == 0 ? "0" : buffer);
+    SetDialogControlTextUtf8(hwnd, controlId, text.empty() || text == "-0" ? "0" : text);
 }
 
 void SetDialogControlRoundedInteger(HWND hwnd, int controlId, double value) {
@@ -191,7 +190,7 @@ void SetRgbColorDialogChannels(HWND hwnd, unsigned int color) {
 }  // namespace
 
 std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const LayoutMetricEditKey& key) {
-    const auto target = ParseBoardMetricBindingTarget(key.metricId);
+    const auto target = ResolveMetricBoardBindingTarget(key.metricId);
     if (!target.has_value()) {
         return {};
     }
@@ -265,7 +264,7 @@ void SetDialogControlTextUtf8(HWND hwnd, int controlId, std::string_view text) {
 }
 
 void SetDialogControlInteger(HWND hwnd, int controlId, int value) {
-    SetDialogControlTextUtf8(hwnd, controlId, std::to_string(value));
+    SetDialogControlTextUtf8(hwnd, controlId, FormatText("%d", value));
 }
 
 void SetDialogControlIntegerOrEmpty(HWND hwnd, int controlId, int value, bool hasValue) {
@@ -287,9 +286,7 @@ LRESULT AddComboStringUtf8(HWND combo, std::string_view text) {
 }
 
 std::string FormatDialogColorHex(unsigned int color) {
-    char buffer[16] = {};
-    sprintf_s(buffer, "#%08X", color);
-    return buffer;
+    return FormatText("#%08X", color);
 }
 
 std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {
@@ -723,12 +720,9 @@ bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style) {
 }
 
 std::string BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first) {
-    std::string label =
+    const char* side =
         leaf.weightAxis == LayoutGuideAxis::Vertical ? (first ? "Left" : "Right") : (first ? "Top" : "Bottom");
-    label += " ";
-    label += first ? leaf.firstWeightName : leaf.secondWeightName;
-    label += " weight:";
-    return label;
+    return FormatText("%s %s weight:", side, (first ? leaf.firstWeightName : leaf.secondWeightName).c_str());
 }
 
 std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
@@ -743,9 +737,7 @@ std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     if (const auto* metricLeaf =
             node->leaf.has_value() ? std::get_if<LayoutMetricEditKey>(&node->leaf->focusKey) : nullptr;
         metricLeaf != nullptr) {
-        std::string title = "Metric: ";
-        title += metricLeaf->metricId;
-        return title;
+        return FormatText("Metric: %s", metricLeaf->metricId.c_str());
     }
     if (const auto* titleLeaf =
             node->leaf.has_value() ? std::get_if<LayoutCardTitleEditKey>(&node->leaf->focusKey) : nullptr;
@@ -755,7 +747,7 @@ std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     if (const auto* nodeFieldLeaf =
             node->leaf.has_value() ? std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey) : nullptr;
         nodeFieldLeaf != nullptr) {
-        return LayoutNodeFieldEditTitle(*nodeFieldLeaf);
+        return std::string(LayoutNodeFieldEditTitle(*nodeFieldLeaf));
     }
     if (const auto* weightLeaf =
             node->leaf.has_value() ? std::get_if<LayoutWeightEditKey>(&node->leaf->focusKey) : nullptr;
@@ -765,71 +757,71 @@ std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node) {
     return TitleCaseWords(node->label);
 }
 
-std::string BuildLayoutEditSummaryText(const LayoutEditTreeNode* node) {
+std::string_view BuildLayoutEditSummaryText(const LayoutEditTreeNode* node) {
     if (node == nullptr) {
-        return "Type in the filter box or choose a tree item to start editing.";
+        return FindLocalizedText(RES_STR("layout_edit.summary.start"));
     }
     if (node->leaf.has_value()) {
         return "";
     }
     if (!node->selectionHighlight.has_value()) {
-        return "This item describes a configuration group and its matching dashboard highlight.";
+        return FindLocalizedText(RES_STR("layout_edit.summary.group"));
     }
     if (const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*node->selectionHighlight)) {
         switch (*special) {
             case LayoutEditSelectionHighlightSpecial::AllCards:
-                return "Highlights every rendered card while this node is selected.";
+                return FindLocalizedText(RES_STR("layout_edit.summary.all_cards"));
             case LayoutEditSelectionHighlightSpecial::AllTexts:
-                return "Highlights editable text targets and text widgets while this node is selected.";
+                return FindLocalizedText(RES_STR("layout_edit.summary.all_texts"));
             case LayoutEditSelectionHighlightSpecial::DashboardBounds:
-                return "Highlights the dashboard bounds while this node is selected.";
+                return FindLocalizedText(RES_STR("layout_edit.summary.dashboard_bounds"));
         }
     }
     if (std::holds_alternative<WidgetClass>(*node->selectionHighlight)) {
-        return "Highlights every rendered widget of this type while this node is selected.";
+        return FindLocalizedText(RES_STR("layout_edit.summary.widget_class"));
     }
     if (std::holds_alternative<LayoutContainerEditKey>(*node->selectionHighlight)) {
-        return "Highlights this container in the active layout while this node is selected.";
+        return FindLocalizedText(RES_STR("layout_edit.summary.container"));
     }
     if (std::holds_alternative<LayoutEditWidgetIdentity>(*node->selectionHighlight)) {
-        return "Highlights every rendered instance of this card while this node is selected.";
+        return FindLocalizedText(RES_STR("layout_edit.summary.card_instances"));
     }
-    return "Highlights the matching dashboard region while this node is selected.";
+    return FindLocalizedText(RES_STR("layout_edit.summary.dashboard_region"));
 }
 
-std::string BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
+std::string_view BuildLayoutEditHintText(const LayoutEditTreeNode* node) {
     if (node == nullptr || !node->leaf.has_value()) {
-        return "Select a field to edit it here.";
+        return FindLocalizedText(RES_STR("layout_edit.status.select_field"));
     }
     if (const auto* parameter = std::get_if<LayoutEditParameter>(&node->leaf->focusKey); parameter != nullptr) {
         switch (node->leaf->valueFormat) {
             case configschema::ValueFormat::Integer:
-                return "Enter a whole number. Valid values preview live.";
+                return FindLocalizedText(RES_STR("layout_edit.hint.integer"));
             case configschema::ValueFormat::FloatingPoint:
-                return "Enter a number. Use a period or comma for decimals.";
+                return FindLocalizedText(RES_STR("layout_edit.hint.floating_point"));
             case configschema::ValueFormat::String:
-                return "Type the replacement text. Changes preview live.";
+                return FindLocalizedText(RES_STR("layout_edit.hint.string"));
             case configschema::ValueFormat::FontSpec:
-                return "Choose a font family, size, and weight. Changes preview live.";
+                return FindLocalizedText(RES_STR("layout_edit.hint.font"));
             case configschema::ValueFormat::ColorHex:
-                return "Edit the color as #RRGGBBAA or use the RGBA controls and picker.";
+                return FindLocalizedText(RES_STR("layout_edit.hint.color"));
         }
     }
     if (std::holds_alternative<LayoutWeightEditKey>(node->leaf->focusKey)) {
-        return "Enter positive integer weights for the two neighboring layout items.";
+        return FindLocalizedText(RES_STR("layout_edit.hint.weight"));
     }
     if (std::holds_alternative<LayoutMetricEditKey>(node->leaf->focusKey)) {
-        return "Adjust the metric label, unit, scale, and board sensor binding. Changes preview live.";
+        return FindLocalizedText(RES_STR("layout_edit.hint.metric_definition"));
     }
     if (std::holds_alternative<LayoutCardTitleEditKey>(node->leaf->focusKey)) {
-        return "Edit the card title text. Changes preview live.";
+        return FindLocalizedText(RES_STR("layout_edit.hint.card_title"));
     }
     if (std::holds_alternative<ThemeColorEditKey>(node->leaf->focusKey)) {
-        return "Edit the theme token as #RRGGBBAA or use the RGBA controls and picker.";
+        return FindLocalizedText(RES_STR("layout_edit.hint.theme_color"));
     }
     if (const auto* nodeFieldLeaf = std::get_if<LayoutNodeFieldEditKey>(&node->leaf->focusKey);
         nodeFieldLeaf != nullptr) {
         return LayoutNodeFieldEditHint(*nodeFieldLeaf);
     }
-    return "Select a field to edit it here.";
+    return FindLocalizedText(RES_STR("layout_edit.status.select_field"));
 }

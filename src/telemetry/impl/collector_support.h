@@ -8,5 +8,4 @@
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, std::string_view path, PDH_HCOUNTER* counter);
 std::string DetectCpuName();
-std::string PdhStatusCodeString(PDH_STATUS status);
 std::string FormatScalarMetric(const ScalarMetric& metric, int precision);

@@ -26,6 +26,7 @@ D2D_INCLUDE_NAMES = {
     "wrl/client.h",
 }
 LARGE_SOURCE_FILE_LOC_THRESHOLD = 1_000
+UNIVERSAL_PACKAGE_DEPENDENCIES = {"util"}
 PACKAGE_DEPENDENCY_LIMITS = {
     "main": {"dashboard", "diagnostics", "display", "util"},
     "dashboard": {"config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "util", "widget"},
@@ -234,7 +235,8 @@ def top_level_package(module_name: str) -> str:
 
 
 def format_allowed_package_dependencies(package: str, dependencies: set[str]) -> str:
-    allowed = [package, *sorted(dependencies)]
+    universal = set() if package in UNIVERSAL_PACKAGE_DEPENDENCIES else UNIVERSAL_PACKAGE_DEPENDENCIES
+    allowed = [package, *sorted(dependencies | universal)]
     if len(allowed) == 1:
         return f"{allowed[0]} modules"
     return ", ".join(allowed[:-1]) + f", or {allowed[-1]} modules"
@@ -276,6 +278,8 @@ def check_package_dependency_limits(edges: dict[tuple[str, str], str]) -> list[V
         if allowed_targets is None:
             continue
         if target == EXTERNAL_D2D_MODULE:
+            continue
+        if target_package in UNIVERSAL_PACKAGE_DEPENDENCIES and source_package not in UNIVERSAL_PACKAGE_DEPENDENCIES:
             continue
         if target_package == source_package or target_package in allowed_targets:
             continue

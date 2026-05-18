@@ -105,6 +105,10 @@ function Test-EligibleCppPath {
     if ([System.IO.Path]::GetExtension($normalizedPath) -notin @('.cpp', '.h')) {
         return $false
     }
+    $fileName = [System.IO.Path]::GetFileName($normalizedPath)
+    if ($fileName -eq 'board_gigabyte_siv_bridge.cpp' -or $fileName -eq 'board_msi_center_bridge.cpp') {
+        return $false
+    }
 
     return $true
 }

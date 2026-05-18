@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "util/strings.h"
+#include "util/text_format.h"
 #include "util/utf8.h"
 
 namespace {
@@ -133,7 +134,7 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
         const std::string friendlyName = Utf8FromWide(targetName.monitorFriendlyDeviceName);
         const std::string monitorPath = Utf8FromWide(targetName.monitorDevicePath);
         if (IsUsefulFriendlyName(friendlyName)) {
-            identity.displayName = friendlyName + " (" + SimplifyDeviceName(deviceName) + ")";
+            identity.displayName = FormatText("%s (%s)", friendlyName.c_str(), SimplifyDeviceName(deviceName).c_str());
             identity.configName = friendlyName;
         } else if (!monitorPath.empty()) {
             identity.displayName = SimplifyDeviceName(deviceName);
@@ -185,8 +186,7 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
             const double fittedScale = ComputeMonitorFittedScale(*context->config, monitorWidth, monitorHeight);
 
             DisplayMenuOption& option = context->options[context->count++];
-            option.displayName =
-                identity.displayName + " (" + std::to_string(monitorWidth) + "x" + std::to_string(monitorHeight) + ")";
+            option.displayName = FormatText("%s (%ldx%ld)", identity.displayName.c_str(), monitorWidth, monitorHeight);
             option.configMonitorName = !identity.configName.empty() ? identity.configName : deviceName;
             option.rect = info.rcMonitor;
             option.dpi = dpi;

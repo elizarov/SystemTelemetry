@@ -14,8 +14,8 @@
 #include "util/elevated_process.h"
 #include "util/paths.h"
 #include "util/temp_file.h"
+#include "util/text_format.h"
 #include "util/trace.h"
-#include "util/win32_format.h"
 
 namespace {
 
@@ -32,28 +32,33 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
         return true;
     }
     if (config.display.monitorName.empty()) {
-        trace.Write(TracePrefix::Wallpaper, "skipped_missing_monitor wallpaper=\"" + config.display.wallpaper + "\"");
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("skipped_missing_monitor wallpaper=\"%s\""),
+            config.display.wallpaper.c_str());
         return false;
     }
 
     const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
-        trace.Write(TracePrefix::Wallpaper,
-            "monitor_unresolved monitor=\"" + config.display.monitorName + "\" wallpaper=\"" +
-                config.display.wallpaper + "\"");
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("monitor_unresolved monitor=\"%s\" wallpaper=\"%s\""),
+            config.display.monitorName.c_str(),
+            config.display.wallpaper.c_str());
         return false;
     }
 
     const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(config.display.wallpaper));
     if (wallpaperPath.empty()) {
-        trace.Write(TracePrefix::Wallpaper, "path_empty monitor=\"" + config.display.monitorName + "\"");
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("path_empty monitor=\"%s\""), config.display.monitorName.c_str());
         return false;
     }
 
     const HRESULT initStatus = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool shouldUninitialize = initStatus == S_OK || initStatus == S_FALSE;
     if (FAILED(initStatus) && initStatus != RPC_E_CHANGED_MODE) {
-        trace.Write(TracePrefix::Wallpaper, "coinitialize_failed hr=" + FormatHresult(initStatus));
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("coinitialize_failed hr=0x%08lX"), static_cast<unsigned long>(initStatus));
         return false;
     }
 
@@ -61,7 +66,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT createStatus =
         CoCreateInstance(CLSID_DesktopWallpaper, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&desktopWallpaper));
     if (FAILED(createStatus) || desktopWallpaper == nullptr) {
-        trace.Write(TracePrefix::Wallpaper, "create_failed hr=" + FormatHresult(createStatus));
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("create_failed hr=0x%08lX"), static_cast<unsigned long>(createStatus));
         if (shouldUninitialize) {
             CoUninitialize();
         }
@@ -73,7 +79,9 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     UINT monitorCount = 0;
     const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
     if (FAILED(countStatus)) {
-        trace.Write(TracePrefix::Wallpaper, "monitor_count_failed hr=" + FormatHresult(countStatus));
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("monitor_count_failed hr=0x%08lX"),
+            static_cast<unsigned long>(countStatus));
     } else {
         for (UINT index = 0; index < monitorCount; ++index) {
             LPWSTR monitorId = nullptr;
@@ -89,9 +97,13 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
                 const std::wstring wideWallpaperPath = wallpaperPath.Wide();
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
-                trace.Write(TracePrefix::Wallpaper,
-                    std::string("apply_") + (applied ? "done" : "failed") + " monitor=\"" + config.display.monitorName +
-                        "\" path=\"" + wallpaperPath.string() + "\" hr=" + FormatHresult(setStatus));
+                const std::string pathText = wallpaperPath.string();
+                trace.WriteFmt(TracePrefix::Wallpaper,
+                    RES_STR("apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX"),
+                    applied ? "done" : "failed",
+                    config.display.monitorName.c_str(),
+                    pathText.c_str(),
+                    static_cast<unsigned long>(setStatus));
                 CoTaskMemFree(monitorId);
                 break;
             }
@@ -100,8 +112,11 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     }
 
     if (!targetFound) {
-        trace.Write(TracePrefix::Wallpaper,
-            "target_not_found monitor=\"" + config.display.monitorName + "\" path=\"" + wallpaperPath.string() + "\"");
+        const std::string pathText = wallpaperPath.string();
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("target_not_found monitor=\"%s\" path=\"%s\""),
+            config.display.monitorName.c_str(),
+            pathText.c_str());
     }
 
     desktopWallpaper->Release();
@@ -156,14 +171,12 @@ bool ConfigureDisplay(
         return false;
     }
 
-    std::string parameters = "/configure-display ";
-    parameters += QuoteCommandLineArgument(tempConfigPath.string());
-    parameters += " /configure-display-target ";
-    parameters += QuoteCommandLineArgument(configPath.string());
-    parameters += " /configure-display-dump ";
-    parameters += QuoteCommandLineArgument(tempDumpPath.string());
-    parameters += " /configure-display-image-target ";
-    parameters += QuoteCommandLineArgument(imagePath.string());
+    const std::string parameters = FormatText("/configure-display %s /configure-display-target %s "
+                                              "/configure-display-dump %s /configure-display-image-target %s",
+        QuoteCommandLineArgument(tempConfigPath.string()).c_str(),
+        QuoteCommandLineArgument(configPath.string()).c_str(),
+        QuoteCommandLineArgument(tempDumpPath.string()).c_str(),
+        QuoteCommandLineArgument(imagePath.string()).c_str());
 
     DWORD exitCode = 1;
     const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);

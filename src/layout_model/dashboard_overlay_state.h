@@ -46,5 +46,6 @@ struct DashboardOverlayState {
     bool IsContainerGuideDragActive() const;
     bool ShouldDrawSelectedTreeHighlight() const;
     bool ShouldRegisterDynamicEditArtifacts() const;
+    bool ShouldDrawOverlayLayer() const;
     void SetPreviewWidget(const LayoutEditWidgetIdentity& widget);
 };

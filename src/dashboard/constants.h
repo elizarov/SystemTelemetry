@@ -4,8 +4,10 @@
 
 inline constexpr UINT_PTR kMoveTimerId = 2;
 inline constexpr UINT_PTR kPlacementTimerId = 3;
+inline constexpr UINT_PTR kAnimationFrameTimerId = 4;
 inline constexpr UINT kMoveTimerMs = 16;
 inline constexpr UINT kPlacementTimerMs = 2000;
+inline constexpr UINT kAnimationFrameTimerMs = 16;
 inline constexpr UINT kTrayMessage = WM_APP + 1;
 inline constexpr UINT kTelemetryUpdateMessage = WM_APP + 2;
 inline constexpr UINT kCommandMove = 1001;
@@ -33,4 +35,6 @@ inline constexpr UINT kCommandScaleMax = 1499;
 inline constexpr UINT kCommandCustomScale = 1500;
 inline constexpr UINT kCommandThemeBase = 1600;
 inline constexpr UINT kCommandThemeMax = 1699;
+inline constexpr UINT kCommandGpuAdapterBase = 1700;
+inline constexpr UINT kCommandGpuAdapterMax = 1799;
 inline constexpr char kWindowClassName[] = "CaseDashDashboard";

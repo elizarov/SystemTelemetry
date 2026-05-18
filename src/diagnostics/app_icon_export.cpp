@@ -7,6 +7,7 @@
 
 #include "renderer/png_export.h"
 #include "util/file_path.h"
+#include "util/text_format.h"
 #include "widget/app_icon_geometry.h"
 
 namespace {
@@ -38,7 +39,7 @@ bool EnsureDirectoryExists(const FilePath& path, std::string* errorText) {
     if (CreateDirectoryW(widePath.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
         return true;
     }
-    return SetError(errorText, "app_icon:create_directory_failed path=" + path.string());
+    return SetError(errorText, FormatText("app_icon:create_directory_failed path=%s", path.string().c_str()));
 }
 
 bool SaveBitmapAsPng(const AppIconBitmap& bitmap, const FilePath& imagePath, std::string* errorText) {

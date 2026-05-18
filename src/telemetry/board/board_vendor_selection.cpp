@@ -4,6 +4,8 @@
 
 const char* BoardVendorName(BoardVendor vendor) {
     switch (vendor) {
+        case BoardVendor::Asus:
+            return "ASUS";
         case BoardVendor::Gigabyte:
             return "Gigabyte";
         case BoardVendor::Msi:
@@ -15,6 +17,9 @@ const char* BoardVendorName(BoardVendor vendor) {
 }
 
 BoardVendor SelectBoardVendor(const BoardVendorInfo& info) {
+    if (ContainsInsensitive(info.manufacturer, "asustek") || ContainsInsensitive(info.manufacturer, "asus")) {
+        return BoardVendor::Asus;
+    }
     if (ContainsInsensitive(info.manufacturer, "micro-star") || ContainsInsensitive(info.manufacturer, "msi")) {
         return BoardVendor::Msi;
     }

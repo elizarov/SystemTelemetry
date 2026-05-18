@@ -51,6 +51,36 @@ TEST(ConfigResolution, CollectsUniqueBoardBindingsFromNestedCardLayouts) {
     EXPECT_EQ(selection.boardFanNames[0], "system");
 }
 
+TEST(ConfigResolution, CollectsGpuFanFallbackBoardBindingFromGpuFanMetric) {
+    LayoutConfig layout;
+    LayoutCardConfig card;
+    card.id = "gpu";
+    card.layout = MakeContainerNode("rows",
+        {MakeWidgetNode("metric_list", "gpu.vram, gpu.fan"), MakeWidgetNode("metric_list", "board.fan.cpu, gpu.fan")});
+    layout.cards.push_back(card);
+
+    const LayoutBindingSelection selection = CollectLayoutBindings(layout);
+
+    ASSERT_EQ(selection.boardFanNames.size(), 2u);
+    EXPECT_EQ(selection.boardFanNames[0], "gpu");
+    EXPECT_EQ(selection.boardFanNames[1], "cpu");
+}
+
+TEST(ConfigResolution, CollectsCpuTemperatureFallbackBoardBindingFromGpuTemperatureMetric) {
+    LayoutConfig layout;
+    LayoutCardConfig card;
+    card.id = "gpu";
+    card.layout = MakeContainerNode("rows",
+        {MakeWidgetNode("metric_list", "gpu.temp, gpu.clock"), MakeWidgetNode("metric_list", "board.temp.vrm")});
+    layout.cards.push_back(card);
+
+    const LayoutBindingSelection selection = CollectLayoutBindings(layout);
+
+    ASSERT_EQ(selection.boardTemperatureNames.size(), 2u);
+    EXPECT_EQ(selection.boardTemperatureNames[0], "cpu");
+    EXPECT_EQ(selection.boardTemperatureNames[1], "vrm");
+}
+
 TEST(ConfigResolution, NormalizesConfiguredDrivesAndRemovesDuplicates) {
     const std::vector<std::string> drives = NormalizeConfiguredDrives({" c", "D:", "c\\", "", "1", "d"});
 
@@ -81,6 +111,7 @@ TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
 TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInputs) {
     AppConfig config;
     config.network.adapterName = "Ethernet";
+    config.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
     config.storage.drives = {"C", "D"};
     config.layout.board.requestedTemperatureNames = {"cpu"};
     config.layout.board.requestedFanNames = {"system"};
@@ -93,6 +124,7 @@ TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInpu
     const TelemetrySettings settings = ExtractTelemetrySettings(config);
 
     EXPECT_EQ(settings.selection.preferredAdapterName, "Ethernet");
+    EXPECT_EQ(settings.selection.preferredGpuAdapterName, "NVIDIA GeForce RTX 4070 Laptop GPU");
     EXPECT_EQ(settings.selection.configuredDrives, (std::vector<std::string>{"C", "D"}));
     EXPECT_EQ(settings.board.requestedTemperatureNames, (std::vector<std::string>{"cpu"}));
     EXPECT_EQ(settings.board.requestedFanNames, (std::vector<std::string>{"system"}));
@@ -103,6 +135,7 @@ TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInpu
 TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingResolvedSelections) {
     AppConfig uiConfig;
     uiConfig.network.adapterName = "Configured Ethernet";
+    uiConfig.gpu.adapterName = "Configured GPU";
     uiConfig.storage.drives = {"Z"};
     uiConfig.layout.gauge.labelBottom = 42;
     uiConfig.layout.metrics.definitions.push_back(
@@ -110,6 +143,7 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
 
     ResolvedTelemetrySelections resolvedSelections;
     resolvedSelections.adapterName = "Resolved Ethernet";
+    resolvedSelections.gpuAdapterName = "Resolved GPU";
     resolvedSelections.drives = {"C", "D"};
     resolvedSelections.boardTemperatureSensorNames["cpu"] = "CPU";
     resolvedSelections.boardFanSensorNames["system"] = "SYS_FAN";
@@ -118,10 +152,23 @@ TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingReso
     const MetricDefinitionConfig* metric = FindMetricDefinition(effectiveConfig.layout.metrics, "gpu.temp");
 
     EXPECT_EQ(effectiveConfig.network.adapterName, "Resolved Ethernet");
+    EXPECT_EQ(effectiveConfig.gpu.adapterName, "Resolved GPU");
     EXPECT_EQ(effectiveConfig.storage.drives, (std::vector<std::string>{"C", "D"}));
     EXPECT_EQ(effectiveConfig.layout.board.temperatureSensorNames.at("cpu"), "CPU");
     EXPECT_EQ(effectiveConfig.layout.board.fanSensorNames.at("system"), "SYS_FAN");
     EXPECT_EQ(effectiveConfig.layout.gauge.labelBottom, 42);
     ASSERT_NE(metric, nullptr);
     EXPECT_EQ(metric->label, "Core Temp");
+}
+
+TEST(ConfigResolution, EffectiveRuntimeConfigKeepsEmptyGpuSelectionAutomatic) {
+    AppConfig uiConfig;
+    uiConfig.gpu.adapterName.clear();
+
+    ResolvedTelemetrySelections resolvedSelections;
+    resolvedSelections.gpuAdapterName = "Resolved GPU";
+
+    const AppConfig effectiveConfig = BuildEffectiveRuntimeConfig(uiConfig, resolvedSelections);
+
+    EXPECT_TRUE(effectiveConfig.gpu.adapterName.empty());
 }

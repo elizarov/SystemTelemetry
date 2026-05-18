@@ -8,6 +8,8 @@
 #include <wincodec.h>
 #include <wrl/client.h>
 
+#include "util/resource_strings.h"
+#include "util/text_format.h"
 #include "util/win32_format.h"
 
 namespace {
@@ -15,6 +17,42 @@ namespace {
 bool SetError(std::string* errorText, std::string text) {
     if (errorText != nullptr) {
         *errorText = std::move(text);
+    }
+    return false;
+}
+
+bool SetError(std::string* errorText, ResourceStringId text) {
+    if (errorText != nullptr) {
+        *errorText = ResourceStringText(text);
+    }
+    return false;
+}
+
+bool SetHresultError(std::string* errorText, ResourceStringId prefix, HRESULT hr) {
+    if (errorText != nullptr) {
+        AssignFormat(*errorText, RES_STR("%s hr="), ResourceStringText(prefix));
+        AppendHresult(*errorText, hr);
+    }
+    return false;
+}
+
+bool SetPrefixedHresultError(std::string* errorText, std::string_view prefix, ResourceStringId suffix, HRESULT hr) {
+    if (errorText != nullptr) {
+        AssignFormat(*errorText,
+            RES_STR("%.*s%s hr="),
+            static_cast<int>(prefix.size()),
+            prefix.data(),
+            ResourceStringText(suffix));
+        AppendHresult(*errorText, hr);
+    }
+    return false;
+}
+
+bool SetPrefixedHresultPathError(
+    std::string* errorText, std::string_view prefix, ResourceStringId suffix, HRESULT hr, const FilePath& imagePath) {
+    if (errorText != nullptr) {
+        SetPrefixedHresultError(errorText, prefix, suffix, hr);
+        AppendFormat(*errorText, RES_STR(" path=\"%s\""), imagePath.string().c_str());
     }
     return false;
 }
@@ -35,7 +73,7 @@ bool SaveBgraPngWithInitializedCom(
     HRESULT hr =
         CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(factory.GetAddressOf()));
     if (FAILED(hr) || factory == nullptr) {
-        return SetError(errorText, "renderer:png_wic_factory_failed hr=" + FormatHresult(hr));
+        return SetHresultError(errorText, RES_STR("png_wic_factory_failed"), hr);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmap> source;
@@ -51,11 +89,11 @@ bool SaveBgraPngWithInitializedCom(
         const_cast<BYTE*>(bgra.data()),
         source.GetAddressOf());
     if (FAILED(hr) || source == nullptr) {
-        return SetError(errorText, "renderer:png_wic_bitmap_failed hr=" + FormatHresult(hr));
+        return SetHresultError(errorText, RES_STR("png_wic_bitmap_failed"), hr);
     }
 
     return SaveWicBitmapSourcePng(
-        factory.Get(), source.Get(), imagePath, PngPixelFormat::BgraWithAlpha, "renderer:png", errorText);
+        factory.Get(), source.Get(), imagePath, PngPixelFormat::BgraWithAlpha, "png", errorText);
 }
 
 }  // namespace
@@ -68,14 +106,14 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     std::string* errorText) {
     const std::string prefix(errorPrefix);
     if (factory == nullptr || source == nullptr) {
-        return SetError(errorText, prefix + "_wic_unavailable");
+        return SetError(errorText, FormatText(RES_STR("%s_wic_unavailable"), prefix.c_str()));
     }
 
     UINT bitmapWidth = 0;
     UINT bitmapHeight = 0;
     HRESULT hr = source->GetSize(&bitmapWidth, &bitmapHeight);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_bitmap_size_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_bitmap_size_failed"), hr);
     }
 
     Microsoft::WRL::ComPtr<IWICFormatConverter> converter;
@@ -84,12 +122,12 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     if (pixelFormat == PngPixelFormat::BgrOpaque) {
         hr = factory->CreateFormatConverter(converter.GetAddressOf());
         if (FAILED(hr) || converter == nullptr) {
-            return SetError(errorText, prefix + "_converter_failed hr=" + FormatHresult(hr));
+            return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_converter_failed"), hr);
         }
         hr = converter->Initialize(
             source, targetPixelFormat, WICBitmapDitherTypeNone, nullptr, 0.0, WICBitmapPaletteTypeCustom);
         if (FAILED(hr)) {
-            return SetError(errorText, prefix + "_converter_init_failed hr=" + FormatHresult(hr));
+            return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_converter_init_failed"), hr);
         }
         frameSource = converter.Get();
     }
@@ -97,55 +135,54 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     Microsoft::WRL::ComPtr<IWICStream> stream;
     hr = factory->CreateStream(stream.GetAddressOf());
     if (FAILED(hr) || stream == nullptr) {
-        return SetError(errorText, prefix + "_stream_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_stream_failed"), hr);
     }
     const std::wstring wideImagePath = imagePath.Wide();
     hr = stream->InitializeFromFilename(wideImagePath.c_str(), GENERIC_WRITE);
     if (FAILED(hr)) {
-        return SetError(
-            errorText, prefix + "_stream_open_failed hr=" + FormatHresult(hr) + " path=\"" + imagePath.string() + "\"");
+        return SetPrefixedHresultPathError(errorText, errorPrefix, RES_STR("_stream_open_failed"), hr, imagePath);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapEncoder> encoder;
     hr = factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf());
     if (FAILED(hr) || encoder == nullptr) {
-        return SetError(errorText, prefix + "_encoder_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_encoder_failed"), hr);
     }
     hr = encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_encoder_init_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_encoder_init_failed"), hr);
     }
 
     Microsoft::WRL::ComPtr<IWICBitmapFrameEncode> frame;
     hr = encoder->CreateNewFrame(frame.GetAddressOf(), nullptr);
     if (FAILED(hr) || frame == nullptr) {
-        return SetError(errorText, prefix + "_frame_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_failed"), hr);
     }
     hr = frame->Initialize(nullptr);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_init_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_init_failed"), hr);
     }
     hr = frame->SetSize(bitmapWidth, bitmapHeight);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_size_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_size_failed"), hr);
     }
 
     WICPixelFormatGUID frameFormat = targetPixelFormat;
     hr = frame->SetPixelFormat(&frameFormat);
     if (FAILED(hr) || !IsEqualGUID(frameFormat, targetPixelFormat)) {
-        return SetError(errorText, prefix + "_frame_format_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_format_failed"), hr);
     }
     hr = frame->WriteSource(frameSource, nullptr);
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_write_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_write_failed"), hr);
     }
     hr = frame->Commit();
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_frame_commit_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_frame_commit_failed"), hr);
     }
     hr = encoder->Commit();
     if (FAILED(hr)) {
-        return SetError(errorText, prefix + "_encoder_commit_failed hr=" + FormatHresult(hr));
+        return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_encoder_commit_failed"), hr);
     }
     return true;
 }
@@ -153,16 +190,16 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
 bool SaveBgraPng(
     const FilePath& imagePath, int width, int height, const std::vector<std::uint8_t>& bgra, std::string* errorText) {
     if (width <= 0 || height <= 0) {
-        return SetError(errorText, "renderer:png_invalid_size");
+        return SetError(errorText, RES_STR("png_invalid_size"));
     }
     const std::size_t expectedBytes = static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4u;
     if (bgra.size() != expectedBytes || expectedBytes > static_cast<std::size_t>((std::numeric_limits<UINT>::max)())) {
-        return SetError(errorText, "renderer:png_invalid_bitmap");
+        return SetError(errorText, RES_STR("png_invalid_bitmap"));
     }
 
     const HRESULT initHr = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     if (FAILED(initHr) && initHr != RPC_E_CHANGED_MODE) {
-        return SetError(errorText, "renderer:png_com_init_failed hr=" + FormatHresult(initHr));
+        return SetHresultError(errorText, RES_STR("png_com_init_failed"), initHr);
     }
     const bool shouldUninitialize = initHr == S_OK || initHr == S_FALSE;
     const bool ok = SaveBgraPngWithInitializedCom(imagePath, width, height, bgra, errorText);

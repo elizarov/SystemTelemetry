@@ -6,6 +6,7 @@
 
 #include "config/config.h"
 #include "renderer/renderer.h"
+#include "widget/animation.h"
 #include "widget/layout_edit_types.h"
 
 struct WidgetLayout;
@@ -73,4 +74,6 @@ public:
     virtual const std::string& ResolveConfiguredMetricSampleValueText(std::string_view metricRef) const = 0;
     virtual std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const = 0;
+    // Main thread: widgets submit geometry-only draw primitives with already-resolved opaque target state.
+    virtual void AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState);
 };

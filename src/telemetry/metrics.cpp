@@ -3,11 +3,12 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
-#include <cstdio>
 #include <string_view>
 #include <utility>
 
+#include "telemetry/timing.h"
 #include "util/numeric_safety.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -105,58 +106,43 @@ std::string FormatScalarValue(std::optional<double> value, std::string_view unit
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.*f", precision, *value);
-    } else {
-        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.*f", precision, *value);
     }
-    return buffer;
+    return FormatText("%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatPercentValue(std::optional<double> value, std::string_view unit, int precision) {
     if (!value.has_value() || !IsFiniteDouble(*value)) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.*f", precision, *value);
+        return FormatText("%.*f", precision, *value);
     } else if (unit == "%") {
-        sprintf_s(buffer, "%.*f%%", precision, *value);
-    } else {
-        sprintf_s(buffer, "%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.*f%%", precision, *value);
     }
-    return buffer;
+    return FormatText("%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatMemoryValue(double usedGb, double totalGb, std::string_view unit) {
     if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, "%.1f / %.0f", usedGb, totalGb);
-    } else {
-        sprintf_s(buffer, "%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(unit.size()), unit.data());
+        return FormatText("%.1f / %.0f", usedGb, totalGb);
     }
-    return buffer;
+    return FormatText("%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(unit.size()), unit.data());
 }
 
 std::string FormatThroughputValue(double valueMbps, std::string_view unit) {
     if (!IsFiniteDouble(valueMbps) || valueMbps < 0.0) {
         return "N/A";
     }
-    char buffer[64];
     if (unit.empty()) {
-        sprintf_s(buffer, valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
-    } else {
-        sprintf_s(buffer,
-            valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s",
-            valueMbps,
-            static_cast<int>(unit.size()),
-            unit.data());
+        return FormatText(valueMbps >= 100.0 ? "%.0f" : "%.1f", valueMbps);
     }
-    return buffer;
+    return FormatText(
+        valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s", valueMbps, static_cast<int>(unit.size()), unit.data());
 }
 
 std::pair<std::string_view, std::string_view> SplitSizeUnits(std::string_view units) {
@@ -172,60 +158,66 @@ std::string FormatSizeAutoValue(double valueGb, std::string_view units) {
         return "N/A";
     }
     const auto [smallUnit, largeUnit] = SplitSizeUnits(units);
-    char buffer[64];
     if (valueGb >= 1024.0) {
         if (largeUnit.empty()) {
-            sprintf_s(buffer, "%.1f", valueGb / 1024.0);
-        } else {
-            sprintf_s(buffer, "%.1f %.*s", valueGb / 1024.0, static_cast<int>(largeUnit.size()), largeUnit.data());
+            return FormatText("%.1f", valueGb / 1024.0);
         }
+        return FormatText("%.1f %.*s", valueGb / 1024.0, static_cast<int>(largeUnit.size()), largeUnit.data());
     } else if (smallUnit.empty()) {
-        sprintf_s(buffer, "%.0f", valueGb);
-    } else {
-        sprintf_s(buffer, "%.0f %.*s", valueGb, static_cast<int>(smallUnit.size()), smallUnit.data());
+        return FormatText("%.0f", valueGb);
     }
-    return buffer;
+    return FormatText("%.0f %.*s", valueGb, static_cast<int>(smallUnit.size()), smallUnit.data());
 }
 
-std::vector<double> SmoothThroughputHistory(const std::vector<double>& history) {
-    if (history.empty()) {
-        return {};
+double AverageThroughputLiveSamples(const std::vector<double>& samples) {
+    if (samples.empty()) {
+        return 0.0;
     }
-
-    std::vector<double> smoothed;
-    smoothed.reserve(history.size());
-    if (history.size() == 1) {
-        smoothed.push_back(FiniteNonNegativeOr(history.front()));
-        return smoothed;
+    double total = 0.0;
+    for (double sample : samples) {
+        total += FiniteNonNegativeOr(sample);
     }
-
-    // Keep only complete adjacent-pair averages so no raw endpoint can drive graph scaling.
-    for (size_t i = 1; i < history.size(); ++i) {
-        smoothed.push_back((FiniteNonNegativeOr(history[i - 1]) + FiniteNonNegativeOr(history[i])) / 2.0);
-    }
-    return smoothed;
+    return total / static_cast<double>(samples.size());
 }
 
-double ResolveDisplayedThroughputValue(double fallbackValue, const std::vector<double>& smoothedHistory) {
-    if (!smoothedHistory.empty()) {
-        return FiniteNonNegativeOr(smoothedHistory.back());
+double ResolveThroughputLiveLeader(const RetainedHistorySeries* history, double fallbackValue) {
+    if (history == nullptr) {
+        return FiniteNonNegativeOr(fallbackValue);
+    }
+    if (!history->throughputLiveSamples.empty()) {
+        return AverageThroughputLiveSamples(history->throughputLiveSamples);
+    }
+    if (!history->samples.empty()) {
+        return FiniteNonNegativeOr(history->samples.back());
     }
     return FiniteNonNegativeOr(fallbackValue);
 }
 
-double GetThroughputGraphMax(const std::vector<double>* const* histories, size_t historyCount) {
-    double maxSmoothedValue = 10.0;
+double ResolveThroughputPlotShift(const RetainedHistorySeries* history) {
+    if (history == nullptr || history->throughputBucketSampleCount == 0) {
+        return 0.0;
+    }
+    return std::clamp(static_cast<double>(history->throughputBucketSampleCount) /
+                          static_cast<double>(kThroughputHistorySmoothingSamples),
+        0.0,
+        1.0);
+}
+
+double GetThroughputGraphMax(
+    const MetricSource::ThroughputSharedState::HistoryEntry* const* histories, size_t historyCount) {
+    double maxDisplayedValue = 10.0;
     for (size_t i = 0; i < historyCount; ++i) {
         const auto* history = histories[i];
         if (history == nullptr) {
             continue;
         }
-        for (double value : *history) {
-            maxSmoothedValue = std::max(maxSmoothedValue, FiniteNonNegativeOr(value));
+        for (double value : history->samples) {
+            maxDisplayedValue = std::max(maxDisplayedValue, FiniteNonNegativeOr(value));
         }
+        maxDisplayedValue = std::max(maxDisplayedValue, FiniteNonNegativeOr(history->liveLeaderMbps));
     }
-    const double roundingStep = maxSmoothedValue > 100.0 ? 50.0 : 5.0;
-    return std::max(10.0, std::ceil(maxSmoothedValue / roundingStep) * roundingStep);
+    const double roundingStep = maxDisplayedValue > 100.0 ? 50.0 : 5.0;
+    return std::max(10.0, std::ceil(maxDisplayedValue / roundingStep) * roundingStep);
 }
 
 double GetThroughputGuideStep(double maxGraph) {
@@ -234,8 +226,9 @@ double GetThroughputGuideStep(double maxGraph) {
 
 double GetTimeMarkerOffsetSamples(const SYSTEMTIME& now) {
     const double secondsIntoTenSecondWindow =
-        std::fmod(static_cast<double>(now.wSecond) + (static_cast<double>(now.wMilliseconds) / 1000.0), 10.0);
-    return secondsIntoTenSecondWindow / 0.5;
+        std::fmod(static_cast<double>(now.wSecond) + (static_cast<double>(now.wMilliseconds) / 1000.0),
+            kThroughputTimeMarkerIntervalSeconds);
+    return secondsIntoTenSecondWindow / kThroughputHistoryPointSeconds;
 }
 
 double ResolveMetricRatio(const MetricDefinitionConfig& definition, double value, double telemetryScale = 0.0) {
@@ -253,23 +246,28 @@ int ResolveScalarPrecision(const std::string& metricRef) {
     return 0;
 }
 
-const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
+const RetainedHistorySeries* FindRetainedHistorySeries(const SystemSnapshot& snapshot, const std::string& seriesRef) {
     RetainedHistoryKey key = RetainedHistoryKey::Count;
     if (TryRetainedHistoryKey(seriesRef, key)) {
         const uint16_t encodedIndex = snapshot.retainedHistoryIndexByKey[static_cast<size_t>(key)];
         if (encodedIndex != 0) {
             const size_t index = encodedIndex - 1u;
             if (index < snapshot.retainedHistories.size() && snapshot.retainedHistories[index].seriesRef == seriesRef) {
-                return &snapshot.retainedHistories[index].samples;
+                return &snapshot.retainedHistories[index];
             }
         }
     }
     for (const auto& history : snapshot.retainedHistories) {
         if (history.seriesRef == seriesRef) {
-            return &history.samples;
+            return &history;
         }
     }
     return nullptr;
+}
+
+const std::vector<double>* FindRetainedHistory(const SystemSnapshot& snapshot, const std::string& seriesRef) {
+    const auto* history = FindRetainedHistorySeries(snapshot, seriesRef);
+    return history != nullptr ? &history->samples : nullptr;
 }
 
 double ResolvePeakRatio(const SystemSnapshot& snapshot,
@@ -288,9 +286,16 @@ double ResolvePeakRatio(const SystemSnapshot& snapshot,
     return ClampFinite(peak, 0.0, 1.0);
 }
 
-std::vector<double> ResolveRetainedHistorySamples(const SystemSnapshot& snapshot, const std::string& seriesRef) {
-    const auto* history = FindRetainedHistory(snapshot, seriesRef);
-    return history != nullptr ? *history : std::vector<double>{};
+void ResolveRetainedThroughputHistory(const SystemSnapshot& snapshot,
+    const MetricBinding& binding,
+    double fallbackValue,
+    std::vector<double>& samples,
+    double& liveLeaderMbps,
+    double& plotShiftSamples) {
+    const auto* history = FindRetainedHistorySeries(snapshot, binding.key);
+    samples = history != nullptr ? history->samples : std::vector<double>{};
+    liveLeaderMbps = ResolveThroughputLiveLeader(history, fallbackValue);
+    plotShiftSamples = ResolveThroughputPlotShift(history);
 }
 
 std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
@@ -645,12 +650,12 @@ bool ResolveMetricValue(const SystemSnapshot& snapshot,
     return true;
 }
 
-const std::vector<double>* FindThroughputHistory(
+const MetricSource::ThroughputSharedState::HistoryEntry* FindThroughputHistory(
     const MetricSource::ThroughputSharedState& state, std::string_view metricRef) {
     for (size_t i = 0; i < state.historyCount; ++i) {
         const auto& entry = state.histories[i];
         if (entry.metricRef != nullptr && std::string_view(entry.metricRef) == metricRef) {
-            return &entry.samples;
+            return &entry;
         }
     }
     return nullptr;
@@ -684,8 +689,8 @@ double ResolveThroughputValue(const SystemSnapshot& snapshot, MetricBindingKind 
 }
 
 void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSource::ThroughputSharedState& state) {
-    const std::vector<double>* networkHistories[2] = {};
-    const std::vector<double>* storageHistories[2] = {};
+    const MetricSource::ThroughputSharedState::HistoryEntry* networkHistories[2] = {};
+    const MetricSource::ThroughputSharedState::HistoryEntry* storageHistories[2] = {};
     size_t networkHistoryCount = 0;
     size_t storageHistoryCount = 0;
     state.historyCount = 0;
@@ -698,13 +703,18 @@ void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSourc
         }
         auto& entry = state.histories[state.historyCount++];
         entry.metricRef = binding.key;
-        entry.samples = SmoothThroughputHistory(ResolveRetainedHistorySamples(snapshot, std::string(binding.key)));
+        ResolveRetainedThroughputHistory(snapshot,
+            binding,
+            ResolveThroughputValue(snapshot, binding.kind),
+            entry.samples,
+            entry.liveLeaderMbps,
+            entry.plotShiftSamples);
         if (binding.throughputGroup == ThroughputGraphGroup::Network &&
             networkHistoryCount < std::size(networkHistories)) {
-            networkHistories[networkHistoryCount++] = &entry.samples;
+            networkHistories[networkHistoryCount++] = &entry;
         } else if (binding.throughputGroup == ThroughputGraphGroup::Storage &&
                    storageHistoryCount < std::size(storageHistories)) {
-            storageHistories[storageHistoryCount++] = &entry.samples;
+            storageHistories[storageHistoryCount++] = &entry;
         }
     }
     state.networkMaxGraph = GetThroughputGraphMax(networkHistories, networkHistoryCount);
@@ -713,13 +723,11 @@ void InitializeThroughputSharedState(const SystemSnapshot& snapshot, MetricSourc
 }
 
 std::string TwoDigit(int value) {
-    char buffer[8];
-    sprintf_s(buffer, "%02d", value);
-    return buffer;
+    return FormatText("%02d", value);
 }
 
 std::string NumberText(int value) {
-    return std::to_string(value);
+    return FormatText("%d", value);
 }
 
 std::string MonthName(int month) {
@@ -846,7 +854,7 @@ std::string FormatWithTokens(
             const FormatToken& token = tokens[tokenIndex];
             if (format.size() - index >= token.length &&
                 format.compare(index, token.length, token.text, token.length) == 0) {
-                output += ResolveFormatToken(time, token.kind);
+                AppendFormat(output, "%s", ResolveFormatToken(time, token.kind).c_str());
                 index += token.length;
                 matched = true;
                 break;
@@ -990,15 +998,17 @@ const ThroughputMetric& MetricSource::ResolveThroughput(const std::string& metri
     if (match.binding != nullptr && BindingSupportsPayload(*match.binding, MetricPayloadKind::Throughput)) {
         const auto* history = FindThroughputHistory(throughputSharedState_, metricRef);
         const std::vector<double> emptyHistory;
-        const std::vector<double>& resolvedHistory = history != nullptr ? *history : emptyHistory;
-        metric.valueMbps =
-            ResolveDisplayedThroughputValue(ResolveThroughputValue(snapshot_, match.binding->kind), resolvedHistory);
+        const std::vector<double>& resolvedHistory = history != nullptr ? history->samples : emptyHistory;
+        metric.liveLeaderMbps =
+            history != nullptr ? history->liveLeaderMbps : ResolveThroughputValue(snapshot_, match.binding->kind);
+        metric.valueMbps = FiniteNonNegativeOr(metric.liveLeaderMbps);
         metric.history = resolvedHistory;
+        metric.plotShiftSamples = history != nullptr ? history->plotShiftSamples : 0.0;
         metric.maxGraph = ResolveThroughputGraphMax(throughputSharedState_, *match.binding);
         metric.guideStepMbps = GetThroughputGuideStep(metric.maxGraph);
     }
     metric.timeMarkerOffsetSamples = throughputSharedState_.timeMarkerOffsetSamples;
-    metric.timeMarkerIntervalSamples = 20.0;
+    metric.timeMarkerIntervalSamples = kThroughputTimeMarkerIntervalSamples;
     if (definition != nullptr) {
         metric.label = definition->label;
         metric.valueText = FormatMetricValueText(*definition, metricRef, metric.valueMbps);
@@ -1014,7 +1024,8 @@ const std::string& MetricSource::ResolveNetworkFooter() const {
         if (snapshot_.network.adapterName.empty()) {
             networkFooterCache_ = snapshot_.network.ipAddress;
         } else {
-            networkFooterCache_ = snapshot_.network.adapterName + " | " + snapshot_.network.ipAddress;
+            networkFooterCache_ =
+                FormatText("%s | %s", snapshot_.network.adapterName.c_str(), snapshot_.network.ipAddress.c_str());
         }
         networkFooterCached_ = true;
     }

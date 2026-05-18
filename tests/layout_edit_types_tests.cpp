@@ -6,6 +6,7 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit_dialog/impl/editor_handler_registry.h"
+#include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
 #include "widget/widget.h"
@@ -29,6 +30,41 @@ TEST(LayoutEditTypes, MatchesWidgetIdentityUsingKindAndPath) {
 
     EXPECT_TRUE(MatchesWidgetIdentity(widgetA, widgetB));
     EXPECT_FALSE(MatchesWidgetIdentity(widgetA, cardChrome));
+}
+
+TEST(DashboardOverlayState, SkipsOverlayLayerWhenItHasNoVisibleContent) {
+    DashboardOverlayState overlayState;
+
+    EXPECT_FALSE(overlayState.ShouldDrawOverlayLayer());
+
+    overlayState.showLayoutEditGuides = true;
+    EXPECT_FALSE(overlayState.ShouldDrawOverlayLayer());
+
+    overlayState.forceLayoutEditAffordances = true;
+    EXPECT_TRUE(overlayState.ShouldDrawOverlayLayer());
+}
+
+TEST(DashboardOverlayState, DrawsOverlayLayerForDragsMoveOverlayAndTreeSelection) {
+    DashboardOverlayState overlayState;
+
+    overlayState.moveOverlay.visible = true;
+    EXPECT_TRUE(overlayState.ShouldDrawOverlayLayer());
+
+    overlayState = DashboardOverlayState{};
+    overlayState.activeMetricListReorderDrag =
+        MetricListReorderOverlayState{LayoutEditWidgetIdentity{"card-a", "card-a", {}}, 0, 12, 4};
+    EXPECT_TRUE(overlayState.ShouldDrawOverlayLayer());
+
+    overlayState = DashboardOverlayState{};
+    overlayState.activeContainerChildReorderDrag = ContainerChildReorderOverlayState{
+        LayoutContainerChildOrderEditKey{"card-a", {}}, {RenderRect{0, 0, 10, 10}}, 0, 8, 1, false};
+    EXPECT_TRUE(overlayState.ShouldDrawOverlayLayer());
+
+    overlayState = DashboardOverlayState{};
+    overlayState.selectedTreeHighlight = LayoutEditSelectionHighlightSpecial::DashboardBounds;
+    EXPECT_FALSE(overlayState.ShouldDrawOverlayLayer());
+    overlayState.showLayoutEditGuides = true;
+    EXPECT_TRUE(overlayState.ShouldDrawOverlayLayer());
 }
 
 TEST(LayoutEditTypes, TooltipPayloadHelpersTreatLayoutGuideAsNonParameterPayload) {

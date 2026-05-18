@@ -26,6 +26,12 @@ bool DashboardOverlayState::ShouldRegisterDynamicEditArtifacts() const {
     return showLayoutEditGuides && !IsContainerGuideDragActive();
 }
 
+bool DashboardOverlayState::ShouldDrawOverlayLayer() const {
+    return moveOverlay.visible || activeMetricListReorderDrag.has_value() ||
+           activeContainerChildReorderDrag.has_value() || ShouldDrawLayoutEditAffordances() ||
+           ShouldDrawSelectedTreeHighlight();
+}
+
 void DashboardOverlayState::SetPreviewWidget(const LayoutEditWidgetIdentity& widget) {
     hoveredEditableWidget = widget;
 }

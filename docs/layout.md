@@ -24,7 +24,7 @@ See also: [resources/config.ini](../resources/config.ini) for the maintained shi
 The language is divided by responsibility:
 
 - Widget sections own widget-local geometry: `[metric_list]`, `[drive_usage_list]`, `[throughput]`, `[gauge]`, `[text]`, `[network_footer]`, and `[layout_editor]`.
-- Runtime selection sections own runtime target choice: `[display]`, `[network]`, and `[storage]`.
+- Runtime selection sections own runtime target choice: `[display]`, `[gpu]`, `[network]`, and `[storage]`.
 - `[board]` owns logical board-metric to provider-sensor bindings.
 - `[metrics]` owns metric presentation and normalization definitions.
 - `[theme.<name>]` owns base color tokens and the user-visible theme description.
@@ -43,11 +43,13 @@ The language is divided by responsibility:
 
 `[display]` selects the target monitor, active named layout, wallpaper, placement, and optional explicit render scale.
 
+`[gpu]` selects the preferred GPU adapter by display name. An empty or missing `adapter_name` means the runtime selects the first non-software DXGI adapter.
+
 `[network]` selects the preferred runtime adapter.
 
 `[storage]` selects the drive letters to show in the drive-usage list. An empty drive selection means the runtime resolves all currently available fixed drives.
 
-`[board]` maps logical metric ids in the `board.temp.*` and `board.fan.*` families to provider-specific sensor names. Empty `cpu` and `system` mappings are resolved from matching provider sensor names at runtime and are persisted by the next `Save Config`.
+`[board]` maps logical metric ids in the `board.temp.*` and `board.fan.*` families to provider-specific sensor names. Empty `cpu`, `gpu`, and `system` mappings are resolved from matching provider sensor names at runtime and are persisted by the next `Save Config`. The `gpu` fan binding is used as the fallback source for `gpu.fan` when the selected GPU provider does not expose fan RPM, and the `cpu` temperature binding is used as the Intel fallback source for `gpu.temp` when the selected Intel GPU provider does not expose native temperature.
 
 `[metrics]` defines the display registry used by bound widgets:
 
