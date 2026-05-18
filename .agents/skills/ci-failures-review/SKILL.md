@@ -1,13 +1,13 @@
 ---
 name: ci-failures-review
-description: "Use only when explicitly invoked: investigate CaseDash CI failures."
+description: "Use only when explicitly invoked: investigate CaseDash CI failures, especially pull request Validation failures."
 ---
 
 # CI Failures Review
 
 ## Overview
 
-Use this skill to investigate a failed workflow from the failing run outward, then make the smallest repository change that addresses all actionable diagnostics.
+Use this skill to investigate a failed workflow from the pull request or failing run outward, then make the smallest repository change that addresses all actionable diagnostics.
 
 ## Workflow
 
@@ -16,10 +16,12 @@ Use this skill to investigate a failed workflow from the failing run outward, th
    - Consult `docs/build.md` for validation entrypoints and workflow behavior.
    - Consult `docs/diagnostics.md` when the failure involves diagnostics output or headless app validation.
 
-2. Identify the failed run.
-   - Use the available GitHub tooling, usually `gh run list`, `gh run view`, and `gh run download`.
-   - Record the workflow name, branch, run id, head commit, failed job, and failed step before editing.
-   - Compare the failed run head SHA with local `HEAD` and branch status; note when the checkout is ahead of or different from the failed commit.
+2. Identify the failed PR check or run.
+   - Treat pull requests as the normal entrypoint for feature-branch validation. Use the available GitHub tooling, usually `gh pr view`, `gh pr checks`, `gh run view`, and `gh run download`.
+   - If the user gives only a branch name, find the open PR for that branch before listing runs. Feature-branch pushes do not start routine `Validation` runs.
+   - Record the workflow name, event, PR number when present, base branch, head branch, run id, head commit, failed job, and failed step before editing.
+   - For `pull_request` runs, remember that the checked-out code is the PR merge ref by default. Compare both the PR head SHA and the run SHA or merge ref with local `HEAD` and branch status; note when the checkout is ahead of or different from the failed commit.
+   - For `push` runs, expect them primarily on `main` after merge. Do not look for a duplicate feature-branch push run unless the workflow has changed again.
    - Use failed-step logs and uploaded artifacts.
 
 3. Diagnose.
@@ -47,6 +49,7 @@ Use this skill to investigate a failed workflow from the failing run outward, th
 - A docs-only or website-only commit can still fail the benchmark build when earlier source-list drift is latent. If `CaseDashBenchmarks` links a source that calls newly factored production helpers, verify the helper `.cpp` is also listed in that benchmark target, not only in the app or test target.
 - `lint.cmd tidy changed` runs the normal lint gates before the changed-file clang-tidy slice. If source-policy failures appear there, fix them even when the downloaded CI artifact only reports clang-tidy diagnostics.
 - PowerShell 7 treats negative `-split` max-substring counts as right-to-left splitting. Release tooling that needs normal line splitting should use max count `0` or omit the max count so CI `pwsh` sees the same chunks as Windows PowerShell.
+- CaseDash validates feature-branch changes through pull requests. A failed PR `Validation` check is the canonical signal to investigate; a same-commit branch-push run is not expected for ordinary feature work.
 
 ## Local Validation
 
@@ -62,6 +65,7 @@ Use this skill to investigate a failed workflow from the failing run outward, th
 Summarize:
 
 - Failed workflow run id, commit, job, and step reviewed.
+- PR number, base branch, and head branch when the failure came from a pull request.
 - Root cause and files changed.
-- Whether local `HEAD` matched the failed CI commit or was ahead of it.
+- Whether local `HEAD` matched the failed CI commit, PR head, or PR merge ref, or was ahead of them.
 - Validation commands run, including any command intentionally skipped because the changed-file validation policy applies.

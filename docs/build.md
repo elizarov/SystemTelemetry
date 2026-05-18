@@ -14,7 +14,7 @@ See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md
 - NuGet package restore access for the WiX Toolset SDK when building the MSI package; the installer project accepts the WiX 7 OSMF EULA for non-interactive local and CI builds.
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - Provider software or drivers for optional hardware-provider telemetry as described in [docs/hardware.md](hardware.md)
-- GitHub Actions uses the `windows-2025-vs2026` runner for branch push and pull request build, test, format, lint, and tidy validation.
+- GitHub Actions uses the `windows-2025-vs2026` runner for pull request, main-branch push, and manual build, test, format, lint, and tidy validation.
 
 ## Current Toolchain
 
@@ -90,7 +90,7 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 
 ## GitHub Validation
 
-- The `Validation` workflow runs on branch pushes, pull requests, and manual dispatch.
+- The `Validation` workflow runs on pull requests targeting `main`, pushes to `main`, and manual dispatch. Feature-branch changes are validated through pull requests rather than duplicate branch-push runs.
 - GitHub workflows restore the shared vcpkg download and registry caches under `.github-cache\CaseDash` inside the checked-out workspace before validation, then save the refreshed cache contents after the run so repeated GitHub-hosted runs reuse the same bootstrap downloads. Cache restore and save failures are best-effort and do not block validation.
 - The workflow checks formatting first with `format.cmd`, then builds with `build.cmd /benchmarks`, runs tests with `test.cmd`, builds the WiX MSI with `package.cmd`, and runs `lint.cmd tidy` on `windows-2025-vs2026`.
 - The repository branch protection requires the `Validation` job before pull requests can merge.
