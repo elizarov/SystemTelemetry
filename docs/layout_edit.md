@@ -1,11 +1,11 @@
-# CaseDash Layout Editing
+# CaseDash Layout-Edit Mode
 
 This document owns user-visible layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 See also: [docs/specifications.md](specifications.md) for general product behavior, [docs/layout.md](layout.md) for config language ownership, [docs/layout_guide_sheet.md](layout_guide_sheet.md) for the diagnostics layout guide sheet, and [docs/diagnostics.md](diagnostics.md) for layout-edit diagnostics switches and trace behavior.
 
 ## Mode Lifecycle
 
-- `Edit Layout` toggles interactive layout-edit mode from the popup menu, `Layout Editor...` starts layout-edit mode when needed and opens the edit configuration dialog, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
+- `Edit Layout` toggles interactive layout-edit mode from the popup menu, `Layout Editor...` starts layout-edit mode when needed and opens the `Edit Configuration` window, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
 - Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
 - Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.
 - Turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
@@ -58,7 +58,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Layout child reorder handles expose tooltips with the edited layout expression on the first line and localized left/right or up/down reorder guidance on the second line.
 - Layout-edit title anchors, size guides, gap handles, selection outlines, and hover outlines that belong to a dragged row or dragged container child are tagged to that target, follow its translated drag position until the drag ends, and draw above the dragged content. Highlights tagged to fixed dashboard content stay behind the dragged target.
 
-## Editable Targets
+## Edit Targets
 
 - Gauge, throughput, metric-list, drive-usage, text, card-chrome, dashboard-spacing, and container-split targets all stay editable through the shared layout-edit interaction model rather than through one-off editors.
 - Layout-edit active regions expose at least one 4x4 logical hit patch inside each registered mouse-reactive region, and independent edit handles do not overlap in a way that makes either handle unreachable.

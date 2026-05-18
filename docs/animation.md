@@ -30,7 +30,7 @@ Layout edits, row reordering, scale changes, and surface changes do not reset co
 
 Animation runs while at least one transition is active or while the main thread publishes layer updates. After transitions reach their targets, the render thread presents the settled frame and waits.
 
-Blank render mode, screenshot exports, layout-guide-sheet exports, app-icon exports, unit tests, and other deterministic offscreen renders draw target snapshot values directly. UI-attached diagnostics screenshots also render target values instead of the currently interpolated live frame.
+Blank render mode, screenshot exports, layout guide sheet exports, app icon exports, unit tests, and other deterministic offscreen renders draw target snapshot values directly. UI-attached diagnostics screenshots also render target values instead of the currently interpolated live frame.
 
 ## Frame Pipeline
 
@@ -239,9 +239,9 @@ Dirty rectangles are renderer-internal redraw regions. Renderer backends may use
 
 When snapshot, overlay, or animation geometry versions change, the render thread treats the whole surface as dirty. Active drags update at least one layer bitmap, so the render thread does not infer smaller geometry deltas from superseded and active drag state.
 
-## Layout Edit Interaction
+## Layout-Edit Interaction
 
-Layout editing stays on the main thread. The render thread never performs hit testing or config mutation.
+Layout-edit interaction stays on the main thread. The render thread never performs hit testing or config mutation.
 
 Dynamic edit artifacts are collected from target snapshot geometry. Hit testing does not follow per-frame interpolated animation geometry.
 

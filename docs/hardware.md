@@ -59,8 +59,8 @@ Troubleshooting:
 
 1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
-3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for the provider state on that machine.
+3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported snapshot dump and trace outputs for the provider state on that machine.
 
 ## Intel
 
@@ -75,8 +75,8 @@ Troubleshooting:
 
 1. Install or update the Intel graphics driver.
 2. Confirm `ze_loader.dll` is present in `C:\Windows\System32`.
-3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for Level Zero Sysman component counts and provider state on that machine.
+3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported snapshot dump and trace outputs for Level Zero Sysman component counts and provider state on that machine.
 
 ## NVIDIA
 
@@ -90,8 +90,8 @@ Troubleshooting:
 
 1. Install or update the NVIDIA display driver.
 2. Confirm `nvml.dll` is present in `C:\Windows\System32` or the NVIDIA NVSMI install directory.
-3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for the provider state on that machine.
+3. Run the matching snapshot dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported snapshot dump and trace outputs for the provider state on that machine.
 
 ## ASUS
 
@@ -106,8 +106,8 @@ Troubleshooting:
 1. Install or update Armoury Crate or ASUS System Control Interface.
 2. Confirm Armoury Crate can show the machine's fan and temperature telemetry from a normal user session.
 3. Confirm the `\\.\ATKACPI` device opens for the current user; trace output reports `atk_driver_open_failed` when Windows blocks it.
-4. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-5. Inspect the dump for `board.*` values and the trace for `asus_armoury_crate:*` diagnostics.
+4. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
+5. Inspect the snapshot dump for `board.*` values and the trace for `asus_armoury_crate:*` diagnostics.
 
 ## MSI
 
@@ -119,8 +119,8 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install MSI Center with the SDK/runtime components that expose board sensors.
-2. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-3. Inspect the dump for `board.*` values and the trace for `msi_center:*` diagnostics.
+2. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
+3. Inspect the snapshot dump for `board.*` values and the trace for `msi_center:*` diagnostics.
 
 ## Gigabyte
 
@@ -133,5 +133,5 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install Gigabyte SIV.
-2. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-3. Inspect the dump for `board.*` values and the trace for `gigabyte_siv:*` diagnostics.
+2. Run the matching trace plus snapshot dump validation flow from [docs/diagnostics.md](diagnostics.md).
+3. Inspect the snapshot dump for `board.*` values and the trace for `gigabyte_siv:*` diagnostics.

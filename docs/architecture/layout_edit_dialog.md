@@ -6,7 +6,7 @@
 
 - Build the modeless editor window and route UI events into descriptor-backed editor handlers.
 - Refresh the config tree directly from current live config through the shared uncached tree-model builder.
-- Preview and revert edits through the same config mutation path used by drag-based layout editing.
+- Preview and revert edits through the same config mutation path used by drag-based layout-edit interaction.
 - Keep focused helper modules under `src/layout_edit_dialog/impl/` when they are private to the dialog package.
 - Reuse config color math for RGB/LCH/HSV conversion instead of carrying dialog-local color-space logic.
 - Reuse the config-owned metric-to-board-binding resolver and runtime active-binding state for metric `Binding` rows, including provider fallback metrics.
