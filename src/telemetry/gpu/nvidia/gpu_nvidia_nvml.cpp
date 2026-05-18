@@ -10,6 +10,7 @@
 
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -131,7 +132,7 @@ public:
             module_ = LoadLibraryW(kNvidiaMlLibraryName);
         }
         if (module_ == nullptr) {
-            diagnostics = "NVML library not found.";
+            diagnostics = ResourceStringText(RES_STR("NVML library not found."));
             return false;
         }
 
@@ -161,7 +162,7 @@ public:
 #undef CASEDASH_LOAD_REQUIRED
 
         if (!loaded) {
-            diagnostics = "NVML library is missing required entry points.";
+            diagnostics = ResourceStringText(RES_STR("NVML library is missing required entry points."));
             return false;
         }
         return true;
@@ -180,7 +181,7 @@ public:
                 return Utf8FromAnsi(text);
             }
         }
-        return FormatText("%d", result);
+        return FormatText(RES_STR("%d"), result);
     }
 
     NvmlReturn DeviceCount(unsigned int& count) const {
@@ -252,13 +253,13 @@ public:
     bool Initialize(const std::string& preferredName, Trace& trace, std::string& diagnostics) {
         module_ = LoadLibraryW(kNvApiLibraryName);
         if (module_ == nullptr) {
-            diagnostics = "NVAPI library not found.";
+            diagnostics = ResourceStringText(RES_STR("NVAPI library not found."));
             return false;
         }
 
         queryInterface_ = reinterpret_cast<NvApiQueryInterfaceFn>(GetProcAddress(module_, "nvapi_QueryInterface"));
         if (queryInterface_ == nullptr) {
-            diagnostics = "NVAPI query interface not found.";
+            diagnostics = ResourceStringText(RES_STR("NVAPI query interface not found."));
             return false;
         }
 
@@ -269,14 +270,14 @@ public:
         gpuGetAllClockFrequencies_ = Query<NvApiGpuGetAllClockFrequenciesFn>(kNvApiGpuGetAllClockFrequencies);
         if (initialize_ == nullptr || enumPhysicalGpus_ == nullptr || gpuGetFullName_ == nullptr ||
             gpuGetAllClockFrequencies_ == nullptr) {
-            diagnostics = "NVAPI library is missing required entry points.";
+            diagnostics = ResourceStringText(RES_STR("NVAPI library is missing required entry points."));
             return false;
         }
 
         const NvApiStatus initStatus = initialize_();
         trace.WriteFmt(TracePrefix::NvidiaNvml, RES_STR("nvapi_init result=\"%s\""), ResultText(initStatus).c_str());
         if (initStatus != kNvApiOk) {
-            diagnostics = FormatText("NVAPI initialization failed: %s", ResultText(initStatus).c_str());
+            diagnostics = FormatText(RES_STR("NVAPI initialization failed: %s"), ResultText(initStatus).c_str());
             return false;
         }
         initialized_ = true;
@@ -289,7 +290,7 @@ public:
             ResultText(enumStatus).c_str(),
             count);
         if (enumStatus != kNvApiOk || count <= 0) {
-            diagnostics = FormatText("NVAPI found no NVIDIA GPUs: %s", ResultText(enumStatus).c_str());
+            diagnostics = FormatText(RES_STR("NVAPI found no NVIDIA GPUs: %s"), ResultText(enumStatus).c_str());
             return false;
         }
 
@@ -321,13 +322,13 @@ public:
         }
 
         if (physicalGpu_ == nullptr) {
-            diagnostics = "NVAPI failed to select a physical GPU.";
+            diagnostics = ResourceStringText(RES_STR("NVAPI failed to select a physical GPU."));
             return false;
         }
 
         trace.WriteFmt(
             TracePrefix::NvidiaNvml, RES_STR("nvapi_device_selected rank=%d name=\"%s\""), bestRank, gpuName_.c_str());
-        diagnostics = FormatText("NVAPI clock GPU=%s", gpuName_.c_str());
+        diagnostics = FormatText(RES_STR("NVAPI clock GPU=%s"), gpuName_.c_str());
         return true;
     }
 
@@ -352,11 +353,11 @@ public:
     std::string ResultText(NvApiStatus status) const {
         switch (status) {
             case kNvApiOk:
-                return "OK";
+                return ResourceStringText(RES_STR("OK"));
             case kNvApiGpuNotPowered:
-                return "GPU not powered";
+                return ResourceStringText(RES_STR("GPU not powered"));
             default:
-                return FormatText("%d", status);
+                return FormatText(RES_STR("%d"), status);
         }
     }
 
@@ -423,7 +424,7 @@ public:
         NvmlReturn result = nvml_.Initialize();
         trace_.WriteFmt(TracePrefix::NvidiaNvml, RES_STR("init_done result=\"%s\""), nvml_.ResultText(result).c_str());
         if (result != kNvmlSuccess) {
-            diagnostics_ = FormatText("NVML initialization failed: %s", nvml_.ResultText(result).c_str());
+            diagnostics_ = FormatText(RES_STR("NVML initialization failed: %s"), nvml_.ResultText(result).c_str());
             return false;
         }
 
@@ -434,7 +435,7 @@ public:
             nvml_.ResultText(result).c_str(),
             deviceCount);
         if (result != kNvmlSuccess || deviceCount == 0) {
-            diagnostics_ = FormatText("NVML found no NVIDIA GPUs: count=%s", nvml_.ResultText(result).c_str());
+            diagnostics_ = FormatText(RES_STR("NVML found no NVIDIA GPUs: count=%s"), nvml_.ResultText(result).c_str());
             return false;
         }
 
@@ -458,19 +459,20 @@ public:
 
         fanRpmSupported_ = DetectFanSpeedRpm();
         nvapiClockAvailable_ = nvapi_.Initialize(gpuName_, trace_, clockDiagnostics_);
-        diagnostics_ =
-            FormatText("NVML GPU=%s load_source=pdh clock_source=%s fan_rpm_supported=%s native_fps_supported=no",
-                gpuName_.c_str(),
-                nvapiClockAvailable_ ? "nvapi" : "unavailable",
-                fanRpmSupported_ ? "yes" : "no");
+        diagnostics_ = FormatText(
+            RES_STR("NVML GPU=%s load_source=pdh clock_source=%s fan_rpm_supported=%s native_fps_supported=no"),
+            gpuName_.c_str(),
+            nvapiClockAvailable_ ? "nvapi" : "unavailable",
+            fanRpmSupported_ ? "yes" : "no");
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = "Presented FPS ETW provider active.";
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         } else {
             const FpsTelemetrySample fpsSample =
                 fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ =
-                fpsSample.diagnostics.empty() ? "Presented FPS ETW provider unavailable." : fpsSample.diagnostics;
+            fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                  : fpsSample.diagnostics;
         }
         initialized_ = true;
         trace_.WriteFmt(TracePrefix::NvidiaNvml,
@@ -576,7 +578,7 @@ public:
         }
 
         sample.available = hasAnyMetric;
-        AppendFormat(sample.diagnostics, " fps=%s", fpsDiagnostics_.c_str());
+        AppendFormat(sample.diagnostics, RES_STR(" fps=%s"), fpsDiagnostics_.c_str());
         trace_.WriteFmt(TracePrefix::NvidiaNvml,
             RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
@@ -651,8 +653,8 @@ private:
             gpuName_.c_str(),
             adapter_.has_value() ? adapter_->adapterName.c_str() : "");
         if (device_ == nullptr) {
-            diagnostics_ =
-                FormatText("NVML failed to open selected NVIDIA GPU: device=%s", nvml_.ResultText(bestResult).c_str());
+            diagnostics_ = FormatText(
+                RES_STR("NVML failed to open selected NVIDIA GPU: device=%s"), nvml_.ResultText(bestResult).c_str());
             return false;
         }
         return true;
@@ -670,9 +672,9 @@ private:
     NvmlDevice device_ = nullptr;
     std::optional<GpuAdapterInfo> adapter_;
     std::string gpuName_;
-    std::string diagnostics_ = "NVML provider not initialized.";
-    std::string clockDiagnostics_ = "NVAPI clock provider not initialized.";
-    std::string fpsDiagnostics_ = "Presented FPS ETW provider not initialized.";
+    std::string diagnostics_ = ResourceStringText(RES_STR("NVML provider not initialized."));
+    std::string clockDiagnostics_ = ResourceStringText(RES_STR("NVAPI clock provider not initialized."));
+    std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::optional<double> totalVramGb_;
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
     bool nvapiClockAvailable_ = false;

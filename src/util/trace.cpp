@@ -108,7 +108,7 @@ void Trace::WriteVFmt(TracePrefix prefix, ResourceStringId format, va_list args)
         return;
     }
 
-    const std::string text = FormatTextV(ResourceStringText(format), args);
+    const std::string text = FormatTextV(format, args);
     WriteTraceLine(output_, PrefixName(prefix), text.c_str());
 }
 
@@ -245,4 +245,12 @@ void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::st
         static_cast<int>(stage.size()),
         stage.data(),
         error.c_str());
+}
+
+void WriteRendererErrorTrace(Trace& trace, ResourceStringId stage, const std::string& error) {
+    if (error.empty()) {
+        return;
+    }
+    trace.WriteFmt(
+        TracePrefix::Renderer, RES_STR("error stage=\"%s\" detail=\"%s\""), ResourceStringText(stage), error.c_str());
 }

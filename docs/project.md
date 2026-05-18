@@ -62,7 +62,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Keep project filesystem operations on `src/util/file_path.*` helpers instead of `std::filesystem`; paths are stored as UTF-8 and widened only at filesystem API calls. `lint.cmd` enforces this source-policy rule for maintained source and test files.
 - Keep native app and benchmark targets built without native C++ exception handling; the C++/CLI bridge owns the managed exception boundary separately.
 - Keep native app, test, and benchmark targets compiled with `_USE_STD_VECTOR_ALGORITHMS=0` so MSVC's vectorized STL algorithm dispatch tables stay out of the single-file binaries.
-- Keep `resources/localization.ini` as the embedded key-value catalog for localizable runtime strings.
+- Keep `resources/localization.ini` as the embedded key-value catalog for localizable runtime strings. Static source lookups can use `RES_STR("localization.key")` ids, but user-visible English copy belongs in the localization catalog rather than directly in the generated `RES_STR` string catalog.
 - Keep one full-fidelity widget draw path for normal repaints and layout-edit drag repaints.
 - When a private module needs shared mutable collector data across multiple `.cpp` files, expose that state through a dedicated state type plus module-owned free functions.
 
@@ -82,6 +82,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - The executable-side `config.ini` overlays the embedded `resources/config.ini` template, and `Save Config` preserves that live file.
 - Embedded `config.ini` and `localization.ini` edits flow through the generated BOM-free UTF-8 text-resource atlas; app-icon and panel-icon edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
 - The generated compressed-resource RC object depends explicitly on `text_atlas.cdlz`; keep that dependency when changing generated text-resource outputs because RC compilation does not otherwise track RCDATA payload changes.
+- `RES_STR` ids are generated as collision-checked hashes; keep the generated header catalog-sized-literal-free so heavy trace sources do not pay a compile-time linear string lookup.
 - Restored saved placement across monitors with different DPI scales lets `WM_DPICHANGED` apply the monitor transition before destination window size scaling.
 - Mouse-driven visual feedback cannot rely only on `WM_TIMER` or queued `WM_PAINT`; continuous pointer input can starve low-priority messages, so move mode and active drags update or redraw from processed pointer messages.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.

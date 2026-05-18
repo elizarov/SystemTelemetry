@@ -15,7 +15,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools\release_changelog_repo
 
 The helper writes `build\release_changelog_report.md` with the latest reachable tag, commit subjects, changed files, and per-commit stats.
 
-2. Read the report and summarize only user-visible changes. Include runtime behavior, diagnostics, installer behavior, website/download behavior, hardware support, documentation that users rely on, release packaging that users touch, and performance or binary-size optimization. Mention performance and size work only briefly in summary form, avoiding benchmark minutiae or implementation details. Omit pure refactors, tests, internal tooling, and wording-only docs changes unless they change what users or release consumers see.
+2. Read the report and summarize only user-visible changes. Include runtime behavior, diagnostics, installer behavior, website/download behavior, hardware support, documentation that users rely on, release packaging that users touch, and performance or binary-size optimization. Mention performance and size work briefly; technical runtime terms are acceptable when they describe behavior or performance that matters to CaseDash's technical audience, but avoid benchmark minutiae and private implementation churn. Omit pure refactors, tests, internal tooling, and wording-only docs changes unless they change what users or release consumers see.
 
 3. Update `docs\changelog.md` at the top of the file. Keep one concise `- ` bullet per release note. Prefer direct release-note verbs such as `Added`, `Improved`, `Fixed`, `Refined`, or `Moved`.
 

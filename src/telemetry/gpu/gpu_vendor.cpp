@@ -15,6 +15,7 @@
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/gpu/intel/gpu_intel_level_zero.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -62,15 +63,17 @@ public:
     bool Initialize() override {
         sample_.providerName = "Unsupported GPU";
         sample_.available = false;
-        sample_.diagnostics = "No supported GPU telemetry provider matches the selected adapter vendor.";
+        sample_.diagnostics =
+            ResourceStringText(RES_STR("No supported GPU telemetry provider matches the selected adapter vendor."));
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = "Presented FPS ETW provider active.";
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         } else {
             const FpsTelemetrySample fpsSample =
                 fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ =
-                fpsSample.diagnostics.empty() ? "Presented FPS ETW provider unavailable." : fpsSample.diagnostics;
+            fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                  : fpsSample.diagnostics;
         }
 
         const std::string adapterName = adapter_.has_value() ? adapter_->adapterName : std::string();
@@ -106,7 +109,7 @@ public:
             }
         }
 
-        AppendFormat(sample.diagnostics, " fps=%s", fpsDiagnostics_.c_str());
+        AppendFormat(sample.diagnostics, RES_STR(" fps=%s"), fpsDiagnostics_.c_str());
         return sample;
     }
 
@@ -114,7 +117,7 @@ private:
     Trace& trace_;
     std::optional<GpuAdapterInfo> adapter_;
     GpuVendorTelemetrySample sample_;
-    std::string fpsDiagnostics_ = "Presented FPS ETW provider not initialized.";
+    std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
 };
 

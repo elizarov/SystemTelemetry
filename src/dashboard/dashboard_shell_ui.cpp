@@ -21,6 +21,7 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "telemetry/metrics.h"
+#include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/numeric_format.h"
 #include "util/text_format.h"
@@ -320,7 +321,8 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
                     GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
                     const std::optional<double> percentage = TryParseScaleValue(Utf8FromWide(buffer));
                     if (!percentage.has_value()) {
-                        MessageBoxUtf8(hwnd, "Enter a positive percentage scale.", MB_ICONERROR);
+                        MessageBoxUtf8(
+                            hwnd, FindLocalizedText(RES_STR("dashboard.message.scale_positive_percent")), MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));
                         SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
                         return TRUE;
@@ -399,7 +401,8 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
 void DashboardShellUi::SyncLayoutEditDialogSelection(
     const LayoutEditController::TooltipTarget* target, bool bringToFront) {
     if (layoutEditDialog_ != nullptr && !layoutEditDialog_->SyncSelection(target, bringToFront)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
     }
 }
 
@@ -410,18 +413,16 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
     state.app = &app_;
     switch (prompt) {
         case UnsavedLayoutEditPrompt::StopEditing:
-            state.mainInstruction = "Save modified changes before turning off layout edit mode?";
-            state.content = "You have unsaved changes made while editing the layout.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_stop_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_unsaved_content"));
             break;
         case UnsavedLayoutEditPrompt::ExitApplication:
-            state.mainInstruction = "Save modified changes before exiting?";
-            state.content =
-                "Unsaved changes made while editing the layout will be discarded if you exit without saving.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_content"));
             break;
         case UnsavedLayoutEditPrompt::ReloadConfig:
-            state.mainInstruction = "Save modified changes before reloading the config?";
-            state.content =
-                "Unsaved changes made while editing the layout will be discarded if you reload without saving.";
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_content"));
             break;
     }
 
@@ -458,7 +459,8 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
                 return false;
             }
         } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
-            MessageBoxUtf8(app_.hwnd_, "Failed to restore the saved layout edit state.", MB_ICONERROR);
+            MessageBoxUtf8(
+                app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_restore_failed")), MB_ICONERROR);
             return false;
         }
     }
@@ -490,7 +492,8 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
     return true;
@@ -508,7 +511,7 @@ bool DashboardShellUi::HandleReloadConfig() {
     }
 
     if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to reload config.ini.", MB_ICONERROR);
+        MessageBoxUtf8(app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), MB_ICONERROR);
         return false;
     }
     RefreshLayoutEditDialog();
@@ -817,11 +820,13 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(app_.hwnd_, "Failed to open the Edit Configuration window.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
     if (IsMetricListAddRowTarget(target) && !ApplyMetricListAddRowPreview(target)) {
-        MessageBoxUtf8(app_.hwnd_, "Failed to add a metric list row.", MB_ICONERROR);
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.metric_list_add_row_failed")), MB_ICONERROR);
         return false;
     }
     return true;
@@ -939,7 +944,9 @@ void DashboardShellUi::ExecuteCommand(
                         }
                         app_.TraceLayoutEditUiEventFmt(
                             TracePrefix::LayoutSwitch, "menu_failed", "selected_layout=\"%s\"", layoutName.c_str());
-                        MessageBoxUtf8(app_.hwnd_, "Failed to switch layout.", MB_ICONERROR);
+                        MessageBoxUtf8(app_.hwnd_,
+                            FindLocalizedText(RES_STR("dashboard.message.switch_layout_failed")),
+                            MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                         if (suppressTooltipRefresh) {
@@ -972,7 +979,9 @@ void DashboardShellUi::ExecuteCommand(
                 if (index < state.config.layout.themes.size()) {
                     if (!app_.controller_.SwitchTheme(
                             app_, state.config.layout.themes[index].name, app_.diagnosticsOptions_.editLayout)) {
-                        MessageBoxUtf8(app_.hwnd_, "Failed to switch theme.", MB_ICONERROR);
+                        MessageBoxUtf8(app_.hwnd_,
+                            FindLocalizedText(RES_STR("dashboard.message.switch_theme_failed")),
+                            MB_ICONERROR);
                     } else {
                         RefreshLayoutEditDialog();
                     }
@@ -1172,7 +1181,7 @@ void DashboardShellUi::ShowContextMenu(
             } else if (label.empty() && focusKey.has_value() &&
                        std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr) {
                 const auto& nodeFieldKey = *std::get_if<LayoutNodeFieldEditKey>(&*focusKey);
-                const std::string subject = LayoutNodeFieldEditMenuSubject(nodeFieldKey);
+                const std::string_view subject = LayoutNodeFieldEditMenuSubject(nodeFieldKey);
                 if (!subject.empty()) {
                     label = BuildLayoutEditMenuLabel(subject);
                 }

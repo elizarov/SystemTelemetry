@@ -10,6 +10,7 @@
 
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/impl/system_info_support.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -158,7 +159,8 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
     UniqueHandle device = OpenAsusAtkDevice();
     if (!device.Valid()) {
         const DWORD error = GetLastError();
-        snapshot.diagnostics = FormatText("ASUS ATKACPI device open failed: %lu", static_cast<unsigned long>(error));
+        snapshot.diagnostics =
+            FormatText(RES_STR("ASUS ATKACPI device open failed: %lu"), static_cast<unsigned long>(error));
         trace.WriteFmt(TracePrefix::AsusArmouryCrate,
             RES_STR("atk_driver_open_failed error=%lu"),
             static_cast<unsigned long>(error));
@@ -170,9 +172,10 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
     CaptureAtkDriverFan(trace, device.Get(), kAsusAtkGpuFan, kAsusGpuFanName, snapshot.fans);
 
     snapshot.success = true;
-    snapshot.diagnostics = FormatText("ASUS Armoury Crate ATKACPI query completed. fan_count=%zu temp_count=%zu",
-        snapshot.fans.size(),
-        snapshot.temperatures.size());
+    snapshot.diagnostics =
+        FormatText(RES_STR("ASUS Armoury Crate ATKACPI query completed. fan_count=%zu temp_count=%zu"),
+            snapshot.fans.size(),
+            snapshot.temperatures.size());
     trace.WriteFmt(TracePrefix::AsusArmouryCrate,
         RES_STR("atk_driver_snapshot_done fan_count=%zu temp_count=%zu"),
         snapshot.fans.size(),
@@ -197,12 +200,12 @@ public:
             boardProduct_.c_str());
 
         if (SelectBoardVendor(info_) != BoardVendor::Asus) {
-            diagnostics_ = "Baseboard manufacturer is not ASUS.";
+            diagnostics_ = ResourceStringText(RES_STR("Baseboard manufacturer is not ASUS."));
             return false;
         }
 
         driverLibrary_ = "ASUS Armoury Crate ATKACPI DSTS";
-        diagnostics_ = "ASUS Armoury Crate ATKACPI provider ready.";
+        diagnostics_ = ResourceStringText(RES_STR("ASUS Armoury Crate ATKACPI provider ready."));
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
@@ -220,12 +223,13 @@ public:
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
             AppendFormat(requestedDiagnosticsSuffix_,
-                " requested_temps=%s",
+                RES_STR(" requested_temps=%s"),
                 JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_, " requested_fans=%s", JoinNames(settings_.requestedFanNames).c_str());
+            AppendFormat(requestedDiagnosticsSuffix_,
+                RES_STR(" requested_fans=%s"),
+                JoinNames(settings_.requestedFanNames).c_str());
         }
         initialized_ = true;
         return true;
@@ -244,7 +248,7 @@ public:
         sample.temperatures = temperatureMetricTemplate_;
         sample.fans = fanMetricTemplate_;
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
 
         if (!initialized_) {
             return sample;
@@ -253,7 +257,7 @@ public:
         AsusArmouryCrateSnapshot snapshot = CaptureAsusAtkDriverSensors(trace_);
         if (!snapshot.success) {
             diagnostics_ = snapshot.diagnostics;
-            sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+            sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
             return sample;
         }
 
@@ -271,7 +275,7 @@ public:
             snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
 
@@ -290,7 +294,7 @@ private:
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string driverLibrary_;
-    std::string diagnostics_ = "ASUS Armoury Crate provider not initialized.";
+    std::string diagnostics_ = ResourceStringText(RES_STR("ASUS Armoury Crate provider not initialized."));
     std::string requestedDiagnosticsSuffix_;
     std::vector<std::string> availableFanNames_;
     std::vector<std::string> availableTemperatureNames_;

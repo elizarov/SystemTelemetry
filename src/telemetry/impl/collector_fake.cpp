@@ -9,6 +9,7 @@
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/timing.h"
 #include "util/file_path.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -334,10 +335,10 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     dump.boardProvider.fans = snapshot.boardFans;
     dump.boardProvider.temperatures = snapshot.boardTemperatures;
     dump.boardProvider.providerName = "Synthetic";
-    dump.boardProvider.diagnostics = "Built-in synthetic telemetry baseline.";
+    dump.boardProvider.diagnostics = ResourceStringText(RES_STR("Built-in synthetic telemetry baseline."));
     dump.boardProvider.available = true;
     dump.gpuProvider.providerName = "Synthetic";
-    dump.gpuProvider.diagnostics = "Built-in synthetic telemetry baseline.";
+    dump.gpuProvider.diagnostics = ResourceStringText(RES_STR("Built-in synthetic telemetry baseline."));
     dump.gpuProvider.available = true;
     return dump;
 }

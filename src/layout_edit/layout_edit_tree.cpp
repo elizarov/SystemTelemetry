@@ -367,7 +367,7 @@ bool BuildContainerNode(const std::string& sectionName,
                 LayoutWeightEditKey{editCardId, nodePath, i},
                 sectionName,
                 memberName,
-                "layout_edit.layout_guide",
+                leafNode.descriptionKey,
                 configschema::ValueFormat::Integer,
                 node.name == "columns" ? LayoutGuideAxis::Vertical : LayoutGuideAxis::Horizontal,
                 ChildDisplayName(node.children[i]),
@@ -447,7 +447,7 @@ bool BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& 
                 LayoutMetricEditKey{metricId},
                 slot.sectionName,
                 metricId,
-                "layout_edit.metric_definition",
+                leafNode.descriptionKey,
                 configschema::ValueFormat::FloatingPoint,
             });
             leafNode.selectionHighlight.emplace(leafNode.leaf->focusKey);

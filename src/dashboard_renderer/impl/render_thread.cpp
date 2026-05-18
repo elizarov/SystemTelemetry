@@ -149,7 +149,7 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
     immediatePresent_.store(immediatePresent);
     if (threaded_) {
         if (!EventsReady()) {
-            SetLastError("render_thread_event_create_failed");
+            SetLastError(RES_STR("render_thread_event_create_failed"));
             threaded_ = false;
             return;
         }
@@ -157,7 +157,7 @@ void DashboardRenderThread::Configure(HWND hwnd, bool threaded, bool immediatePr
             stopRequested_ = false;
             thread_ = CreateThread(nullptr, 0, &DashboardRenderThread::ThreadProc, this, 0, nullptr);
             if (thread_ == nullptr) {
-                SetLastError("render_thread_create_failed");
+                SetLastError(RES_STR("render_thread_create_failed"));
                 threaded_ = false;
             }
         }
@@ -231,7 +231,7 @@ bool DashboardRenderThread::PublishFrame(DashboardPresentationFrame frame) {
     {
         const LightweightMutexLock lock(mutex_);
         if (stopRequested_ || thread_ == nullptr) {
-            lastError_ = "render_thread_not_running";
+            lastError_ = ResourceStringText(RES_STR("render_thread_not_running"));
             ReleaseFrameLayers(std::move(frame));
             return false;
         }
@@ -254,7 +254,7 @@ bool DashboardRenderThread::PublishFrameAndWait(DashboardPresentationFrame frame
     {
         const LightweightMutexLock lock(mutex_);
         if (stopRequested_ || thread_ == nullptr) {
-            lastError_ = "render_thread_not_running";
+            lastError_ = ResourceStringText(RES_STR("render_thread_not_running"));
             ReleaseFrameLayers(std::move(frame));
             return false;
         }
@@ -305,7 +305,7 @@ bool DashboardRenderThread::PresentFrameSynchronously(Renderer& renderer, Dashbo
 
 bool DashboardRenderThread::PresentStoredFrameSynchronously() {
     if (syncRenderer_ == nullptr || !syncFrame_.has_value()) {
-        SetLastError("no_stored_frame");
+        SetLastError(RES_STR("no_stored_frame"));
         return false;
     }
     const bool presented = PresentFrame(*syncRenderer_, syncTimeline_, *syncFrame_, syncPresentedState_);
@@ -901,6 +901,10 @@ void DashboardRenderThread::WriteTraceFmt(ResourceStringId format, ...) const {
     va_start(args, format);
     trace->WriteVFmt(TracePrefix::Renderer, format, args);
     va_end(args);
+}
+
+void DashboardRenderThread::SetLastError(ResourceStringId error) {
+    SetLastError(ResourceStringText(error));
 }
 
 void DashboardRenderThread::SetLastError(std::string error) {

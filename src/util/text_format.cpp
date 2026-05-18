@@ -2,6 +2,8 @@
 
 #include <cstdio>
 
+#include "util/resource_strings.h"
+
 namespace {
 
 void AppendFormatArgs(std::string& text, const char* format, va_list args) {
@@ -32,7 +34,19 @@ std::string FormatTextV(const char* format, va_list args) {
     return text;
 }
 
+std::string FormatTextV(ResourceStringId format, va_list args) {
+    return FormatTextV(ResourceStringText(format), args);
+}
+
 std::string FormatText(const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    std::string text = FormatTextV(format, args);
+    va_end(args);
+    return text;
+}
+
+std::string FormatText(ResourceStringId format, ...) {
     va_list args;
     va_start(args, format);
     std::string text = FormatTextV(format, args);
@@ -48,9 +62,24 @@ void AssignFormat(std::string& text, const char* format, ...) {
     va_end(args);
 }
 
+void AssignFormat(std::string& text, ResourceStringId format, ...) {
+    text.clear();
+    va_list args;
+    va_start(args, format);
+    AppendFormatArgs(text, ResourceStringText(format), args);
+    va_end(args);
+}
+
 void AppendFormat(std::string& text, const char* format, ...) {
     va_list args;
     va_start(args, format);
     AppendFormatArgs(text, format, args);
+    va_end(args);
+}
+
+void AppendFormat(std::string& text, ResourceStringId format, ...) {
+    va_list args;
+    va_start(args, format);
+    AppendFormatArgs(text, ResourceStringText(format), args);
     va_end(args);
 }

@@ -20,11 +20,18 @@ function Normalize-Lines {
     return (($Text -replace "`r`n", "`n") -replace "`r", "`n").TrimStart([char]0xFEFF)
 }
 
+function Split-Lines {
+    param([string]$Text)
+
+    # PowerShell 7 treats negative max-substring counts as right-to-left splitting.
+    return @($Text -split "`n", 0)
+}
+
 function Get-TopChunk {
     param([string]$Text)
 
     $normalized = Normalize-Lines -Text $Text
-    $lines = @($normalized -split "`n", -1)
+    $lines = Split-Lines -Text $normalized
     $separatorIndex = -1
     for ($index = 0; $index -lt $lines.Count; ++$index) {
         if ($lines[$index].Trim() -eq '---') {
@@ -60,7 +67,7 @@ function Get-TopChunk {
 function Get-FirstNonEmptyLine {
     param([string]$Text)
 
-    foreach ($line in @($Text -split "`n")) {
+    foreach ($line in (Split-Lines -Text $Text)) {
         $trimmed = $line.Trim()
         if ($trimmed -ne '') {
             return $trimmed
@@ -75,7 +82,7 @@ function Get-ChunkBody {
         [string]$ExpectedHeader
     )
 
-    $lines = @($Chunk -split "`n", -1)
+    $lines = Split-Lines -Text $Chunk
     $headerIndex = -1
     for ($index = 0; $index -lt $lines.Count; ++$index) {
         if ($lines[$index].Trim() -eq '') {
@@ -103,13 +110,30 @@ function Assert-HasReleaseBullets {
         [string]$Context
     )
 
-    foreach ($line in @($Body -split "`n")) {
+    foreach ($line in (Split-Lines -Text $Body)) {
         if ($line.TrimStart().StartsWith('- ')) {
             return
         }
     }
 
     throw "$Context must contain at least one '- ' changelog bullet."
+}
+
+function Assert-SingleReleaseBody {
+    param(
+        [string]$Body,
+        [string]$Context
+    )
+
+    foreach ($line in (Split-Lines -Text $Body)) {
+        $trimmed = $line.Trim()
+        if ($trimmed -eq '---') {
+            throw "$Context must contain only one release chunk, but it still contains a '---' separator. Check docs\changelog.md separator placement."
+        }
+        if ($trimmed -match '^##\s+v[0-9]+(\.[0-9]+){1,2}\s*$') {
+            throw "$Context must contain only one release chunk, but it still contains release header '$trimmed'. Check docs\changelog.md separators."
+        }
+    }
 }
 
 function Write-Utf8NoBom {
@@ -155,6 +179,7 @@ if ($Mode -eq 'Prepare') {
     if ($firstLine -eq $expectedHeader) {
         $body = Get-ChunkBody -Chunk $chunks.First -ExpectedHeader $expectedHeader
         Assert-HasReleaseBullets -Body $body -Context 'The stamped top changelog chunk'
+        Assert-SingleReleaseBody -Body $body -Context 'The stamped top changelog chunk'
         Write-Host "docs\changelog.md already starts with $expectedHeader."
         exit 0
     }
@@ -164,6 +189,7 @@ if ($Mode -eq 'Prepare') {
     }
 
     Assert-HasReleaseBullets -Body $chunks.First -Context 'The top changelog draft'
+    Assert-SingleReleaseBody -Body $chunks.First -Context 'The top changelog draft'
 
     $updatedFirst = "$expectedHeader`n`n$($chunks.First.Trim())"
     if ($chunks.HasSeparator) {
@@ -183,6 +209,7 @@ if ($firstLine -ne $expectedHeader) {
 
 $releaseBody = Get-ChunkBody -Chunk $chunks.First -ExpectedHeader $expectedHeader
 Assert-HasReleaseBullets -Body $releaseBody -Context 'The release notes body'
+Assert-SingleReleaseBody -Body $releaseBody -Context 'The release notes body'
 
 if ($OutputPath -ne '') {
     $resolvedOutput = $OutputPath

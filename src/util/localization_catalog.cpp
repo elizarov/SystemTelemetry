@@ -1,8 +1,10 @@
 #include "util/localization_catalog.h"
 
+#include <cstdint>
 #include <utility>
 
 #include "util/resource_loader.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 
@@ -66,4 +68,20 @@ std::string FindLocalizedText(std::string_view key) {
     const LocalizationCatalogMap& catalog = LocalizationCatalog();
     const auto it = catalog.find(std::string(key));
     return it != catalog.end() ? it->second : std::string{};
+}
+
+const char* FindLocalizedText(ResourceStringId key) {
+    const char* textKey = ResourceStringText(key);
+    const LocalizationCatalogMap& catalog = LocalizationCatalog();
+    if (textKey[0] != '\0') {
+        const auto it = catalog.find(textKey);
+        return it != catalog.end() ? it->second.c_str() : textKey;
+    }
+    const auto target = static_cast<std::uint32_t>(key);
+    for (const auto& [catalogKey, value] : catalog) {
+        if (resource_strings_detail::ResourceStringHash(catalogKey.data(), catalogKey.size()) == target) {
+            return value.c_str();
+        }
+    }
+    return textKey;
 }

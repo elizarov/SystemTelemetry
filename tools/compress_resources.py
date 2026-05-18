@@ -3,48 +3,102 @@ from __future__ import annotations
 
 import argparse
 import struct
+from collections import defaultdict
 from pathlib import Path
 
 
 MAGIC = b"CDLZ"
 MAX_OFFSET = 4095
 MIN_MATCH = 3
-MAX_MATCH = 18
+EXTENDED_MATCH_LENGTH = MIN_MATCH + 15
+MAX_MATCH = EXTENDED_MATCH_LENGTH + 255
+RESOURCE_STRING_HASH_SEED = 2166136261
+RESOURCE_STRING_HASH_PRIME = 16777619
 
 
 def lzss_compress(data: bytes) -> bytes:
+    best_lengths, best_offsets = find_lzss_matches(data)
+    costs = [[0] * 8 for _ in range(len(data) + 1)]
+    choices = [[1] * 8 for _ in range(len(data))]
+
+    for index in range(len(data) - 1, -1, -1):
+        for flag_bit in range(8):
+            next_flag_bit = (flag_bit + 1) % 8
+            flag_cost = 1 if flag_bit == 0 else 0
+            best_cost = flag_cost + 1 + costs[index + 1][next_flag_bit]
+            best_length = 1
+            for length in range(MIN_MATCH, best_lengths[index] + 1):
+                match_cost = 3 if length >= EXTENDED_MATCH_LENGTH else 2
+                cost = flag_cost + match_cost + costs[index + length][next_flag_bit]
+                if cost < best_cost or (cost == best_cost and length > best_length):
+                    best_cost = cost
+                    best_length = length
+            costs[index][flag_bit] = best_cost
+            choices[index][flag_bit] = best_length
+
     output = bytearray()
     index = 0
+    flag_bit = 0
+    flags_offset = 0
+    flags = 0
     while index < len(data):
-        flags_offset = len(output)
-        output.append(0)
-        flags = 0
-        for bit in range(8):
-            if index >= len(data):
-                break
-            best_offset = 0
-            best_length = 0
-            search_start = max(0, index - MAX_OFFSET)
+        if flag_bit == 0:
+            flags_offset = len(output)
+            output.append(0)
+            flags = 0
+
+        length = choices[index][flag_bit]
+        if length >= MIN_MATCH:
+            flags |= 1 << flag_bit
+            length_code = length - MIN_MATCH
+            if length >= EXTENDED_MATCH_LENGTH:
+                length_code = EXTENDED_MATCH_LENGTH - MIN_MATCH
+            token = ((best_offsets[index] - 1) << 4) | length_code
+            output.extend(struct.pack("<H", token))
+            if length >= EXTENDED_MATCH_LENGTH:
+                output.append(length - EXTENDED_MATCH_LENGTH)
+            index += length
+        else:
+            output.append(data[index])
+            index += 1
+
+        flag_bit = (flag_bit + 1) % 8
+        if flag_bit == 0 or index >= len(data):
+            output[flags_offset] = flags
+    return bytes(output)
+
+
+def find_lzss_matches(data: bytes) -> tuple[list[int], list[int]]:
+    best_lengths = [0] * len(data)
+    best_offsets = [0] * len(data)
+    positions_by_prefix: defaultdict[bytes, list[int]] = defaultdict(list)
+
+    for index in range(len(data)):
+        if index + MIN_MATCH <= len(data):
+            prefix = data[index : index + MIN_MATCH]
+            positions = positions_by_prefix[prefix]
+            search_start = index - MAX_OFFSET
+            stale_count = 0
+            while stale_count < len(positions) and positions[stale_count] < search_start:
+                stale_count += 1
+            if stale_count:
+                del positions[:stale_count]
+
             max_length = min(MAX_MATCH, len(data) - index)
-            for candidate in range(index - 1, search_start - 1, -1):
-                length = 0
+            for candidate in reversed(positions):
+                length = MIN_MATCH
                 while length < max_length and data[candidate + length] == data[index + length]:
                     length += 1
-                if length >= MIN_MATCH and length > best_length:
-                    best_offset = index - candidate
-                    best_length = length
+                if length > best_lengths[index]:
+                    best_offsets[index] = index - candidate
+                    best_lengths[index] = length
                     if length == max_length:
                         break
-            if best_length >= MIN_MATCH:
-                flags |= 1 << bit
-                token = ((best_offset - 1) << 4) | (best_length - MIN_MATCH)
-                output.extend(struct.pack("<H", token))
-                index += best_length
-            else:
-                output.append(data[index])
-                index += 1
-        output[flags_offset] = flags
-    return bytes(output)
+
+        if index + MIN_MATCH <= len(data):
+            positions_by_prefix[data[index : index + MIN_MATCH]].append(index)
+
+    return best_lengths, best_offsets
 
 
 def write_if_changed(path: Path, data: bytes) -> None:
@@ -162,7 +216,7 @@ def parse_c_string_literal_sequence(text: str, index: int, path: Path) -> tuple[
 
 
 def collect_resource_strings(source_root: Path) -> list[str]:
-    strings: set[str] = set()
+    strings: dict[str, None] = {}
     for path in sorted((source_root / "src").rglob("*.cpp")):
         text = path.read_text(encoding="utf-8")
         index = 0
@@ -185,29 +239,30 @@ def collect_resource_strings(source_root: Path) -> list[str]:
                 raise SystemExit(f"{path}: RES_STR only supports one string-literal argument")
             if "\n" in value or "\r" in value or "\0" in value:
                 raise SystemExit(f"{path}: RES_STR values must stay single-line trace strings")
-            strings.add(value)
+            strings.setdefault(value, None)
             index = close + 1
-    return sorted(strings)
+    return list(strings)
 
 
-def cpp_string_literal(text: str) -> str:
-    output = ['"']
-    for ch in text:
-        if ch == "\\":
-            output.append("\\\\")
-        elif ch == '"':
-            output.append('\\"')
-        elif ch == "\t":
-            output.append("\\t")
-        elif ord(ch) < 0x20 or ord(ch) == 0x7F:
-            output.append(f"\\x{ord(ch):02X}")
-        else:
-            output.append(ch)
-    output.append('"')
-    return "".join(output)
+def resource_string_hash(text: str, seed: int) -> int:
+    value = seed
+    for byte in text.encode("utf-8"):
+        value ^= byte
+        value = (value * RESOURCE_STRING_HASH_PRIME) & 0xFFFFFFFF
+    return value
+
+
+def find_resource_string_hash_seed(strings: list[str]) -> int:
+    for attempt in range(4096):
+        seed = (RESOURCE_STRING_HASH_SEED + attempt * 0x9E3779B1) & 0xFFFFFFFF
+        hashes = {resource_string_hash(value, seed) for value in strings}
+        if len(hashes) == len(strings):
+            return seed
+    raise SystemExit("RES_STR hash ids collided for every generated seed attempt")
 
 
 def build_resource_string_header(strings: list[str]) -> str:
+    hash_seed = find_resource_string_hash_seed(strings)
     lines = [
         "#pragma once",
         "",
@@ -216,40 +271,28 @@ def build_resource_string_header(strings: list[str]) -> str:
         "",
         "namespace resource_strings_detail {",
         "",
-        "template <std::size_t RightSize>",
-        "constexpr bool ResourceStringEquals(const char* left, std::size_t leftLength, const char (&right)[RightSize]) {",
-        "    if (leftLength + 1 != RightSize) {",
-        "        return false;",
+        f"constexpr std::uint32_t ResourceStringHashSeed = 0x{hash_seed:08X}u;",
+        f"constexpr std::uint32_t ResourceStringHashPrime = {RESOURCE_STRING_HASH_PRIME}u;",
+        "",
+        "constexpr std::uint32_t ResourceStringHash(const char* text, std::size_t length) {",
+        "    std::uint32_t hash = ResourceStringHashSeed;",
+        "    for (std::size_t index = 0; index < length; ++index) {",
+        "        hash ^= static_cast<std::uint8_t>(text[index]);",
+        "        hash *= ResourceStringHashPrime;",
         "    }",
-        "    for (std::size_t index = 0; index < leftLength; ++index) {",
-        "        if (left[index] != right[index]) {",
-        "            return false;",
-        "        }",
-        "    }",
-        "    return true;",
+        "    return hash;",
         "}",
         "",
         "template <std::size_t Size>",
         "consteval ResourceStringId MakeResourceStringId(const char (&text)[Size]) {",
-        "    constexpr std::size_t length = Size - 1;",
+        "    return static_cast<ResourceStringId>(ResourceStringHash(text, Size - 1));",
+        "}",
+        "",
+        "}  // namespace resource_strings_detail",
+        "",
+        "#define RES_STR(text) (::resource_strings_detail::MakeResourceStringId(text))",
+        "",
     ]
-
-    for index, value in enumerate(strings):
-        lines.append(f"    if (ResourceStringEquals(text, length, {cpp_string_literal(value)})) {{")
-        lines.append(f"        return static_cast<ResourceStringId>({index}u);")
-        lines.append("    }")
-
-    lines.extend(
-        [
-            "    return static_cast<ResourceStringId>(0xFFFFFFFFu);",
-            "}",
-            "",
-            "}  // namespace resource_strings_detail",
-            "",
-            "#define RES_STR(text) (::resource_strings_detail::MakeResourceStringId(text))",
-            "",
-        ]
-    )
     return "\n".join(lines)
 
 

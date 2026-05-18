@@ -363,8 +363,7 @@ constexpr const char* kLayoutEditControlTexts[] = {"",
     "Binding:",
     "Format:",
     "Revert Field",
-    "Changes preview live. Closing this window keeps Edit layout active. Use Save Config or turn off Edit layout to "
-    "finish the session.",
+    "",
     "Red:",
     "Green:",
     "Blue:",
@@ -375,6 +374,13 @@ constexpr const char* kLayoutEditControlTexts[] = {"",
     "Value:",
     "Add row"};
 static_assert(static_cast<size_t>(LayoutEditControlText::Count) == ARRAYSIZE(kLayoutEditControlTexts));
+
+const char* LayoutEditControlTextValue(LayoutEditControlText text) {
+    if (text == LayoutEditControlText::FooterHint) {
+        return FindLocalizedText(RES_STR("layout_edit.dialog.footer_hint"));
+    }
+    return kLayoutEditControlTexts[static_cast<size_t>(text)];
+}
 
 constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_FILTER_LABEL, 8, 10, 26, 8, LayoutEditControlKind::Label, LayoutEditControlText::Filter},
@@ -772,7 +778,7 @@ WPARAM LayoutEditDialogFont(HWND hwnd) {
 
 HWND CreateLayoutEditControl(HWND hwnd, const LayoutEditControlSpec& spec, WPARAM font) {
     const size_t kind = static_cast<size_t>(spec.kind);
-    const char* text = kLayoutEditControlTexts[static_cast<size_t>(spec.text)];
+    const char* text = LayoutEditControlTextValue(spec.text);
     std::wstring wideText;
     if (text[0] != '\0') {
         wideText = WideFromUtf8(text);
@@ -2400,12 +2406,14 @@ std::string LayoutEditConfiguredSectionDescription(const LayoutEditDialogState* 
 
 void SetLayoutEditDescription(LayoutEditDialogState* state, HWND hwnd, const LayoutEditTreeNode* node) {
     if (node == nullptr) {
-        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_TITLE, "No matching setting");
+        SetDialogControlTextUtf8(
+            hwnd, IDC_LAYOUT_EDIT_TITLE, FindLocalizedText(RES_STR("layout_edit.dialog.no_match_title")));
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_LOCATION, "");
         SetDialogControlTextUtf8(
-            hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, "Try a different filter or clear it to see the full tree.");
+            hwnd, IDC_LAYOUT_EDIT_DESCRIPTION, FindLocalizedText(RES_STR("layout_edit.dialog.no_match_description")));
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_SUMMARY, "");
-        SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_HINT, "Select a field to edit it here.");
+        SetDialogControlTextUtf8(
+            hwnd, IDC_LAYOUT_EDIT_HINT, FindLocalizedText(RES_STR("layout_edit.status.select_field")));
         return;
     }
 

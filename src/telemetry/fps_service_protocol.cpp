@@ -3,6 +3,8 @@
 #include <cstring>
 #include <utility>
 
+#include "util/resource_strings.h"
+
 namespace {
 
 constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;      // "CDRQ" little-endian.
@@ -222,30 +224,30 @@ std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
 
     CashDashServiceRequestHeader header;
     if (!ReadBytes(cursor, remaining, &header, sizeof(header))) {
-        diagnostics = "CashDash service request is too short.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request is too short."));
         return std::nullopt;
     }
     if (header.magic != kCashDashServiceRequestMagic) {
-        diagnostics = "CashDash service request magic does not match.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request magic does not match."));
         return std::nullopt;
     }
     if (header.version != kFpsServiceProtocolVersion) {
-        diagnostics = "CashDash service request version is not supported.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request version is not supported."));
         return std::nullopt;
     }
     if (!IsKnownRequestId(header.requestId)) {
-        diagnostics = "CashDash service request id is not supported.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request id is not supported."));
         return std::nullopt;
     }
 
     CashDashServiceRequest request;
     request.id = static_cast<CashDashServiceRequestId>(header.requestId);
     if (!ReadString(cursor, remaining, header.nameBytes, request.name) || remaining != 0) {
-        diagnostics = "CashDash service request payload is malformed.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request payload is malformed."));
         return std::nullopt;
     }
     if (request.name != RequestName(request.id)) {
-        diagnostics = "CashDash service request name does not match its id.";
+        diagnostics = ResourceStringText(RES_STR("CashDash service request name does not match its id."));
         return std::nullopt;
     }
     return request;
@@ -299,37 +301,37 @@ std::optional<FpsTelemetrySample> ParseFpsServiceResponse(const void* data, size
 
     CashDashServiceResponseHeader header;
     if (!ReadBytes(cursor, remaining, &header, sizeof(header))) {
-        diagnostics = "FPS service response is too short.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response is too short."));
         return std::nullopt;
     }
     if (header.magic != kCashDashServiceResponseMagic) {
-        diagnostics = "FPS service response magic does not match.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response magic does not match."));
         return std::nullopt;
     }
     if (header.version != kFpsServiceProtocolVersion) {
-        diagnostics = "FPS service response version is not supported.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response version is not supported."));
         return std::nullopt;
     }
     if (header.requestId != static_cast<uint32_t>(CashDashServiceRequestId::PresentedFpsSample)) {
-        diagnostics = "FPS service response request id does not match.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response request id does not match."));
         return std::nullopt;
     }
     if (header.payloadBytes > kMaximumProtocolPayloadBytes || remaining != header.payloadBytes) {
-        diagnostics = "FPS service response payload is malformed.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response payload is malformed."));
         return std::nullopt;
     }
 
     FpsServiceResponseHeader payloadHeader;
     if (!ReadBytes(cursor, remaining, &payloadHeader, sizeof(payloadHeader))) {
-        diagnostics = "FPS service response payload is too short.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response payload is too short."));
         return std::nullopt;
     }
     if (payloadHeader.magic != kFpsServicePayloadMagic) {
-        diagnostics = "FPS service response payload magic does not match.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response payload magic does not match."));
         return std::nullopt;
     }
     if (payloadHeader.version != kFpsServiceProtocolVersion) {
-        diagnostics = "FPS service response payload version is not supported.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response payload version is not supported."));
         return std::nullopt;
     }
 
@@ -343,7 +345,7 @@ std::optional<FpsTelemetrySample> ParseFpsServiceResponse(const void* data, size
 
     if (!ReadString(cursor, remaining, payloadHeader.processNameBytes, sample.processName) ||
         !ReadString(cursor, remaining, payloadHeader.diagnosticsBytes, sample.diagnostics) || remaining != 0) {
-        diagnostics = "FPS service response string payload is malformed.";
+        diagnostics = ResourceStringText(RES_STR("FPS service response string payload is malformed."));
         return std::nullopt;
     }
     return sample;

@@ -17,6 +17,7 @@
 #include "telemetry/fps/impl/gpu_raw_counter_map.h"
 #include "telemetry/impl/collector_support.h"
 #include "util/lightweight_mutex.h"
+#include "util/resource_strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -157,7 +158,7 @@ public:
 
         LARGE_INTEGER frequency{};
         if (!QueryPerformanceFrequency(&frequency) || frequency.QuadPart <= 0) {
-            diagnostics_ = "QueryPerformanceFrequency failed.";
+            diagnostics_ = ResourceStringText(RES_STR("QueryPerformanceFrequency failed."));
             trace_.WriteFmt(TracePrefix::FpsEtw, RES_STR("initialize_failed diagnostics=\"%s\""), diagnostics_.c_str());
             return false;
         }
@@ -188,7 +189,7 @@ public:
         }
         if (status != ERROR_SUCCESS) {
             permissionRequired_ = IsPermissionDenied(status);
-            diagnostics_ = FormatText("Failed to start FPS ETW session: %s", FormatWin32Error(status).c_str());
+            diagnostics_ = FormatText(RES_STR("Failed to start FPS ETW session: %s"), FormatWin32Error(status).c_str());
             return false;
         }
 
@@ -212,7 +213,7 @@ public:
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
-            diagnostics_ = FormatText("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s",
+            diagnostics_ = FormatText(RES_STR("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s"),
                 FormatWin32Error(dxgiStatus).c_str(),
                 FormatWin32Error(d3d9Status).c_str(),
                 FormatWin32Error(dxgkrnlStatus).c_str());
@@ -228,20 +229,21 @@ public:
         traceLog.Context = this;
         traceHandle_ = OpenTraceW(&traceLog);
         if (traceHandle_ == INVALID_PROCESSTRACE_HANDLE) {
-            diagnostics_ = FormatText("Failed to open FPS ETW trace: %s", FormatWin32Error(GetLastError()).c_str());
+            diagnostics_ =
+                FormatText(RES_STR("Failed to open FPS ETW trace: %s"), FormatWin32Error(GetLastError()).c_str());
             StopLocked();
             return false;
         }
 
         processingThread_ = CreateThread(nullptr, 0, &PresentedFpsEtwProvider::ProcessTraceThread, this, 0, nullptr);
         if (processingThread_ == nullptr) {
-            diagnostics_ =
-                FormatText("Failed to create FPS ETW processing thread: %s", FormatWin32Error(GetLastError()).c_str());
+            diagnostics_ = FormatText(
+                RES_STR("Failed to create FPS ETW processing thread: %s"), FormatWin32Error(GetLastError()).c_str());
             StopLocked();
             return false;
         }
 
-        diagnostics_ = "Presented FPS ETW provider active.";
+        diagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         permissionRequired_ = false;
         initialized_ = true;
         trace_.WriteFmt(TracePrefix::FpsEtw,
@@ -285,7 +287,7 @@ public:
             ResetSelectionLocked();
             sample.available = false;
             sample.diagnostics = BuildDiagnosticsLocked(
-                FormatText(" No presenting application selected.%s", GpuUsageDiagnostics().c_str()));
+                FormatText(RES_STR(" No presenting application selected.%s"), GpuUsageDiagnostics().c_str()));
             return sample;
         }
 
@@ -296,14 +298,14 @@ public:
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
         sample.available = true;
         sample.fps = fps;
-        std::string detail = FormatText(" process=%s", sample.processName.c_str());
+        std::string detail = FormatText(RES_STR(" process=%s"), sample.processName.c_str());
         AppendFormat(detail,
-            " source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f",
+            RES_STR(" source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f"),
             PresentEventSourceName(bestSelection.source),
             bestSelection.count,
             rawFps,
             fps);
-        AppendFormat(detail, "%s", GpuUsageDiagnostics().c_str());
+        AppendFormat(detail, RES_STR("%s"), GpuUsageDiagnostics().c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return sample;
     }
@@ -465,15 +467,15 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        std::string detail = FormatText(" top GPU 3D application has no matching present events. process=%s "
-                                        "selected_process=%s",
+        std::string detail = FormatText(RES_STR(" top GPU 3D application has no matching present events. process=%s "
+                                                "selected_process=%s"),
             sample.processName.c_str(),
             ResolveProcessNameLocked(selected.processId).c_str());
         AppendFormat(detail,
-            " selected_source=%s selected_window_count=%zu",
+            RES_STR(" selected_source=%s selected_window_count=%zu"),
             PresentEventSourceName(selected.source),
             selected.count);
-        AppendFormat(detail, "%s", GpuUsageDiagnosticsForProcess(selected.processId).c_str());
+        AppendFormat(detail, RES_STR("%s"), GpuUsageDiagnosticsForProcess(selected.processId).c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return true;
     }
@@ -695,12 +697,12 @@ private:
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
         AssignFormat(gpuUsageDiagnostics_,
-            " gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process=",
+            RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process="),
             static_cast<long>(collectStatus),
             static_cast<long>(status));
-        AppendFormat(gpuUsageDiagnostics_, "%s", ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
+        AppendFormat(gpuUsageDiagnostics_, RES_STR("%s"), ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
         AppendFormat(gpuUsageDiagnostics_,
-            " top_gpu3d_pid=%lu top_gpu3d=value=%.1f",
+            RES_STR(" top_gpu3d_pid=%lu top_gpu3d=value=%.1f"),
             static_cast<unsigned long>(topGpu3dProcessId_),
             topGpu3dUsage_);
     }
@@ -714,7 +716,7 @@ private:
             return gpuUsageDiagnostics_;
         }
         std::string diagnostics = gpuUsageDiagnostics_;
-        AppendFormat(diagnostics, " selected_gpu3d=value=%.1f", Gpu3dUsageForProcess(processId));
+        AppendFormat(diagnostics, RES_STR(" selected_gpu3d=value=%.1f"), Gpu3dUsageForProcess(processId));
         return diagnostics;
     }
 
@@ -787,10 +789,10 @@ private:
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
         std::string text = diagnostics_;
         AppendFormat(text,
-            " runtime_events=%llu dxgkrnl_events=%llu",
+            RES_STR(" runtime_events=%llu dxgkrnl_events=%llu"),
             static_cast<unsigned long long>(runtimePresentEvents_),
             static_cast<unsigned long long>(kernelPresentEvents_));
-        AppendFormat(text, "%s", suffix.c_str());
+        AppendFormat(text, RES_STR("%s"), suffix.c_str());
         return text;
     }
 
@@ -882,7 +884,7 @@ private:
     DWORD topGpu3dProcessId_ = 0;
     double topGpu3dUsage_ = 0.0;
     PresentEventSource selectedSource_ = PresentEventSource::Runtime;
-    std::string diagnostics_ = "FPS ETW provider not initialized.";
+    std::string diagnostics_ = ResourceStringText(RES_STR("FPS ETW provider not initialized."));
     std::string gpuUsageDiagnostics_;
     uint64_t runtimePresentEvents_ = 0;
     uint64_t kernelPresentEvents_ = 0;

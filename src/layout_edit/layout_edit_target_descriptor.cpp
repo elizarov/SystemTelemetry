@@ -3,6 +3,7 @@
 #include <array>
 #include <utility>
 
+#include "util/localization_catalog.h"
 #include "util/text_format.h"
 
 namespace {
@@ -14,8 +15,9 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "metric_list",
         "layout_edit.metric_list_reorder",
-        "Metric List",
-        "Choose the metric for each row, move rows up or down, remove rows, or add a new row.",
+        RES_STR("layout_edit.metric_list_reorder"),
+        RES_STR("layout_edit.node_field.metric_list.title"),
+        RES_STR("layout_edit.node_field.metric_list.hint"),
         "metric_list_order"},
     {WidgetClass::ClockTime,
         LayoutNodeField::Parameter,
@@ -23,8 +25,9 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "clock_time",
         "layout_edit.clock_time_format",
-        "Time Format",
-        "Choose a time format. Changes preview live.",
+        RES_STR("layout_edit.clock_time_format"),
+        RES_STR("layout_edit.node_field.clock_time.title"),
+        RES_STR("layout_edit.node_field.clock_time.hint"),
         "date_time_format"},
     {WidgetClass::ClockDate,
         LayoutNodeField::Parameter,
@@ -32,8 +35,9 @@ constexpr std::array<LayoutNodeFieldEditDescriptor, 3> kNodeFieldDescriptors{{
         configschema::ValueFormat::String,
         "clock_date",
         "layout_edit.clock_date_format",
-        "Date Format",
-        "Choose a date format. Changes preview live.",
+        RES_STR("layout_edit.clock_date_format"),
+        RES_STR("layout_edit.node_field.clock_date.title"),
+        RES_STR("layout_edit.node_field.clock_date.hint"),
         "date_time_format"},
 }};
 
@@ -55,17 +59,17 @@ std::optional<LayoutNodeFieldEditKey> LayoutNodeFieldEditKeyForWidgetParameter(
                                                              : std::nullopt;
 }
 
-std::string LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key) {
+std::string_view LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key) {
     const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
-    return descriptor != nullptr ? std::string(descriptor->title) : std::string{};
+    return descriptor != nullptr ? FindLocalizedText(descriptor->titleKey) : std::string_view{};
 }
 
-std::string LayoutNodeFieldEditHint(const LayoutNodeFieldEditKey& key) {
+std::string_view LayoutNodeFieldEditHint(const LayoutNodeFieldEditKey& key) {
     const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
-    return descriptor != nullptr ? std::string(descriptor->hint) : std::string{};
+    return descriptor != nullptr ? FindLocalizedText(descriptor->hintKey) : std::string_view{};
 }
 
-std::string LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& key) {
+std::string_view LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& key) {
     return LayoutNodeFieldEditTitle(key);
 }
 

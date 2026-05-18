@@ -5,6 +5,7 @@
 #include <limits>
 #include <string_view>
 
+#include "util/resource_strings.h"
 #include "util/text_format.h"
 
 namespace {
@@ -929,8 +930,8 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                 const std::string_view firstKey = calloutKey(firstIndex);
                 const std::string_view secondKey = calloutKey(secondIndex);
                 traceDetails->push_back(FormatText(
-                    "intersection_card=\"%.*s\" intersection_kind=\"%s\" first_side=\"%s\" first_callout=\"%.*s\" "
-                    "second_side=\"%s\" second_callout=\"%.*s\"",
+                    ResourceStringText(RES_STR("intersection_card=\"%.*s\" intersection_kind=\"%s\" first_side=\"%s\" "
+                                               "first_callout=\"%.*s\" second_side=\"%s\" second_callout=\"%.*s\"")),
                     static_cast<int>(cardId.size()),
                     cardId.data(),
                     kind,
@@ -972,17 +973,18 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             const CardCalloutColumns& columns = plannedByCard[cardIndex];
             const int leaderScore = countLeaderIntersections(columns, cardPlacements[cardIndex]);
             const std::string& cardId = cardPlacements[cardIndex].id;
-            traceDetails->push_back(FormatText("leader_score_%s=%d leader_repair_passes_%s=%d "
-                                               "leader_columns_%s=\"%zu,%zu,%zu,%zu\"",
-                cardId.c_str(),
-                leaderScore,
-                cardId.c_str(),
-                columns.leaderRepairPasses,
-                cardId.c_str(),
-                columns.left.size(),
-                columns.top.size(),
-                columns.right.size(),
-                columns.bottom.size()));
+            traceDetails->push_back(
+                FormatText(ResourceStringText(RES_STR(
+                               "leader_score_%s=%d leader_repair_passes_%s=%d leader_columns_%s=\"%zu,%zu,%zu,%zu\"")),
+                    cardId.c_str(),
+                    leaderScore,
+                    cardId.c_str(),
+                    columns.leaderRepairPasses,
+                    cardId.c_str(),
+                    columns.left.size(),
+                    columns.top.size(),
+                    columns.right.size(),
+                    columns.bottom.size()));
         }
     }
     return result;

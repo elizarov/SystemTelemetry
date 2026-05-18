@@ -655,9 +655,9 @@ add_executable(CaseDashTests
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/localization_catalog.cpp
-    src/util/resource_loader.cpp
     src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
+    tests/resource_loader_test_stub.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp

@@ -79,5 +79,5 @@ std::vector<std::string> AvailableMetricDefinitionIds(const AppConfig& config);
 bool IsMetricListSupportedDisplayStyle(MetricDisplayStyle style);
 std::string BuildWeightEditorLabel(const LayoutEditTreeLeaf& leaf, bool first);
 std::string BuildLayoutEditNodeTitle(const LayoutEditTreeNode* node);
-std::string BuildLayoutEditSummaryText(const LayoutEditTreeNode* node);
-std::string BuildLayoutEditHintText(const LayoutEditTreeNode* node);
+std::string_view BuildLayoutEditSummaryText(const LayoutEditTreeNode* node);
+std::string_view BuildLayoutEditHintText(const LayoutEditTreeNode* node);

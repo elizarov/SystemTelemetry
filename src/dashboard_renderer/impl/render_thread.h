@@ -149,6 +149,7 @@ private:
     void WriteTrace(ResourceStringId text) const;
     void WriteTraceFmt(const char* format, ...) const;
     void WriteTraceFmt(ResourceStringId format, ...) const;
+    void SetLastError(ResourceStringId error);
     void SetLastError(std::string error);
     bool EventsReady() const;
 

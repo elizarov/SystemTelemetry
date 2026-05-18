@@ -13,6 +13,7 @@
 #include "telemetry/board/msi/board_msi_center_bridge.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/file_path.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -114,9 +115,10 @@ public:
 
     MsiCenterSnapshot FinishSuccess() {
         snapshot_.success = true;
-        snapshot_.diagnostics = FormatText("MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu",
-            snapshot_.fans.size(),
-            snapshot_.temperatures.size());
+        snapshot_.diagnostics =
+            FormatText(RES_STR("MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu"),
+                snapshot_.fans.size(),
+                snapshot_.temperatures.size());
         return std::move(snapshot_);
     }
 
@@ -145,18 +147,18 @@ public:
             boardProduct_.c_str());
 
         if (SelectBoardVendor(info_) != BoardVendor::Msi) {
-            diagnostics_ = "Baseboard manufacturer is not MSI.";
+            diagnostics_ = ResourceStringText(RES_STR("Baseboard manufacturer is not MSI."));
             return false;
         }
 
         msiCenterDirectory_ = FindInstalledMsiCenterDirectory();
         if (!msiCenterDirectory_.has_value()) {
-            diagnostics_ = "MSI Center SDK directory was not found in the registry.";
+            diagnostics_ = ResourceStringText(RES_STR("MSI Center SDK directory was not found in the registry."));
             return false;
         }
 
         loadedLibrary_ = (*msiCenterDirectory_ / "CS_CommonAPI.dll").string();
-        diagnostics_ = "MSI Center provider ready.";
+        diagnostics_ = ResourceStringText(RES_STR("MSI Center provider ready."));
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
@@ -174,12 +176,13 @@ public:
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
             AppendFormat(requestedDiagnosticsSuffix_,
-                " requested_temps=%s",
+                RES_STR(" requested_temps=%s"),
                 JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_, " requested_fans=%s", JoinNames(settings_.requestedFanNames).c_str());
+            AppendFormat(requestedDiagnosticsSuffix_,
+                RES_STR(" requested_fans=%s"),
+                JoinNames(settings_.requestedFanNames).c_str());
         }
         initialized_ = true;
         return true;
@@ -198,7 +201,7 @@ public:
         sample.temperatures = temperatureMetricTemplate_;
         sample.fans = fanMetricTemplate_;
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
 
         const std::optional<FilePath> msiCenterDirectory = msiCenterDirectory_;
         if (!initialized_ || !msiCenterDirectory.has_value()) {
@@ -211,7 +214,7 @@ public:
         MsiCenterSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;
-            sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+            sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
             return sample;
         }
 
@@ -229,7 +232,7 @@ public:
             snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
 
@@ -254,7 +257,7 @@ private:
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string loadedLibrary_;
-    std::string diagnostics_ = "MSI Center provider not initialized.";
+    std::string diagnostics_ = ResourceStringText(RES_STR("MSI Center provider not initialized."));
     std::string requestedDiagnosticsSuffix_;
     std::vector<std::string> availableFanNames_;
     std::vector<std::string> availableTemperatureNames_;

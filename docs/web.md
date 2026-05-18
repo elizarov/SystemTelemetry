@@ -4,7 +4,7 @@ This document owns the public CaseDash website behavior, content, section contra
 
 ## Purpose
 
-The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, what hardware providers are currently supported, how first use works, how layout editing looks, and where to contribute.
+The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, how animation behaves, what hardware providers are currently supported, how first use works, how layout editing looks, and where to contribute.
 
 The site takes its tone and structure from the README: compact, practical, and visually led by the actual dashboard. It stays consistent across sections and avoids repeating product claims, configuration syntax, or diagnostics details that are already owned by maintained docs.
 
@@ -13,6 +13,7 @@ The site takes its tone and structure from the README: compact, practical, and v
 The primary visitor owns or is considering a small telemetry display for a Windows PC. The page assumes the visitor wants to quickly answer:
 
 - What CaseDash looks like.
+- Whether the dashboard animates smoothly without heavy per-frame work.
 - Whether their hardware is likely to work.
 - How to install and configure it.
 - How layouts and themes can be adjusted.
@@ -54,9 +55,10 @@ The top-left navigation brand shows `CaseDash` plus the current `VERSION` value 
 The features section summarizes the product capabilities that matter to end users:
 
 - Compact always-on Windows telemetry dashboard.
+- vsync-paced live animation for metric fills and throughput plots that spends less than 1 ms per frame.
 - Constraint-based layouts and live layout editing.
 - Theme system derived from a small set of base colors.
-- Native executable under 1 MB and fast frame rendering.
+- Native executable under 1 MB.
 - Layouts for common small-panel formats.
 - Built-in display setup, placement restore, startup wallpaper, and Start with Windows support.
 

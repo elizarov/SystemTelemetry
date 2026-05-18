@@ -66,7 +66,7 @@ Other top-level areas:
 
 ## Resources And Build Graph
 
-- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded text atlas resource from config, localization, and the sorted `RES_STR` trace string catalog.
+- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded text atlas resource from config, localization, and the deduplicated first source-use `RES_STR` trace string catalog with collision-checked hash ids.
 - `resources/resource.h` owns resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.

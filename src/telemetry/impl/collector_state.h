@@ -21,6 +21,7 @@
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/telemetry.h"
+#include "util/resource_strings.h"
 #include "util/trace.h"
 
 struct DriveCounterState {
@@ -34,7 +35,7 @@ struct RealTelemetryCollectorState {
     struct BoardState {
         std::unique_ptr<BoardVendorTelemetryProvider> provider;
         std::string providerName = "None";
-        std::string providerDiagnostics = "Provider not initialized.";
+        std::string providerDiagnostics = ResourceStringText(RES_STR("Provider not initialized."));
         std::string boardManufacturer;
         std::string boardProduct;
         std::string driverLibrary;
@@ -54,7 +55,7 @@ struct RealTelemetryCollectorState {
     struct GpuState {
         std::unique_ptr<GpuVendorTelemetryProvider> provider;
         std::string providerName = "None";
-        std::string providerDiagnostics = "Provider not initialized.";
+        std::string providerDiagnostics = ResourceStringText(RES_STR("Provider not initialized."));
         bool providerAvailable = false;
         std::optional<GpuAdapterInfo> selectedAdapter;
         std::vector<GpuAdapterCandidate> adapterCandidates;

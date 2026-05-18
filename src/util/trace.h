@@ -84,3 +84,4 @@ private:
 };
 
 void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::string& error);
+void WriteRendererErrorTrace(Trace& trace, ResourceStringId stage, const std::string& error);

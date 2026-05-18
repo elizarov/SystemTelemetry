@@ -14,6 +14,7 @@
 #include "telemetry/board/gigabyte/board_gigabyte_siv_bridge.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/file_path.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -77,7 +78,10 @@ std::optional<FilePath> FindInstalledSivDirectory() {
 
 class GigabyteSivCapture final : public GigabyteSivCaptureSink {
 public:
-    explicit GigabyteSivCapture(Trace& trace) : trace_(trace) {}
+    explicit GigabyteSivCapture(Trace& trace) : trace_(trace) {
+        snapshot_.fans.reserve(4);
+        snapshot_.temperatures.reserve(4);
+    }
 
     void AddFanReading(const wchar_t* title, double rpm) override {
         snapshot_.fans.push_back(BoardSensorReading{Utf8FromNullableWide(title), rpm});
@@ -126,7 +130,7 @@ public:
     GigabyteSivSnapshot FinishSuccess() {
         snapshot_.success = true;
         snapshot_.diagnostics =
-            FormatText("Gigabyte SIV hardware-monitor query completed. fan_count=%zu temp_count=%zu",
+            FormatText(RES_STR("Gigabyte SIV hardware-monitor query completed. fan_count=%zu temp_count=%zu"),
                 snapshot_.fans.size(),
                 snapshot_.temperatures.size());
         trace_.WriteFmt(TracePrefix::GigabyteSiv,
@@ -161,19 +165,19 @@ public:
             boardProduct_.c_str());
 
         if (SelectBoardVendor(info_) != BoardVendor::Gigabyte) {
-            diagnostics_ = "Baseboard manufacturer is not Gigabyte.";
+            diagnostics_ = ResourceStringText(RES_STR("Baseboard manufacturer is not Gigabyte."));
             return false;
         }
 
         sivDirectory_ = FindInstalledSivDirectory();
 
         if (!sivDirectory_.has_value()) {
-            diagnostics_ = "Gigabyte SIV directory was not found in the registry.";
+            diagnostics_ = ResourceStringText(RES_STR("Gigabyte SIV directory was not found in the registry."));
             return false;
         }
 
         loadedLibrary_ = (*sivDirectory_ / kEngineEnvironmentControlDll).string();
-        diagnostics_ = "Gigabyte SIV provider ready.";
+        diagnostics_ = ResourceStringText(RES_STR("Gigabyte SIV provider ready."));
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
@@ -191,12 +195,13 @@ public:
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
             AppendFormat(requestedDiagnosticsSuffix_,
-                " requested_temps=%s",
+                RES_STR(" requested_temps=%s"),
                 JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_, " requested_fans=%s", JoinNames(settings_.requestedFanNames).c_str());
+            AppendFormat(requestedDiagnosticsSuffix_,
+                RES_STR(" requested_fans=%s"),
+                JoinNames(settings_.requestedFanNames).c_str());
         }
         initialized_ = true;
         return true;
@@ -207,17 +212,12 @@ public:
         sample.providerName = "Gigabyte";
         sample.requestedFanNames = settings_.requestedFanNames;
         sample.requestedTemperatureNames = settings_.requestedTemperatureNames;
-        sample.availableFanNames = availableFanNames_;
-        sample.availableTemperatureNames = availableTemperatureNames_;
         sample.boardManufacturer = boardManufacturer_;
         sample.boardProduct = boardProduct_;
         sample.driverLibrary = loadedLibrary_;
-        sample.temperatures = temperatureMetricTemplate_;
-        sample.fans = fanMetricTemplate_;
-        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
 
         if (!initialized_ || !sivDirectory_.has_value()) {
+            PopulateUnavailableSample(sample);
             return sample;
         }
 
@@ -227,7 +227,7 @@ public:
         GigabyteSivSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;
-            sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+            PopulateUnavailableSample(sample);
             return sample;
         }
 
@@ -245,7 +245,7 @@ public:
             snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-        sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
 
@@ -262,6 +262,15 @@ private:
         return trace_;
     }
 
+    void PopulateUnavailableSample(BoardVendorTelemetrySample& sample) const {
+        sample.availableFanNames = availableFanNames_;
+        sample.availableTemperatureNames = availableTemperatureNames_;
+        sample.temperatures = temperatureMetricTemplate_;
+        sample.fans = fanMetricTemplate_;
+        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+    }
+
     Trace& trace_;
     BoardVendorInfo info_;
     BoardTelemetrySettings settings_{};
@@ -270,7 +279,7 @@ private:
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string loadedLibrary_;
-    std::string diagnostics_ = "Gigabyte provider not initialized.";
+    std::string diagnostics_ = ResourceStringText(RES_STR("Gigabyte provider not initialized."));
     std::string requestedDiagnosticsSuffix_;
     std::vector<std::string> availableFanNames_;
     std::vector<std::string> availableTemperatureNames_;

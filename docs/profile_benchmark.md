@@ -391,6 +391,23 @@ These changes produced real wins and remain in the codebase:
 - Conclusion:
   - The live-update benchmark still spends most of its time inside real telemetry APIs, but the Gigabyte provider was paying meaningful extra CPU for per-sample reflection argument setup and managed-string churn. Reusing those internal resources is worth keeping, but `GetCurrentMonitoredData` still requires a live collection instance even on its by-reference parameter, so that specific null-out shortcut must stay reverted.
 
+### Hypothesis: Trim Gigabyte SIV typed-sample row processing without reducing samples
+
+- Change:
+  - Keep the Gigabyte SIV provider on one fan capture and one temperature capture every telemetry update, but remove per-row `Unit` property reflection, unit string comparisons, generic culture-aware value conversion, and duplicate success-path sample prefill work. The bridge now trusts the typed SIV `Fan` and `Temperature` queries on this validated SIV installation and unboxes the `Single` `Value` property directly.
+- Result:
+  - Kept.
+- Observed effect:
+  - After reverting the rejected sample-reuse experiment, a fresh direct `build\CaseDashBenchmarks.exe update-telemetry 240 2` run landed at `update_loop per_iter_ms=5.86`, `telemetry_update avg_ms=3.29`, and `paint_draw avg_ms=2.56`.
+  - The retained row-processing cleanup produced repeat direct runs at `update_loop per_iter_ms=4.88` to `5.00`, `telemetry_update avg_ms=2.64` to `2.72`, and `paint_draw avg_ms=2.22` to `2.27`.
+  - The final full direct benchmark refresh landed at `update_loop per_iter_ms=5.00`, `telemetry_update avg_ms=2.76`, and `paint_draw avg_ms=2.24`.
+  - The daemon-backed capture under `build\profile_benchmark_daemon\requests\3303_30022_15221\` landed at `update_loop per_iter_ms=5.21`, `telemetry_update avg_ms=2.88`, and `paint_draw avg_ms=2.33`; CLR and mscorlib remain visible, but the top app-inclusive functions are again dominated by benchmark control and Direct2D/DirectWrite drawing.
+  - The SIV all-sensor overload was rejected because even `build\CaseDashBenchmarks.exe update-telemetry 20 2` timed out after 15 seconds, so that overload is much more expensive than the two typed queries on this machine.
+  - Caching the SIV collection constructor was rejected because repeat direct runs stayed neutral at `telemetry_update avg_ms=2.70` to `2.71` while adding extra reflection state.
+  - Headless diagnostics with `CaseDash.exe /trace:build\gigabyte_siv_typed_trace.txt /trace-prefixes:telemetry,gigabyte_siv,board_vendor /dump:build\gigabyte_siv_typed_dump.txt /default-config /exit` kept a real `gigabyte_siv:snapshot_done fan_count=3 temp_count=4` on each telemetry update and preserved CPU temperature plus CPU and system fan RPM in the dump.
+- Conclusion:
+  - Keep the typed two-call SIV shape and the lean per-row extraction. Do not use the all-sensor SIV overload, sample reuse, persistent collection reuse, or constructor caching for this provider path.
+
 ### Hypothesis: Compute both GPU PDH engine totals from one wildcard fetch
 
 - Change:

@@ -121,7 +121,7 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
         if (errorText != nullptr) {
             *errorText = error;
         }
-        WriteRendererErrorTrace(trace, "layout_guide_sheet_initialize", error);
+        WriteRendererErrorTrace(trace, RES_STR("layout_guide_sheet_initialize"), error);
         trace.Write(TracePrefix::Diagnostics, RES_STR("layout_guide_sheet failed stage=\"initialize\""));
         return false;
     }
@@ -132,7 +132,7 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     std::string* outputErrorText = errorText != nullptr ? errorText : &localError;
     if (!BuildLayoutGuideSheetPipelineInputs(
             renderer, snapshot, callouts, selectedCardIds, outputErrorText, outputStats)) {
-        WriteRendererErrorTrace(trace, "layout_guide_sheet_active_regions", *outputErrorText);
+        WriteRendererErrorTrace(trace, RES_STR("layout_guide_sheet_active_regions"), *outputErrorText);
         trace.Write(TracePrefix::Diagnostics, RES_STR("layout_guide_sheet failed stage=\"active_regions\""));
         return false;
     }
@@ -144,7 +144,7 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
         imagePath, snapshot, callouts, selectedCardIds, &traceDetails, outputErrorText, &renderStats);
     RecordRenderStats(renderStats, outputStats);
     if (!saved) {
-        WriteRendererErrorTrace(trace, "layout_guide_sheet_save", *outputErrorText);
+        WriteRendererErrorTrace(trace, RES_STR("layout_guide_sheet_save"), *outputErrorText);
         trace.Write(TracePrefix::Diagnostics, RES_STR("layout_guide_sheet failed stage=\"save\""));
         return false;
     }

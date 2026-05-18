@@ -6,13 +6,15 @@
 #include "telemetry/impl/collector_state.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/numeric_safety.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 
 namespace {
 
 void ApplyBoardVendorSample(RealTelemetryCollectorState& state, const BoardVendorTelemetrySample& sample) {
     state.board_.providerName = sample.providerName.empty() ? "None" : sample.providerName;
-    state.board_.providerDiagnostics = sample.diagnostics.empty() ? "(none)" : sample.diagnostics;
+    state.board_.providerDiagnostics =
+        sample.diagnostics.empty() ? ResourceStringText(RES_STR("(none)")) : sample.diagnostics;
     state.board_.providerAvailable = sample.available;
     state.board_.boardManufacturer = sample.boardManufacturer;
     state.board_.boardProduct = sample.boardProduct;

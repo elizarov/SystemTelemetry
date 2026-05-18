@@ -106,13 +106,14 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
 }
 
 std::string BuildLayoutGuideTooltipText(const AppConfig& config, const LayoutEditGuide& guide) {
-    return TooltipText(BuildLayoutGuideTooltipLine(config, guide), FindLocalizedText("layout_edit.layout_guide"));
+    return TooltipText(
+        BuildLayoutGuideTooltipLine(config, guide), FindLocalizedText(RES_STR("layout_edit.layout_guide")));
 }
 
 std::string BuildMetricTooltipText(const LayoutMetricEditKey& key, const MetricDefinitionConfig& definition) {
     return TooltipText(
         FormatText("[metrics] %s = %s", key.metricId.c_str(), FormatMetricDefinitionValue(definition).c_str()),
-        FindLocalizedText("layout_edit.metric_definition"));
+        FindLocalizedText(RES_STR("layout_edit.metric_definition")));
 }
 
 std::string BuildMetricListOrderTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex) {
@@ -120,7 +121,7 @@ std::string BuildMetricListOrderTooltipText(const AppConfig& config, const Layou
     if (!firstLine.has_value()) {
         return {};
     }
-    return TooltipText(*firstLine, FindLocalizedText("layout_edit.metric_list_reorder"));
+    return TooltipText(*firstLine, FindLocalizedText(RES_STR("layout_edit.metric_list_reorder")));
 }
 
 std::string BuildMetricListAddRowTooltipText(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
@@ -128,7 +129,7 @@ std::string BuildMetricListAddRowTooltipText(const AppConfig& config, const Layo
     if (!firstLine.has_value()) {
         return {};
     }
-    return TooltipText(*firstLine, FindLocalizedText("layout_edit.metric_list_add_row"));
+    return TooltipText(*firstLine, FindLocalizedText(RES_STR("layout_edit.metric_list_add_row")));
 }
 
 std::string BuildContainerChildOrderTooltipText(const AppConfig& config, const LayoutEditAnchorRegion& anchor) {
@@ -140,9 +141,9 @@ std::string BuildContainerChildOrderTooltipText(const AppConfig& config, const L
     if (!firstLine.has_value()) {
         return {};
     }
-    const char* descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
-                                     ? "layout_edit.container_reorder_horizontal"
-                                     : "layout_edit.container_reorder_vertical";
+    const ResourceStringId descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
+                                                ? RES_STR("layout_edit.container_reorder_horizontal")
+                                                : RES_STR("layout_edit.container_reorder_vertical");
     return TooltipText(*firstLine, FindLocalizedText(descriptionKey));
 }
 
@@ -275,7 +276,7 @@ bool BuildLayoutEditTooltipTextForPayload(
                                            : std::string(EnumToString(nodeFieldKey->widgetClass));
         std::string text =
             FormatText("%s = %s", valueLabel.c_str(), ReadLayoutNodeFieldValue(*node, nodeFieldKey->field).c_str());
-        AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionKey));
+        AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionResourceKey));
         tooltipText = std::move(text);
         return true;
     }

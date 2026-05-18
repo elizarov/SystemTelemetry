@@ -12,6 +12,7 @@
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/util.h"
+#include "util/localization_catalog.h"
 #include "util/numeric_format.h"
 #include "util/strings.h"
 #include "util/text_format.h"
@@ -581,11 +582,11 @@ bool PopulateDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
 
 LayoutEditValidationResult ValidateMetricListOrderSelection(LayoutEditDialogState* state, HWND hwnd) {
     if (SelectedMetricListOrderKey(state) == nullptr) {
-        return {false, "Choose a metric for each row."};
+        return {false, FindLocalizedText(RES_STR("layout_edit.validation.choose_metric_row"))};
     }
     for (const auto& metricRef : ReadMetricListOrderDialogRows(state, hwnd)) {
         if (metricRef.empty()) {
-            return {false, "Choose a metric for each row."};
+            return {false, FindLocalizedText(RES_STR("layout_edit.validation.choose_metric_row"))};
         }
     }
     return {true, ""};
@@ -594,11 +595,12 @@ LayoutEditValidationResult ValidateMetricListOrderSelection(LayoutEditDialogStat
 LayoutEditValidationResult ValidateDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
     const LayoutNodeFieldEditDescriptor* descriptor = SelectedNodeFieldDescriptor(state);
     if (descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
-        return {false, "Choose a date or time format."};
+        return {false, FindLocalizedText(RES_STR("layout_edit.validation.choose_date_time_format"))};
     }
     const std::string format = Trim(ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
     return !format.empty() ? LayoutEditValidationResult{true, ""}
-                           : LayoutEditValidationResult{false, "Choose a date or time format."};
+                           : LayoutEditValidationResult{
+                                 false, FindLocalizedText(RES_STR("layout_edit.validation.choose_date_time_format"))};
 }
 
 bool PreviewDateTimeFormatSelection(LayoutEditDialogState* state, HWND hwnd) {
@@ -744,7 +746,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_LABEL, "Family:");
         PopulateFontFaceComboBox(hwnd, CommonFontFamilyText(config.layout.fonts));
         ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::GlobalFontFamily);
-        FinishPopulateLayoutEditSelectionUi(state, hwnd, "Previewing changes in the dashboard.");
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, FindLocalizedText(RES_STR("layout_edit.status.previewing")));
         TracePopulateLayoutEditSelection(state, " editor=\"font_family\"");
         return;
     }
@@ -752,7 +754,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, "Theme:");
         PopulateThemeNameCombo(hwnd, config);
         ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::ThemeSelector);
-        FinishPopulateLayoutEditSelectionUi(state, hwnd, "Previewing changes in the dashboard.");
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, FindLocalizedText(RES_STR("layout_edit.status.previewing")));
         InvalidateRect(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW), nullptr, TRUE);
         TracePopulateLayoutEditSelection(
             state, FormatText(" editor=\"theme_selector\" theme=%s", QuoteTraceText(config.display.theme).c_str()));
@@ -762,14 +764,14 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_THEME_LABEL, "Layout:");
         PopulateLayoutNameCombo(hwnd, config);
         ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::LayoutSelector);
-        FinishPopulateLayoutEditSelectionUi(state, hwnd, "Previewing changes in the dashboard.");
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, FindLocalizedText(RES_STR("layout_edit.status.previewing")));
         TracePopulateLayoutEditSelection(
             state, FormatText(" editor=\"layout_selector\" layout=%s", QuoteTraceText(config.display.layout).c_str()));
         return;
     }
     if (state->selectedLeaf == nullptr) {
         ShowLayoutEditSelectionEditor(state, hwnd, LayoutEditEditorKind::Summary);
-        FinishPopulateLayoutEditSelectionUi(state, hwnd, "Select a field to edit it here.");
+        FinishPopulateLayoutEditSelectionUi(state, hwnd, FindLocalizedText(RES_STR("layout_edit.status.select_field")));
         TracePopulateLayoutEditSelection(state, " editor=\"none\"");
         return;
     }
@@ -897,7 +899,7 @@ void PopulateLayoutEditSelection(LayoutEditDialogState* state, HWND hwnd) {
         TracePopulateLayoutEditSelection(state, traceDetail);
     }
     RefreshSelectedColorDerivedControls(state, hwnd);
-    FinishPopulateLayoutEditSelectionUi(state, hwnd, "Previewing changes in the dashboard.");
+    FinishPopulateLayoutEditSelectionUi(state, hwnd, FindLocalizedText(RES_STR("layout_edit.status.previewing")));
 }
 
 LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* state, HWND hwnd) {
@@ -918,30 +920,30 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
             const std::optional<int> size = TryParseDialogInteger(sizeBuffer);
             const std::optional<int> weight = TryParseDialogInteger(weightBuffer);
             if (faceBuffer[0] == wchar_t{}) {
-                return {false, "Enter a font name."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.font_name"))};
             }
             if (!size.has_value() || *size < 1) {
-                return {false, "Enter a font size of 1 or greater."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.font_size"))};
             }
             if (!weight.has_value()) {
-                return {false, "Enter an integer font weight."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.font_weight"))};
             }
             return {true, ""};
         }
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::ColorHex) {
             if (IsDerivedColorMode(hwnd)) {
                 if (!ReadDerivedColorExpressionFromDialog(hwnd).has_value()) {
-                    return {false, "Complete the derived color controls with valid values."};
+                    return {false, FindLocalizedText(RES_STR("layout_edit.validation.derived_color"))};
                 }
                 return {true, ""};
             }
             wchar_t hexBuffer[64] = {};
             GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexBuffer, ARRAYSIZE(hexBuffer));
             if (hexBuffer[0] != wchar_t{} && !TryParseDialogHexColor(hexBuffer).has_value()) {
-                return {false, "Enter a #RRGGBBAA color value."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.color_hex"))};
             }
             if (!ReadColorDialogValue(hwnd).has_value()) {
-                return {false, "Enter each RGBA channel as a whole number between 0 and 255."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.color_channels"))};
             }
             return {true, ""};
         }
@@ -954,11 +956,12 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::Integer) {
             return TryParseDialogInteger(valueBuffer).has_value()
                        ? LayoutEditValidationResult{true, ""}
-                       : LayoutEditValidationResult{false, "Enter a whole number."};
+                       : LayoutEditValidationResult{
+                             false, FindLocalizedText(RES_STR("layout_edit.validation.whole_number"))};
         }
         return TryParseDialogDouble(valueBuffer).has_value()
                    ? LayoutEditValidationResult{true, ""}
-                   : LayoutEditValidationResult{false, "Enter a valid number."};
+                   : LayoutEditValidationResult{false, FindLocalizedText(RES_STR("layout_edit.validation.number"))};
     }
 
     if (std::holds_alternative<LayoutCardTitleEditKey>(state->selectedLeaf->focusKey)) {
@@ -969,10 +972,10 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         wchar_t hexBuffer[64] = {};
         GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, hexBuffer, ARRAYSIZE(hexBuffer));
         if (hexBuffer[0] != wchar_t{} && !TryParseDialogHexColor(hexBuffer).has_value()) {
-            return {false, "Enter a #RRGGBBAA color value."};
+            return {false, FindLocalizedText(RES_STR("layout_edit.validation.color_hex"))};
         }
         if (!ReadColorDialogValue(hwnd).has_value()) {
-            return {false, "Enter each RGBA channel as a whole number between 0 and 255."};
+            return {false, FindLocalizedText(RES_STR("layout_edit.validation.color_channels"))};
         }
         return {true, ""};
     }
@@ -987,14 +990,14 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         const AppConfig& config = state->dialog->Host().CurrentConfig();
         const MetricDefinitionConfig* definition = FindMetricDefinition(config.layout.metrics, metricKey->metricId);
         if (definition == nullptr) {
-            return {false, "Unable to find the current metric definition."};
+            return {false, FindLocalizedText(RES_STR("layout_edit.validation.metric_definition_missing"))};
         }
         if (!definition->telemetryScale && definition->style != MetricDisplayStyle::LabelOnly) {
             wchar_t scaleBuffer[128] = {};
             GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT, scaleBuffer, ARRAYSIZE(scaleBuffer));
             const std::optional<double> scale = TryParseDialogDouble(scaleBuffer);
             if (!scale.has_value() || *scale <= 0.0) {
-                return {false, "Enter a metric scale greater than 0."};
+                return {false, FindLocalizedText(RES_STR("layout_edit.validation.metric_scale_positive"))};
             }
         }
         return {true, ""};
@@ -1007,7 +1010,7 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
     const std::optional<int> first = TryParseDialogInteger(firstBuffer);
     const std::optional<int> second = TryParseDialogInteger(secondBuffer);
     if (!first.has_value() || !second.has_value() || *first < 1 || *second < 1) {
-        return {false, "Enter positive integer weights for both neighboring items."};
+        return {false, FindLocalizedText(RES_STR("layout_edit.validation.neighbor_weights_positive"))};
     }
     return {true, ""};
 }
@@ -1020,9 +1023,11 @@ void RefreshLayoutEditValidationState(LayoutEditDialogState* state, HWND hwnd) {
     state->activeSelectionValid = validation.valid;
     if (state->selectedLeaf == nullptr && !IsFontsSectionNode(state) && !IsThemeSectionNode(state) &&
         !IsLayoutSectionNode(state)) {
-        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, "Select a field to edit it here.");
+        SetLayoutEditStatus(
+            state, hwnd, LayoutEditStatusKind::Info, FindLocalizedText(RES_STR("layout_edit.status.select_field")));
     } else if (validation.valid) {
-        SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Info, "Previewing changes in the dashboard.");
+        SetLayoutEditStatus(
+            state, hwnd, LayoutEditStatusKind::Info, FindLocalizedText(RES_STR("layout_edit.status.previewing")));
     } else {
         SetLayoutEditStatus(state, hwnd, LayoutEditStatusKind::Error, validation.message);
     }

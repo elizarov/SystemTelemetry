@@ -107,7 +107,8 @@ void DashboardRenderer::SetConfig(const AppConfig& config) {
     config_ = config;
     const RendererStyle nextStyle = BuildRendererStyle();
     if (!renderer_->SetStyle(nextStyle) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "reconfigure_failed" : renderer_->LastError();
+        lastError_ =
+            renderer_->LastError().empty() ? ResourceStringText(RES_STR("reconfigure_failed")) : renderer_->LastError();
     }
 }
 
@@ -120,7 +121,8 @@ void DashboardRenderer::SetRenderScale(double scale) {
     renderScale_ = nextScale;
     ++configVersion_;
     if (!renderer_->SetStyle(BuildRendererStyle()) || !ResolveLayout()) {
-        lastError_ = renderer_->LastError().empty() ? "rescale_failed" : renderer_->LastError();
+        lastError_ =
+            renderer_->LastError().empty() ? ResourceStringText(RES_STR("rescale_failed")) : renderer_->LastError();
     }
 }
 

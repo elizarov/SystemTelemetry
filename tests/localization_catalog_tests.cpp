@@ -32,6 +32,13 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
     EXPECT_EQ(catalog.at("config.gauge.segment_count"), "Segment count text");
 }
 
+TEST(LocalizationCatalog, LooksUpResourceStringKeys) {
+    ReplaceLocalizationCatalogForTesting(
+        ParseLocalizationCatalog("[dashboard.message]\nreload_config_failed = Failed to reload config.ini.\n"));
+
+    EXPECT_STREQ(FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), "Failed to reload config.ini.");
+}
+
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
     const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath.string(), std::ios::binary);

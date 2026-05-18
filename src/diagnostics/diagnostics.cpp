@@ -27,6 +27,7 @@
 #include "util/command_line.h"
 #include "util/message_box.h"
 #include "util/paths.h"
+#include "util/resource_strings.h"
 #include "util/scale.h"
 #include "util/strings.h"
 #include "util/text_format.h"
@@ -84,7 +85,7 @@ void WriteResolvedColorTraceLine(
     const std::string valueText = FormatRgbaColorText(color.ToRgba());
     if (!color.expression.empty()) {
         diagnostics.WriteTraceMarkerFmt(TracePrefix::Diagnostics,
-            "resolved_color section=\"%.*s\" name=\"%.*s\" value=\"%s\" expression=\"%s\"",
+            RES_STR("resolved_color section=\"%.*s\" name=\"%.*s\" value=\"%s\" expression=\"%s\""),
             static_cast<int>(section.size()),
             section.data(),
             static_cast<int>(name.size()),
@@ -93,7 +94,7 @@ void WriteResolvedColorTraceLine(
             color.expression.c_str());
     } else {
         diagnostics.WriteTraceMarkerFmt(TracePrefix::Diagnostics,
-            "resolved_color section=\"%.*s\" name=\"%.*s\" value=\"%s\"",
+            RES_STR("resolved_color section=\"%.*s\" name=\"%.*s\" value=\"%s\""),
             static_cast<int>(section.size()),
             section.data(),
             static_cast<int>(name.size()),
@@ -245,6 +246,41 @@ private:
     DashboardRenderer& renderer_;
     DashboardOverlayState& overlayState_;
 };
+
+void WriteSaveErrorTrace(DiagnosticsSession& diagnostics,
+    ResourceStringId traceEvent,
+    const std::string& pathText,
+    std::string_view detail,
+    std::string_view traceSuffix) {
+    const char* eventText = ResourceStringText(traceEvent);
+    if (traceSuffix.empty() && detail.empty()) {
+        diagnostics.WriteTraceMarkerFmt(
+            TracePrefix::Diagnostics, RES_STR("%s path=\"%s\""), eventText, pathText.c_str());
+    } else if (traceSuffix.empty()) {
+        diagnostics.WriteTraceMarkerFmt(TracePrefix::Diagnostics,
+            RES_STR("%s path=\"%s\" detail=\"%.*s\""),
+            eventText,
+            pathText.c_str(),
+            static_cast<int>(detail.size()),
+            detail.data());
+    } else if (detail.empty()) {
+        diagnostics.WriteTraceMarkerFmt(TracePrefix::Diagnostics,
+            RES_STR("%s path=\"%s\" %.*s"),
+            eventText,
+            pathText.c_str(),
+            static_cast<int>(traceSuffix.size()),
+            traceSuffix.data());
+    } else {
+        diagnostics.WriteTraceMarkerFmt(TracePrefix::Diagnostics,
+            RES_STR("%s path=\"%s\" %.*s detail=\"%.*s\""),
+            eventText,
+            pathText.c_str(),
+            static_cast<int>(traceSuffix.size()),
+            traceSuffix.data(),
+            static_cast<int>(detail.size()),
+            detail.data());
+    }
+}
 
 }  // namespace
 
@@ -517,14 +553,14 @@ bool ApplyDiagnosticsLayoutOverride(
     if (SelectLayout(config, options.layoutName)) {
         if (diagnostics != nullptr) {
             diagnostics->WriteTraceMarkerFmt(
-                TracePrefix::Diagnostics, "layout_override name=\"%s\"", options.layoutName.c_str());
+                TracePrefix::Diagnostics, RES_STR("layout_override name=\"%s\""), options.layoutName.c_str());
         }
         return true;
     }
 
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarkerFmt(
-            TracePrefix::Diagnostics, "layout_override_failed name=\"%s\"", options.layoutName.c_str());
+            TracePrefix::Diagnostics, RES_STR("layout_override_failed name=\"%s\""), options.layoutName.c_str());
         return false;
     }
 
@@ -543,7 +579,7 @@ bool ApplyDiagnosticsThemeOverride(
             ResolveConfiguredColors(config);
             if (diagnostics != nullptr) {
                 diagnostics->WriteTraceMarkerFmt(
-                    TracePrefix::Diagnostics, "theme_override name=\"%s\"", options.themeName.c_str());
+                    TracePrefix::Diagnostics, RES_STR("theme_override name=\"%s\""), options.themeName.c_str());
             }
             return true;
         }
@@ -551,7 +587,7 @@ bool ApplyDiagnosticsThemeOverride(
 
     if (diagnostics != nullptr) {
         diagnostics->WriteTraceMarkerFmt(
-            TracePrefix::Diagnostics, "theme_override_failed name=\"%s\"", options.themeName.c_str());
+            TracePrefix::Diagnostics, RES_STR("theme_override_failed name=\"%s\""), options.themeName.c_str());
         return false;
     }
 
@@ -642,11 +678,35 @@ void DiagnosticsSession::WriteTraceMarker(TracePrefix prefix, const char* text) 
     trace_.Write(prefix, text);
 }
 
+void DiagnosticsSession::WriteTraceMarker(TracePrefix prefix, ResourceStringId text) {
+    trace_.Write(prefix, text);
+}
+
 void DiagnosticsSession::WriteTraceMarker(TracePrefix prefix, const std::string& text) {
     trace_.Write(prefix, text);
 }
 
+void DiagnosticsSession::WriteTraceMarkerWithDetail(
+    TracePrefix prefix, ResourceStringId text, std::string_view detail) {
+    if (detail.empty()) {
+        WriteTraceMarker(prefix, text);
+        return;
+    }
+    WriteTraceMarkerFmt(prefix,
+        RES_STR("%s detail=\"%.*s\""),
+        ResourceStringText(text),
+        static_cast<int>(detail.size()),
+        detail.data());
+}
+
 void DiagnosticsSession::WriteTraceMarkerFmt(TracePrefix prefix, const char* format, ...) {
+    va_list args;
+    va_start(args, format);
+    WriteTraceMarkerVFmt(prefix, format, args);
+    va_end(args);
+}
+
+void DiagnosticsSession::WriteTraceMarkerFmt(TracePrefix prefix, ResourceStringId format, ...) {
     va_list args;
     va_start(args, format);
     WriteTraceMarkerVFmt(prefix, format, args);
@@ -657,6 +717,10 @@ void DiagnosticsSession::WriteTraceMarkerVFmt(TracePrefix prefix, const char* fo
     trace_.WriteVFmt(prefix, format, args);
 }
 
+void DiagnosticsSession::WriteTraceMarkerVFmt(TracePrefix prefix, ResourceStringId format, va_list args) {
+    trace_.WriteVFmt(prefix, format, args);
+}
+
 void DiagnosticsSession::ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message) {
     WriteTraceMarker(prefix, traceText);
     if (ShouldShowDialogs()) {
@@ -664,21 +728,17 @@ void DiagnosticsSession::ReportError(TracePrefix prefix, const std::string& trac
     }
 }
 
-bool DiagnosticsSession::ReportSaveError(const char* traceEvent,
+bool DiagnosticsSession::ReportSaveError(ResourceStringId traceEvent,
     const char* messageAction,
     const FilePath& path,
     std::string_view detail,
     std::string_view traceSuffix) {
     const std::string pathText = path.string();
     const std::string message = FormatText("Failed to %s:\n%s", messageAction, pathText.c_str());
-    std::string traceText = FormatText("%s path=\"%s\"", traceEvent, pathText.c_str());
-    if (!traceSuffix.empty()) {
-        AppendFormat(traceText, " %.*s", static_cast<int>(traceSuffix.size()), traceSuffix.data());
+    WriteSaveErrorTrace(*this, traceEvent, pathText, detail, traceSuffix);
+    if (ShouldShowDialogs()) {
+        MessageBoxUtf8(message, MB_ICONERROR);
     }
-    if (!detail.empty()) {
-        AppendFormat(traceText, " detail=\"%.*s\"", static_cast<int>(detail.size()), detail.data());
-    }
-    ReportError(TracePrefix::Diagnostics, traceText, message);
     return false;
 }
 
@@ -693,7 +753,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         const bool dumpWritten = WriteTelemetryDump(dumpFile, dump);
         fclose(dumpFile);
         if (!dumpWritten) {
-            return ReportSaveError("dump_write_failed", "write dump file", dumpPath_);
+            return ReportSaveError(RES_STR("dump_write_failed"), "write dump file", dumpPath_);
         }
     }
 
@@ -713,7 +773,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
                 options_.hoverPoint.has_value() ? RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y}
                                                 : RenderPoint{},
                 &screenshotError)) {
-            return ReportSaveError("screenshot_save_failed", "save screenshot", screenshotPath_, screenshotError);
+            return ReportSaveError(
+                RES_STR("screenshot_save_failed"), "save screenshot", screenshotPath_, screenshotError);
         }
     }
 
@@ -721,7 +782,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
         std::string layoutGuideSheetError;
         if (!SaveLayoutGuideSheet(
                 layoutGuideSheetPath_, dump.snapshot, config, savedScreenshotScale, trace_, &layoutGuideSheetError)) {
-            return ReportSaveError("layout_guide_sheet_save_failed",
+            return ReportSaveError(RES_STR("layout_guide_sheet_save_failed"),
                 "save layout guide sheet",
                 layoutGuideSheetPath_,
                 layoutGuideSheetError);
@@ -731,23 +792,25 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
     if (options_.appIcon) {
         std::string appIconError;
         if (!SaveRenderedAppIcon(appIconPath_, config, options_.appIconSize, &appIconError)) {
-            return ReportSaveError("app_icon_save_failed",
+            return ReportSaveError(RES_STR("app_icon_save_failed"),
                 "save app icon",
                 appIconPath_,
                 appIconError,
-                FormatText("size=%d", options_.appIconSize));
+                FormatText(RES_STR("size=%d"), options_.appIconSize));
         }
         const std::string pathText = appIconPath_.string();
-        WriteTraceMarkerFmt(
-            TracePrefix::Diagnostics, "app_icon_saved path=\"%s\" size=%d", pathText.c_str(), options_.appIconSize);
+        WriteTraceMarkerFmt(TracePrefix::Diagnostics,
+            RES_STR("app_icon_saved path=\"%s\" size=%d"),
+            pathText.c_str(),
+            options_.appIconSize);
     }
 
     if (options_.saveConfig && !SaveConfig(saveConfigPath_, config, ConfigParseContext{TelemetryMetricCatalog()})) {
-        return ReportSaveError("config_save_failed", "save config file", saveConfigPath_);
+        return ReportSaveError(RES_STR("config_save_failed"), "save config file", saveConfigPath_);
     }
 
     if (options_.saveFullConfig && !SaveFullConfig(saveFullConfigPath_, config)) {
-        return ReportSaveError("full_config_save_failed", "save full config file", saveFullConfigPath_);
+        return ReportSaveError(RES_STR("full_config_save_failed"), "save full config file", saveFullConfigPath_);
     }
 
     return true;
@@ -757,7 +820,7 @@ void DiagnosticsSession::ShowFileOpenError(const char* label, const FilePath& pa
     const std::string pathText = path.string();
     const std::string message = FormatText("Failed to open %s:\n%s", label, pathText.c_str());
     ReportError(TracePrefix::Diagnostics,
-        FormatText("file_open_failed label=\"%s\" path=\"%s\"", label, pathText.c_str()),
+        FormatText(RES_STR("file_open_failed label=\"%s\" path=\"%s\""), label, pathText.c_str()),
         message);
 }
 
@@ -823,10 +886,11 @@ int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& target
 }
 
 std::string FormatTelemetryInitializeError(std::string_view errorText) {
-    return errorText.empty() ? "Failed to initialize telemetry collector."
-                             : FormatText("Failed to initialize telemetry collector.\n\n%.*s",
-                                   static_cast<int>(errorText.size()),
-                                   errorText.data());
+    std::string message = ResourceStringText(RES_STR("Failed to initialize telemetry collector."));
+    if (!errorText.empty()) {
+        AppendFormat(message, "\n\n%.*s", static_cast<int>(errorText.size()), errorText.data());
+    }
+    return message;
 }
 
 std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
@@ -860,17 +924,17 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
         LoadConfig(configPath, !diagnosticsOptions.defaultConfig, ConfigParseContext{TelemetryMetricCatalog()});
     AppConfig effectiveReloadedConfig = reloadedConfig;
     if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_begin");
+        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_begin"));
     }
     if (!ApplyDiagnosticsLayoutOverride(effectiveReloadedConfig, diagnosticsOptions, diagnostics)) {
         if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_failed");
+            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
         }
         return false;
     }
     if (!ApplyDiagnosticsThemeOverride(effectiveReloadedConfig, diagnosticsOptions, diagnostics)) {
         if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_failed");
+            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
         }
         return false;
     }
@@ -886,11 +950,8 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
             *errorText = reloadError;
         }
         if (diagnostics != nullptr) {
-            std::string traceText = "reload_config_failed";
-            if (!reloadError.empty()) {
-                AppendFormat(traceText, " detail=\"%s\"", reloadError.c_str());
-            }
-            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, traceText);
+            diagnostics->WriteTraceMarkerWithDetail(
+                TracePrefix::Diagnostics, RES_STR("reload_config_failed"), reloadError);
         }
         return false;
     }
@@ -900,7 +961,7 @@ bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     activeConfig = std::move(effectiveReloadedConfig);
     ApplyResolvedTelemetrySelections(activeConfig, reloadedUpdate.resolvedSelections);
     if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, "reload_config_done");
+        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_done"));
         WriteResolvedColorTrace(*diagnostics, activeConfig);
     }
     return true;
@@ -931,18 +992,18 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
         if (errorText != nullptr) {
             *errorText = error;
         }
-        WriteRendererErrorTrace(trace, "screenshot_initialize", error);
+        WriteRendererErrorTrace(trace, RES_STR("screenshot_initialize"), error);
         return false;
     }
     if (!editLayoutWidgetName.empty()) {
         const auto widget = renderer.FindFirstLayoutEditPreviewWidget(editLayoutWidgetName);
         if (!widget.has_value()) {
             const std::string error =
-                FormatText("edit_layout_widget_not_found name=\"%s\"", editLayoutWidgetName.c_str());
+                FormatText(RES_STR("edit_layout_widget_not_found name=\"%s\""), editLayoutWidgetName.c_str());
             if (errorText != nullptr) {
                 *errorText = error;
             }
-            WriteRendererErrorTrace(trace, "screenshot_edit_layout_widget", error);
+            WriteRendererErrorTrace(trace, RES_STR("screenshot_edit_layout_widget"), error);
             return false;
         }
         overlayState.SetPreviewWidget(*widget);
@@ -955,7 +1016,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             if (errorText != nullptr) {
                 *errorText = error;
             }
-            WriteRendererErrorTrace(trace, "screenshot_hover_regions", error);
+            WriteRendererErrorTrace(trace, RES_STR("screenshot_hover_regions"), error);
             return false;
         }
 
@@ -995,7 +1056,7 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
         if (errorText != nullptr) {
             *errorText = error;
         }
-        WriteRendererErrorTrace(trace, "screenshot_save", error);
+        WriteRendererErrorTrace(trace, RES_STR("screenshot_save"), error);
     }
     if (saved) {
         WriteLayoutEditActiveRegionTrace(
@@ -1032,30 +1093,27 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
     }
 
     diagnostics.WriteTraceMarkerFmt(
-        TracePrefix::Diagnostics, "headless_start scale=%.6f", ResolveSavedScreenshotScale(config));
+        TracePrefix::Diagnostics, RES_STR("headless_start scale=%.6f"), ResolveSavedScreenshotScale(config));
     WriteResolvedColorTrace(diagnostics, config);
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialize_begin");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("telemetry_initialize_begin"));
 
     std::string telemetryError;
     std::unique_ptr<TelemetryRuntime> telemetry =
         InitializeTelemetryRuntimeInstance(config, diagnosticsOptions, trace, nullptr, &telemetryError);
     if (telemetry == nullptr) {
-        std::string traceText = "telemetry_initialize_failed";
-        if (!telemetryError.empty()) {
-            AppendFormat(traceText, " detail=\"%s\"", telemetryError.c_str());
-        }
-        diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, traceText);
+        diagnostics.WriteTraceMarkerWithDetail(
+            TracePrefix::Diagnostics, RES_STR("telemetry_initialize_failed"), telemetryError);
         if (diagnostics.ShouldShowDialogs()) {
             MessageBoxUtf8(FormatTelemetryInitializeError(telemetryError), MB_ICONERROR);
         }
         return 1;
     }
 
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "telemetry_initialized");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("telemetry_initialized"));
     Sleep(1000);
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "update_snapshot_begin");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("update_snapshot_begin"));
     TelemetryUpdate telemetryUpdate = telemetry->Latest();
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "update_snapshot_done");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("update_snapshot_done"));
     if (diagnosticsOptions.reload) {
         std::string reloadError;
         if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
@@ -1074,12 +1132,12 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         telemetryUpdate = telemetry->Latest();
     }
     ApplyResolvedTelemetrySelections(config, telemetryUpdate.resolvedSelections);
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "write_outputs_begin");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_begin"));
     if (!diagnostics.WriteOutputs(telemetryUpdate.dump, config)) {
-        diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "write_outputs_failed");
+        diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_failed"));
         return 1;
     }
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "write_outputs_done");
-    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, "headless_done");
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_done"));
+    diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("headless_done"));
     return 0;
 }
