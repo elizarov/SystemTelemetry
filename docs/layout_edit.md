@@ -9,7 +9,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
 - Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.
 - Turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
-- Turning off layout-edit mode, exiting the app, or reloading config while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
+- Turning off layout-edit mode, exiting the app, reloading config, or restarting as administrator while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
 
 ## Live Dashboard Interaction
 

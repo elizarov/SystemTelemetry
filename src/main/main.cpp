@@ -46,19 +46,6 @@ void ShutdownPreviousInstance() {
     }
 }
 
-bool IsCurrentProcessElevated() {
-    HANDLE token = nullptr;
-    if (!OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &token)) {
-        return false;
-    }
-
-    TOKEN_ELEVATION elevation{};
-    DWORD returnedLength = 0;
-    const BOOL ok = GetTokenInformation(token, TokenElevation, &elevation, sizeof(elevation), &returnedLength);
-    CloseHandle(token);
-    return ok && elevation.TokenIsElevated != 0;
-}
-
 std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& commandLine) {
     if (!HasSwitch(commandLine, "/elevate") || IsCurrentProcessElevated()) {
         return std::nullopt;
