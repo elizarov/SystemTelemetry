@@ -18,7 +18,7 @@ This file records the current benchmark baselines, latest confirmed hotspots, an
 - Measure the repeatable layout-switch benchmark with `build\CaseDashBenchmarks.exe layout-switch 240 2`.
 - Measure the repeatable mouse-hover benchmark with `build\CaseDashBenchmarks.exe mouse-hover 240 2`.
 - Measure the repeatable theme-change benchmark with `build\CaseDashBenchmarks.exe theme-change 240 2`.
-- Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler.
+- Measure the repeatable telemetry-refresh benchmark with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; this benchmark deliberately uses the package-private synchronous collector to measure provider collection CPU instead of the production telemetry runtime thread scheduler. For machine-specific provider stress against the executable-side overlay, pass a config path after the render scale, such as `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini`.
 - `CaseDashBenchmarks` accepts the supported benchmark names `animation`, `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `snapshot-handoff`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - Real `/trace-prefixes:profile` runs emit only `profile:timing` summaries every 10 seconds for comparable runtime operation names such as `telemetry_update`, `paint_draw`, `presentation_frame_build`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `presentation_frame_publish`, and `animation_frame`; `animation_frame` covers animation sampling and composition work and excludes the live DXGI vsync wait. Use those summaries to check whether direct benchmark timings match the interactive app on the same machine without paying verbose provider-trace overhead.
@@ -869,6 +869,22 @@ These changes produced real wins and remain in the codebase:
   - `build\CaseDashBenchmarks.exe theme-change 240 2` landed at `theme_loop per_iter_ms=4.92`, with `dashboard_config avg_ms=1.05`, `edit_tree avg_ms=0.18`, `theme_preview avg_ms=1.00`, and `theme_paint avg_ms=2.61`.
 - Conclusion:
   - Keep theme-preview rendering behind the shared module and compare future theme-selector work against the full theme-change loop rather than a standalone triangle microbenchmark.
+
+### Hypothesis: NVIDIA laptop telemetry should not poll NVML utilization or clock at 250 ms
+
+- Change:
+  - Stop using `nvmlDeviceGetUtilizationRates` for NVIDIA load and let the existing Windows GPU Engine counter path provide per-update load.
+  - Stop using `nvmlDeviceGetClockInfo` for NVIDIA current clock and use NVAPI current-clock reads instead, treating `NVAPI_GPU_NOT_POWERED` as an unavailable clock for that sample.
+  - Add an optional config path argument to `update-telemetry` so local provider stress can run against `build\config.ini`.
+- Result:
+  - Fixed the real NVIDIA laptop telemetry stalls without caching whole GPU samples.
+- Observed effect:
+  - The failing real trace showed `nvmlDeviceGetUtilizationRates` returning `Unknown Error` and later showed `nvmlDeviceGetClockInfo` independently blocking for about `390 ms` at the production 250 ms cadence while the dGPU was idle.
+  - `nvidia-smi --query-gpu=timestamp,pstate,utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total --format=csv -lms 250` reproduced the driver behavior outside CaseDash: idle samples intermittently reported `[Unknown Error]` for P-state and utilization while temperature, clock, and memory remained printable.
+  - `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini` landed at `update_loop per_iter_ms=7.36`, `telemetry_update avg_ms=2.96`, and `paint_draw avg_ms=4.40`.
+  - A verbose real-config trace recorded `43` NVIDIA sample starts and `43` successful sample completions, with zero NVML utilization calls, zero NVML clock calls, zero cached samples, `43` NVAPI clock attempts, `43` successful temperature reads, `43` successful memory reads, and `42` GPU Engine load samples. Runtime `telemetry_update` averaged `5.90 ms` over the main 10-second window.
+- Conclusion:
+  - On WDDM laptop dGPUs, the idle power state can make NVML utilization and current-clock polling unreliable at the app cadence. Keep NVIDIA load on PDH and current clock on NVAPI so a powered-off dGPU reports clock unavailable quickly instead of blocking the telemetry worker.
 
 ## Practical Guidance For Future Experiments
 

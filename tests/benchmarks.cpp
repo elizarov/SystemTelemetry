@@ -86,6 +86,7 @@ struct BenchmarkCommandLine {
     Benchmark benchmark;
     size_t iterations = 240;
     double renderScale = 2.0;
+    std::optional<FilePath> configPath;
 };
 
 FilePath SourceConfigPath() {
@@ -213,6 +214,15 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
         if (TryParsePositiveDouble(argv[nextArgument], parsedRenderScale)) {
             commandLine.renderScale = parsedRenderScale;
         }
+        ++nextArgument;
+    }
+    if (argc > nextArgument) {
+        commandLine.configPath = FilePath(argv[nextArgument]);
+        ++nextArgument;
+    }
+    if (argc > nextArgument) {
+        std::cerr << "too many benchmark arguments\n";
+        return std::nullopt;
     }
     return commandLine;
 }
@@ -1461,8 +1471,11 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
     return 0;
 }
 
-int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
-    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+int RunUpdateTelemetryBenchmarkCommand(
+    size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
+    const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
+    const bool includeOverlay = configPath.has_value();
+    const AppConfig config = LoadConfig(resolvedConfigPath, includeOverlay, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config, trace);
     if (telemetry == nullptr) {
         std::cerr << "telemetry init failed\n";
@@ -1478,7 +1491,8 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
     }
 
     std::cout << "update_telemetry_benchmark mode=sync_collector iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+              << " render_scale=" << renderScale << " config=\"" << resolvedConfigPath.string()
+              << "\" include_overlay=" << (includeOverlay ? "yes" : "no") << "\n";
     const BenchResult result = RunTelemetryUpdateBenchmark(host, *telemetry, iterations);
     PrintTelemetryBenchResult(result);
 
@@ -1506,7 +1520,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
         case Benchmark::ThemeChange:
             return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
-            return RunUpdateTelemetryBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+            return RunUpdateTelemetryBenchmarkCommand(
+                commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
     }
     std::cerr << "unknown benchmark \"" << EnumToString(commandLine.benchmark) << "\"\n";
     return 1;
