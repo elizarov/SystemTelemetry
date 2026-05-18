@@ -35,6 +35,12 @@ bool LaunchElevatedSelf(
     if (!ShellExecuteExW(&executeInfo)) {
         return false;
     }
+    if (executeInfo.hProcess != nullptr) {
+        const DWORD processId = GetProcessId(executeInfo.hProcess);
+        if (processId != 0) {
+            AllowSetForegroundWindow(processId);
+        }
+    }
     if (process != nullptr) {
         *process = executeInfo.hProcess;
     } else if (executeInfo.hProcess != nullptr) {

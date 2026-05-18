@@ -2,6 +2,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "dashboard/autostart.h"
 #include "dashboard/constants.h"
@@ -46,12 +47,22 @@ void ShutdownPreviousInstance() {
     }
 }
 
+void AppendCommandLineArgument(std::string& parameters, std::string_view argument) {
+    if (!parameters.empty()) {
+        parameters += ' ';
+    }
+    parameters += QuoteCommandLineArgument(argument);
+}
+
 std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& commandLine) {
     if (!HasSwitch(commandLine, "/elevate") || IsCurrentProcessElevated()) {
         return std::nullopt;
     }
 
-    const std::string parameters = BuildCommandLineExcludingSwitch(commandLine, "/elevate");
+    std::string parameters = BuildCommandLineExcludingSwitch(commandLine, "/elevate");
+    if (!HasSwitch(commandLine, "/bring-to-front")) {
+        AppendCommandLineArgument(parameters, "/bring-to-front");
+    }
     // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
     DWORD exitCode = 1;
     return RunElevatedSelfAndWait(nullptr, parameters, GetWorkingDirectory(), SW_SHOWNORMAL, &exitCode)
