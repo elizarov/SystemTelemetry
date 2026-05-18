@@ -1,7 +1,7 @@
 # CaseDash
 
 This document owns general user-visible product behavior.
-See also: [docs/hardware.md](hardware.md) for supported hardware providers, [docs/layout_edit.md](layout_edit.md) for layout-edit mode and editor behavior, [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
+See also: [docs/glossary.md](glossary.md) for project terminology, [docs/hardware.md](hardware.md) for supported hardware providers, [docs/layout_edit.md](layout_edit.md) for layout-edit mode and editor behavior, [docs/layout.md](layout.md) for config language and section ownership, [docs/theme_configuration.md](theme_configuration.md) for theme selection and derived color behavior, [docs/diagnostics.md](diagnostics.md) for diagnostics CLI behavior, [docs/build.md](build.md) for build and setup, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Overview
 
@@ -42,12 +42,12 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Throughput graph guide lines use 5-unit spacing on small scales and 50-unit spacing once the shared graph maximum is above 50.
 - The storage card also shows per-drive activity and usage rows.
 - The time card shows a dominant configured-format time readout plus the configured-format local date. The shipped formats are `HH:MM` for time and `YYYY-MM-DD` for date.
-- Metric labels and displayed units come from the metric registry defined in config, while dump units stay on the dump contract described in [docs/diagnostics.md](diagnostics.md).
+- Metric labels and displayed units come from the metric registry defined in config, while snapshot dump units stay on the snapshot dump contract described in [docs/diagnostics.md](diagnostics.md).
 - The UI style stays high-contrast and minimal: dark background, bright foreground text, restrained separators, rounded cards, compact headers, and shared visual rhythm across comparable cards.
 - CPU and GPU gauges share one fitted gauge size within the active layout even when their surrounding cards differ in height.
 - Metric rows and usage bars render as rounded horizontal fills, throughput widgets render scrolling retained-history lines with shared time markers, and drive activity renders as stacked whole-segment indicators.
 - In the live window, data-driven fills and throughput plots interpolate across the 250 ms telemetry cadence. Snapshot text, card chrome, labels, layout geometry, and edit affordances update only at snapshot or interaction boundaries.
-- Deterministic renders, including blank mode, saved screenshots, layout-guide-sheet output, app-icon output, and offscreen validation renders, draw target snapshot values directly without live interpolation.
+- Deterministic renders, including blank mode, saved screenshots, layout guide sheet output, app icon output, and offscreen validation renders, draw target snapshot values directly without live interpolation.
 - Metric-list rows can show a small right-aligned annotation above the bar when the resolved metric supplies one; `gpu.fps` uses this annotation for the cleaned presenting application name, or a warning-colored `!admin` indicator when only the presenting application name needs elevated access. When the FPS application name and FPS value share too little row width, the application name is shortened with a middle `...` while preserving the first letters and final letter so the value text remains unobscured.
 - Palette colors include alpha. Gauge peak segments and metric-list recent-peak markers use the shared peak ghost color from the palette, and short permission-required metric indicators use the shared warning color.
 - Metric rows and gauges draw only their background track when a metric value is unavailable or fully permission-gated; a fully permission-gated value displays the warning-colored short text `!admin` instead of `N/A`.
@@ -75,8 +75,8 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
-- The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless layout-editor refresh work runs.
-- The `Layout` and `Theme` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless layout-editor refresh work runs. The `Theme` submenu appears immediately after `Layout`.
+- The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless `Edit Configuration` window refresh work runs.
+- The `Layout` and `Theme` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately after `Layout`.
 - The `Scale` submenu changes scale immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage Drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
@@ -100,10 +100,10 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The telemetry runtime owns collection on a 250 ms cadence, skips missed intervals after process stalls or machine sleep, and publishes each new snapshot to the dashboard when collection finishes.
 - The telemetry cadence is the shared duration used by live dashboard animation, so a visual transition completes as the next steady-state telemetry snapshot becomes due.
 - CPU, GPU, network, storage, drive activity, retained histories, and the clock all refresh from that telemetry-owned cadence.
-- The built-in fake telemetry source is static for deterministic one-shot diagnostics and live for normal fake dashboard runs. Live fake runs advance one synthetic reading on the same 250 ms telemetry cadence as real collection, including the retained-throughput smoothing used by network and storage charts.
+- The built-in synthetic telemetry source is static for deterministic one-shot diagnostics and live for normal `/fake` dashboard runs. Live fake runs advance one synthetic reading on the same 250 ms telemetry cadence as real collection, including the retained-throughput smoothing used by network and storage charts.
 - The dashboard redraws after receiving a new telemetry snapshot instead of driving collection from the UI message loop.
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
-- Dashboard formatting uses the configured metric display definitions, while dump serialization keeps its own stable machine-facing unit contract.
+- Dashboard formatting uses the configured metric display definitions, while snapshot dump serialization keeps its own stable machine-facing unit contract.
 - The dashboard runs as a single-instance application. Starting a new UI instance closes the existing one and continues startup in the replacement instance.
 - Starting with `/bring-to-front` uses the normal UI startup path and raises the dashboard after creating the tray icon.
 - Headless diagnostics `/exit` runs are outside that normal single-instance replacement path; diagnostics-specific behavior is defined in [docs/diagnostics.md](diagnostics.md).

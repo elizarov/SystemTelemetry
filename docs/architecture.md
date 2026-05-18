@@ -8,18 +8,18 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 - [config](architecture/config.md) - persisted configuration model, INI parsing and writing, schema metadata, theme and color resolution, config color text formatting, and config-facing contracts.
 - [dashboard](architecture/dashboard.md) - shell UI, controller orchestration, tray integration, menus and menu labels, auto-start, service registration, and user-facing command flow.
 - [dashboard_renderer](architecture/dashboard_renderer.md) - dashboard scene traversal, layout resolution, widget host services, drawing-mode state, and active-region collection.
-- [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app-icon export, and native crash reports.
+- [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app icon export, and native crash reports.
 - [display](architecture/display.md) - monitor enumeration, display targeting, placement, scale, and wallpaper/configure-display helpers.
 - [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, tooltip text, and active-region trace output.
 - [layout_edit_dialog](architecture/layout_edit_dialog.md) - modeless configuration editor window, editor controls, preview/revert flow, and theme preview drawing.
-- [layout_guide_sheet](architecture/layout_guide_sheet.md) - diagnostics guide-sheet planning, representative-card selection, callout layout, leader routing, and sheet rendering.
+- [layout_guide_sheet](architecture/layout_guide_sheet.md) - diagnostics layout guide sheet planning, representative-card selection, callout layout, leader routing, and sheet rendering.
 - [layout_model](architecture/layout_model.md) - renderer-safe layout-edit contracts, edit-target identity, active-region behavior, hit priority, and overlay state.
 - [main](architecture/main.md) - process entry point, command-line startup mode selection, elevation handoff, service host entry, and runtime config loading.
 - [renderer](architecture/renderer.md) - D2D-free renderer interface, render-space DTOs, style resources, Direct2D/DirectWrite/WIC backend, text measurement, and bitmap export support.
 - [telemetry](architecture/telemetry.md) - telemetry runtime, snapshot contracts, metric catalog, provider bridges, FPS service protocol, fake runtime, and retained histories.
 - [util](architecture/util.md) - domain-neutral file path, command-line, string, enum, UTF-8, resource, localization, numeric formatting, Win32 error formatting, trace, and callback helpers.
 - [vendor](architecture/vendor.md) - narrow vendored source kept outside project layering rules where package-managed dependencies are not practical.
-- [widget](architecture/widget.md) - widget contracts, widget factories, widget-local drawing/layout behavior, edit-artifact registration, and app-icon/card-chrome geometry.
+- [widget](architecture/widget.md) - widget contracts, widget factories, widget-local drawing/layout behavior, edit-artifact registration, and app icon and card-chrome geometry.
 
 Other top-level areas:
 
@@ -43,15 +43,8 @@ Other top-level areas:
 
 ## Package Dependency Rules
 
-- `util` may depend on `util` only; every other package may depend on `util`.
-- `config` may depend on `config` and `util`.
-- `telemetry` may depend on `telemetry`, `config`, and `util`.
-- `renderer` may depend on `renderer`, `config`, `util`, and the synthetic `d2d` package.
-- `widget` may depend on `widget`, `renderer`, `telemetry`, `config`, and `util`.
-- `layout_model` may depend on `layout_model`, `config`, `renderer`, `util`, and `widget`.
-- `dashboard_renderer` may depend on `dashboard_renderer`, `config`, `layout_model`, `renderer`, `telemetry`, `util`, and `widget`.
-- `layout_edit` may depend on `layout_edit`, `config`, `layout_model`, `util`, and `widget`.
-- `layout_edit_dialog` may depend on `layout_edit_dialog`, `config`, `layout_edit`, `layout_model`, `telemetry`, `util`, and `widget`.
+- `lint.cmd` is the maintained checker for package dependency rules and package-private boundaries.
+- Package-specific notes under [docs/architecture/](architecture/) list the allowed dependency shape for each package.
 - Application-facing packages such as `dashboard`, `diagnostics`, `display`, and `main` may compose lower-layer services but do not move reusable lower-layer logic upward into shell code.
 - Files below package subdirectories are package-private implementation modules. Dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 
@@ -60,8 +53,8 @@ Other top-level areas:
 - Startup begins in `main`, parses command-line options, handles service and elevation modes, loads config from the embedded template plus executable-side overlay, then chooses the normal UI path or the diagnostics `/exit` path.
 - Telemetry collects through `telemetry`, publishes copied snapshots and resolved runtime selections, and supplies the metric data consumed by renderer-facing flows.
 - Rendering flows through `dashboard_renderer`, which combines the active config, latest telemetry snapshot, renderer style input, and widget draw contracts into live paints and diagnostics screenshot exports.
-- Layout editing starts from shell pointer events, resolves targets from renderer-produced active regions, mutates config through `layout_edit`, and shares preview behavior with `layout_edit_dialog`.
-- Diagnostics owns requested trace, dump, screenshot, layout-guide-sheet, app-icon, and config exports, using the same runtime state and render paths as the live dashboard.
+- Layout-edit interaction starts from shell pointer events, resolves targets from renderer-produced active regions, mutates config through `layout_edit`, and shares preview behavior with `layout_edit_dialog`.
+- Diagnostics owns requested trace, snapshot dump, screenshot, layout guide sheet, app icon, and config exports, using the same runtime state and render paths as the live dashboard.
 - Persistence compares minimal saves against the loaded INI text, uses the embedded template for full exports, and relaunches through maintained elevation helpers when target files or registry/service state require elevation.
 
 ## Resources And Build Graph

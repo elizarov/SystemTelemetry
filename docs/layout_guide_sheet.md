@@ -19,11 +19,11 @@ User-visible labels and documentation refer to the generated image as a `layout 
 
 ## Input Selection
 
-- The sheet uses the same loaded configuration, selected named layout, scale override, default-config behavior, fake-data behavior, and localization catalog as the diagnostics run.
+- The sheet uses the same loaded configuration, selected named layout, scale override, default-config behavior, fake-runtime behavior, and localization catalog as the diagnostics run.
 - The active named layout is selected by normal config resolution or by `/layout:<name>`.
-- The content source is the latest diagnostics snapshot. Fake telemetry is preferred for repeatable output, but the sheet accepts live telemetry when the diagnostics run uses live data.
-- Blank rendering mode is not part of the guide-sheet contract. The sheet exists to explain editable UI and therefore renders representative content, guides, anchors, callouts, and help text.
-- The guide-sheet generator works from the resolved layout model rather than parsing `config.ini` text directly.
+- The content source is the latest diagnostics snapshot. Built-in synthetic telemetry is preferred for repeatable output, but the sheet accepts live telemetry when the diagnostics run uses live data.
+- Blank rendering mode is not part of the layout guide sheet contract. The sheet exists to explain editable UI and therefore renders representative content, guides, anchors, callouts, and help text.
+- The layout guide sheet generator works from the resolved layout model rather than parsing `config.ini` text directly.
 
 ## Card Coverage
 
@@ -65,10 +65,10 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Guide geometry comes from the same renderer-owned layout-edit artifact registration path used by live layout-edit mode and diagnostics active-region tracing.
 - Guide rendering remains visually consistent with live layout-edit hover rendering, including stroke weights, colors, dash patterns, anchor shapes, and ruler numbering.
 - The sheet may force normally hover-only guide families visible at the same time when that is necessary to explain all editable targets.
-- Forced guide-sheet affordances always use hover-equivalent visual styling, including color, line width, dash pattern, and emphasis; dialog-active or selected `active_edit_color` styling is not used on the sheet.
-- Every callout target renders the same hover-equivalent affordance that live layout editing shows for that target family, including widget-local gauge and metric-list guides, card-internal layout guides, gap handles, text anchors, and color targets.
+- Forced layout guide sheet affordances always use hover-equivalent visual styling, including color, line width, dash pattern, and emphasis; dialog-active or selected `active_edit_color` styling is not used on the sheet.
+- Every callout target renders the same hover-equivalent affordance that live layout-edit mode shows for that target family, including widget-local gauge and metric-list guides, card-internal layout guides, gap handles, text anchors, and color targets.
 - Overview card title and icon callouts render the corresponding packed card chrome as hovered, including the exact dotted text or icon target outline and the matching anchor shape produced by card-chrome edit-artifact registration.
-- Overview color callouts attach to the same packed card-chrome active text or icon region that live layout editing uses, and color-only callouts do not draw a guide-sheet-only target outline.
+- Overview color callouts attach to the same packed card-chrome active text or icon region that live layout-edit mode uses, and color-only callouts do not draw an extra target outline.
 - Overview anchor callouts attach their leader to the visible anchor shape. Anchors that have no live hover target outline do not draw an extra target outline.
 - Representative-card anchor callouts attach their leaders to the resolved drag-anchor rectangle rather than the broader widget or target region. Circular radial-distance anchors attach to the closest point on the resolved circle.
 - Representative-card gauge accent and track color callouts attach to the corresponding left or right midpoint of the visible ring stroke rather than the center of the broad color hit rectangle.
@@ -87,7 +87,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - Overview layout-child reorder handles produce at most one left/right callout and at most one up/down callout, using the first representative of each orientation in screen order.
 - Representative cards do not repeat overview-owned card title, icon, card style, dashboard spacing, or dashboard padding callouts.
 - Color-parameter callouts are unique across the whole sheet. If an overview callout already documents a color parameter such as `icon_color`, representative cards keep their visible color target affordances but do not add another bubble or leader for that same color parameter.
-- Metric-definition rows under `[metrics]`, such as `cpu.temp`, `cpu.clock`, and other metric ids, are equivalent for guide-sheet coverage. The first rendered metric-definition row receives the single representative bubble and leader, and that row renders the same hover-equivalent dotted outline, wedge anchor, and text-size anchor that live layout editing shows for the hovered metric row.
+- Metric-definition rows under `[metrics]`, such as `cpu.temp`, `cpu.clock`, and other metric ids, are equivalent for layout guide sheet coverage. The first rendered metric-definition row receives the single representative bubble and leader, and that row renders the same hover-equivalent dotted outline, wedge anchor, and text-size anchor that live layout-edit mode shows for the hovered metric row.
 - Each help bubble has exactly one thin straight leader line connected to one representative target area for that tooltip text.
 - When the same tooltip text appears multiple times, the representative target area is the topmost example in sheet coordinates, with leftmost position breaking ties.
 - Leader lines use the direct segment from the representative target point to the selected bubble attachment point.
@@ -98,7 +98,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
   - Line 1 shows the config parameter, field, or edit target shape controlled by the guide.
   - Line 2 shows the same localized description text used by the live layout-edit tooltip for that target.
 - The first line uses the same wording and value shape that the live tooltip uses for the edited config target.
-- The second line comes from the shared tooltip-description source of truth, not from guide-sheet-only strings.
+- The second line comes from the shared tooltip-description source of truth, not from separate layout guide sheet strings.
 - Help bubbles are placed outside the card bounds with enough margin to keep the card content unobscured.
 - Callouts are arranged mostly to the left or right of each card. After the side split is known, one left-stack item may move below the annotated item and one right-stack item may move above it, giving each block one top and one bottom callout centered against the annotated item when those side stacks exist.
 - Promoted top and bottom callouts keep their natural single-line width unless that width would overlap a left or right callout stack. Only in that case, the promoted callout is constrained to the annotated item width and its description line wraps vertically.
@@ -108,11 +108,11 @@ User-visible labels and documentation refer to the generated image as a `layout 
 
 ## Callout Visual Style
 
-- Callout styling uses the active renderer palette so guide-sheet colors follow the loaded config.
-- The guide sheet uses dedicated `[layout_guide_sheet]` entries for callout-only chrome: `callout_leader_color`, `callout_fill_color`, `callout_border_color`, `callout_parameter_color`, and `callout_description_color`.
+- Callout styling uses the active renderer palette so layout guide sheet colors follow the loaded config.
+- The layout guide sheet uses dedicated `[layout_guide_sheet]` entries for callout-only chrome: `callout_leader_color`, `callout_fill_color`, `callout_border_color`, `callout_parameter_color`, and `callout_description_color`.
 - With the shipped palette, panel guide chrome uses its normal layout-edit hover colors, leader lines use `callout_leader_color` (`#FFE45CE6`), bubble fill uses `callout_fill_color` (`#06080BF5`), bubble border uses `callout_border_color` (`#B88A22FF`), parameter text uses `callout_parameter_color` (`#FFFFFFFF`), and description text uses `callout_description_color` (`#A5B4BEFF`).
-- Only callout-specific chrome, meaning leader lines and help bubbles, receives distinct guide-sheet styling.
-- Guide-sheet callout colors come directly from those `[layout_guide_sheet]` entries rather than from adjusted variants of other colors, and they are not exposed in the layout-edit dialog.
+- Only callout-specific chrome, meaning leader lines and help bubbles, receives distinct layout guide sheet styling.
+- Layout guide sheet callout colors come directly from those `[layout_guide_sheet]` entries rather than from adjusted variants of other colors, and they are not exposed in the layout-edit dialog.
 - Leader lines use the configured `leader_stroke_width`, are solid and square-capped, and are drawn above card content but below bubble borders and text.
 - Leader lines use `callout_leader_color` exactly as configured.
 - The leader starts at the representative target rectangle or anchor shape and ends at the closest compatible point on the bubble border.
@@ -125,11 +125,11 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - The first line uses `callout_parameter_color` and matches the live layout-edit tooltip text, including configured color expressions for color targets; the second line uses `callout_description_color` and is always reserved when the tooltip has description text.
 - The configured `callout_line_gap` separates the parameter line from the description line.
 - Bubbles do not use drop shadows or blurred backplates because the artifact must stay crisp under screenshot comparison.
-- Guide-sheet-only margins, block spacing, callout spacing, bubble padding, border widths, leader stroke and endpoint sizes, and packed-overview helper stroke and handle sizes come from `[layout_guide_sheet]`.
+- Layout guide sheet margins, block spacing, callout spacing, bubble padding, border widths, leader stroke and endpoint sizes, and packed-overview helper stroke and handle sizes come from `[layout_guide_sheet]`.
 
 ## Bubble Layout Algorithm
 
-The guide-sheet bubble layout is deterministic and runs after the selected cards have resolved their normal dashboard geometry and layout-edit active areas.
+The layout guide sheet bubble layout is deterministic and runs after the selected cards have resolved their normal dashboard geometry and layout-edit active areas.
 
 1. Collect targets. Compose the packed overview without widget content, collect its real tooltip-bearing active regions, and separately collect editable active areas that overlap a rendered representative card. Each record stores its rendered source id, active-area rectangle, guide kind, tooltip parameter line, tooltip description line, hover-equivalent overlay state, priority, and stable order from the active-region or edit-artifact source.
 2. Select representatives. Group records by distinct tooltip text, except metric-definition records group together as one equivalent class, color records group by edited color parameter across the whole sheet, and card-title records group together as one overview class. Each group produces one bubble. The bubble's representative target area is the topmost record in sheet coordinates, with leftmost position and then stable source order breaking ties. Non-representative records keep their guides but do not receive bubbles or leaders.
@@ -160,12 +160,12 @@ The algorithm favors readable bubbles and deterministic output while preserving 
 ## Diagnostics Behavior
 
 - The layout guide sheet is requested explicitly with `/layout-guide-sheet[:path]` and does not appear as a side effect of `/screenshot`.
-- A headless `/exit` run that requests a guide sheet exports it once and exits.
-- A UI-attached run that requests a guide sheet refreshes it on the same cadence as other diagnostics screenshots unless the implementation defines a cheaper explicit-refresh policy in diagnostics docs.
+- A headless `/exit` run that requests a layout guide sheet exports it once and exits.
+- A UI-attached run that requests a layout guide sheet refreshes it on the same cadence as other diagnostics screenshots unless the implementation defines a cheaper explicit-refresh policy in diagnostics docs.
 - Explicit output paths resolve by the same current-working-directory rules as other diagnostics outputs.
 - The default output filename is `casedash_layout_guide_sheet.png`.
 - The output overwrite behavior matches ordinary screenshot export.
-- When `/trace` is enabled, guide-sheet export writes a start event, an end event, the selected layout name, selected card ids, covered widget types, output dimensions, placed callout count, and any callout-placement warnings.
+- When `/trace` is enabled, layout guide sheet export writes a start event, an end event, the selected layout name, selected card ids, covered widget types, output dimensions, placed callout count, and any callout-placement warnings.
 - Guide-sheet trace events use `diagnostics:layout_guide_sheet` as the event family.
 - Failures follow the diagnostics failure policy: traced runs report the failure to trace and return a failure exit code in headless mode rather than blocking behind modal UI.
 
@@ -174,5 +174,5 @@ The algorithm favors readable bubbles and deterministic output while preserving 
 - The sheet does not generate a complete printed manual.
 - The sheet does not show widgets that are not present in the selected layout.
 - The sheet does not edit, save, normalize, or reformat config files.
-- The sheet does not replace the live `Edit Configuration` dialog.
+- The sheet does not replace the live `Edit Configuration` window.
 - The sheet does not define new config parameters; it documents the editable parameters already exposed by layout-edit metadata.

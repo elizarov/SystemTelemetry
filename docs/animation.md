@@ -1,7 +1,7 @@
 # Dashboard Animation
 
 This document owns live-dashboard animation behavior and the architecture that supports it.
-See also: [specifications.md](specifications.md) for user-visible dashboard behavior, [layout_edit.md](layout_edit.md) for layout-edit interaction, [diagnostics.md](diagnostics.md) for trace and export behavior, [profile_benchmark.md](profile_benchmark.md) for benchmark workflow and baselines, and [architecture.md](architecture.md) for package boundaries.
+See also: [specifications.md](specifications.md) for user-visible dashboard behavior, [layout_edit.md](layout_edit.md) for layout-edit interaction, [diagnostics.md](diagnostics.md) for trace and export behavior, [profile_benchmark.md](profile_benchmark.md) for benchmark workflow and [performance](performance/) for machine-specific baselines, and [architecture.md](architecture.md) for package boundaries.
 
 ## Purpose
 
@@ -30,7 +30,7 @@ Layout edits, row reordering, scale changes, and surface changes do not reset co
 
 Animation runs while at least one transition is active or while the main thread publishes layer updates. After transitions reach their targets, the render thread presents the settled frame and waits.
 
-Blank render mode, screenshot exports, layout-guide-sheet exports, app-icon exports, unit tests, and other deterministic offscreen renders draw target snapshot values directly. UI-attached diagnostics screenshots also render target values instead of the currently interpolated live frame.
+Blank render mode, screenshot exports, layout guide sheet exports, app icon exports, unit tests, and other deterministic offscreen renders draw target snapshot values directly. UI-attached diagnostics screenshots also render target values instead of the currently interpolated live frame.
 
 ## Frame Pipeline
 
@@ -239,9 +239,9 @@ Dirty rectangles are renderer-internal redraw regions. Renderer backends may use
 
 When snapshot, overlay, or animation geometry versions change, the render thread treats the whole surface as dirty. Active drags update at least one layer bitmap, so the render thread does not infer smaller geometry deltas from superseded and active drag state.
 
-## Layout Edit Interaction
+## Layout-Edit Interaction
 
-Layout editing stays on the main thread. The render thread never performs hit testing or config mutation.
+Layout-edit interaction stays on the main thread. The render thread never performs hit testing or config mutation.
 
 Dynamic edit artifacts are collected from target snapshot geometry. Hit testing does not follow per-frame interpolated animation geometry.
 
@@ -277,11 +277,6 @@ Animation code follows the maintained package boundaries documented under [archi
 
 ## Validation
 
-Animation changes use the standard project validation flow:
+Animation changes use the standard project validation entrypoints from [docs/build.md](build.md).
 
-- `build.cmd`
-- `test.cmd`
-- `lint.cmd`
-- `format.cmd changed`
-
-Changes that affect live animation, layer construction, dirty composition, or frame handoff also build benchmarks with `build.cmd /benchmarks` and compare relevant benchmark output against [profile_benchmark.md](profile_benchmark.md).
+Changes that affect live animation, layer construction, dirty composition, or frame handoff also build benchmarks with `build.cmd /benchmarks` and compare relevant benchmark output against the matching file under [performance](performance/).

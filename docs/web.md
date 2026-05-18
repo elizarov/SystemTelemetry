@@ -4,7 +4,7 @@ This document owns the public CaseDash website behavior, content, section contra
 
 ## Purpose
 
-The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, how animation behaves, what hardware providers are currently supported, how first use works, how layout editing looks, and where to contribute.
+The website is the end-user introduction to CaseDash. It presents what the app is, how to download it, how animation behaves, what hardware providers are currently supported, how first use works, how layout-edit mode looks, and where to contribute.
 
 The site takes its tone and structure from the README: compact, practical, and visually led by the actual dashboard. It stays consistent across sections and avoids repeating product claims, configuration syntax, or diagnostics details that are already owned by maintained docs.
 
@@ -16,7 +16,7 @@ The primary visitor owns or is considering a small telemetry display for a Windo
 - Whether the dashboard animates smoothly without heavy per-frame work.
 - Whether their hardware is likely to work.
 - How to install and configure it.
-- How layouts and themes can be adjusted.
+- How named layouts and named themes can be selected and edited.
 - Where to download, report issues, or contribute.
 
 The secondary visitor is a potential contributor who wants a concise project overview before opening GitHub.
@@ -56,7 +56,7 @@ The features section summarizes the product capabilities that matter to end user
 
 - Compact always-on Windows telemetry dashboard.
 - vsync-paced live animation for metric fills and throughput plots that spends less than 1 ms per frame.
-- Constraint-based layouts and live layout editing.
+- Constraint-based layouts and live layout-edit mode.
 - Theme system derived from a small set of base colors.
 - Native executable under 1 MB.
 - Layouts for common small-panel formats.
@@ -70,13 +70,13 @@ The hardware section gives visitors a concise support overview with one-line pro
 
 ## Layout Section
 
-The layout section introduces layout selection and layout editing from an end-user perspective.
+The layout section introduces layout selection and layout-edit mode from an end-user perspective.
 
 The section includes:
 
 - A short explanation that CaseDash uses named static layouts sized for small displays.
 - The generated layout guide sheet for the active website theme.
-- A concise explanation of what the guide sheet shows: editable cards, widget guides, spacing controls, and hover-style callouts.
+- A concise explanation of what the layout guide sheet shows: editable cards, widget guides, spacing controls, and tooltip-style callouts.
 - A link to `docs/layout.md` for the maintained layout language reference.
 
 The page does not duplicate layout syntax examples unless the project later designates this website copy as the maintained source for a specific example.
@@ -122,9 +122,9 @@ The page favicon follows the browser `prefers-color-scheme` value. The dark favi
 
 ## Generated Assets
 
-The website source does not manually mirror screenshots, guide sheets, or theme metadata for each theme.
+The website source does not manually mirror screenshots, layout guide sheets, or theme metadata for each theme.
 
-GitHub social preview artwork is generated separately by `tools\generate_social_preview.ps1`. The script writes a 1280 x 640 PNG under `build\social_preview\` by default, using the `dark_cyan` theme, fake telemetry, the built-in default config, a generated dashboard screenshot, and a generated app icon from the executable. The composition shows the app icon, white `CaseDash` wordmark, the motto `Compact Windows dashboard for dedicated PC screens`, the repository link, and the centered-right fake dashboard screenshot without feature-list boxes.
+GitHub social preview artwork is generated separately by `tools\generate_social_preview.ps1`. The script writes a 1280 x 640 PNG under `build\social_preview\` by default, using the `dark_cyan` theme, built-in synthetic telemetry, the built-in default config, a generated dashboard screenshot, and a generated app icon from the executable. The composition shows the app icon, white `CaseDash` wordmark, the motto `Compact Windows dashboard for dedicated PC screens`, the repository link, and the centered-right synthetic dashboard screenshot without feature-list boxes.
 
 The website build generates, for every configured app theme:
 
@@ -136,14 +136,14 @@ The website build generates, for every configured app theme:
 Generated dashboard screenshots use:
 
 - Built-in default config behavior.
-- Fake telemetry.
+- Built-in synthetic telemetry.
 - Default layout.
 - Render scale `2`.
 - The selected theme.
 
-Generated layout guide sheets use the same config, fake/default data, scale, and selected theme. The guide sheet generation uses the diagnostics layout-guide-sheet output instead of a separate web-only renderer.
+Generated layout guide sheets use the same config, built-in synthetic telemetry, default-config behavior, scale, and selected theme. The layout guide sheet generation uses the diagnostics `/layout-guide-sheet` output instead of a separate web-only renderer.
 
-Generated screenshots, guide sheets, and website app icons are not committed. Generated files are written under the web build output so repository roots and documentation image folders stay clean. Generated dashboard screenshots and layout guide sheets are encoded as opaque 24-bit PNGs; generated app icons retain alpha and use compressed PNG output.
+Generated dashboard screenshots, layout guide sheets, and website app icons are not committed. Generated files are written under the web build output so repository roots and documentation image folders stay clean. Generated dashboard screenshots and layout guide sheets are encoded as opaque 24-bit PNGs; generated app icons retain alpha and use compressed PNG output.
 
 ## Source Layout
 
@@ -182,7 +182,7 @@ The website build:
 4. Writes theme metadata JSON.
 5. Copies static website source and generated assets into `web/dist/`.
 
-`web-build.cmd clean` removes `web/dist/` before the build and forces every generated screenshot, guide sheet, and app icon to be rebuilt.
+`web-build.cmd clean` removes `web/dist/` before the build and forces every generated screenshot, layout guide sheet, and app icon to be rebuilt.
 
 The build prints one progress line per theme while generating or reusing that theme's dashboard screenshot, layout guide sheet, and app icon.
 
@@ -219,6 +219,6 @@ The page is usable without JavaScript except for theme switching and theme-speci
 
 The page respects reduced-motion preferences. Smooth scrolling and theme transitions are disabled or shortened when the visitor prefers reduced motion.
 
-Generated images are optimized for web delivery, avoid alpha channels for opaque dashboard and guide-sheet assets, and include width and height metadata. The active theme's screenshot is loaded eagerly in the download section; non-active theme images may load lazily.
+Generated images are optimized for web delivery, avoid alpha channels for opaque dashboard and layout guide sheet assets, and include width and height metadata. The active theme's screenshot is loaded eagerly in the download section; non-active theme images may load lazily.
 
 The color derivation used by the website maintains readable contrast for body text, navigation text, buttons, and links for every generated app theme. If a theme cannot satisfy minimum contrast through derived colors, the build reports the theme and role that failed.

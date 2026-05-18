@@ -1,12 +1,13 @@
 # CaseDash Project Notes
 
 This document owns documentation ownership rules, repository conventions, and engineering constraints.
-See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](layout.md) for config language, [docs/diagnostics.md](diagnostics.md) for diagnostics behavior, [docs/release.md](release.md) for release publication, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for code structure.
+See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](glossary.md) for project terminology, [docs/layout.md](layout.md) for config language, [docs/diagnostics.md](diagnostics.md) for diagnostics behavior, [docs/release.md](release.md) for release publication, [docs/optimize_size.md](optimize_size.md) for executable-size research, and [docs/architecture.md](architecture.md) for code structure.
 
 ## Documentation Ownership
 
 - `docs/specifications.md` owns general user-visible runtime behavior.
 - `docs/animation.md` owns live-dashboard animation behavior, target render-thread architecture, and animation-specific implementation contracts.
+- `docs/glossary.md` owns canonical project terminology and context-specific spelling rules.
 - `docs/hardware.md` owns supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
 - `docs/layout_edit.md` owns layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
@@ -16,8 +17,9 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - `docs/source_policy_guardrails.md` owns short explanations for hard source-policy lessons, including lint-enforced bans and review-enforced rules that are too noisy to check mechanically.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
-- `docs/profile_benchmark.md` owns benchmark workflow, baselines, hotspots, and performance experiment history.
-- `docs/optimize_size.md` owns executable-size constraints, assumptions, map workflow notes, and size experiment history.
+- `docs/profile_benchmark.md` owns benchmark workflow and the shared performance optimization journal.
+- `docs/performance/*.md` owns machine-specific benchmark ranges, current bottlenecks, and further research directions.
+- `docs/optimize_size.md` owns executable-size constraints, assumptions, map workflow notes, current size shape, and active experiment guidance.
 - `docs/release.md` owns release versioning, changelog format, local release preparation, and release publication.
 - `docs/changelog.md` owns machine-readable release-note chunks consumed by the local release script and GitHub Release workflow.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
@@ -32,11 +34,12 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Repository Conventions
 
 - Keep production sources in `src`, tests in `tests`, documentation in `docs`, and embedded assets in `resources`.
+- Keep documentation headings descriptive and non-numbered so sections can be reordered without renumbering churn.
 - Keep reusable agent or automation skills in `.agents\skills`.
-- Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app-icon PNGs under `build\app_icon\`, regenerate `resources\app.ico` from those rendered assets, and losslessly recompress the ICO's PNG frames.
+- Use `tools\update_app_icon.ps1` to rebuild the app, export compressed default-theme app icon PNGs under `build\app_icon\`, regenerate `resources\app.ico` from those rendered assets, and losslessly recompress the ICO's PNG frames.
 - `package.cmd` generates the WiX dialog and banner bitmaps under `build\installer_dialog_bmp\` from native-size dark_cyan app icon exports before building the MSI; generated installer bitmaps are not committed.
 - Use `tools\update_readme_images.ps1` to update committed README screenshots under `docs\image\`.
-- Use `tools\generate_social_preview.ps1` to generate the GitHub social preview PNG under `build\social_preview\` from dark_cyan fake telemetry and a rendered app icon.
+- Use `tools\generate_social_preview.ps1` to generate the GitHub social preview PNG under `build\social_preview\` from the `dark_cyan` theme, built-in synthetic telemetry, and a rendered app icon.
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
@@ -69,10 +72,12 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 ## Single-Source References
 
 - Use [docs/build.md](build.md) instead of repeating build or install commands elsewhere.
+- Use [docs/glossary.md](glossary.md) instead of introducing new synonyms for project terms.
 - Use [docs/diagnostics.md](diagnostics.md) instead of repeating diagnostics command examples elsewhere.
 - Use [docs/layout.md](layout.md) and [resources/config.ini](../resources/config.ini) instead of repeating config key lists elsewhere.
-- Use [docs/profile_benchmark.md](profile_benchmark.md) instead of repeating benchmark workflow or experiment history elsewhere.
-- Use [docs/optimize_size.md](optimize_size.md) instead of repeating executable-size assumptions, constraints, or experiment history elsewhere.
+- Use [docs/profile_benchmark.md](profile_benchmark.md) instead of repeating benchmark workflow or shared experiment history elsewhere.
+- Use `docs/performance/*.md` instead of recording machine-specific benchmark ranges or hardware bottlenecks in shared docs.
+- Use [docs/optimize_size.md](optimize_size.md) instead of repeating executable-size assumptions, constraints, current size shape, or active experiment guidance elsewhere.
 - Use [docs/release.md](release.md) and [docs/changelog.md](changelog.md) instead of repeating release procedure or changelog format details elsewhere.
 
 ## Project Pitfall Notes
@@ -80,7 +85,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Fake-runtime startup failures stay aligned with the diagnostics dialog policy; direct modal dialogs in `/fake /exit` can make a headless process wait behind the dialog.
 - Win32 dialog templates and control ids live in `resources/CaseDash.rc` and `resources/resource.h`; check those files when shell dialog layout or control placement is wrong.
 - The executable-side `config.ini` overlays the embedded `resources/config.ini` template, and `Save Config` preserves that live file.
-- Embedded `config.ini` and `localization.ini` edits flow through the generated BOM-free UTF-8 text-resource atlas; app-icon and panel-icon edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
+- Embedded `config.ini` and `localization.ini` edits flow through the generated BOM-free UTF-8 text-resource atlas; app icon and panel-icon edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
 - The generated compressed-resource RC object depends explicitly on `text_atlas.cdlz`; keep that dependency when changing generated text-resource outputs because RC compilation does not otherwise track RCDATA payload changes.
 - `RES_STR` ids are generated as collision-checked hashes; keep the generated header catalog-sized-literal-free so heavy trace sources do not pay a compile-time linear string lookup.
 - Restored saved placement across monitors with different DPI scales lets `WM_DPICHANGED` apply the monitor transition before destination window size scaling.
@@ -88,7 +93,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/layout.md](lay
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
-- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; size-specific experiments are recorded in `docs/optimize_size.md`.
+- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific lessons stay grouped in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
 - Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
