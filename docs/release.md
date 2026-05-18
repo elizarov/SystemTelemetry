@@ -19,6 +19,7 @@ See also: [docs/build.md](build.md) for local build setup and [docs/project.md](
 - Before local release preparation, the top chunk is a concise list of `- ` bullets without a version header.
 - `release.cmd <version>` stamps the top chunk with `## v<VERSION>` when the header is missing, or validates that the existing top header already matches `v<VERSION>`.
 - The `.agents\skills\release-changelog` skill creates the top draft by generating a `v<LATEST_TAG>..HEAD` report, summarizing user-visible changes, and preserving older chunks below the separator.
+- Release preparation and publication fail when the selected release body still contains a `---` separator or another `## v<VERSION>` release header, so malformed chunk boundaries do not publish multiple releases in one GitHub Release body.
 - The `Release` GitHub Actions workflow extracts the body of the stamped top chunk and publishes it as the GitHub Release notes.
 
 ## Build Kinds
