@@ -31,8 +31,11 @@ using ZesFan = void*;
 using ZesFrequency = void*;
 using ZesMemory = void*;
 using ZesTemperature = void*;
+using NtStatus = LONG;
+using D3DkmtHandle = UINT;
 
 constexpr ZeResult kZeResultSuccess = 0;
+constexpr ZeResult kZeResultErrorUnsupportedFeature = 0x78000003;
 constexpr unsigned int kIntelVendorId = 0x8086;
 constexpr int kZeDeviceTypeGpu = 1;
 constexpr int kZeStructureTypeDeviceProperties = 0x3;
@@ -59,7 +62,10 @@ constexpr int kZesTemperatureGpuMin = 4;
 constexpr int kZesTemperatureMemoryMin = 5;
 constexpr int kZesTemperatureGpuBoard = 6;
 constexpr int kZesTemperatureGpuBoardMin = 7;
+constexpr int kD3DkmtQueryNodePerfData = 61;
+constexpr int kMaximumD3DkmtNodeOrdinal = 32;
 constexpr wchar_t kLevelZeroLibraryName[] = L"ze_loader.dll";  // LoadLibraryW requires a UTF-16 DLL name.
+constexpr wchar_t kGdi32LibraryName[] = L"gdi32.dll";          // Win32 module loading requires a UTF-16 DLL name.
 
 struct ZeDeviceUuid {
     std::uint8_t id[16] = {};
@@ -182,9 +188,56 @@ struct ZesTemperatureProperties {
     ZeBool isThreshold2Supported = 0;
 };
 
+struct D3DkmtOpenAdapterFromLuid {
+    LUID adapterLuid;
+    D3DkmtHandle adapter = 0;
+};
+
+struct D3DkmtNodePerfData {
+    std::uint32_t nodeOrdinal = 0;
+    std::uint32_t physicalAdapterIndex = 0;
+    std::uint64_t frequency = 0;
+    std::uint64_t maxFrequency = 0;
+    std::uint64_t maxFrequencyOc = 0;
+    ULONG voltage = 0;
+    ULONG voltageMax = 0;
+    ULONG voltageMaxOc = 0;
+    std::uint64_t maxTransitionLatency = 0;
+};
+
+struct D3DkmtQueryAdapterInfo {
+    D3DkmtHandle adapter = 0;
+    int type = 0;
+    void* privateDriverData = nullptr;
+    UINT privateDriverDataSize = 0;
+};
+
+struct D3DkmtCloseAdapter {
+    D3DkmtHandle adapter = 0;
+};
+
+struct WddmNodeClockSample {
+    std::optional<double> mhz;
+    std::uint32_t successfulNodes = 0;
+    NtStatus firstFailure = 0;
+    bool hasFailure = false;
+};
+
+struct ClockSample {
+    std::optional<double> mhz;
+    const char* source = "none";
+    std::uint32_t wddmNodes = 0;
+    NtStatus wddmFirstFailure = 0;
+    bool wddmHasFailure = false;
+};
+
 using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
 using ZesDriverGetFn = ZeResult(__cdecl*)(std::uint32_t*, ZesDriver*);
 using ZesDeviceGetFn = ZeResult(__cdecl*)(ZesDriver, std::uint32_t*, ZesDevice*);
+using ZeInitFn = ZeResult(__cdecl*)(std::uint32_t);
+using ZeDriverGetFn = ZeResult(__cdecl*)(std::uint32_t*, ZesDriver*);
+using ZeDeviceGetFn = ZeResult(__cdecl*)(ZesDriver, std::uint32_t*, ZesDevice*);
+using ZeDeviceGetPropertiesFn = ZeResult(__cdecl*)(ZesDevice, ZeDeviceProperties*);
 using ZesDeviceGetPropertiesFn = ZeResult(__cdecl*)(ZesDevice, ZesDeviceProperties*);
 using ZesDeviceEnumEngineGroupsFn = ZeResult(__cdecl*)(ZesDevice, std::uint32_t*, ZesEngine*);
 using ZesEngineGetPropertiesFn = ZeResult(__cdecl*)(ZesEngine, ZesEngineProperties*);
@@ -201,6 +254,9 @@ using ZesMemoryGetStateFn = ZeResult(__cdecl*)(ZesMemory, ZesMemoryState*);
 using ZesDeviceEnumTemperatureSensorsFn = ZeResult(__cdecl*)(ZesDevice, std::uint32_t*, ZesTemperature*);
 using ZesTemperatureGetPropertiesFn = ZeResult(__cdecl*)(ZesTemperature, ZesTemperatureProperties*);
 using ZesTemperatureGetStateFn = ZeResult(__cdecl*)(ZesTemperature, double*);
+using D3DkmtOpenAdapterFromLuidFn = NtStatus(WINAPI*)(D3DkmtOpenAdapterFromLuid*);
+using D3DkmtQueryAdapterInfoFn = NtStatus(WINAPI*)(const D3DkmtQueryAdapterInfo*);
+using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
 
 std::string ResultCodeString(ZeResult result) {
     switch (result) {
@@ -335,6 +391,10 @@ ZeResult EnumerateChildHandles(ZesDeviceGetFn enumerate, void* parent, std::vect
     return result;
 }
 
+bool NtSucceeded(NtStatus status) {
+    return status >= 0;
+}
+
 class LevelZeroLibrary {
 public:
     ~LevelZeroLibrary() {
@@ -350,57 +410,137 @@ public:
             return false;
         }
 
-        bool loaded = true;
-#define CASEDASH_LOAD_REQUIRED(function, name)                                                                         \
-    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name));                                    \
-    loaded = function != nullptr && loaded
-        CASEDASH_LOAD_REQUIRED(sysmanInit_, "zesInit");
-        CASEDASH_LOAD_REQUIRED(driverGet_, "zesDriverGet");
-        CASEDASH_LOAD_REQUIRED(deviceGet_, "zesDeviceGet");
-        CASEDASH_LOAD_REQUIRED(deviceGetProperties_, "zesDeviceGetProperties");
-        CASEDASH_LOAD_REQUIRED(deviceEnumEngineGroups_, "zesDeviceEnumEngineGroups");
-        CASEDASH_LOAD_REQUIRED(engineGetProperties_, "zesEngineGetProperties");
-        CASEDASH_LOAD_REQUIRED(engineGetActivity_, "zesEngineGetActivity");
-        CASEDASH_LOAD_REQUIRED(deviceEnumFans_, "zesDeviceEnumFans");
-        CASEDASH_LOAD_REQUIRED(fanGetProperties_, "zesFanGetProperties");
-        CASEDASH_LOAD_REQUIRED(fanGetState_, "zesFanGetState");
-        CASEDASH_LOAD_REQUIRED(deviceEnumFrequencyDomains_, "zesDeviceEnumFrequencyDomains");
-        CASEDASH_LOAD_REQUIRED(frequencyGetProperties_, "zesFrequencyGetProperties");
-        CASEDASH_LOAD_REQUIRED(frequencyGetState_, "zesFrequencyGetState");
-        CASEDASH_LOAD_REQUIRED(deviceEnumMemoryModules_, "zesDeviceEnumMemoryModules");
-        CASEDASH_LOAD_REQUIRED(memoryGetProperties_, "zesMemoryGetProperties");
-        CASEDASH_LOAD_REQUIRED(memoryGetState_, "zesMemoryGetState");
-        CASEDASH_LOAD_REQUIRED(deviceEnumTemperatureSensors_, "zesDeviceEnumTemperatureSensors");
-        CASEDASH_LOAD_REQUIRED(temperatureGetProperties_, "zesTemperatureGetProperties");
-        CASEDASH_LOAD_REQUIRED(temperatureGetState_, "zesTemperatureGetState");
-#undef CASEDASH_LOAD_REQUIRED
+#define CASEDASH_LOAD_OPTIONAL(function, name)                                                                         \
+    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name))
+        CASEDASH_LOAD_OPTIONAL(sysmanInit_, "zesInit");
+        CASEDASH_LOAD_OPTIONAL(driverGet_, "zesDriverGet");
+        CASEDASH_LOAD_OPTIONAL(deviceGet_, "zesDeviceGet");
+        CASEDASH_LOAD_OPTIONAL(coreInit_, "zeInit");
+        CASEDASH_LOAD_OPTIONAL(coreDriverGet_, "zeDriverGet");
+        CASEDASH_LOAD_OPTIONAL(coreDeviceGet_, "zeDeviceGet");
+        CASEDASH_LOAD_OPTIONAL(coreDeviceGetProperties_, "zeDeviceGetProperties");
+        CASEDASH_LOAD_OPTIONAL(deviceGetProperties_, "zesDeviceGetProperties");
+        CASEDASH_LOAD_OPTIONAL(deviceEnumEngineGroups_, "zesDeviceEnumEngineGroups");
+        CASEDASH_LOAD_OPTIONAL(engineGetProperties_, "zesEngineGetProperties");
+        CASEDASH_LOAD_OPTIONAL(engineGetActivity_, "zesEngineGetActivity");
+        CASEDASH_LOAD_OPTIONAL(deviceEnumFans_, "zesDeviceEnumFans");
+        CASEDASH_LOAD_OPTIONAL(fanGetProperties_, "zesFanGetProperties");
+        CASEDASH_LOAD_OPTIONAL(fanGetState_, "zesFanGetState");
+        CASEDASH_LOAD_OPTIONAL(deviceEnumFrequencyDomains_, "zesDeviceEnumFrequencyDomains");
+        CASEDASH_LOAD_OPTIONAL(frequencyGetProperties_, "zesFrequencyGetProperties");
+        CASEDASH_LOAD_OPTIONAL(frequencyGetState_, "zesFrequencyGetState");
+        CASEDASH_LOAD_OPTIONAL(deviceEnumMemoryModules_, "zesDeviceEnumMemoryModules");
+        CASEDASH_LOAD_OPTIONAL(memoryGetProperties_, "zesMemoryGetProperties");
+        CASEDASH_LOAD_OPTIONAL(memoryGetState_, "zesMemoryGetState");
+        CASEDASH_LOAD_OPTIONAL(deviceEnumTemperatureSensors_, "zesDeviceEnumTemperatureSensors");
+        CASEDASH_LOAD_OPTIONAL(temperatureGetProperties_, "zesTemperatureGetProperties");
+        CASEDASH_LOAD_OPTIONAL(temperatureGetState_, "zesTemperatureGetState");
+#undef CASEDASH_LOAD_OPTIONAL
 
-        if (!loaded) {
-            diagnostics = ResourceStringText(RES_STR("Level Zero loader is missing required Sysman entry points."));
+        if (!HasSysmanDeviceEnumerationApi() && !HasCoreDeviceEnumerationApi()) {
+            diagnostics =
+                ResourceStringText(RES_STR("Level Zero loader has no Sysman or core device enumeration entry points."));
+            return false;
+        }
+        if (!HasDevicePropertiesApi()) {
+            diagnostics =
+                ResourceStringText(RES_STR("Level Zero loader has no Sysman or core device property entry points."));
             return false;
         }
         return true;
     }
 
     ZeResult InitializeSysman() const {
-        return sysmanInit_(0);
+        return sysmanInit_ != nullptr ? sysmanInit_(0) : kZeResultSuccess;
+    }
+
+    bool HasSysmanInitializationApi() const {
+        return sysmanInit_ != nullptr;
+    }
+
+    ZeResult InitializeCoreForDeviceEnumeration() const {
+        return UsesCoreDeviceEnumeration() && coreInit_ != nullptr ? coreInit_(0) : kZeResultSuccess;
+    }
+
+    bool UsesCoreDeviceEnumeration() const {
+        return !HasSysmanDeviceEnumerationApi() && HasCoreDeviceEnumerationApi();
+    }
+
+    bool HasSysmanDeviceEnumerationApi() const {
+        return driverGet_ != nullptr && deviceGet_ != nullptr;
+    }
+
+    bool HasCoreDeviceEnumerationApi() const {
+        return coreInit_ != nullptr && coreDriverGet_ != nullptr && coreDeviceGet_ != nullptr &&
+               coreDeviceGetProperties_ != nullptr;
+    }
+
+    bool HasDevicePropertiesApi() const {
+        return deviceGetProperties_ != nullptr || coreDeviceGetProperties_ != nullptr;
+    }
+
+    bool HasEngineApi() const {
+        return deviceEnumEngineGroups_ != nullptr && engineGetProperties_ != nullptr && engineGetActivity_ != nullptr;
+    }
+
+    bool HasFanApi() const {
+        return deviceEnumFans_ != nullptr && fanGetProperties_ != nullptr && fanGetState_ != nullptr;
+    }
+
+    bool HasFrequencyApi() const {
+        return deviceEnumFrequencyDomains_ != nullptr && frequencyGetProperties_ != nullptr &&
+               frequencyGetState_ != nullptr;
+    }
+
+    bool HasMemoryApi() const {
+        return deviceEnumMemoryModules_ != nullptr && memoryGetProperties_ != nullptr && memoryGetState_ != nullptr;
+    }
+
+    bool HasTemperatureApi() const {
+        return deviceEnumTemperatureSensors_ != nullptr && temperatureGetProperties_ != nullptr &&
+               temperatureGetState_ != nullptr;
     }
 
     ZeResult Drivers(std::vector<ZesDriver>& drivers) const {
+        if (UsesCoreDeviceEnumeration()) {
+            return EnumerateDriverHandles(coreDriverGet_, drivers);
+        }
         return EnumerateDriverHandles(driverGet_, drivers);
     }
 
     ZeResult Devices(ZesDriver driver, std::vector<ZesDevice>& devices) const {
+        if (UsesCoreDeviceEnumeration()) {
+            return EnumerateChildHandles(coreDeviceGet_, driver, devices);
+        }
         return EnumerateChildHandles(deviceGet_, driver, devices);
     }
 
     ZeResult DeviceProperties(ZesDevice device, ZesDeviceProperties& properties) const {
         properties = ZesDeviceProperties{};
         properties.stype = kZesStructureTypeDeviceProperties;
-        return deviceGetProperties_(device, &properties);
+        const ZeResult sysmanResult = deviceGetProperties_ != nullptr ? deviceGetProperties_(device, &properties)
+                                                                      : kZeResultErrorUnsupportedFeature;
+        if (sysmanResult == kZeResultSuccess || coreDeviceGetProperties_ == nullptr) {
+            return sysmanResult;
+        }
+
+        ZeDeviceProperties coreProperties{};
+        const ZeResult coreResult = coreDeviceGetProperties_(device, &coreProperties);
+        if (coreResult != kZeResultSuccess) {
+            return sysmanResult;
+        }
+
+        properties = ZesDeviceProperties{};
+        properties.stype = kZesStructureTypeDeviceProperties;
+        properties.core = coreProperties;
+        return kZeResultSuccess;
     }
 
     ZeResult EngineGroups(ZesDevice device, std::vector<ZesEngine>& engines) const {
+        if (!HasEngineApi()) {
+            engines.clear();
+            return kZeResultErrorUnsupportedFeature;
+        }
         return EnumerateChildHandles(deviceEnumEngineGroups_, device, engines);
     }
 
@@ -411,10 +551,17 @@ public:
     }
 
     ZeResult EngineActivity(ZesEngine engine, ZesEngineStats& stats) const {
+        if (!HasEngineApi()) {
+            return kZeResultErrorUnsupportedFeature;
+        }
         return engineGetActivity_(engine, &stats);
     }
 
     ZeResult Fans(ZesDevice device, std::vector<ZesFan>& fans) const {
+        if (!HasFanApi()) {
+            fans.clear();
+            return kZeResultErrorUnsupportedFeature;
+        }
         return EnumerateChildHandles(deviceEnumFans_, device, fans);
     }
 
@@ -425,10 +572,17 @@ public:
     }
 
     ZeResult FanStateRpm(ZesFan fan, std::int32_t& speed) const {
+        if (!HasFanApi()) {
+            return kZeResultErrorUnsupportedFeature;
+        }
         return fanGetState_(fan, kZesFanSpeedUnitsRpm, &speed);
     }
 
     ZeResult FrequencyDomains(ZesDevice device, std::vector<ZesFrequency>& frequencies) const {
+        if (!HasFrequencyApi()) {
+            frequencies.clear();
+            return kZeResultErrorUnsupportedFeature;
+        }
         return EnumerateChildHandles(deviceEnumFrequencyDomains_, device, frequencies);
     }
 
@@ -439,12 +593,19 @@ public:
     }
 
     ZeResult FrequencyState(ZesFrequency frequency, ZesFrequencyState& state) const {
+        if (!HasFrequencyApi()) {
+            return kZeResultErrorUnsupportedFeature;
+        }
         state = ZesFrequencyState{};
         state.stype = kZesStructureTypeFrequencyState;
         return frequencyGetState_(frequency, &state);
     }
 
     ZeResult MemoryModules(ZesDevice device, std::vector<ZesMemory>& memoryModules) const {
+        if (!HasMemoryApi()) {
+            memoryModules.clear();
+            return kZeResultErrorUnsupportedFeature;
+        }
         return EnumerateChildHandles(deviceEnumMemoryModules_, device, memoryModules);
     }
 
@@ -455,12 +616,19 @@ public:
     }
 
     ZeResult MemoryState(ZesMemory memory, ZesMemoryState& state) const {
+        if (!HasMemoryApi()) {
+            return kZeResultErrorUnsupportedFeature;
+        }
         state = ZesMemoryState{};
         state.stype = kZesStructureTypeMemoryState;
         return memoryGetState_(memory, &state);
     }
 
     ZeResult TemperatureSensors(ZesDevice device, std::vector<ZesTemperature>& temperatures) const {
+        if (!HasTemperatureApi()) {
+            temperatures.clear();
+            return kZeResultErrorUnsupportedFeature;
+        }
         return EnumerateChildHandles(deviceEnumTemperatureSensors_, device, temperatures);
     }
 
@@ -471,6 +639,9 @@ public:
     }
 
     ZeResult TemperatureState(ZesTemperature temperature, double& value) const {
+        if (!HasTemperatureApi()) {
+            return kZeResultErrorUnsupportedFeature;
+        }
         return temperatureGetState_(temperature, &value);
     }
 
@@ -479,6 +650,10 @@ private:
     ZesInitFn sysmanInit_ = nullptr;
     ZesDriverGetFn driverGet_ = nullptr;
     ZesDeviceGetFn deviceGet_ = nullptr;
+    ZeInitFn coreInit_ = nullptr;
+    ZeDriverGetFn coreDriverGet_ = nullptr;
+    ZeDeviceGetFn coreDeviceGet_ = nullptr;
+    ZeDeviceGetPropertiesFn coreDeviceGetProperties_ = nullptr;
     ZesDeviceGetPropertiesFn deviceGetProperties_ = nullptr;
     ZesDeviceEnumEngineGroupsFn deviceEnumEngineGroups_ = nullptr;
     ZesEngineGetPropertiesFn engineGetProperties_ = nullptr;
@@ -495,6 +670,122 @@ private:
     ZesDeviceEnumTemperatureSensorsFn deviceEnumTemperatureSensors_ = nullptr;
     ZesTemperatureGetPropertiesFn temperatureGetProperties_ = nullptr;
     ZesTemperatureGetStateFn temperatureGetState_ = nullptr;
+};
+
+class WddmNodeClockReader {
+public:
+    ~WddmNodeClockReader() {
+        Close();
+    }
+
+    bool Initialize(const std::optional<GpuAdapterInfo>& adapter, Trace& trace) {
+        Close();
+        if (!adapter.has_value() || !adapter->hasAdapterLuid) {
+            trace.Write(
+                TracePrefix::IntelLevelZero, RES_STR("wddm_clock_init available=no reason=\"no adapter LUID\""));
+            return false;
+        }
+
+        module_ = LoadLibraryW(kGdi32LibraryName);
+        if (module_ == nullptr) {
+            trace.Write(
+                TracePrefix::IntelLevelZero, RES_STR("wddm_clock_init available=no reason=\"gdi32 load failed\""));
+            return false;
+        }
+
+        openAdapter_ =
+            reinterpret_cast<D3DkmtOpenAdapterFromLuidFn>(GetProcAddress(module_, "D3DKMTOpenAdapterFromLuid"));
+        queryAdapter_ = reinterpret_cast<D3DkmtQueryAdapterInfoFn>(GetProcAddress(module_, "D3DKMTQueryAdapterInfo"));
+        closeAdapter_ = reinterpret_cast<D3DkmtCloseAdapterFn>(GetProcAddress(module_, "D3DKMTCloseAdapter"));
+        if (openAdapter_ == nullptr || queryAdapter_ == nullptr || closeAdapter_ == nullptr) {
+            trace.Write(TracePrefix::IntelLevelZero,
+                RES_STR("wddm_clock_init available=no reason=\"D3DKMT entry point missing\""));
+            Close();
+            return false;
+        }
+
+        D3DkmtOpenAdapterFromLuid open{};
+        open.adapterLuid.HighPart = static_cast<LONG>(adapter->adapterLuidHighPart);
+        open.adapterLuid.LowPart = static_cast<DWORD>(adapter->adapterLuidLowPart);
+        const NtStatus status = openAdapter_(&open);
+        if (!NtSucceeded(status)) {
+            trace.WriteFmt(TracePrefix::IntelLevelZero,
+                RES_STR("wddm_clock_init available=no status=0x%08X"),
+                static_cast<unsigned int>(status));
+            Close();
+            return false;
+        }
+
+        adapter_ = open.adapter;
+        trace.WriteFmt(TracePrefix::IntelLevelZero,
+            RES_STR("wddm_clock_init available=yes luid=0x%08X:0x%08X"),
+            static_cast<unsigned int>(adapter->adapterLuidHighPart),
+            static_cast<unsigned int>(adapter->adapterLuidLowPart));
+        return true;
+    }
+
+    bool Available() const {
+        return adapter_ != 0 && queryAdapter_ != nullptr;
+    }
+
+    WddmNodeClockSample QueryClockMhz() const {
+        WddmNodeClockSample sample;
+        if (!Available()) {
+            return sample;
+        }
+
+        std::uint64_t bestFrequencyHz = 0;
+        for (int nodeOrdinal = 0; nodeOrdinal < kMaximumD3DkmtNodeOrdinal; ++nodeOrdinal) {
+            D3DkmtNodePerfData perf{};
+            perf.nodeOrdinal = static_cast<std::uint32_t>(nodeOrdinal);
+
+            D3DkmtQueryAdapterInfo query{};
+            query.adapter = adapter_;
+            query.type = kD3DkmtQueryNodePerfData;
+            query.privateDriverData = &perf;
+            query.privateDriverDataSize = sizeof(perf);
+
+            const NtStatus status = queryAdapter_(&query);
+            if (!NtSucceeded(status)) {
+                if (!sample.hasFailure) {
+                    sample.firstFailure = status;
+                    sample.hasFailure = true;
+                }
+                continue;
+            }
+
+            ++sample.successfulNodes;
+            bestFrequencyHz = std::max(bestFrequencyHz, perf.frequency);
+        }
+
+        if (sample.successfulNodes > 0) {
+            sample.mhz = static_cast<double>(bestFrequencyHz) / 1000000.0;
+        }
+        return sample;
+    }
+
+private:
+    void Close() {
+        if (adapter_ != 0 && closeAdapter_ != nullptr) {
+            D3DkmtCloseAdapter close{};
+            close.adapter = adapter_;
+            closeAdapter_(&close);
+        }
+        adapter_ = 0;
+        openAdapter_ = nullptr;
+        queryAdapter_ = nullptr;
+        closeAdapter_ = nullptr;
+        if (module_ != nullptr) {
+            FreeLibrary(module_);
+            module_ = nullptr;
+        }
+    }
+
+    HMODULE module_ = nullptr;
+    D3DkmtHandle adapter_ = 0;
+    D3DkmtOpenAdapterFromLuidFn openAdapter_ = nullptr;
+    D3DkmtQueryAdapterInfoFn queryAdapter_ = nullptr;
+    D3DkmtCloseAdapterFn closeAdapter_ = nullptr;
 };
 
 struct EngineProbe {
@@ -533,13 +824,38 @@ public:
                 TracePrefix::IntelLevelZero, RES_STR("load_failed diagnostics=\"%s\""), diagnostics_.c_str());
             return false;
         }
+        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            RES_STR("load_done sysman_init_api=%s sysman_device_enum=%s core_device_enum=%s device_properties_api=%s "
+                    "engine_api=%s fan_api=%s frequency_api=%s memory_api=%s temperature_api=%s"),
+            Trace::BoolText(levelZero_.HasSysmanInitializationApi()),
+            Trace::BoolText(levelZero_.HasSysmanDeviceEnumerationApi()),
+            Trace::BoolText(levelZero_.HasCoreDeviceEnumerationApi()),
+            Trace::BoolText(levelZero_.HasDevicePropertiesApi()),
+            Trace::BoolText(levelZero_.HasEngineApi()),
+            Trace::BoolText(levelZero_.HasFanApi()),
+            Trace::BoolText(levelZero_.HasFrequencyApi()),
+            Trace::BoolText(levelZero_.HasMemoryApi()),
+            Trace::BoolText(levelZero_.HasTemperatureApi()));
 
         const ZeResult initResult = levelZero_.InitializeSysman();
-        trace_.WriteFmt(
-            TracePrefix::IntelLevelZero, RES_STR("sysman_init result=\"%s\""), ResultCodeString(initResult).c_str());
+        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            RES_STR("sysman_init used=%s result=\"%s\""),
+            Trace::BoolText(levelZero_.HasSysmanInitializationApi()),
+            ResultCodeString(initResult).c_str());
         if (initResult != kZeResultSuccess) {
             diagnostics_ = FormatText(
                 RES_STR("Level Zero Sysman initialization failed: %s"), ResultCodeString(initResult).c_str());
+            return false;
+        }
+
+        const ZeResult coreInitResult = levelZero_.InitializeCoreForDeviceEnumeration();
+        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            RES_STR("core_init used=%s result=\"%s\""),
+            Trace::BoolText(levelZero_.UsesCoreDeviceEnumeration()),
+            ResultCodeString(coreInitResult).c_str());
+        if (coreInitResult != kZeResultSuccess) {
+            diagnostics_ = FormatText(
+                RES_STR("Level Zero core initialization failed: %s"), ResultCodeString(coreInitResult).c_str());
             return false;
         }
 
@@ -547,6 +863,7 @@ public:
             return false;
         }
 
+        wddmClockReader_.Initialize(adapter_, trace_);
         EnumerateMetricHandles();
         CaptureEngineBaselines();
 
@@ -615,13 +932,16 @@ public:
             hasAnyMetric = true;
         }
 
-        const std::optional<double> clockMhz = QueryClockMhz();
+        const ClockSample clock = QueryClockMhz();
         trace_.WriteFmt(TracePrefix::IntelLevelZero,
-            RES_STR("get_clock %s domains=%zu"),
-            FormatOptionalMetric("value", clockMhz, 1).c_str(),
-            frequencyProbeCount_);
-        if (clockMhz.has_value()) {
-            sample.coreClockMhz = *clockMhz;
+            RES_STR("get_clock %s source=%s domains=%zu wddm_nodes=%u wddm_first_failure=0x%08X"),
+            FormatOptionalMetric("value", clock.mhz, 1).c_str(),
+            clock.source,
+            frequencyProbeCount_,
+            clock.wddmNodes,
+            static_cast<unsigned int>(clock.wddmHasFailure ? clock.wddmFirstFailure : 0));
+        if (clock.mhz.has_value()) {
+            sample.coreClockMhz = *clock.mhz;
             hasAnyMetric = true;
         }
 
@@ -771,16 +1091,21 @@ private:
     void SelectDevice(ZesDevice device, const ZesDeviceProperties& properties, const char* matchKind) {
         device_ = device;
         sysmanGpuName_ = ResolveGpuName(properties);
+        deviceCoreClockMhz_ = properties.core.coreClockRate > 0
+                                  ? std::optional<double>{static_cast<double>(properties.core.coreClockRate)}
+                                  : std::nullopt;
         gpuName_ = matchKind != nullptr && std::string_view(matchKind) == "device_id" && adapter_.has_value() &&
                            !adapter_->adapterName.empty()
                        ? adapter_->adapterName
                        : sysmanGpuName_;
         trace_.WriteFmt(TracePrefix::IntelLevelZero,
-            RES_STR("device_selected match=\"%s\" sysman_name=\"%s\" display_name=\"%s\" selected_adapter=\"%s\""),
+            RES_STR("device_selected match=\"%s\" sysman_name=\"%s\" display_name=\"%s\" selected_adapter=\"%s\" "
+                    "core_clock_mhz=%s"),
             matchKind != nullptr ? matchKind : "unknown",
             sysmanGpuName_.c_str(),
             gpuName_.c_str(),
-            adapter_.has_value() ? adapter_->adapterName.c_str() : "");
+            adapter_.has_value() ? adapter_->adapterName.c_str() : "",
+            FormatOptionalMetric("value", deviceCoreClockMhz_, 1).c_str());
     }
 
     void EnumerateMetricHandles() {
@@ -956,7 +1281,7 @@ private:
         return preferred.has_value() ? preferred : fallback;
     }
 
-    std::optional<double> QueryClockMhz() const {
+    ClockSample QueryClockMhz() const {
         std::optional<double> preferred;
         std::optional<double> fallback;
         for (const MetricProbe& frequency : metricProbes_) {
@@ -984,7 +1309,28 @@ private:
                 fallback = fallback.has_value() ? std::max(*fallback, *value) : *value;
             }
         }
-        return preferred.has_value() ? preferred : fallback;
+        if (preferred.has_value()) {
+            return ClockSample{preferred, "sysman_frequency"};
+        }
+        if (fallback.has_value()) {
+            return ClockSample{fallback, "sysman_frequency"};
+        }
+
+        const WddmNodeClockSample wddm = wddmClockReader_.QueryClockMhz();
+        if (wddm.mhz.has_value() && *wddm.mhz > 0.0) {
+            return ClockSample{wddm.mhz, "wddm_node_perf", wddm.successfulNodes, wddm.firstFailure, wddm.hasFailure};
+        }
+        if (deviceCoreClockMhz_.has_value()) {
+            return ClockSample{deviceCoreClockMhz_,
+                "level_zero_core_properties",
+                wddm.successfulNodes,
+                wddm.firstFailure,
+                wddm.hasFailure};
+        }
+        if (wddm.mhz.has_value()) {
+            return ClockSample{wddm.mhz, "wddm_node_perf", wddm.successfulNodes, wddm.firstFailure, wddm.hasFailure};
+        }
+        return ClockSample{std::nullopt, "none", wddm.successfulNodes, wddm.firstFailure, wddm.hasFailure};
     }
 
     std::optional<MemorySample> QueryMemory() const {
@@ -1033,10 +1379,12 @@ private:
 
     Trace& trace_;
     LevelZeroLibrary levelZero_;
+    WddmNodeClockReader wddmClockReader_;
     ZesDevice device_ = nullptr;
     std::optional<GpuAdapterInfo> adapter_;
     std::string sysmanGpuName_ = "Intel GPU";
     std::string gpuName_;
+    std::optional<double> deviceCoreClockMhz_;
     std::string diagnostics_ = ResourceStringText(RES_STR("Level Zero provider not initialized."));
     std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::vector<EngineProbe> engines_;

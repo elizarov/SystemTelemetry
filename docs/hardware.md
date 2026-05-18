@@ -67,18 +67,18 @@ Troubleshooting:
 ## Intel
 
 - Supported hardware family: Intel GPU telemetry.
-- Runtime dependency: Intel display driver with the Level Zero Sysman loader (`ze_loader.dll`) available.
-- Metrics include provider-supplied GPU telemetry such as engine load, temperature, clock, device-local memory, and fan speed when the driver exposes those Sysman components.
-- Integrated GPUs commonly expose no device-local memory or fan component; in those cases CaseDash keeps VRAM on the generic Windows dedicated-memory fallback and renders fan speed unavailable. When Level Zero exposes no native temperature sensor for the selected Intel GPU, CaseDash falls back to the resolved board CPU temperature for `gpu.temp` because integrated CPU and GPU telemetry describe the same package temperature source.
+- Runtime dependency: Intel display driver with the Level Zero Sysman loader (`ze_loader.dll`) available. CaseDash supports loaders that expose direct Sysman driver and device enumeration, and older loaders that expose core Level Zero device enumeration plus Sysman component APIs.
+- Metrics include provider-supplied GPU telemetry such as engine load, temperature, clock, device-local memory, and fan speed when the driver exposes those Sysman components. `gpu.clock` uses the selected GPU's Sysman GPU frequency domain first, then the selected adapter's WDDM node performance frequency when Sysman frequency domains are unavailable, then the selected Level Zero device's core clock rate when the driver exposes no dynamic graphics frequency; it does not fall back to CPU clock.
+- Integrated GPUs commonly expose no device-local memory or fan component; in those cases CaseDash keeps VRAM on the generic Windows dedicated-memory fallback and renders fan speed unavailable. When Level Zero exposes no native temperature sensor for the selected Intel GPU, CaseDash falls back to the resolved board CPU temperature for `gpu.temp` because integrated CPU and GPU telemetry can describe the same package temperature source.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because Level Zero Sysman has no native game-FPS metric.
-- Trace output can include `intel_level_zero:*` provider details and `unsupported_gpu` fallback markers.
+- Trace output can include `intel_level_zero:*` provider details such as Sysman and core enumeration availability, WDDM clock initialization, clock source, component counts, and `unsupported_gpu` fallback markers.
 
 Troubleshooting:
 
 1. Install or update the Intel graphics driver.
 2. Confirm `ze_loader.dll` is present in `C:\Windows\System32`.
 3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for Level Zero Sysman component counts and provider state on that machine.
+4. Inspect the exported dump and trace outputs for Level Zero Sysman capability markers, component counts, `get_clock source=...`, and provider state on that machine.
 
 ## NVIDIA
 
