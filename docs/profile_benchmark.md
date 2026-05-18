@@ -225,6 +225,22 @@ These shared decisions produced useful wins or preserve important benchmark sema
 - Evidence: Moving preview construction into `layout_edit_dialog/theme_preview.*` and replacing `SetPixel` with a DIB transfer improved maintainability and established the full `theme-change` benchmark.
 - Conclusion: Keep theme preview rendering behind the shared module and compare future theme-selector work against the whole-flow benchmark.
 
+### Hypothesis: NVIDIA laptop telemetry should not poll NVML utilization or clock at 250 ms
+
+- Change:
+  - Stop using `nvmlDeviceGetUtilizationRates` for NVIDIA load and let the existing Windows GPU Engine counter path provide per-update load.
+  - Stop using `nvmlDeviceGetClockInfo` for NVIDIA current clock and use NVAPI current-clock reads instead, treating `NVAPI_GPU_NOT_POWERED` as an unavailable clock for that sample.
+  - Add an optional config path argument to `update-telemetry` so local provider stress can run against `build\config.ini`.
+- Result:
+  - Fixed the real NVIDIA laptop telemetry stalls without caching whole GPU samples.
+- Observed effect:
+  - The failing real trace showed `nvmlDeviceGetUtilizationRates` returning `Unknown Error` and later showed `nvmlDeviceGetClockInfo` independently blocking for about `390 ms` at the production 250 ms cadence while the dGPU was idle.
+  - `nvidia-smi --query-gpu=timestamp,pstate,utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total --format=csv -lms 250` reproduced the driver behavior outside CaseDash: idle samples intermittently reported `[Unknown Error]` for P-state and utilization while temperature, clock, and memory remained printable.
+  - `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini` landed at `update_loop per_iter_ms=7.36`, `telemetry_update avg_ms=2.96`, and `paint_draw avg_ms=4.40`.
+  - A verbose real-config trace recorded `43` NVIDIA sample starts and `43` successful sample completions, with zero NVML utilization calls, zero NVML clock calls, zero cached samples, `43` NVAPI clock attempts, `43` successful temperature reads, `43` successful memory reads, and `42` GPU Engine load samples. Runtime `telemetry_update` averaged `5.90 ms` over the main 10-second window.
+- Conclusion:
+  - On WDDM laptop dGPUs, the idle power state can make NVML utilization and current-clock polling unreliable at the app cadence. Keep NVIDIA load on PDH and current clock on NVAPI so a powered-off dGPU reports clock unavailable quickly instead of blocking the telemetry worker.
+
 ## Practical Guidance For Future Experiments
 
 - Keep benchmark comparisons on the same command shape, same iteration count, same warmup count, and same machine file.

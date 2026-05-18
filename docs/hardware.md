@@ -89,10 +89,9 @@ Troubleshooting:
 
 - Supported hardware family: NVIDIA GPU telemetry.
 - Runtime dependency: NVIDIA display driver with NVML available.
-- Metrics include provider-supplied GPU telemetry such as load, dedicated memory, temperature, clock, and fan speed.
-- If NVML utilization transiently fails after a successful sample, CaseDash reuses the last successful NVIDIA sample for that update and skips the remaining NVML calls for a short backoff so one driver call cannot stall the telemetry cadence.
+- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses the Windows GPU Engine counters because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI when the dGPU is powered; when NVAPI reports `GPU not powered`, the clock value is unavailable for that sample instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because NVML has no native game-FPS metric.
-- Trace output can include `nvidia_nvml:*` provider details and `unsupported_gpu` fallback markers.
+- Trace output can include `nvidia_nvml:*` provider details, including NVAPI clock-selection markers, and `unsupported_gpu` fallback markers.
 
 Troubleshooting:
 

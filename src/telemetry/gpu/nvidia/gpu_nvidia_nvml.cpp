@@ -22,14 +22,50 @@ using NvmlReturn = int;
 
 constexpr NvmlReturn kNvmlSuccess = 0;
 constexpr unsigned int kNvmlTemperatureGpu = 0;
-constexpr unsigned int kNvmlClockGraphics = 0;
-constexpr int kNvmlTransientFailureBackoffSamples = 1;
 constexpr char kNvidiaMlLibraryName[] = "nvidia-ml.dll";
 constexpr char kNvmlLibraryName[] = "nvml.dll";
+constexpr char kNvApiLibraryName[] = "nvapi64.dll";
 
-struct NvmlUtilization {
-    unsigned int gpu = 0;
-    unsigned int memory = 0;
+using NvApiStatus = int;
+using NvApiPhysicalGpuHandle = void*;
+
+constexpr NvApiStatus kNvApiOk = 0;
+constexpr NvApiStatus kNvApiGpuNotPowered = -220;
+constexpr int kNvApiMaxPhysicalGpus = 64;
+constexpr int kNvApiShortStringSize = 64;
+constexpr int kNvApiMaxGpuPublicClocks = 32;
+constexpr int kNvApiPublicClockGraphics = 0;
+constexpr unsigned int kNvApiClockFrequenciesCurrent = 0;
+constexpr unsigned int kNvApiInitialize = 0x0150E828;
+constexpr unsigned int kNvApiUnload = 0xD22BDD7E;
+constexpr unsigned int kNvApiEnumPhysicalGpus = 0xE5AC921F;
+constexpr unsigned int kNvApiGpuGetFullName = 0xCEEE8E9F;
+constexpr unsigned int kNvApiGpuGetAllClockFrequencies = 0xDCB616C3;
+
+constexpr unsigned int NvApiStructVersion(unsigned int size, unsigned int version) {
+    return size | (version << 16);
+}
+
+struct NvApiClockDomain {
+    unsigned int bIsPresent : 1;
+    unsigned int reserved : 31;
+    unsigned int frequency = 0;
+};
+
+struct NvApiClockFrequencies {
+    unsigned int version = 0;
+    unsigned int clockType : 4;
+    unsigned int reserved : 20;
+    unsigned int reserved1 : 8;
+    NvApiClockDomain domain[kNvApiMaxGpuPublicClocks]{};
+};
+
+constexpr unsigned int kNvApiClockFrequenciesV3 =
+    NvApiStructVersion(static_cast<unsigned int>(sizeof(NvApiClockFrequencies)), 3);
+
+struct NvApiClockSample {
+    NvApiStatus status = 0;
+    std::optional<double> clockMhz;
 };
 
 struct NvmlMemory {
@@ -66,12 +102,17 @@ using NvmlErrorStringFn = const char* (*)(NvmlReturn);
 using NvmlDeviceGetCountFn = NvmlReturn (*)(unsigned int*);
 using NvmlDeviceGetHandleByIndexFn = NvmlReturn (*)(unsigned int, NvmlDevice*);
 using NvmlDeviceGetNameFn = NvmlReturn (*)(NvmlDevice, char*, unsigned int);
-using NvmlDeviceGetUtilizationRatesFn = NvmlReturn (*)(NvmlDevice, NvmlUtilization*);
 using NvmlDeviceGetTemperatureFn = NvmlReturn (*)(NvmlDevice, unsigned int, unsigned int*);
-using NvmlDeviceGetClockInfoFn = NvmlReturn (*)(NvmlDevice, unsigned int, unsigned int*);
 using NvmlDeviceGetMemoryInfoFn = NvmlReturn (*)(NvmlDevice, NvmlMemory*);
 using NvmlDeviceGetFanSpeedRpmFn = NvmlReturn (*)(NvmlDevice, NvmlFanSpeedInfo*);
 using NvmlDeviceGetPciInfoFn = NvmlReturn (*)(NvmlDevice, NvmlPciInfo*);
+
+using NvApiQueryInterfaceFn = void* (*)(unsigned int);
+using NvApiInitializeFn = NvApiStatus (*)();
+using NvApiUnloadFn = NvApiStatus (*)();
+using NvApiEnumPhysicalGpusFn = NvApiStatus (*)(NvApiPhysicalGpuHandle*, int*);
+using NvApiGpuGetFullNameFn = NvApiStatus (*)(NvApiPhysicalGpuHandle, char*);
+using NvApiGpuGetAllClockFrequenciesFn = NvApiStatus (*)(NvApiPhysicalGpuHandle, NvApiClockFrequencies*);
 
 class NvmlLibrary {
 public:
@@ -106,9 +147,7 @@ public:
         CASEDASH_LOAD_REQUIRED(deviceGetCount_, "nvmlDeviceGetCount_v2");
         CASEDASH_LOAD_REQUIRED(deviceGetHandleByIndex_, "nvmlDeviceGetHandleByIndex_v2");
         CASEDASH_LOAD_REQUIRED(deviceGetName_, "nvmlDeviceGetName");
-        CASEDASH_LOAD_REQUIRED(deviceGetUtilizationRates_, "nvmlDeviceGetUtilizationRates");
         CASEDASH_LOAD_REQUIRED(deviceGetTemperature_, "nvmlDeviceGetTemperature");
-        CASEDASH_LOAD_REQUIRED(deviceGetClockInfo_, "nvmlDeviceGetClockInfo");
         CASEDASH_LOAD_REQUIRED(deviceGetMemoryInfo_, "nvmlDeviceGetMemoryInfo");
         CASEDASH_LOAD_OPTIONAL(deviceGetFanSpeedRpm_, "nvmlDeviceGetFanSpeedRPM");
         CASEDASH_LOAD_OPTIONAL(deviceGetPciInfo_, "nvmlDeviceGetPciInfo_v3");
@@ -141,7 +180,7 @@ public:
                 return text;
             }
         }
-        return FormatText("%d", result);
+        return FormatText(RES_STR("%d"), result);
     }
 
     NvmlReturn DeviceCount(unsigned int& count) const {
@@ -156,16 +195,8 @@ public:
         return deviceGetName_(device, buffer, bufferSize);
     }
 
-    NvmlReturn UtilizationRates(NvmlDevice device, NvmlUtilization& utilization) const {
-        return deviceGetUtilizationRates_(device, &utilization);
-    }
-
     NvmlReturn Temperature(NvmlDevice device, unsigned int& temperatureC) const {
         return deviceGetTemperature_(device, kNvmlTemperatureGpu, &temperatureC);
-    }
-
-    NvmlReturn GraphicsClock(NvmlDevice device, unsigned int& clockMhz) const {
-        return deviceGetClockInfo_(device, kNvmlClockGraphics, &clockMhz);
     }
 
     NvmlReturn MemoryInfo(NvmlDevice device, NvmlMemory& memory) const {
@@ -200,12 +231,153 @@ private:
     NvmlDeviceGetCountFn deviceGetCount_ = nullptr;
     NvmlDeviceGetHandleByIndexFn deviceGetHandleByIndex_ = nullptr;
     NvmlDeviceGetNameFn deviceGetName_ = nullptr;
-    NvmlDeviceGetUtilizationRatesFn deviceGetUtilizationRates_ = nullptr;
     NvmlDeviceGetTemperatureFn deviceGetTemperature_ = nullptr;
-    NvmlDeviceGetClockInfoFn deviceGetClockInfo_ = nullptr;
     NvmlDeviceGetMemoryInfoFn deviceGetMemoryInfo_ = nullptr;
     NvmlDeviceGetFanSpeedRpmFn deviceGetFanSpeedRpm_ = nullptr;
     NvmlDeviceGetPciInfoFn deviceGetPciInfo_ = nullptr;
+    bool initialized_ = false;
+};
+
+class NvApiLibrary {
+public:
+    ~NvApiLibrary() {
+        if (initialized_ && unload_ != nullptr) {
+            unload_();
+        }
+        if (module_ != nullptr) {
+            FreeLibrary(module_);
+        }
+    }
+
+    bool Initialize(const std::string& preferredName, Trace& trace, std::string& diagnostics) {
+        module_ = LoadLibraryA(kNvApiLibraryName);
+        if (module_ == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("NVAPI library not found."));
+            return false;
+        }
+
+        queryInterface_ = reinterpret_cast<NvApiQueryInterfaceFn>(GetProcAddress(module_, "nvapi_QueryInterface"));
+        if (queryInterface_ == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("NVAPI query interface not found."));
+            return false;
+        }
+
+        initialize_ = Query<NvApiInitializeFn>(kNvApiInitialize);
+        unload_ = Query<NvApiUnloadFn>(kNvApiUnload);
+        enumPhysicalGpus_ = Query<NvApiEnumPhysicalGpusFn>(kNvApiEnumPhysicalGpus);
+        gpuGetFullName_ = Query<NvApiGpuGetFullNameFn>(kNvApiGpuGetFullName);
+        gpuGetAllClockFrequencies_ = Query<NvApiGpuGetAllClockFrequenciesFn>(kNvApiGpuGetAllClockFrequencies);
+        if (initialize_ == nullptr || enumPhysicalGpus_ == nullptr || gpuGetFullName_ == nullptr ||
+            gpuGetAllClockFrequencies_ == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("NVAPI library is missing required entry points."));
+            return false;
+        }
+
+        const NvApiStatus initStatus = initialize_();
+        trace.WriteFmt(TracePrefix::NvidiaNvml, RES_STR("nvapi_init result=\"%s\""), ResultText(initStatus).c_str());
+        if (initStatus != kNvApiOk) {
+            diagnostics = FormatText(RES_STR("NVAPI initialization failed: %s"), ResultText(initStatus).c_str());
+            return false;
+        }
+        initialized_ = true;
+
+        NvApiPhysicalGpuHandle handles[kNvApiMaxPhysicalGpus] = {};
+        int count = 0;
+        const NvApiStatus enumStatus = enumPhysicalGpus_(handles, &count);
+        trace.WriteFmt(TracePrefix::NvidiaNvml,
+            RES_STR("nvapi_enum result=\"%s\" count=%d"),
+            ResultText(enumStatus).c_str(),
+            count);
+        if (enumStatus != kNvApiOk || count <= 0) {
+            diagnostics = FormatText(RES_STR("NVAPI found no NVIDIA GPUs: %s"), ResultText(enumStatus).c_str());
+            return false;
+        }
+
+        int bestRank = -1;
+        for (int index = 0; index < count && index < kNvApiMaxPhysicalGpus; ++index) {
+            if (handles[index] == nullptr) {
+                continue;
+            }
+            char name[kNvApiShortStringSize] = {};
+            const NvApiStatus nameStatus = gpuGetFullName_(handles[index], name);
+            const std::string candidateName = nameStatus == kNvApiOk ? std::string(name) : std::string();
+            const int rank = !preferredName.empty() && EqualsInsensitive(candidateName, preferredName)
+                                 ? 3
+                                 : (!preferredName.empty() && (ContainsInsensitive(candidateName, preferredName) ||
+                                                                  ContainsInsensitive(preferredName, candidateName))
+                                           ? 2
+                                           : 1);
+            trace.WriteFmt(TracePrefix::NvidiaNvml,
+                RES_STR("nvapi_device_candidate index=%d name_result=\"%s\" match_rank=%d name=\"%s\""),
+                index,
+                ResultText(nameStatus).c_str(),
+                rank,
+                candidateName.c_str());
+            if (nameStatus == kNvApiOk && rank > bestRank) {
+                bestRank = rank;
+                physicalGpu_ = handles[index];
+                gpuName_ = candidateName;
+            }
+        }
+
+        if (physicalGpu_ == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("NVAPI failed to select a physical GPU."));
+            return false;
+        }
+
+        trace.WriteFmt(
+            TracePrefix::NvidiaNvml, RES_STR("nvapi_device_selected rank=%d name=\"%s\""), bestRank, gpuName_.c_str());
+        diagnostics = FormatText(RES_STR("NVAPI clock GPU=%s"), gpuName_.c_str());
+        return true;
+    }
+
+    NvApiClockSample GraphicsClock() const {
+        NvApiClockSample sample;
+        if (!initialized_ || physicalGpu_ == nullptr || gpuGetAllClockFrequencies_ == nullptr) {
+            sample.status = -1;
+            return sample;
+        }
+
+        NvApiClockFrequencies frequencies{};
+        frequencies.version = kNvApiClockFrequenciesV3;
+        frequencies.clockType = kNvApiClockFrequenciesCurrent;
+        sample.status = gpuGetAllClockFrequencies_(physicalGpu_, &frequencies);
+        if (sample.status == kNvApiGpuNotPowered) {
+            sample.clockMhz = 0.0;
+            return sample;
+        }
+        const NvApiClockDomain& graphics = frequencies.domain[kNvApiPublicClockGraphics];
+        if (sample.status == kNvApiOk && graphics.bIsPresent != 0) {
+            sample.clockMhz = static_cast<double>(graphics.frequency) / 1000.0;
+        }
+        return sample;
+    }
+
+    std::string ResultText(NvApiStatus status) const {
+        switch (status) {
+            case kNvApiOk:
+                return ResourceStringText(RES_STR("OK"));
+            case kNvApiGpuNotPowered:
+                return ResourceStringText(RES_STR("GPU not powered"));
+            default:
+                return FormatText(RES_STR("%d"), status);
+        }
+    }
+
+private:
+    template <typename Fn> Fn Query(unsigned int id) const {
+        return queryInterface_ != nullptr ? reinterpret_cast<Fn>(queryInterface_(id)) : nullptr;
+    }
+
+    HMODULE module_ = nullptr;
+    NvApiQueryInterfaceFn queryInterface_ = nullptr;
+    NvApiInitializeFn initialize_ = nullptr;
+    NvApiUnloadFn unload_ = nullptr;
+    NvApiEnumPhysicalGpusFn enumPhysicalGpus_ = nullptr;
+    NvApiGpuGetFullNameFn gpuGetFullName_ = nullptr;
+    NvApiGpuGetAllClockFrequenciesFn gpuGetAllClockFrequencies_ = nullptr;
+    NvApiPhysicalGpuHandle physicalGpu_ = nullptr;
+    std::string gpuName_;
     bool initialized_ = false;
 };
 
@@ -242,8 +414,8 @@ int NvidiaDeviceMatchRank(const GpuAdapterInfo& adapter, const NvmlPciInfo* pci,
 
 class NvidiaNvmlGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    NvidiaNvmlGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter)
-        : trace_(trace), adapter_(std::move(adapter)) {}
+    NvidiaNvmlGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps)
+        : trace_(trace), adapter_(std::move(adapter)), collectPresentedFps_(collectPresentedFps) {}
 
     bool Initialize() override {
         trace_.Write(TracePrefix::NvidiaNvml, RES_STR("initialize_begin"));
@@ -289,18 +461,25 @@ public:
         }
 
         fanRpmSupported_ = DetectFanSpeedRpm();
-        diagnostics_ = FormatText(RES_STR("NVML GPU=%s fan_rpm_supported=%s native_fps_supported=no"),
+        nvapiClockAvailable_ = nvapi_.Initialize(gpuName_, trace_, clockDiagnostics_);
+        diagnostics_ = FormatText(
+            RES_STR("NVML GPU=%s load_source=pdh clock_source=%s fan_rpm_supported=%s native_fps_supported=no"),
             gpuName_.c_str(),
+            nvapiClockAvailable_ ? "nvapi" : "unavailable",
             fanRpmSupported_ ? "yes" : "no");
-        fpsProvider_ = CreatePresentedFpsProvider(trace_);
-        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+        if (collectPresentedFps_) {
+            fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
+            if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+                fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+            } else {
+                const FpsTelemetrySample fpsSample =
+                    fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+                fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                      ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                      : fpsSample.diagnostics;
+            }
         } else {
-            const FpsTelemetrySample fpsSample =
-                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS collection not requested by layout."));
         }
         initialized_ = true;
         trace_.WriteFmt(TracePrefix::NvidiaNvml,
@@ -319,38 +498,10 @@ public:
             return sample;
         }
 
-        if (nvmlTransientBackoffSamples_ > 0 && hasCachedSample_) {
-            --nvmlTransientBackoffSamples_;
-            return CachedSample("transient NVML backoff");
-        }
-
         bool hasAnyMetric = false;
 
-        NvmlUtilization utilization{};
-        NvmlReturn result = nvml_.UtilizationRates(device_, utilization);
-        if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
-                RES_STR("get_utilization result=\"%s\" gpu=%u"),
-                nvml_.ResultText(result).c_str(),
-                utilization.gpu);
-        }
-        if (result == kNvmlSuccess) {
-            sample.loadPercent = static_cast<double>(utilization.gpu);
-            hasAnyMetric = true;
-        } else {
-            // Some laptop NVML stacks make the next clock query stall after this transient failure.
-            if (hasCachedSample_) {
-                nvmlTransientBackoffSamples_ = kNvmlTransientFailureBackoffSamples;
-                return CachedSample(FormatText("NVML utilization failed: %s", nvml_.ResultText(result).c_str()));
-            }
-            sample.diagnostics = FormatText(
-                "%s nvml=\"utilization failed: %s\"", sample.diagnostics.c_str(), nvml_.ResultText(result).c_str());
-            sample.available = false;
-            return sample;
-        }
-
         unsigned int temperatureC = 0;
-        result = nvml_.Temperature(device_, temperatureC);
+        NvmlReturn result = nvml_.Temperature(device_, temperatureC);
         if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
             trace_.WriteFmt(TracePrefix::NvidiaNvml,
                 RES_STR("get_temperature result=\"%s\" value=%u"),
@@ -362,17 +513,19 @@ public:
             hasAnyMetric = true;
         }
 
-        unsigned int clockMhz = 0;
-        result = nvml_.GraphicsClock(device_, clockMhz);
-        if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
-                RES_STR("get_clock result=\"%s\" value=%u"),
-                nvml_.ResultText(result).c_str(),
-                clockMhz);
-        }
-        if (result == kNvmlSuccess) {
-            sample.coreClockMhz = static_cast<double>(clockMhz);
-            hasAnyMetric = true;
+        if (nvapiClockAvailable_) {
+            const NvApiClockSample clockSample = nvapi_.GraphicsClock();
+            if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
+                const double clockMhz = clockSample.clockMhz.value_or(0.0);
+                trace_.WriteFmt(TracePrefix::NvidiaNvml,
+                    RES_STR("get_clock_nvapi result=\"%s\" value_mhz=%.1f"),
+                    nvapi_.ResultText(clockSample.status).c_str(),
+                    clockMhz);
+            }
+            if (clockSample.clockMhz.has_value()) {
+                sample.coreClockMhz = *clockSample.clockMhz;
+                hasAnyMetric = true;
+            }
         }
 
         NvmlMemory memory{};
@@ -437,11 +590,6 @@ public:
             RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
             sample.diagnostics.c_str());
-        if (sample.available) {
-            cachedSample_ = sample;
-            hasCachedSample_ = true;
-            nvmlTransientBackoffSamples_ = 0;
-        }
         return sample;
     }
 
@@ -452,20 +600,6 @@ private:
         sample.name = gpuName_;
         sample.totalVramGb = totalVramGb_;
         sample.diagnostics = diagnostics_;
-        return sample;
-    }
-
-    GpuVendorTelemetrySample CachedSample(const std::string& reason) const {
-        GpuVendorTelemetrySample sample = cachedSample_;
-        sample.providerName = "NVIDIA NVML";
-        if (sample.name.has_value() && sample.name->empty()) {
-            sample.name = gpuName_;
-        }
-        AppendFormat(sample.diagnostics, " nvml_cached=\"%s\"", reason.c_str());
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
-            RES_STR("sample_cached reason=\"%s\" available=%s"),
-            reason.c_str(),
-            Trace::BoolText(sample.available));
         return sample;
     }
 
@@ -541,23 +675,24 @@ private:
 
     Trace& trace_;
     NvmlLibrary nvml_;
+    NvApiLibrary nvapi_;
     NvmlDevice device_ = nullptr;
     std::optional<GpuAdapterInfo> adapter_;
     std::string gpuName_;
     std::string diagnostics_ = ResourceStringText(RES_STR("NVML provider not initialized."));
+    std::string clockDiagnostics_ = ResourceStringText(RES_STR("NVAPI clock provider not initialized."));
     std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::optional<double> totalVramGb_;
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
-    GpuVendorTelemetrySample cachedSample_;
-    int nvmlTransientBackoffSamples_ = 0;
-    bool hasCachedSample_ = false;
+    bool nvapiClockAvailable_ = false;
     bool fanRpmSupported_ = false;
+    bool collectPresentedFps_ = false;
     bool initialized_ = false;
 };
 
 }  // namespace
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateNvidiaGpuTelemetryProvider(
-    Trace& trace, std::optional<GpuAdapterInfo> adapter) {
-    return std::make_unique<NvidiaNvmlGpuTelemetryProvider>(trace, std::move(adapter));
+    Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
+    return std::make_unique<NvidiaNvmlGpuTelemetryProvider>(trace, std::move(adapter), collectPresentedFps);
 }

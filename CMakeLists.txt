@@ -816,6 +816,8 @@ add_executable(CaseDashBenchmarks
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/win32_format.cpp
+    src/util/elevated_process.cpp
+    src/util/paths.cpp
     src/util/scale.cpp
     src/config/config_telemetry.cpp
     src/config/config_primitives.cpp
