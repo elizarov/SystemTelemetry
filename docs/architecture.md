@@ -25,10 +25,10 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, tidy, profiling, generated asset, and source dependency graph helper scripts.
+- `tools/` contains shared formatting, lint, clang-tidy, profiling, generated asset, and source dependency graph helper scripts.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
-- `.github/workflows/` contains runner-hosted build, test, format, lint, tidy, package, release, and website deployment automation.
+- `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, manual full clang-tidy, package, release, and website deployment automation.
 
 ## Layered Core
 
@@ -71,7 +71,7 @@ Other top-level areas:
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.
 - The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
-- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the Windows runner.
+- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the unused-include sweep through `lint.cmd includes` on the Windows runner.
 - `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.
 
 ## Source Dependency Graph
