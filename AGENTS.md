@@ -5,6 +5,7 @@ Use the following maintained references and keep them in sync before finishing w
 - `docs/specifications.md` - general user-visible runtime behavior.
 - `docs/glossary.md` - canonical project terminology and context-specific spelling rules.
 - `docs/hardware.md` - supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
+- `docs/layout.md` and `docs/theme_configuration.md` - config language, section ownership, validation rules, and theme or derived color behavior.
 - `docs/layout_edit.md` - layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout_guide_sheet.md` - diagnostics layout guide sheet feature behavior.
 - `docs/diagnostics.md` - diagnostics flow, trace, snapshot dump, screenshot, app icon, and validation recipes.
@@ -34,7 +35,7 @@ Write commit messages with a concise subject starting with an action verb. Good 
 ## Project Constraints
 
 - Ignore the stray `$null` file at the repository root; it is a Codex sandbox artifact.
-- This project does not main backwards compatibility; do not preserve legacy config compatibility unless explicitly requested.
+- This project does not maintain backward config compatibility unless explicitly requested.
 - Keep headers declarative; non-template and non-inline-required production logic belongs in `.cpp` files.
 - Add a short code comment when a condition preserves a supported case or invariant that is not obvious nearby.
 - If you resolve a project-specific pitfall, record it in the owning documentation file.
