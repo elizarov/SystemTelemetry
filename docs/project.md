@@ -19,7 +19,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
 - `docs/profile_benchmark.md` owns benchmark workflow and the shared performance optimization journal.
 - `docs/performance/*.md` owns machine-specific benchmark ranges, current bottlenecks, and further research directions.
-- `docs/optimize_size.md` owns executable-size constraints, assumptions, map workflow notes, and size experiment history.
+- `docs/optimize_size.md` owns executable-size constraints, assumptions, map workflow notes, current size shape, and active experiment guidance.
 - `docs/release.md` owns release versioning, changelog format, local release preparation, and release publication.
 - `docs/changelog.md` owns machine-readable release-note chunks consumed by the local release script and GitHub Release workflow.
 - `resources/config.ini` is the maintained example and spelling authority for shipped config entries.
@@ -77,7 +77,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Use [docs/layout.md](layout.md) and [resources/config.ini](../resources/config.ini) instead of repeating config key lists elsewhere.
 - Use [docs/profile_benchmark.md](profile_benchmark.md) instead of repeating benchmark workflow or shared experiment history elsewhere.
 - Use `docs/performance/*.md` instead of recording machine-specific benchmark ranges or hardware bottlenecks in shared docs.
-- Use [docs/optimize_size.md](optimize_size.md) instead of repeating executable-size assumptions, constraints, or experiment history elsewhere.
+- Use [docs/optimize_size.md](optimize_size.md) instead of repeating executable-size assumptions, constraints, current size shape, or active experiment guidance elsewhere.
 - Use [docs/release.md](release.md) and [docs/changelog.md](changelog.md) instead of repeating release procedure or changelog format details elsewhere.
 
 ## Project Pitfall Notes
@@ -93,7 +93,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
-- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific experiments are recorded in `docs/optimize_size.md`.
+- Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific lessons stay grouped in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
 - Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.

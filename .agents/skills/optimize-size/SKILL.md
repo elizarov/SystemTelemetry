@@ -12,7 +12,7 @@ Use this skill to run measured, high-leverage executable-size experiments for Ca
 ## Required Context
 
 1. Read `AGENTS.md`.
-2. Read `docs/optimize_size.md` before forming hypotheses. Treat it as the source of truth for size constraints, retained decisions, rejected experiments, map workflow, current baseline, and size pitfall notes.
+2. Read `docs/optimize_size.md` before forming hypotheses. Treat it as the source of truth for size constraints, retained size shape, active negative guidance, map workflow, current baseline, and size pitfall notes.
 3. Read `docs/build.md` for build and validation entrypoints.
 4. Read `docs/profile_benchmark.md` before changing renderer, widget layout, layout resolver, telemetry, provider sampling, or other hot paths.
 5. Read `docs/architecture.md` and the relevant `docs/architecture/*.md` files before removing or bypassing package boundaries, middle-man layers, or shared abstractions.
@@ -48,7 +48,7 @@ Prioritize changes that can delete whole families of generated code, metadata, u
 - Small fixed domains still using broad STL containers, sorting, callbacks, type erasure, or local algorithm variants.
 - Middle-man abstractions that can be removed only when package boundaries and `lint.cmd` architecture checks allow it.
 
-Do not spend the main effort on tiny localized cleanups unless they are part of a broader measured pattern or unblock a larger deletion. Avoid experiments already rejected in `docs/optimize_size.md` unless new surrounding code makes the old measurement stale, and record why the retry is justified.
+Do not spend the main effort on tiny localized cleanups unless they are part of a broader measured pattern or unblock a larger deletion. Avoid experiments covered by active negative guidance in `docs/optimize_size.md` unless new surrounding code makes the old measurement stale, and record why the retry is justified.
 
 ## Experiment Discipline
 
@@ -79,7 +79,7 @@ Do not spend the main effort on tiny localized cleanups unless they are part of 
 
 ## Documentation
 
-Update `docs/optimize_size.md` when an experiment is retained, rejected, neutral, or reveals a recurring project-specific pitfall. Keep the entry present-tense and concise, with baseline/final executable sizes and the important section or object deltas when useful.
+Update `docs/optimize_size.md` when an experiment changes the retained size shape, active negative guidance, current baseline, or a recurring project-specific pitfall. Keep entries grouped, present-tense, and concise, with baseline/final executable sizes and important section or object deltas only when they help future decisions.
 
 Update other maintained docs only when behavior, commands, architecture boundaries, diagnostics behavior, or provider requirements change.
 
