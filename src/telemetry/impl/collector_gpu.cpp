@@ -13,17 +13,58 @@
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
 #include "util/resource_strings.h"
+#include "util/text_format.h"
 
 namespace {
 
 constexpr wchar_t kGpuEngine3dMarker[] = L"engtype_3D";  // PDH GPU engine instance names are UTF-16.
+constexpr char kPdhAllGpuAdaptersFilterLabel[] = "all";
 
 struct CounterArrayTotals {
     double total = 0.0;
     double total3d = 0.0;
+    DWORD matchedCount = 0;
 };
 
-CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PDH_HCOUNTER counter) {
+std::wstring WidenAscii(std::string_view value) {
+    return std::wstring(value.begin(), value.end());
+}
+
+std::optional<std::string> SelectedGpuPdhLuidToken(const RealTelemetryCollectorState& state) {
+    if (!state.gpu_.selectedAdapter.has_value() || !state.gpu_.selectedAdapter->hasAdapterLuid) {
+        return std::nullopt;
+    }
+    return FormatText(RES_STR("luid_0x%08x_0x%08x"),
+        static_cast<unsigned int>(state.gpu_.selectedAdapter->adapterLuidHighPart),
+        static_cast<unsigned int>(state.gpu_.selectedAdapter->adapterLuidLowPart));
+}
+
+bool MatchesPdhInstanceFilter(const wchar_t* instance, const std::wstring& filter) {
+    if (filter.empty()) {
+        return true;
+    }
+    if (instance == nullptr) {
+        return false;
+    }
+
+    const auto lowerAscii = [](wchar_t ch) {
+        return ch >= L'A' && ch <= L'Z' ? static_cast<wchar_t>(ch - L'A' + L'a') : ch;
+    };
+    for (const wchar_t* cursor = instance; *cursor != L'\0'; ++cursor) {
+        size_t matched = 0;
+        while (matched < filter.size() && cursor[matched] != L'\0' &&
+               lowerAscii(cursor[matched]) == lowerAscii(filter[matched])) {
+            ++matched;
+        }
+        if (matched == filter.size()) {
+            return true;
+        }
+    }
+    return false;
+}
+
+CounterArrayTotals ReadCounterArrayTotals(
+    RealTelemetryCollectorState& state, PDH_HCOUNTER counter, const std::wstring& instanceFilter, const char* filter) {
     CounterArrayTotals totals;
     if (counter == nullptr) {
         return totals;
@@ -50,9 +91,13 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
 
     for (DWORD i = 0; i < itemCount; ++i) {
         const wchar_t* instance = items[i].szName;
+        if (!MatchesPdhInstanceFilter(instance, instanceFilter)) {
+            continue;
+        }
         if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !IsFiniteDouble(items[i].FmtValue.doubleValue)) {
             continue;
         }
+        ++totals.matchedCount;
         totals.total += items[i].FmtValue.doubleValue;
         if (instance != nullptr && wcsstr(instance, kGpuEngine3dMarker) != nullptr) {
             totals.total3d += items[i].FmtValue.doubleValue;
@@ -60,9 +105,11 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     }
 
     state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("pdh_array_done status=%ld count=%lu total=value=%.2f total3d=value=%.2f"),
+        RES_STR("pdh_array_done status=%ld count=%lu matched=%lu filter=\"%s\" total=value=%.2f total3d=value=%.2f"),
         static_cast<long>(status),
         static_cast<unsigned long>(itemCount),
+        static_cast<unsigned long>(totals.matchedCount),
+        filter,
         totals.total,
         totals.total3d);
     totals.total = FiniteNonNegativeOr(totals.total);
@@ -70,8 +117,9 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     return totals;
 }
 
-double SumCounterArray(RealTelemetryCollectorState& state, PDH_HCOUNTER counter) {
-    return ReadCounterArrayTotals(state, counter).total;
+double SumCounterArray(
+    RealTelemetryCollectorState& state, PDH_HCOUNTER counter, const std::wstring& instanceFilter, const char* filter) {
+    return ReadCounterArrayTotals(state, counter, instanceFilter, filter).total;
 }
 
 void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
@@ -190,11 +238,14 @@ void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
         static_cast<double>(adapter.dedicatedVideoMemoryBytes) / (1024.0 * 1024.0 * 1024.0);
 
     state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("gpu_adapter_selected index=%u vendor_id=0x%04X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\""),
+        RES_STR("gpu_adapter_selected index=%u vendor_id=0x%04X dedicated_bytes=%llu dedicated_gb=%.2f "
+                "luid=0x%08x:0x%08x name=\"%s\""),
         adapter.adapterIndex,
         adapter.vendorId,
         static_cast<unsigned long long>(adapter.dedicatedVideoMemoryBytes),
         state.snapshot_.gpu.vram.totalGb,
+        static_cast<unsigned int>(adapter.adapterLuidHighPart),
+        static_cast<unsigned int>(adapter.adapterLuidLowPart),
         adapter.adapterName.c_str());
 }
 
@@ -299,15 +350,21 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     ApplyIntelCpuTemperatureFallback(state);
 
     if (!hasVendorLoad && state.gpu_.query != nullptr) {
+        const std::optional<std::string> filterToken = SelectedGpuPdhLuidToken(state);
+        const std::string filterLabel = filterToken.value_or(kPdhAllGpuAdaptersFilterLabel);
+        const std::wstring instanceFilter = filterToken.has_value() ? WidenAscii(*filterToken) : std::wstring();
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
         state.trace_.WriteFmt(
             TracePrefix::Telemetry, RES_STR("gpu_collect status=%ld"), static_cast<long>(collectStatus));
-        const CounterArrayTotals loadTotals = ReadCounterArrayTotals(state, state.gpu_.loadCounter);
+        const CounterArrayTotals loadTotals =
+            ReadCounterArrayTotals(state, state.gpu_.loadCounter, instanceFilter, filterLabel.c_str());
         const double load3d = loadTotals.total3d;
         const double loadAll = loadTotals.total;
         state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
         state.trace_.WriteFmt(TracePrefix::Telemetry,
-            RES_STR("gpu_load load3d=value=%.2f loadAll=value=%.2f selected=value=%.2f"),
+            RES_STR("gpu_load filter=\"%s\" matched=%lu load3d=value=%.2f loadAll=value=%.2f selected=value=%.2f"),
+            filterLabel.c_str(),
+            static_cast<unsigned long>(loadTotals.matchedCount),
             load3d,
             loadAll,
             state.snapshot_.gpu.loadPercent);
@@ -316,13 +373,17 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         state.snapshot_, RetainedHistoryKey::GpuLoad, state.snapshot_.gpu.loadPercent);
 
     if (!hasVendorVram && state.gpu_.memoryQuery != nullptr) {
+        const std::optional<std::string> filterToken = SelectedGpuPdhLuidToken(state);
+        const std::string filterLabel = filterToken.value_or(kPdhAllGpuAdaptersFilterLabel);
+        const std::wstring instanceFilter = filterToken.has_value() ? WidenAscii(*filterToken) : std::wstring();
         const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
         state.trace_.WriteFmt(
             TracePrefix::Telemetry, RES_STR("gpu_memory_collect status=%ld"), static_cast<long>(collectStatus));
-        const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter);
+        const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter, instanceFilter, filterLabel.c_str());
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
         state.trace_.WriteFmt(TracePrefix::Telemetry,
-            RES_STR("gpu_memory bytes=value=%.0f used_gb=value=%.2f"),
+            RES_STR("gpu_memory filter=\"%s\" bytes=value=%.0f used_gb=value=%.2f"),
+            filterLabel.c_str(),
             bytes,
             state.snapshot_.gpu.vram.usedGb);
     }

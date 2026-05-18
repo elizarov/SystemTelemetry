@@ -21,6 +21,9 @@ struct GpuAdapterInfo : GpuVendorInfo {
     unsigned int deviceId = 0;
     unsigned int subSysId = 0;
     unsigned int revision = 0;
+    bool hasAdapterLuid = false;
+    std::uint32_t adapterLuidHighPart = 0;
+    std::uint32_t adapterLuidLowPart = 0;
     bool hasPciAddress = false;
     unsigned int pciDomain = 0;
     unsigned int pciBus = 0;
