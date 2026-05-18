@@ -1,5 +1,6 @@
 #include "dashboard/fps_service.h"
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -21,7 +22,9 @@
 
 namespace {
 
+constexpr DWORD kServiceStartWaitMs = 10000;
 constexpr DWORD kServiceStopWaitMs = 10000;
+constexpr DWORD kServiceDeleteWaitMs = 5000;
 constexpr DWORD kPipeBufferBytes = 4096;
 constexpr DWORD kPipeRequestBytes = 128;
 constexpr char kFpsServiceDisplayName[] = "CaseDash Service";
@@ -137,6 +140,31 @@ private:
     void* memory_ = nullptr;
 };
 
+struct PipeServerState {
+    PipeServerState() {
+        InitializeCriticalSection(&fpsProviderLock);
+        InitializeCriticalSection(&boardProviderLock);
+    }
+
+    ~PipeServerState() {
+        DeleteCriticalSection(&boardProviderLock);
+        DeleteCriticalSection(&fpsProviderLock);
+    }
+
+    PipeServerState(const PipeServerState&) = delete;
+    PipeServerState& operator=(const PipeServerState&) = delete;
+
+    Trace trace;
+    std::unique_ptr<FpsTelemetryProvider> fpsProvider;
+    CRITICAL_SECTION fpsProviderLock{};
+    CRITICAL_SECTION boardProviderLock{};
+};
+
+struct PipeClientContext {
+    HANDLE pipe = INVALID_HANDLE_VALUE;
+    std::shared_ptr<PipeServerState> state;
+};
+
 void SetServiceStatusState(DWORD state, DWORD win32ExitCode = NO_ERROR, DWORD waitHint = 0) {
     if (g_serviceStatusHandle == nullptr) {
         return;
@@ -169,6 +197,29 @@ DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceH
     return service.Get() != nullptr ? ERROR_SUCCESS : GetLastError();
 }
 
+bool IsServiceAbsentOrPendingDelete(DWORD status) {
+    return status == ERROR_SERVICE_DOES_NOT_EXIST || status == ERROR_SERVICE_MARKED_FOR_DELETE;
+}
+
+DWORD WaitForServiceDeletedOrPendingDelete() {
+    const ULONGLONG startedAt = GetTickCount64();
+    for (;;) {
+        ServiceHandle manager;
+        ServiceHandle service;
+        const DWORD status = OpenInstalledService(manager, SERVICE_QUERY_STATUS, service);
+        if (IsServiceAbsentOrPendingDelete(status)) {
+            return ERROR_SUCCESS;
+        }
+        if (status != ERROR_SUCCESS) {
+            return status;
+        }
+        if (GetTickCount64() - startedAt >= kServiceDeleteWaitMs) {
+            return ERROR_TIMEOUT;
+        }
+        Sleep(100);
+    }
+}
+
 bool IsExpectedServiceBinaryPath(const std::string& command) {
     const std::string expected = BuildFpsServiceBinaryPath();
     return !expected.empty() && NormalizeCommandPath(command) == NormalizeCommandPath(expected);
@@ -190,23 +241,120 @@ std::optional<std::string> QueryServiceBinaryPath(SC_HANDLE service) {
     return Utf8FromWide(config->lpBinaryPathName);
 }
 
+DWORD QueryServiceStatusProcess(SC_HANDLE service, SERVICE_STATUS_PROCESS& status) {
+    DWORD bytesNeeded = 0;
+    return QueryServiceStatusEx(
+               service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)
+               ? ERROR_SUCCESS
+               : GetLastError();
+}
+
+DWORD FailedServiceExitCode(const SERVICE_STATUS_PROCESS& status, DWORD fallback) {
+    return status.dwWin32ExitCode != NO_ERROR ? status.dwWin32ExitCode : fallback;
+}
+
+DWORD ServicePollIntervalMs(const SERVICE_STATUS_PROCESS& status) {
+    if (status.dwWaitHint == 0) {
+        return 100;
+    }
+    return std::clamp(status.dwWaitHint / 10, static_cast<DWORD>(100), static_cast<DWORD>(1000));
+}
+
+DWORD WaitForServiceState(SC_HANDLE service, DWORD desiredState, DWORD timeoutMs) {
+    const ULONGLONG startedAt = GetTickCount64();
+    for (;;) {
+        SERVICE_STATUS_PROCESS status{};
+        const DWORD queryStatus = QueryServiceStatusProcess(service, status);
+        if (queryStatus != ERROR_SUCCESS) {
+            return queryStatus;
+        }
+        if (status.dwCurrentState == desiredState) {
+            return ERROR_SUCCESS;
+        }
+        if (desiredState == SERVICE_RUNNING && status.dwCurrentState == SERVICE_STOPPED) {
+            return FailedServiceExitCode(status, ERROR_SERVICE_NOT_ACTIVE);
+        }
+        if (GetTickCount64() - startedAt >= timeoutMs) {
+            return ERROR_TIMEOUT;
+        }
+        Sleep(ServicePollIntervalMs(status));
+    }
+}
+
+std::optional<std::string> QueryProcessImagePath(DWORD processId) {
+    Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId));
+    if (process.Get() == nullptr) {
+        return std::nullopt;
+    }
+
+    std::wstring path(MAX_PATH, wchar_t{});
+    DWORD size = static_cast<DWORD>(path.size());
+    if (!QueryFullProcessImageNameW(process.Get(), 0, path.data(), &size) || size == 0) {
+        return std::nullopt;
+    }
+    path.resize(size);
+    return Utf8FromWide(path);
+}
+
+bool IsProcessImageExpected(const SERVICE_STATUS_PROCESS& status) {
+    if (status.dwProcessId == 0) {
+        return false;
+    }
+    const auto executablePath = GetExecutablePath();
+    const auto processPath = QueryProcessImagePath(status.dwProcessId);
+    return executablePath.has_value() && processPath.has_value() &&
+           NormalizeCommandPath(*processPath) == NormalizeCommandPath(executablePath->string());
+}
+
+bool IsProcessImageExpectedOrUnqueryable(const SERVICE_STATUS_PROCESS& status) {
+    if (status.dwProcessId == 0) {
+        return false;
+    }
+    const auto executablePath = GetExecutablePath();
+    const auto processPath = QueryProcessImagePath(status.dwProcessId);
+    return executablePath.has_value() &&
+           (!processPath.has_value() ||
+               NormalizeCommandPath(*processPath) == NormalizeCommandPath(executablePath->string()));
+}
+
 DWORD StartServiceIfNeeded(SC_HANDLE service) {
-    if (StartServiceW(service, 0, nullptr)) {
+    SERVICE_STATUS_PROCESS status{};
+    DWORD queryStatus = QueryServiceStatusProcess(service, status);
+    if (queryStatus != ERROR_SUCCESS) {
+        return queryStatus;
+    }
+    if (status.dwCurrentState == SERVICE_RUNNING) {
         return ERROR_SUCCESS;
     }
+    if (status.dwCurrentState == SERVICE_START_PENDING) {
+        return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
+    }
+    if (status.dwCurrentState == SERVICE_STOP_PENDING) {
+        const DWORD stopStatus = WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
+        if (stopStatus != ERROR_SUCCESS) {
+            return stopStatus;
+        }
+    }
+
+    if (StartServiceW(service, 0, nullptr)) {
+        return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
+    }
     const DWORD error = GetLastError();
-    return error == ERROR_SERVICE_ALREADY_RUNNING ? ERROR_SUCCESS : error;
+    return error == ERROR_SERVICE_ALREADY_RUNNING ? WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs)
+                                                  : error;
 }
 
 DWORD StopServiceIfRunning(SC_HANDLE service) {
     SERVICE_STATUS_PROCESS status{};
-    DWORD bytesNeeded = 0;
-    if (!QueryServiceStatusEx(
-            service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)) {
-        return GetLastError();
+    DWORD queryStatus = QueryServiceStatusProcess(service, status);
+    if (queryStatus != ERROR_SUCCESS) {
+        return queryStatus;
     }
     if (status.dwCurrentState == SERVICE_STOPPED) {
         return ERROR_SUCCESS;
+    }
+    if (status.dwCurrentState == SERVICE_STOP_PENDING) {
+        return WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
     }
 
     SERVICE_STATUS stopStatus{};
@@ -217,18 +365,7 @@ DWORD StopServiceIfRunning(SC_HANDLE service) {
         }
     }
 
-    const DWORD startedAt = GetTickCount();
-    while (GetTickCount() - startedAt < kServiceStopWaitMs) {
-        if (!QueryServiceStatusEx(
-                service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)) {
-            return GetLastError();
-        }
-        if (status.dwCurrentState == SERVICE_STOPPED) {
-            return ERROR_SUCCESS;
-        }
-        Sleep(100);
-    }
-    return ERROR_TIMEOUT;
+    return WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
 }
 
 SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
@@ -289,7 +426,7 @@ bool ConnectPipeOrStop(HANDLE pipe, HANDLE stopEvent) {
     return waitResult == WAIT_OBJECT_0 + 1;
 }
 
-void ServePipeClient(HANDLE pipe, FpsTelemetryProvider* fpsProvider, Trace& trace) {
+void ServePipeClient(HANDLE pipe, PipeServerState& state) {
     std::vector<char> request;
     request.reserve(kPipeRequestBytes);
     std::optional<CashDashServiceRequest> serviceRequest;
@@ -319,17 +456,21 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider* fpsProvider, Trace& trac
     switch (serviceRequest->id) {
         case CashDashServiceRequestId::PresentedFpsSample: {
             FpsTelemetrySample sample;
-            if (fpsProvider != nullptr) {
-                sample = fpsProvider->Sample(serviceRequest->fpsOptions);
+            EnterCriticalSection(&state.fpsProviderLock);
+            if (state.fpsProvider != nullptr) {
+                sample = state.fpsProvider->Sample(serviceRequest->fpsOptions);
             } else {
                 sample.diagnostics = "FPS service provider is unavailable.";
             }
+            LeaveCriticalSection(&state.fpsProviderLock);
             response = SerializeFpsServiceSample(sample);
             break;
         }
         case CashDashServiceRequestId::BoardSensorsSample:
+            EnterCriticalSection(&state.boardProviderLock);
             response = SerializeBoardSensorsServiceSample(
-                CaptureLenovoHardwareScanServiceSample(trace, ExtractBoardVendorInfo()));
+                CaptureLenovoHardwareScanServiceSample(state.trace, ExtractBoardVendorInfo()));
+            LeaveCriticalSection(&state.boardProviderLock);
             break;
     }
     if (response.empty()) {
@@ -341,11 +482,40 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider* fpsProvider, Trace& trac
     FlushFileBuffers(pipe);
 }
 
+DWORD WINAPI PipeClientThread(void* contextPtr) {
+    std::unique_ptr<PipeClientContext> context(static_cast<PipeClientContext*>(contextPtr));
+    if (context == nullptr || context->state == nullptr) {
+        return 1;
+    }
+
+    Handle pipe(context->pipe);
+    context->pipe = INVALID_HANDLE_VALUE;
+    if (pipe.Get() != INVALID_HANDLE_VALUE) {
+        ServePipeClient(pipe.Get(), *context->state);
+        DisconnectNamedPipe(pipe.Get());
+    }
+    return 0;
+}
+
+bool StartPipeClientThread(HANDLE pipe, std::shared_ptr<PipeServerState> state) {
+    auto context = std::make_unique<PipeClientContext>();
+    context->pipe = pipe;
+    context->state = std::move(state);
+    HANDLE thread = CreateThread(nullptr, 0, PipeClientThread, context.get(), 0, nullptr);
+    if (thread == nullptr) {
+        return false;
+    }
+
+    context.release();
+    CloseHandle(thread);
+    return true;
+}
+
 void RunPipeServer(HANDLE stopEvent) {
-    Trace trace;
-    std::unique_ptr<FpsTelemetryProvider> fpsProvider = CreateFpsServiceTelemetryProvider(trace);
-    if (fpsProvider != nullptr) {
-        fpsProvider->Initialize();
+    auto state = std::make_shared<PipeServerState>();
+    state->fpsProvider = CreateFpsServiceTelemetryProvider(state->trace);
+    if (state->fpsProvider != nullptr) {
+        state->fpsProvider->Initialize();
     }
 
     while (WaitForSingleObject(stopEvent, 0) == WAIT_TIMEOUT) {
@@ -356,8 +526,12 @@ void RunPipeServer(HANDLE stopEvent) {
         }
 
         if (ConnectPipeOrStop(pipe.Get(), stopEvent)) {
-            ServePipeClient(pipe.Get(), fpsProvider.get(), trace);
-            DisconnectNamedPipe(pipe.Get());
+            HANDLE connectedPipe = pipe.Release();
+            if (!StartPipeClientThread(connectedPipe, state)) {
+                Handle fallbackPipe(connectedPipe);
+                ServePipeClient(fallbackPipe.Get(), *state);
+                DisconnectNamedPipe(fallbackPipe.Get());
+            }
         }
     }
 }
@@ -441,10 +615,12 @@ DWORD InstallOrUpdateFpsService() {
         return GetLastError();
     }
 
+    constexpr DWORD kServiceAccess =
+        SERVICE_CHANGE_CONFIG | SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
     ServiceHandle service(CreateServiceW(manager.Get(),
         serviceName.c_str(),
         serviceDisplayName.c_str(),
-        SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
+        kServiceAccess,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
         SERVICE_ERROR_NORMAL,
@@ -460,11 +636,17 @@ DWORD InstallOrUpdateFpsService() {
         if (createError != ERROR_SERVICE_EXISTS) {
             return createError;
         }
-        service = ServiceHandle(OpenServiceW(
-            manager.Get(), serviceName.c_str(), SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START));
+        service = ServiceHandle(OpenServiceW(manager.Get(), serviceName.c_str(), kServiceAccess));
         if (service.Get() == nullptr) {
             return GetLastError();
         }
+        const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
+        const bool binaryPathChanged =
+            !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
+        SERVICE_STATUS_PROCESS previousStatus{};
+        const bool runningUnexpectedProcess =
+            QueryServiceStatusProcess(service.Get(), previousStatus) == ERROR_SUCCESS &&
+            previousStatus.dwCurrentState == SERVICE_RUNNING && !IsProcessImageExpected(previousStatus);
         if (!ChangeServiceConfigW(service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
@@ -478,6 +660,12 @@ DWORD InstallOrUpdateFpsService() {
                 serviceDisplayName.c_str())) {
             return GetLastError();
         }
+        if (binaryPathChanged || runningUnexpectedProcess) {
+            const DWORD stopStatus = StopServiceIfRunning(service.Get());
+            if (stopStatus != ERROR_SUCCESS && stopStatus != ERROR_SERVICE_NOT_ACTIVE) {
+                return stopStatus;
+            }
+        }
     }
 
     return StartServiceIfNeeded(service.Get());
@@ -487,22 +675,21 @@ DWORD StopAndDeleteFpsService() {
     ServiceHandle manager;
     ServiceHandle service;
     DWORD status = OpenInstalledService(manager, SERVICE_STOP | DELETE | SERVICE_QUERY_STATUS, service);
-    if (status == ERROR_SERVICE_DOES_NOT_EXIST) {
+    if (IsServiceAbsentOrPendingDelete(status)) {
         return ERROR_SUCCESS;
     }
     if (status != ERROR_SUCCESS) {
         return status;
     }
 
-    status = StopServiceIfRunning(service.Get());
-    if (status != ERROR_SUCCESS && status != ERROR_SERVICE_NOT_ACTIVE) {
-        return status;
-    }
+    (void)StopServiceIfRunning(service.Get());
+    // SCM stop completion can lag; still request deletion so a late stop cannot leave auto-start installed.
     if (!DeleteService(service.Get())) {
         const DWORD deleteError = GetLastError();
         return deleteError == ERROR_SERVICE_MARKED_FOR_DELETE ? ERROR_SUCCESS : deleteError;
     }
-    return ERROR_SUCCESS;
+    service = ServiceHandle();
+    return WaitForServiceDeletedOrPendingDelete();
 }
 
 bool IsFpsServiceRunningForCurrentExecutable() {
@@ -519,13 +706,8 @@ bool IsFpsServiceRunningForCurrentExecutable() {
     }
 
     SERVICE_STATUS_PROCESS serviceStatus{};
-    DWORD bytesNeeded = 0;
-    if (!QueryServiceStatusEx(service.Get(),
-            SC_STATUS_PROCESS_INFO,
-            reinterpret_cast<LPBYTE>(&serviceStatus),
-            sizeof(serviceStatus),
-            &bytesNeeded)) {
+    if (QueryServiceStatusProcess(service.Get(), serviceStatus) != ERROR_SUCCESS) {
         return false;
     }
-    return serviceStatus.dwCurrentState == SERVICE_RUNNING;
+    return serviceStatus.dwCurrentState == SERVICE_RUNNING && IsProcessImageExpectedOrUnqueryable(serviceStatus);
 }

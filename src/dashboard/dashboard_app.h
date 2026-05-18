@@ -61,6 +61,7 @@ private:
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
     void BringOnTop();
+    void ScheduleBringToFrontRetries();
     bool ApplyConfiguredWallpaper();
     bool ApplyWindowDpi(UINT dpi, const RECT* suggestedRect = nullptr);
     void SetDashboardWindowGeometry(int left, int top, int width, int height, UINT flags, std::string_view reason);
@@ -141,6 +142,7 @@ private:
     HICON appIconSmall_ = nullptr;
     DiagnosticsOptions diagnosticsOptions_;
     bool bringToFrontOnRun_ = false;
+    int bringToFrontRetriesRemaining_ = 0;
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;

@@ -34,6 +34,7 @@ RECT RectFromPoint(RenderPoint point, int radius) {
 }
 
 constexpr double kScaleEpsilon = 0.0001;
+constexpr int kBringToFrontRetryCount = 8;
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
@@ -517,9 +518,30 @@ std::optional<FilePath> DashboardApp::PromptDiagnosticsSavePath(
 }
 
 void DashboardApp::BringOnTop() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
     ShowWindow(hwnd_, SW_SHOWNORMAL);
-    SetWindowPos(hwnd_, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
-    SetForegroundWindow(hwnd_);
+    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    const BOOL foregroundSet = SetForegroundWindow(hwnd_);
+    SetActiveWindow(hwnd_);
+    trace_.WriteFmt(TracePrefix::Diagnostics,
+        "bring_to_front hwnd=0x%p visible=%d iconic=%d foreground_set=%d",
+        reinterpret_cast<void*>(hwnd_),
+        IsWindowVisible(hwnd_) != FALSE,
+        IsIconic(hwnd_) != FALSE,
+        foregroundSet != FALSE);
+}
+
+void DashboardApp::ScheduleBringToFrontRetries() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    bringToFrontRetriesRemaining_ = kBringToFrontRetryCount;
+    SetTimer(hwnd_, kBringToFrontRetryTimerId, kBringToFrontRetryTimerMs, nullptr);
 }
 
 bool DashboardApp::ApplyConfiguredWallpaper() {
@@ -1099,6 +1121,7 @@ void DashboardApp::RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wPara
 int DashboardApp::Run() {
     if (bringToFrontOnRun_) {
         BringOnTop();
+        ScheduleBringToFrontRetries();
     } else {
         ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     }
@@ -1159,6 +1182,20 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             if (wParam == kPlacementTimerId) {
                 RetryConfigPlacementIfPending();
+                return 0;
+            }
+            if (wParam == kBringToFrontRetryTimerId) {
+                if (bringToFrontRetriesRemaining_ <= 0) {
+                    KillTimer(hwnd_, kBringToFrontRetryTimerId);
+                    return 0;
+                }
+
+                --bringToFrontRetriesRemaining_;
+                BringOnTop();
+                if (bringToFrontRetriesRemaining_ <= 0 || GetForegroundWindow() == hwnd_) {
+                    bringToFrontRetriesRemaining_ = 0;
+                    KillTimer(hwnd_, kBringToFrontRetryTimerId);
+                }
                 return 0;
             }
             return 0;
@@ -1455,6 +1492,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             KillTimer(hwnd_, kMoveTimerId);
             KillTimer(hwnd_, kPlacementTimerId);
             KillTimer(hwnd_, kAnimationFrameTimerId);
+            KillTimer(hwnd_, kBringToFrontRetryTimerId);
             if (state.telemetry != nullptr) {
                 state.telemetry->Shutdown();
             }

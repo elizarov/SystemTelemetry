@@ -11,6 +11,58 @@ namespace {
 constexpr char kAutoStartRunSubKey[] = "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run";
 constexpr char kAutoStartValueName[] = "CaseDash";
 
+struct AutoStartUpdateResult {
+    bool success = false;
+    bool accessDenied = false;
+};
+
+void BringOwnerToFront(HWND owner) {
+    if (owner == nullptr || !IsWindow(owner)) {
+        return;
+    }
+    ShowWindow(owner, SW_SHOWNORMAL);
+    SetWindowPos(owner, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+    SetForegroundWindow(owner);
+}
+
+bool IsAccessDenied(DWORD status) {
+    return status == ERROR_ACCESS_DENIED;
+}
+
+bool IsAccessDenied(LSTATUS status) {
+    return status == ERROR_ACCESS_DENIED;
+}
+
+void CleanupAutoStartRegistration() {
+    (void)WriteAutoStartRegistryValue(false);
+    (void)StopAndDeleteFpsService();
+}
+
+AutoStartUpdateResult EnableAutoStartRegistration() {
+    const DWORD serviceStatus = InstallOrUpdateFpsService();
+    if (serviceStatus != ERROR_SUCCESS) {
+        if (!IsAccessDenied(serviceStatus)) {
+            CleanupAutoStartRegistration();
+        }
+        return {false, IsAccessDenied(serviceStatus)};
+    }
+
+    const LSTATUS registryStatus = WriteAutoStartRegistryValue(true);
+    if (registryStatus != ERROR_SUCCESS) {
+        CleanupAutoStartRegistration();
+        return {false, IsAccessDenied(registryStatus)};
+    }
+
+    return {true, false};
+}
+
+AutoStartUpdateResult DisableAutoStartRegistration() {
+    const LSTATUS registryStatus = WriteAutoStartRegistryValue(false);
+    const DWORD serviceStatus = StopAndDeleteFpsService();
+    return {registryStatus == ERROR_SUCCESS && serviceStatus == ERROR_SUCCESS,
+        IsAccessDenied(registryStatus) || IsAccessDenied(serviceStatus)};
+}
+
 }  // namespace
 
 std::optional<std::string> ReadAutoStartCommand() {
@@ -99,34 +151,25 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
 }
 
 int RunElevatedAutoStartMode(bool enabled) {
-    const LSTATUS status = WriteAutoStartRegistryValue(enabled);
-    if (status != ERROR_SUCCESS) {
-        return 1;
-    }
-
-    const DWORD serviceStatus = enabled ? InstallOrUpdateFpsService() : StopAndDeleteFpsService();
-    return serviceStatus == ERROR_SUCCESS ? 0 : 1;
+    const AutoStartUpdateResult result = enabled ? EnableAutoStartRegistration() : DisableAutoStartRegistration();
+    return result.success ? 0 : 1;
 }
 
 bool UpdateAutoStartElevated(bool enabled, HWND owner) {
     DWORD exitCode = 1;
-    return RunElevatedSelfAndWait(
-               owner, enabled ? "/set-autostart on" : "/set-autostart off", {}, SW_HIDE, &exitCode) &&
-           exitCode == 0;
+    const bool launched =
+        RunElevatedSelfAndWait(owner, enabled ? "/set-autostart on" : "/set-autostart off", {}, SW_HIDE, &exitCode);
+    BringOwnerToFront(owner);
+    return launched && exitCode == 0;
 }
 
 bool UpdateAutoStartRegistration(bool enabled, HWND owner) {
-    const LSTATUS status = WriteAutoStartRegistryValue(enabled);
-    if (status == ERROR_ACCESS_DENIED) {
+    const AutoStartUpdateResult result = enabled ? EnableAutoStartRegistration() : DisableAutoStartRegistration();
+    if (result.success) {
+        return true;
+    }
+    if (result.accessDenied) {
         return UpdateAutoStartElevated(enabled, owner);
     }
-    if (status != ERROR_SUCCESS) {
-        return false;
-    }
-
-    const DWORD serviceStatus = enabled ? InstallOrUpdateFpsService() : StopAndDeleteFpsService();
-    if (serviceStatus == ERROR_ACCESS_DENIED) {
-        return UpdateAutoStartElevated(enabled, owner);
-    }
-    return serviceStatus == ERROR_SUCCESS;
+    return false;
 }

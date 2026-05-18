@@ -5,9 +5,11 @@
 inline constexpr UINT_PTR kMoveTimerId = 2;
 inline constexpr UINT_PTR kPlacementTimerId = 3;
 inline constexpr UINT_PTR kAnimationFrameTimerId = 4;
+inline constexpr UINT_PTR kBringToFrontRetryTimerId = 5;
 inline constexpr UINT kMoveTimerMs = 16;
 inline constexpr UINT kPlacementTimerMs = 2000;
 inline constexpr UINT kAnimationFrameTimerMs = 16;
+inline constexpr UINT kBringToFrontRetryTimerMs = 250;
 inline constexpr UINT kTrayMessage = WM_APP + 1;
 inline constexpr UINT kTelemetryUpdateMessage = WM_APP + 2;
 inline constexpr UINT kCommandMove = 1001;

@@ -80,7 +80,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The `Scale` submenu changes scale immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage Drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
-- The `Start with Windows` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide `CashDashService` service used for privileged collection. The command is checked only when the Run entry targets the current executable and the matching service is currently running. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required.
+- The `Start with Windows` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide `CashDashService` service used for privileged collection. The command is checked only when the Run entry targets the current executable, the service binary path targets the current executable, and the service is running; when Windows denies the unelevated UI access to the LocalSystem service process image, the service binary path is the authority. Disabling auto-start removes the Run entry, stops and deletes the service, and treats an already-absent or SCM-pending-delete service as cleaned up. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required, and failed enable attempts roll back partial service or Run registration.
 
 ## Telemetry And Content Behavior
 
@@ -105,5 +105,5 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
 - Dashboard formatting uses the configured metric display definitions, while dump serialization keeps its own stable machine-facing unit contract.
 - The dashboard runs as a single-instance application. Starting a new UI instance closes the existing one and continues startup in the replacement instance.
-- Starting with `/bring-to-front` uses the normal UI startup path and raises the dashboard after creating the tray icon.
+- Starting with `/bring-to-front` uses the normal UI startup path and raises the dashboard after creating the tray icon. Elevated UI relaunches include this switch and briefly retry the foreground raise after startup.
 - Headless diagnostics `/exit` runs are outside that normal single-instance replacement path; diagnostics-specific behavior is defined in [docs/diagnostics.md](diagnostics.md).
