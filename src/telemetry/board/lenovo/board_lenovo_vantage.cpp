@@ -9,8 +9,10 @@
 #include <future>
 #include <iterator>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 #include <utility>
 #include <vector>
 #include <Wbemidl.h>
@@ -48,6 +50,15 @@ struct LenovoHardwareScanSnapshot {
 
 struct LenovoGameZoneFanValue {
     std::uint32_t rpm = 0;
+};
+
+struct LenovoServiceSnapshotState {
+    std::mutex mutex;
+    bool running = false;
+    bool done = false;
+    bool hasResponse = false;
+    std::string diagnostics;
+    LenovoHardwareScanSnapshot snapshot;
 };
 
 class Handle {
@@ -620,6 +631,38 @@ LenovoHardwareScanSnapshot SnapshotFromServiceSample(const BoardVendorTelemetryS
     return snapshot;
 }
 
+void StartLenovoServiceSnapshot(std::shared_ptr<LenovoServiceSnapshotState> state) {
+    {
+        std::lock_guard lock(state->mutex);
+        if (state->running) {
+            return;
+        }
+        state->running = true;
+        state->done = false;
+        state->hasResponse = false;
+        state->diagnostics.clear();
+        state->snapshot = {};
+    }
+
+    std::thread([state = std::move(state)]() {
+        std::string diagnostics;
+        std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
+        LenovoHardwareScanSnapshot snapshot;
+        const bool hasResponse = serviceSample.has_value();
+        if (hasResponse) {
+            snapshot = SnapshotFromServiceSample(*serviceSample);
+            diagnostics = snapshot.diagnostics;
+        }
+
+        std::lock_guard lock(state->mutex);
+        state->snapshot = std::move(snapshot);
+        state->diagnostics = std::move(diagnostics);
+        state->hasResponse = hasResponse;
+        state->done = true;
+        state->running = false;
+    }).detach();
+}
+
 class LenovoHardwareScanCapture final : public LenovoHardwareScanCaptureSink {
 public:
     explicit LenovoHardwareScanCapture(Trace& trace) : trace_(trace) {}
@@ -802,16 +845,27 @@ public:
         }
 
         std::string serviceDiagnostics;
-        LenovoHardwareScanSnapshot serviceSnapshot = CaptureServiceSnapshot(serviceDiagnostics);
-        if (serviceSnapshot.success) {
-            AppendGameZoneFans(serviceSnapshot);
-            ApplySnapshotToSample(serviceSnapshot, sample);
+        CompletePendingServiceSnapshot(serviceDiagnostics);
+        MaybeStartServiceSnapshot(serviceDiagnostics);
+        const bool serviceSnapshotRunning = IsServiceSnapshotRunning();
+        if (hasCachedServiceSnapshot_) {
+            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
+            if (serviceSnapshotRunning) {
+                sample.diagnostics = FormatText(
+                    "%s refresh=running service=\"%s\"", sample.diagnostics.c_str(), serviceDiagnostics.c_str());
+            }
             return sample;
         }
 
         std::string directDiagnostics;
         CompletePendingDirectSnapshot(directDiagnostics);
-        MaybeStartDirectSnapshot(directDiagnostics);
+        if (serviceSnapshotRunning) {
+            if (directDiagnostics.empty()) {
+                directDiagnostics = "Direct Lenovo Hardware Scan refresh is waiting for service sample.";
+            }
+        } else {
+            MaybeStartDirectSnapshot(directDiagnostics);
+        }
 
         if (hasCachedDirectSnapshot_) {
             ApplySnapshotToSample(cachedDirectSnapshot_, sample);
@@ -826,7 +880,12 @@ public:
             directDiagnostics = "Direct Lenovo Hardware Scan refresh is waiting.";
         }
         std::string gameZoneDiagnostics;
-        LenovoHardwareScanSnapshot gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        LenovoHardwareScanSnapshot gameZoneSnapshot;
+        if (serviceSnapshotRunning) {
+            gameZoneDiagnostics = "Lenovo GameZone WMI fan query is waiting for service sample.";
+        } else {
+            gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        }
         if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
             gameZoneSnapshot.diagnostics =
                 FormatText("Lenovo GameZone WMI fan query active. service=\"%s\" direct=\"%s\" gamezone=\"%s\"",
@@ -881,33 +940,95 @@ private:
         sample.diagnostics = FormatText("%s%s", diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
     }
 
-    LenovoHardwareScanSnapshot CaptureServiceSnapshot(std::string& diagnostics) {
-        if (!serviceUsable_) {
-            ++serviceRetrySample_;
-            if (serviceRetrySample_ < kSensorRetrySampleInterval) {
-                diagnostics = "CashDash service Lenovo Hardware Scan path is waiting for retry.";
-                return {};
+    bool IsServiceSnapshotRunning() {
+        std::lock_guard lock(serviceSnapshotState_->mutex);
+        return serviceSnapshotState_->running;
+    }
+
+    void CompletePendingServiceSnapshot(std::string& diagnostics) {
+        LenovoHardwareScanSnapshot snapshot;
+        bool done = false;
+        bool hasResponse = false;
+        {
+            std::lock_guard lock(serviceSnapshotState_->mutex);
+            if (serviceSnapshotState_->running && diagnostics.empty()) {
+                diagnostics = "CashDash service Lenovo Hardware Scan refresh is running.";
             }
-            serviceRetrySample_ = 0;
+            if (!serviceSnapshotState_->done) {
+                return;
+            }
+
+            snapshot = std::move(serviceSnapshotState_->snapshot);
+            diagnostics = std::move(serviceSnapshotState_->diagnostics);
+            hasResponse = serviceSnapshotState_->hasResponse;
+            serviceSnapshotState_->done = false;
+            serviceSnapshotState_->hasResponse = false;
+            done = true;
         }
 
-        std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
-        if (!serviceSample.has_value()) {
+        if (!done) {
+            return;
+        }
+
+        lastServiceSnapshotStart_ = std::chrono::steady_clock::now();
+        if (!hasResponse) {
             serviceUsable_ = false;
             serviceRetrySample_ = 0;
             trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
                 RES_STR("service_sample_failed diagnostics=\"%s\""),
                 diagnostics.c_str());
-            return {};
+            return;
         }
 
         serviceUsable_ = true;
         serviceRetrySample_ = kSensorRetrySampleInterval;
         trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("service_sample_done available=%d diagnostics=\"%s\""),
-            serviceSample->available ? 1 : 0,
-            serviceSample->diagnostics.c_str());
-        return SnapshotFromServiceSample(*serviceSample);
+            snapshot.success ? 1 : 0,
+            snapshot.diagnostics.c_str());
+        if (snapshot.success) {
+            AppendGameZoneFans(snapshot);
+            diagnostics = snapshot.diagnostics;
+            cachedServiceSnapshot_ = std::move(snapshot);
+            hasCachedServiceSnapshot_ = true;
+        }
+    }
+
+    void MaybeStartServiceSnapshot(std::string& diagnostics) {
+        {
+            std::lock_guard lock(serviceSnapshotState_->mutex);
+            if (serviceSnapshotState_->running) {
+                if (diagnostics.empty()) {
+                    diagnostics = "CashDash service Lenovo Hardware Scan refresh is running.";
+                }
+                return;
+            }
+        }
+
+        if (!serviceUsable_) {
+            ++serviceRetrySample_;
+            if (serviceRetrySample_ < kSensorRetrySampleInterval) {
+                if (diagnostics.empty()) {
+                    diagnostics = "CashDash service Lenovo Hardware Scan path is waiting for retry.";
+                }
+                return;
+            }
+            serviceRetrySample_ = 0;
+        }
+
+        const auto now = std::chrono::steady_clock::now();
+        if (lastServiceSnapshotStart_.has_value() &&
+            now - *lastServiceSnapshotStart_ < kDirectSnapshotRefreshInterval) {
+            if (diagnostics.empty()) {
+                diagnostics = "CashDash service Lenovo Hardware Scan refresh is waiting.";
+            }
+            return;
+        }
+
+        lastServiceSnapshotStart_ = now;
+        diagnostics = "CashDash service Lenovo Hardware Scan refresh started.";
+        trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("service_sample_refresh_started"));
+        StartLenovoServiceSnapshot(serviceSnapshotState_);
     }
 
     void CompletePendingDirectSnapshot(std::string& diagnostics) {
@@ -1029,14 +1150,18 @@ private:
     std::vector<NamedScalarMetric> temperatureMetricTemplate_;
     BoardMetricIndexBySourceName requestedFanIndexBySourceName_;
     BoardMetricIndexBySourceName requestedTemperatureIndexBySourceName_;
+    std::shared_ptr<LenovoServiceSnapshotState> serviceSnapshotState_ = std::make_shared<LenovoServiceSnapshotState>();
+    LenovoHardwareScanSnapshot cachedServiceSnapshot_;
     LenovoHardwareScanSnapshot cachedDirectSnapshot_;
     std::future<LenovoHardwareScanSnapshot> pendingDirectSnapshot_;
+    std::optional<std::chrono::steady_clock::time_point> lastServiceSnapshotStart_;
     std::optional<std::chrono::steady_clock::time_point> lastDirectSnapshotStart_;
     int serviceRetrySample_ = kSensorRetrySampleInterval;
     int gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
     bool serviceUsable_ = true;
     bool gameZoneFanUsable_ = true;
     bool wantsGameZoneFans_ = false;
+    bool hasCachedServiceSnapshot_ = false;
     bool hasCachedDirectSnapshot_ = false;
     bool initialized_ = false;
 };
