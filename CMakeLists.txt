@@ -114,14 +114,14 @@ add_custom_target(CaseDashGeneratedResources DEPENDS
 )
 
 set(CASEDASH_CONFIG_META_DIR "${CASEDASH_GENERATED_DIR}/config")
-set(CASEDASH_CONFIG_META_HEADER "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.h")
+set(CASEDASH_CONFIG_DEF_HEADER "${CASEDASH_CONFIG_META_DIR}/config_def.h")
 set(CASEDASH_CONFIG_META_CPP "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.cpp")
 set(CASEDASH_CONFIG_META_JSON "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.json")
 set(CASEDASH_LAYOUT_EDIT_META_HEADER "${CASEDASH_GENERATED_DIR}/layout_model/layout_edit_parameter_metadata.generated.h")
 set(CASEDASH_LAYOUT_EDIT_META_CPP "${CASEDASH_GENERATED_DIR}/layout_model/layout_edit_parameter_metadata.generated.cpp")
 add_custom_command(
     OUTPUT
-        "${CASEDASH_CONFIG_META_HEADER}"
+        "${CASEDASH_CONFIG_DEF_HEADER}"
         "${CASEDASH_CONFIG_META_CPP}"
         "${CASEDASH_LAYOUT_EDIT_META_HEADER}"
         "${CASEDASH_LAYOUT_EDIT_META_CPP}"
@@ -131,7 +131,7 @@ add_custom_command(
         "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
         --descriptor "${CMAKE_SOURCE_DIR}/src/config/config_desc.h"
         --resource-config "${CMAKE_SOURCE_DIR}/resources/config.ini"
-        --output-header "${CASEDASH_CONFIG_META_HEADER}"
+        --output-header "${CASEDASH_CONFIG_DEF_HEADER}"
         --output-cpp "${CASEDASH_CONFIG_META_CPP}"
         --output-layout-edit-header "${CASEDASH_LAYOUT_EDIT_META_HEADER}"
         --output-layout-edit-cpp "${CASEDASH_LAYOUT_EDIT_META_CPP}"
@@ -143,7 +143,7 @@ add_custom_command(
     VERBATIM
 )
 add_custom_target(CaseDashGeneratedConfigMeta DEPENDS
-    "${CASEDASH_CONFIG_META_HEADER}"
+    "${CASEDASH_CONFIG_DEF_HEADER}"
     "${CASEDASH_CONFIG_META_CPP}"
     "${CASEDASH_LAYOUT_EDIT_META_HEADER}"
     "${CASEDASH_LAYOUT_EDIT_META_CPP}"
@@ -214,7 +214,8 @@ add_executable(CaseDash WIN32
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -315,7 +316,8 @@ set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION
 )
 
 set(casedash_release_speed_sources
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/config_resolution.cpp
     src/config/metric_catalog.cpp
     src/dashboard/dashboard_app.cpp
@@ -627,7 +629,8 @@ add_executable(CaseDashTests
     tests/animation_timeline_tests.cpp
     tests/throughput_chart_widget_tests.cpp
     tests/render_thread_tests.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -787,7 +790,8 @@ add_executable(CaseDashBenchmarks
     src/util/text_format.cpp
     src/util/win32_format.cpp
     src/util/scale.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp

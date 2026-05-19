@@ -4,7 +4,7 @@
 #include <optional>
 #include <string>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "diagnostics/app_icon_export.h"
 #include "util/file_path.h"
 #include "widget/app_icon_geometry.h"

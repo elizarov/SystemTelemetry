@@ -5,7 +5,7 @@
 #include <string>
 #include <string_view>
 
-#include "config/config.h"
+#include "config/config_def.h"
 
 enum class RuntimeConfigFieldValueKind : std::uint8_t {
     Int,

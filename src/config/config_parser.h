@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "config/metric_catalog.h"
 #include "util/file_path.h"
 

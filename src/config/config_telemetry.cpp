@@ -1,6 +1,5 @@
-#include "config/config.h"
+#include "config/config_telemetry.h"
 
-#include "config/color_format.h"
 #include "util/numeric_format.h"
 #include "util/text_format.h"
 
@@ -18,22 +17,6 @@ const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
 };
 
 }  // namespace
-
-ColorConfig ColorConfig::FromRgba(unsigned int value) {
-    return ColorConfig{static_cast<std::uint32_t>(value), FormatRgbaColorText(value)};
-}
-
-unsigned int ColorConfig::ToRgb() const {
-    return (rgba >> 8) & 0xFFFFFFu;
-}
-
-unsigned int ColorConfig::ToRgba() const {
-    return rgba;
-}
-
-std::uint8_t ColorConfig::Alpha() const {
-    return static_cast<std::uint8_t>(rgba & 0xFFu);
-}
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id) {
     for (const auto& definition : metrics.definitions) {

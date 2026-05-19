@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "config/color_math.h"
-#include "config/config.h"
+#include "config/config_def.h"
 #include "util/utf8.h"
 
 namespace {

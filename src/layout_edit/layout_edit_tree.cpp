@@ -1,5 +1,6 @@
 #include "layout_edit/layout_edit_tree.h"
 
+#include "config/config_telemetry.h"
 #include "config/config_parser.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_helpers.h"

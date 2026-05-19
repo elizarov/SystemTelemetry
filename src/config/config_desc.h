@@ -1,4 +1,4 @@
-#include "config/config.h"
+#include "config/config_primitives.h"
 
 // config_meta: static [display]
 struct DisplayConfig {

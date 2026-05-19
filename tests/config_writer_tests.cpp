@@ -6,6 +6,7 @@
 #include <sstream>
 
 #include "config/color_resolver.h"
+#include "config/config_telemetry.h"
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "telemetry/metrics.h"

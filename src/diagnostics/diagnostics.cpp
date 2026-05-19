@@ -12,6 +12,7 @@
 
 #include "config/color_format.h"
 #include "config/color_resolver.h"
+#include "config/config_telemetry.h"
 #include "config/config_io.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"

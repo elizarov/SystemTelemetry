@@ -2,6 +2,7 @@
 
 #include <algorithm>
 
+#include "config/config_telemetry.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"

@@ -4,7 +4,7 @@
 #include <string>
 #include <string_view>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "renderer/renderer.h"
 #include "widget/animation.h"
 #include "widget/layout_edit_types.h"

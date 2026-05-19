@@ -6,7 +6,7 @@
 #include <utility>
 #include <vector>
 
-#include "config/config.h"
+#include "config/config_primitives.h"
 #include "renderer/render_types.h"
 #include "widget/card_chrome_layout.h"
 #include "widget/layout_edit_types.h"

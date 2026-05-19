@@ -2,7 +2,7 @@
 
 `tools/config_meta_gen.py` generates CaseDash config schema structs, runtime config field metadata, a review manifest, and layout-edit field metadata from `src/config/config_desc.h`. The descriptor is the maintained source for schema-shaped config structs, section names, dynamic-section prefixes, field keys, field policies, and generated layout-edit config-field mappings.
 
-`src/config/config.h` owns hand-authored value types and codec-owned payloads, then includes `config/config_meta.generated.h` for generated schema structs. `ColorConfig`, `UiFontConfig`, `LogicalPointConfig`, `LogicalSizeConfig`, `LayoutNodeConfig`, `MetricDefinitionConfig`, `BoardConfig`, and `MetricsSectionConfig` stay hand-authored because they carry behavior or storage that is not a fixed field list.
+`src/config/config_primitives.h` owns hand-authored value types and codec-owned payloads. `config_def.h` includes it before generated schema structs, and `src/config/config_telemetry.h` includes the generated schema through its normal include block before declaring telemetry and metric-definition helper functions. `ColorConfig`, `UiFontConfig`, `LogicalPointConfig`, `LogicalSizeConfig`, `LayoutNodeConfig`, `MetricDefinitionConfig`, `BoardConfig`, and `MetricsSectionConfig` stay hand-authored because they carry behavior or storage that is not a fixed field list.
 
 ## Build Integration
 
@@ -10,7 +10,7 @@ CMake runs the generator as a custom command during normal builds. The command d
 
 The generator writes these files under `build/cmake/generated/`:
 
-- `config/config_meta.generated.h`
+- `config/config_def.h`
 - `config/config_meta.generated.cpp`
 - `config/config_meta.generated.json`
 - `layout_model/layout_edit_parameter_metadata.generated.h`
@@ -86,7 +86,7 @@ Container and root structs describe ownership and traversal order. `AppConfig` i
 
 ## Generated Schema Structs
 
-`config_meta.generated.h` defines schema structs for non-custom descriptor entries. Fields are default-initialized, and each generated struct has a defaulted equality operator. Custom section structs are skipped because their storage is hand-authored in `src/config/config.h`.
+`config_def.h` includes `src/config/config_primitives.h`, then defines schema structs for non-custom descriptor entries. Each emitted struct is marked with `// Generated from config_desc.h`, fields are default-initialized, and each generated struct has a defaulted equality operator. Custom section structs are skipped because their storage is hand-authored in `src/config/config_primitives.h`.
 
 The generated header contains data layout only. Parsing, encoding, clamping, color formatting, layout-expression formatting, and field comparison stay in hand-authored config code.
 

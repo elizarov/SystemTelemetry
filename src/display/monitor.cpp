@@ -3,7 +3,7 @@
 #include <cmath>
 #include <vector>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/utf8.h"

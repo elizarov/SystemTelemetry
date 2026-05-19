@@ -468,7 +468,7 @@ def generate_schema_struct(struct: StructDesc) -> str:
     if struct.kind == "custom":
         return ""
 
-    lines = [f"struct {struct.name} {{"]
+    lines = ["// Generated from config_desc.h", f"struct {struct.name} {{"]
     for item in struct.fields:
         lines.append(f"    {item.type_name} {item.name}{{}};")
 
@@ -488,9 +488,7 @@ def generate_header(structs: list[StructDesc]) -> str:
     lines = [
         "#pragma once",
         "",
-        "#include <cstdint>",
-        "#include <string>",
-        "#include <vector>",
+        '#include "config/config_primitives.h"',
         "",
         generate_schema_structs(structs),
         "",

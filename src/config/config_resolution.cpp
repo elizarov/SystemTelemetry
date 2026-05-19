@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "config/metric_board_binding.h"
 #include "util/strings.h"
 

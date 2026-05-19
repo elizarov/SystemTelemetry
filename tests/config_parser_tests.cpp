@@ -3,6 +3,7 @@
 
 #include "config/color_expression.h"
 #include "config/color_math.h"
+#include "config/config_telemetry.h"
 #include "config/config_parser.h"
 #include "telemetry/metrics.h"
 

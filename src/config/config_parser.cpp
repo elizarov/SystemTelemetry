@@ -7,6 +7,7 @@
 #include <string_view>
 
 #include "config/color_resolver.h"
+#include "config/config_telemetry.h"
 #include "config/config_file_io.h"
 #include "config/config_resolution.h"
 #include "config/config_runtime_fields.h"

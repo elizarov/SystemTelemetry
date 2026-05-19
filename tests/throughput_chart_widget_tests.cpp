@@ -7,6 +7,7 @@
 #include <utility>
 #include <vector>
 
+#include "config/config_telemetry.h"
 #include "dashboard_renderer/impl/animation_timeline.h"
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/metrics.h"

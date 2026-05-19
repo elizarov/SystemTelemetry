@@ -10,7 +10,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config.h"
+#include "config/config_def.h"
 #include "dashboard_renderer/impl/layout_resolver.h"
 #include "dashboard_renderer/impl/metric_lookup_cache.h"
 #include "layout_model/dashboard_overlay_state.h"
