@@ -1,12 +1,12 @@
 # Config Metadata Generation
 
-`tools/config_meta_gen.py` generates CaseDash config schema structs, runtime config field metadata, a review manifest, and layout-edit field metadata from `src/config/config_desc.h`. The descriptor is the maintained source for schema-shaped config structs, section names, dynamic-section prefixes, field keys, field policies, and generated layout-edit config-field mappings.
+`tools/config_meta_gen.py` generates CaseDash config schema structs, runtime config field metadata, a review manifest, and layout-edit field metadata from `src/config/config_desc.h` and `src/widget/layout_edit_parameter_id.h`. The descriptor is the maintained source for schema-shaped config structs, section names, dynamic-section prefixes, field keys, and field policies. The layout-edit parameter enum is the maintained source for layout-edit metadata order and hit-test grouping.
 
 `src/config/config_primitives.h` owns hand-authored value types and codec-owned payloads. `config_def.h` includes it before generated schema structs, and `src/config/config_telemetry.h` includes the generated schema through its normal include block before declaring telemetry and metric-definition helper functions. `ColorConfig`, `UiFontConfig`, `LogicalPointConfig`, `LogicalSizeConfig`, `LayoutNodeConfig`, `MetricDefinitionConfig`, `BoardConfig`, and `MetricsSectionConfig` stay hand-authored because they carry behavior or storage that is not a fixed field list.
 
 ## Build Integration
 
-CMake runs the generator as a custom command during normal builds. The command depends on `tools/config_meta_gen.py`, `src/config/config_desc.h`, and `resources/config.ini`, so CMake regenerates metadata when the generator, descriptor, or embedded config template changes.
+CMake runs the generator as a custom command during normal builds. The command depends on `tools/config_meta_gen.py`, `src/config/config_desc.h`, `src/widget/layout_edit_parameter_id.h`, and `resources/config.ini`, so CMake regenerates metadata when the generator, descriptor, layout-edit parameter enum, or embedded config template changes.
 
 The generator writes these files under `build/cmake/generated/`:
 
@@ -114,7 +114,7 @@ Public runtime consumers use:
 
 The generator emits layout-edit config-field metadata separately from the runtime section table because layout edit needs direct `AppConfig` root offsets indexed by `LayoutEditParameter`.
 
-`tools/config_meta_gen.py` keeps the active layout-edit field list in `ACTIVE_PARAMETERS`. Each entry names a `LayoutEditParameter` enum value, a static-section owner type, and a descriptor field. The generated table follows that list order, and the generated `.cpp` contains a `static_assert` that its row count matches `LayoutEditParameter::Count`. `src/widget/layout_edit_parameter_id.h` remains the authoritative enum and hit-test priority contract, so the enum order and `ACTIVE_PARAMETERS` order stay aligned.
+`tools/config_meta_gen.py` parses `LayoutEditParameter` enum values from `src/widget/layout_edit_parameter_id.h`, then resolves each enum name to a static config field by matching the enum name against generated section and field metadata. The generated table follows enum order, and the generated `.cpp` contains a `static_assert` that its row count matches `LayoutEditParameter::Count`. `src/widget/layout_edit_parameter_id.h` remains the authoritative enum and hit-test priority contract.
 
 Generated layout-edit rows include section name, persisted field key, value format, runtime value kind, clamp policy, and root offset. The generated `.cpp` implements the span accessor declared by `src/layout_model/layout_edit_parameter_metadata.h`. Layout edit reads the table through:
 

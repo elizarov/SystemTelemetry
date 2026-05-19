@@ -128,6 +128,7 @@ add_custom_command(
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
         --descriptor "${CMAKE_SOURCE_DIR}/src/config/config_desc.h"
+        --layout-edit-parameters "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
         --resource-config "${CMAKE_SOURCE_DIR}/resources/config.ini"
         --output-header "${CASEDASH_CONFIG_DEF_HEADER}"
         --output-cpp "${CASEDASH_CONFIG_META_CPP}"
@@ -136,6 +137,7 @@ add_custom_command(
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
         "${CMAKE_SOURCE_DIR}/src/config/config_desc.h"
+        "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
     VERBATIM
 )

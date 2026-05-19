@@ -4,6 +4,7 @@
 
 enum class LayoutEditParameter : std::uint8_t {
     // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
+    // Fonts
     FontTitle,
     FontBig,
     FontValue,
@@ -13,22 +14,34 @@ enum class LayoutEditParameter : std::uint8_t {
     FontFooter,
     FontClockTime,
     FontClockDate,
+
+    // Card style anchors
     CardRadius,
     CardBorder,
     CardHeaderIconSize,
     CardRowGap,
     CardColumnGap,
+
+    // Card style guides
     CardPadding,
     CardHeaderIconGap,
     CardHeaderContentGap,
+
+    // Dashboard guides
     DashboardOuterMargin,
     DashboardRowGap,
     DashboardColumnGap,
+
+    // Text
     TextBottomGap,
     NetworkFooterBottomGap,
+
+    // Metric list
     MetricListBarHeight,
     MetricListLabelWidth,
     MetricListRowGap,
+
+    // Drive usage list
     DriveUsageActivitySegments,
     DriveUsageBarHeight,
     DriveUsageLabelGap,
@@ -40,11 +53,15 @@ enum class LayoutEditParameter : std::uint8_t {
     DriveUsageActivitySegmentGap,
     DriveUsageHeaderGap,
     DriveUsageRowGap,
+
+    // Throughput
     ThroughputGuideStrokeWidth,
     ThroughputPlotStrokeWidth,
     ThroughputLeaderDiameter,
     ThroughputAxisPadding,
     ThroughputHeaderGap,
+
+    // Gauge
     GaugeSegmentCount,
     GaugeValueBottom,
     GaugeLabelBottom,
@@ -52,6 +69,8 @@ enum class LayoutEditParameter : std::uint8_t {
     GaugeSegmentGapDegrees,
     GaugeOuterPadding,
     GaugeRingThickness,
+
+    // Colors
     ColorBackground,
     ColorForeground,
     ColorIcon,

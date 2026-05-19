@@ -36,73 +36,6 @@ KNOWN_CODECS = {
     "metrics": "MetricsSectionCodec",
 }
 
-ACTIVE_PARAMETERS = [
-    ("FontTitle", "FontsConfig", "title"),
-    ("FontBig", "FontsConfig", "big"),
-    ("FontValue", "FontsConfig", "value"),
-    ("FontLabel", "FontsConfig", "label"),
-    ("FontText", "FontsConfig", "text"),
-    ("FontSmall", "FontsConfig", "smallText"),
-    ("FontFooter", "FontsConfig", "footer"),
-    ("FontClockTime", "FontsConfig", "clockTime"),
-    ("FontClockDate", "FontsConfig", "clockDate"),
-    ("CardRadius", "CardStyleConfig", "cardRadius"),
-    ("CardBorder", "CardStyleConfig", "cardBorder"),
-    ("CardHeaderIconSize", "CardStyleConfig", "headerIconSize"),
-    ("CardRowGap", "CardStyleConfig", "rowGap"),
-    ("CardColumnGap", "CardStyleConfig", "columnGap"),
-    ("CardPadding", "CardStyleConfig", "cardPadding"),
-    ("CardHeaderIconGap", "CardStyleConfig", "headerIconGap"),
-    ("CardHeaderContentGap", "CardStyleConfig", "headerContentGap"),
-    ("DashboardOuterMargin", "DashboardSectionConfig", "outerMargin"),
-    ("DashboardRowGap", "DashboardSectionConfig", "rowGap"),
-    ("DashboardColumnGap", "DashboardSectionConfig", "columnGap"),
-    ("TextBottomGap", "TextWidgetConfig", "bottomGap"),
-    ("NetworkFooterBottomGap", "NetworkFooterWidgetConfig", "bottomGap"),
-    ("MetricListBarHeight", "MetricListWidgetConfig", "barHeight"),
-    ("MetricListLabelWidth", "MetricListWidgetConfig", "labelWidth"),
-    ("MetricListRowGap", "MetricListWidgetConfig", "rowGap"),
-    ("DriveUsageActivitySegments", "DriveUsageListWidgetConfig", "activitySegments"),
-    ("DriveUsageBarHeight", "DriveUsageListWidgetConfig", "barHeight"),
-    ("DriveUsageLabelGap", "DriveUsageListWidgetConfig", "labelGap"),
-    ("DriveUsageBarGap", "DriveUsageListWidgetConfig", "barGap"),
-    ("DriveUsageRwGap", "DriveUsageListWidgetConfig", "rwGap"),
-    ("DriveUsagePercentGap", "DriveUsageListWidgetConfig", "percentGap"),
-    ("DriveUsageActivityWidth", "DriveUsageListWidgetConfig", "activityWidth"),
-    ("DriveUsageFreeWidth", "DriveUsageListWidgetConfig", "freeWidth"),
-    ("DriveUsageActivitySegmentGap", "DriveUsageListWidgetConfig", "activitySegmentGap"),
-    ("DriveUsageHeaderGap", "DriveUsageListWidgetConfig", "headerGap"),
-    ("DriveUsageRowGap", "DriveUsageListWidgetConfig", "rowGap"),
-    ("ThroughputGuideStrokeWidth", "ThroughputWidgetConfig", "guideStrokeWidth"),
-    ("ThroughputPlotStrokeWidth", "ThroughputWidgetConfig", "plotStrokeWidth"),
-    ("ThroughputLeaderDiameter", "ThroughputWidgetConfig", "leaderDiameter"),
-    ("ThroughputAxisPadding", "ThroughputWidgetConfig", "axisPadding"),
-    ("ThroughputHeaderGap", "ThroughputWidgetConfig", "headerGap"),
-    ("GaugeSegmentCount", "GaugeWidgetConfig", "segmentCount"),
-    ("GaugeValueBottom", "GaugeWidgetConfig", "valueBottom"),
-    ("GaugeLabelBottom", "GaugeWidgetConfig", "labelBottom"),
-    ("GaugeSweepDegrees", "GaugeWidgetConfig", "sweepDegrees"),
-    ("GaugeSegmentGapDegrees", "GaugeWidgetConfig", "segmentGapDegrees"),
-    ("GaugeOuterPadding", "GaugeWidgetConfig", "outerPadding"),
-    ("GaugeRingThickness", "GaugeWidgetConfig", "ringThickness"),
-    ("ColorBackground", "ColorsConfig", "backgroundColor"),
-    ("ColorForeground", "ColorsConfig", "foregroundColor"),
-    ("ColorIcon", "ColorsConfig", "iconColor"),
-    ("ColorPeakGhost", "ColorsConfig", "peakGhostColor"),
-    ("ColorWarning", "ColorsConfig", "warningColor"),
-    ("ColorAccent", "ColorsConfig", "accentColor"),
-    ("ColorLayoutGuide", "ColorsConfig", "layoutGuideColor"),
-    ("ColorActiveEdit", "ColorsConfig", "activeEditColor"),
-    ("ColorPanelBorder", "ColorsConfig", "panelBorderColor"),
-    ("ColorMutedText", "ColorsConfig", "mutedTextColor"),
-    ("ColorTrack", "ColorsConfig", "trackColor"),
-    ("ColorPanelFill", "ColorsConfig", "panelFillColor"),
-    ("ColorGraphBackground", "ColorsConfig", "graphBackgroundColor"),
-    ("ColorGraphAxis", "ColorsConfig", "graphAxisColor"),
-    ("ColorGraphMarker", "ColorsConfig", "graphMarkerColor"),
-]
-
-
 class ConfigMetaError(RuntimeError):
     pass
 
@@ -291,6 +224,130 @@ def parse_descriptor(path: Path) -> list[StructDesc]:
     if pending_directive is not None:
         raise ConfigMetaError("trailing config_meta directive does not apply to a struct")
     return structs
+
+
+def identifier_words(name: str) -> list[str]:
+    return [item for item in lower_camel_to_snake(name).split("_") if item]
+
+
+def singular_word(word: str) -> str:
+    if word.endswith("ies") and len(word) > 3:
+        return f"{word[:-3]}y"
+    if word.endswith("s") and len(word) > 1:
+        return word[:-1]
+    return word
+
+
+def append_unique(items: list[list[str]], value: list[str]) -> None:
+    if value and value not in items:
+        items.append(value)
+
+
+def config_type_words(type_name: str) -> list[str]:
+    words = identifier_words(type_name)
+    for suffix in (["widget", "config"], ["section", "config"], ["config"]):
+        if words[-len(suffix) :] == suffix:
+            return words[: -len(suffix)]
+    return words
+
+
+def layout_edit_owner_aliases(struct: StructDesc) -> list[list[str]]:
+    aliases: list[list[str]] = []
+    sources = [config_type_words(struct.name)]
+    if struct.section is not None:
+        sources.append(identifier_words(struct.section))
+
+    for words in sources:
+        append_unique(aliases, words)
+        append_unique(aliases, words[:-1] + [singular_word(words[-1])])
+        if words[-1:] in (["list"], ["style"]):
+            append_unique(aliases, words[:-1])
+            append_unique(aliases, words[:-2] + [singular_word(words[-2])] if len(words) > 1 else [])
+    return aliases
+
+
+def field_aliases(field: Field) -> list[list[str]]:
+    aliases: list[list[str]] = []
+    append_unique(aliases, identifier_words(field.name))
+    append_unique(aliases, identifier_words(field.key))
+    return aliases
+
+
+def starts_with_words(words: list[str], prefix: list[str]) -> bool:
+    return len(words) >= len(prefix) and words[: len(prefix)] == prefix
+
+
+def ends_with_words(words: list[str], suffix: list[str]) -> bool:
+    return len(words) >= len(suffix) and words[-len(suffix) :] == suffix
+
+
+def layout_edit_field_suffixes(field_words: list[str], owner_words: list[str]) -> list[list[str]]:
+    suffixes: list[list[str]] = []
+    append_unique(suffixes, field_words)
+    if starts_with_words(field_words, owner_words):
+        append_unique(suffixes, field_words[len(owner_words) :])
+    if ends_with_words(field_words, owner_words):
+        append_unique(suffixes, field_words[: -len(owner_words)])
+    return suffixes
+
+
+def words_to_pascal(words: list[str]) -> str:
+    return "".join(item[:1].upper() + item[1:] for item in words)
+
+
+def parse_layout_edit_parameter_names(path: Path) -> list[str]:
+    text = path.read_text(encoding="utf-8")
+    match = re.search(r"enum\s+class\s+LayoutEditParameter\s*:\s*std::uint8_t\s*\{(?P<body>.*?)\};", text, re.S)
+    if not match:
+        raise ConfigMetaError(f"{path}: missing LayoutEditParameter enum")
+
+    names: list[str] = []
+    body_start_line = text[: match.start("body")].count("\n") + 1
+    for offset, raw_line in enumerate(match.group("body").splitlines(), start=0):
+        line_number = body_start_line + offset
+        line = raw_line.split("//", 1)[0].strip()
+        if not line:
+            continue
+        item = re.fullmatch(r"([A-Za-z_][A-Za-z0-9_]*)\s*,", line)
+        if not item:
+            raise ConfigMetaError(f"{path}:{line_number}: unsupported LayoutEditParameter entry '{line}'")
+        name = item.group(1)
+        if name == "Count":
+            break
+        names.append(name)
+
+    if not names:
+        raise ConfigMetaError(f"{path}: LayoutEditParameter enum has no generated metadata entries")
+    return names
+
+
+def build_layout_edit_candidate_map(structs: list[StructDesc]) -> dict[str, set[tuple[str, str]]]:
+    candidates: dict[str, set[tuple[str, str]]] = {}
+    for struct in structs:
+        if struct.kind != "static":
+            continue
+        for owner_words in layout_edit_owner_aliases(struct):
+            for field in struct.config_fields():
+                for field_words in field_aliases(field):
+                    for suffix_words in layout_edit_field_suffixes(field_words, owner_words):
+                        candidate = words_to_pascal(owner_words + suffix_words)
+                        candidates.setdefault(candidate, set()).add((struct.name, field.name))
+    return candidates
+
+
+def resolve_layout_edit_parameters(path: Path, structs: list[StructDesc]) -> list[tuple[str, str, str]]:
+    candidates = build_layout_edit_candidate_map(structs)
+    parameters: list[tuple[str, str, str]] = []
+    for enum_name in parse_layout_edit_parameter_names(path):
+        matches = sorted(candidates.get(enum_name, set()))
+        if not matches:
+            raise ConfigMetaError(f"layout edit parameter '{enum_name}' does not match a static config field")
+        if len(matches) > 1:
+            formatted = ", ".join(f"{owner_type}::{field_name}" for owner_type, field_name in matches)
+            raise ConfigMetaError(f"layout edit parameter '{enum_name}' matches multiple config fields: {formatted}")
+        owner_type, field_name = matches[0]
+        parameters.append((enum_name, owner_type, field_name))
+    return parameters
 
 
 def parse_resource_config(path: Path) -> dict[str, list[str]]:
@@ -765,7 +822,9 @@ def generate_layout_edit_cpp(
     return "\n".join(lines)
 
 
-def build_manifest(structs: list[StructDesc], paths: dict[str, list[str]]) -> dict[str, object]:
+def build_manifest(
+    structs: list[StructDesc], paths: dict[str, list[str]], active_parameters: list[tuple[str, str, str]]
+) -> dict[str, object]:
     sections: list[dict[str, object]] = []
     dynamic_sections: list[dict[str, object]] = []
     custom_sections: list[dict[str, object]] = []
@@ -807,7 +866,7 @@ def build_manifest(structs: list[StructDesc], paths: dict[str, list[str]]) -> di
     layout_parameters = []
     by_name = {item.name: item for item in structs}
     root = next(item for item in structs if item.kind == "root")
-    for enum_name, owner_type, field_name in ACTIVE_PARAMETERS:
+    for enum_name, owner_type, field_name in active_parameters:
         owner = by_name[owner_type]
         source_field = next(item for item in owner.config_fields() if item.name == field_name)
         meta = field_metadata(source_field)
@@ -844,6 +903,7 @@ def write_if_changed(path: Path, content: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--descriptor", required=True, type=Path)
+    parser.add_argument("--layout-edit-parameters", required=True, type=Path)
     parser.add_argument("--resource-config", required=True, type=Path)
     parser.add_argument("--output-header", required=True, type=Path)
     parser.add_argument("--output-cpp", required=True, type=Path)
@@ -858,10 +918,11 @@ def main() -> int:
         global ROOT_CONTEXT_BY_NAME
         ROOT_CONTEXT_BY_NAME = {item.name: item for item in structs}
         paths = build_owner_paths(structs)
+        layout_edit_parameters = resolve_layout_edit_parameters(args.layout_edit_parameters, structs)
         header = generate_header(structs)
         cpp = generate_cpp(structs, paths)
-        layout_edit_cpp = generate_layout_edit_cpp(structs, paths, ACTIVE_PARAMETERS)
-        manifest = json.dumps(build_manifest(structs, paths), indent=2) + "\n"
+        layout_edit_cpp = generate_layout_edit_cpp(structs, paths, layout_edit_parameters)
+        manifest = json.dumps(build_manifest(structs, paths, layout_edit_parameters), indent=2) + "\n"
         write_if_changed(args.output_header, header)
         write_if_changed(args.output_cpp, cpp)
         write_if_changed(args.output_layout_edit_cpp, layout_edit_cpp)
