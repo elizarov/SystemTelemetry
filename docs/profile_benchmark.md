@@ -30,6 +30,7 @@ This file keeps the shared optimization journal useful across test machines. It 
 - Treat direct `build\CaseDashBenchmarks.exe <benchmark> <iterations> 2` runs as the repeatable comparison loop and xperf profiles as hotspot validation.
 - Treat timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline.
 - Daemon-backed and one-shot elevated runs persist benchmark stdout and hotspot summaries in the request directory and replay both in the caller window after the request finishes.
+- Use `profile_benchmark.cmd /direct <benchmark> <iterations> 2 [extra benchmark args]` for a clean elevated daemon or one-shot `/elevate` run without xperf when provider access requires elevation but repeatable direct-run timing is the target.
 - Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `CaseDashBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
 - Override the circular ETL cap with `PROFILE_BENCHMARK_MAX_FILE_MB=<size>` and the call-tree cutoff with `PROFILE_BENCHMARK_STACK_MIN_HITS=<hits>` when a specific investigation needs a different tradeoff.
 
@@ -42,7 +43,8 @@ This file keeps the shared optimization journal useful across test machines. It 
 - Measure layout switching with `build\CaseDashBenchmarks.exe layout-switch 240 2`; the benchmark cycles configured layouts, applies the selected layout, refreshes the edit-dialog tree model, and repaints.
 - Measure mouse hover with `build\CaseDashBenchmarks.exe mouse-hover 240 2`; the benchmark moves the layout-edit cursor path from the dashboard top-left to bottom-right, resolving hover hits and drawing overlay state on every step.
 - Measure theme changes with `build\CaseDashBenchmarks.exe theme-change 240 2`; the benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
-- Measure telemetry refresh with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; the benchmark deliberately uses the package-private synchronous collector to measure one real provider collection plus one repaint instead of the production telemetry runtime thread scheduler.
+- Measure telemetry refresh with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; the benchmark deliberately uses the package-private synchronous collector to measure one real provider collection plus one repaint instead of the production telemetry runtime thread scheduler. For machine-specific provider stress against the executable-side overlay, pass a config path after the render scale, such as `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini`.
+- When the elevated daemon runs a telemetry benchmark with an overlay config, pass an absolute config path; relative paths resolve from the daemon process working directory.
 
 ## Profile Commands
 
