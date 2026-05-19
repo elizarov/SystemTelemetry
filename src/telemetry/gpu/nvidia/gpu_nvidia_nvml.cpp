@@ -415,8 +415,8 @@ int NvidiaDeviceMatchRank(const GpuAdapterInfo& adapter, const NvmlPciInfo* pci,
 
 class NvidiaNvmlGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    NvidiaNvmlGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter)
-        : trace_(trace), adapter_(std::move(adapter)) {}
+    NvidiaNvmlGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps)
+        : trace_(trace), adapter_(std::move(adapter)), collectPresentedFps_(collectPresentedFps) {}
 
     bool Initialize() override {
         trace_.Write(TracePrefix::NvidiaNvml, RES_STR("initialize_begin"));
@@ -468,15 +468,19 @@ public:
             gpuName_.c_str(),
             nvapiClockAvailable_ ? "nvapi" : "unavailable",
             fanRpmSupported_ ? "yes" : "no");
-        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
-        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+        if (collectPresentedFps_) {
+            fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
+            if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+                fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+            } else {
+                const FpsTelemetrySample fpsSample =
+                    fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+                fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                      ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                      : fpsSample.diagnostics;
+            }
         } else {
-            const FpsTelemetrySample fpsSample =
-                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS collection not requested by layout."));
         }
         initialized_ = true;
         trace_.WriteFmt(TracePrefix::NvidiaNvml,
@@ -683,12 +687,13 @@ private:
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
     bool nvapiClockAvailable_ = false;
     bool fanRpmSupported_ = false;
+    bool collectPresentedFps_ = false;
     bool initialized_ = false;
 };
 
 }  // namespace
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateNvidiaGpuTelemetryProvider(
-    Trace& trace, std::optional<GpuAdapterInfo> adapter) {
-    return std::make_unique<NvidiaNvmlGpuTelemetryProvider>(trace, std::move(adapter));
+    Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
+    return std::make_unique<NvidiaNvmlGpuTelemetryProvider>(trace, std::move(adapter), collectPresentedFps);
 }

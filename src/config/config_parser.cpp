@@ -416,5 +416,6 @@ AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigPars
     const LayoutBindingSelection layoutBindings = CollectLayoutBindings(config.layout);
     config.layout.board.requestedTemperatureNames = layoutBindings.boardTemperatureNames;
     config.layout.board.requestedFanNames = layoutBindings.boardFanNames;
+    config.layout.presentedFpsRequested = layoutBindings.presentedFpsRequested;
     return config;
 }

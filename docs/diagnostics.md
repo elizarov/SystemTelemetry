@@ -19,7 +19,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 ### Source and config overrides
 
 - `/reload` forces a config reload through the normal live-dashboard reload path before exporting outputs.
-- `/fake[:path]` uses the built-in synthetic telemetry source or reloads the selected fake dump file once per second.
+- `/fake[:path]` uses the built-in synthetic telemetry source or reloads the selected snapshot dump file once per second.
 - `/layout:<name>` overrides the active named layout for the current process.
 - `/theme:<name>` overrides the active named theme for the current process.
 - `/default-config` suppresses the executable-side `config.ini` overlay for the current process.
@@ -31,7 +31,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - `/blank` exports the blank rendering mode.
 - `/edit-layout` enables layout-edit guides for the current process and for screenshot exports.
 - `/edit-layout:<widget-name>` forces one visible widget of that type into its hover-equivalent layout-edit guide state for screenshot validation.
-- `/edit-layout:horizonatal-sizes` renders every visible horizontal size ruler and numbering group.
+- `/edit-layout:horizontal-sizes` renders every visible horizontal size ruler and numbering group.
 - `/edit-layout:vertical-sizes` renders every visible vertical size ruler and numbering group.
 - `/hover:<x>,<y>` applies a layout-edit hover point in dashboard client coordinates during screenshot exports and enables layout-edit hover affordances for that export.
 
@@ -55,23 +55,23 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - Default filenames are `casedash_trace.txt`, `casedash_dump.txt`, `casedash_screenshot.png`, `casedash_layout_guide_sheet.png`, `casedash_app_icon.png`, `casedash_config.ini`, and `casedash_full_config.ini`.
 - Trace output appends UTF-8 text without a BOM and uses the `[trace yyyy-mm-dd hh:mm:ss.mmm] <prefix>:` format. Supported prefix-filter names are `amd_adlx`, `asus_armoury_crate`, `board_vendor`, `crash`, `diagnostics`, `fake`, `fps_etw`, `fps_provider`, `fps_service_client`, `gigabyte_siv`, `gpu_vendor`, `intel_level_zero`, `lenovo_hardware_scan`, `layout_edit_dialog`, `layout_edit_drag`, `layout_edit_hover`, `layout_edit_modal`, `layout_edit_mouse_tracking`, `layout_edit_tooltip`, `layout_edit_ui`, `layout_switch`, `msi_center`, `nvidia_nvml`, `profile`, `renderer`, `telemetry`, `unsupported_board`, `unsupported_gpu`, and `wallpaper`.
 - Intel GPU traces use `intel_level_zero:load_done` to show available Sysman/core enumeration and component API groups, `intel_level_zero:wddm_clock_init` to show whether the selected adapter LUID opened for WDDM node-frequency queries, and `intel_level_zero:get_clock source=...` to show whether `gpu.clock` came from Sysman frequency domains, WDDM node performance data, Level Zero core device properties, or no clock source.
-- Dump, screenshot, layout-guide-sheet, app-icon, minimal-config, and full-config exports overwrite only their requested target file.
+- Snapshot dump, screenshot, layout guide sheet, app icon, minimal config overlay, and full config exports overwrite only their requested target file.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file. The built-in baseline uses the themed `fluxsim` FPS application label.
-- `/fake:<path>` reads only the selected dump file.
-- The UI diagnostics save dialogs use the same dump, screenshot, layout-guide-sheet, and full-config formats as the CLI outputs.
+- `/fake:<path>` reads only the selected snapshot dump file.
+- The UI diagnostics save dialogs use the same snapshot dump, screenshot, layout guide sheet, and full config formats as the CLI outputs.
 
 ## Runtime Mode Behavior
 
 - Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
-- In UI-attached mode, trace logging continues for the process lifetime and requested dump, screenshot, layout-guide-sheet, app-icon, and config outputs refresh once per second from the latest runtime state.
+- In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, layout guide sheet, app icon, and config outputs refresh once per second from the latest runtime state.
 - With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
-- With `/elevate`, trace, dump, screenshot, layout-guide-sheet, app-icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
+- With `/elevate`, trace, snapshot dump, screenshot, layout guide sheet, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake` without `/exit` advances the built-in synthetic source on the telemetry-owned 250 ms refresh path so the dashboard exercises live fake values and the same retained-throughput smoothing as real telemetry.
 - `/fake /exit` keeps the built-in synthetic source on its static baseline so deterministic diagnostics exports stay stable.
 - `/fake:<path>` reloads the selected fake file from the telemetry-owned refresh path while the process runs so manual edits affect a later telemetry-published snapshot.
-- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior. Screenshot-style PNG exports are encoded as opaque 24-bit images because the rendered diagnostics surfaces include their own background.
+- Screenshot exports use the same Direct2D and DirectWrite scene as the live dashboard draw path, so exported images match live styling, scale, and blank-mode behavior. Screenshot PNG exports are encoded as opaque 24-bit images because the rendered diagnostics surfaces include their own background.
 - App-icon exports use the same programmatic icon renderer as the live window, tray, and dialog icons, write compressed PNG files from the generated icon bitmap, use the current resolved theme colors including the dashboard card fill composited over the app background, and do not depend on dashboard render scale.
 - App-icon exports create the target parent directory when it is missing.
 - Unhandled native process crashes write a best-effort minidump and text report named `casedash_crash_<timestamp>_<pid>.dmp` and `casedash_crash_<timestamp>_<pid>.txt`. Crash files are created in the launch working directory when it is writable, otherwise in the process temp directory.
@@ -79,7 +79,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines from the `LayoutEditActiveRegions` snapshot for mouse-reactive dashboard regions that are present in the exported frame, including card and widget hover regions, layout guides, container-child reorder targets, gap handles, widget guides, text anchors, and color targets. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
 - Headless trace output writes one `diagnostics:resolved_color` line per resolved `[colors]` and `[layout_guide_sheet]` color after startup config resolution and after a successful `/reload`. Each line includes the config section, color name, resolved `#RRGGBBAA` value, and source expression when the color came from a config expression.
 - When `/trace` is enabled with the `profile` prefix included, the app collects high-precision timing samples for the real runtime operations that mirror benchmark phases and writes `profile:timing` summaries about every 10 seconds, plus a final partial flush when the trace stream closes. Each summary line reports one operation with `op`, `samples`, `total_ms`, `avg_ms`, and `interval_ms`; current operations include `telemetry_update`, `hover_hit_test`, `snap`, `apply`, `paint_total`, `paint_draw`, `presentation_frame_build`, `presentation_resolve_metrics`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `dynamic_edit_collisions`, `overlay_layer_bitmap`, `overlay_layer_content`, `presentation_frame_publish`, and `animation_frame`. The `animation_frame` operation measures animation sampling and composition work only; it excludes the live DXGI vsync wait. Use `/trace-prefixes:profile` for timing-only trace output without verbose provider logging.
-- When `/trace` and `/layout-guide-sheet` are both enabled, each guide-sheet export writes a `diagnostics:layout_guide_sheet` start marker, one `diagnostics:layout_guide_sheet detail` line per collected render detail such as canvas dimensions, leader scores, selected cards, placed callout count, and remaining leader intersections, one detail line per remaining intersection with its card, kind, sides, and callout keys, one `diagnostics:layout_guide_sheet stats` line with selected-card and callout counts plus active-region, planning, measurement, placement, and draw timings, and then an end marker.
+- When `/trace` and `/layout-guide-sheet` are both enabled, each layout guide sheet export writes a `diagnostics:layout_guide_sheet` start marker, one `diagnostics:layout_guide_sheet detail` line per collected render detail such as canvas dimensions, leader scores, selected cards, placed callout count, and remaining leader intersections, one detail line per remaining intersection with its card, kind, sides, and callout keys, one `diagnostics:layout_guide_sheet stats` line with selected-card and callout counts plus active-region, planning, measurement, placement, and draw timings, and then an end marker.
 - When `/trace` and `/app-icon` are both enabled, each successful icon export writes `diagnostics:app_icon_saved`; failures write `diagnostics:app_icon_save_failed` with the target path, size, and error detail when available.
 - When `/hover:<x>,<y>` is active during a traced screenshot export, the trace writes one `diagnostics:hover` line with the hover point, resolved target kind, and tooltip text that the live layout-edit UI would show. If no hover target resolves, the line reports `target="none"`.
 - Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
@@ -96,16 +96,16 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.
 - The modeless layout-edit dialog writes focused trace markers for tree rebuild, tree viewport restoration, tree selection, layout/theme preview, field preview, and color-picker flows when trace is enabled.
 
-## Dump Contract
+## Snapshot Dump Contract
 
-- The dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
-- The dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
+- The snapshot dump contains only the runtime snapshot model that the dashboard renders and that `/fake` reloads.
+- The snapshot dump includes retained histories, configured drive rows, and local date and time down to milliseconds.
 - Retained histories store raw sampled values in native runtime units.
-- The current dump format version is `casedash_snapshot_v12`.
-- Dump GPU FPS fields include the optional cleaned presenting application name as `gpu.fps.app_name`.
-- Dump scalar-unit fields use only the canonical dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
-- Dump scalar issue fields, including named board temperature and fan metric issue fields, use `none` or `permission_required`.
-- Provider-specific diagnostics and trace-only debug details do not appear in the dump schema.
+- The current snapshot dump format version is `casedash_snapshot_v12`.
+- Snapshot dump GPU FPS fields include the optional cleaned presenting application name as `gpu.fps.app_name`.
+- Snapshot dump scalar-unit fields use only the canonical snapshot dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
+- Snapshot dump scalar issue fields, including named board temperature and fan metric issue fields, use `none` or `permission_required`.
+- Provider-specific diagnostics and trace-only debug details do not appear in the snapshot dump schema.
 
 ## Single-Instance Interaction
 
@@ -116,7 +116,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 ## Validation Recipes
 
 - Build first through `build.cmd`.
-- Include `/trace` during diagnostics validation and inspect trace output even when the main change affects dump or screenshot behavior.
+- Include `/trace` during diagnostics validation and inspect trace output even when the main change affects snapshot dump or screenshot behavior.
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
 - Prefer the smallest traced `/exit` command that exercises the changed behavior.
@@ -124,10 +124,10 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 
 Recommended coverage:
 
-- Trace plus dump validates snapshot content and provider state.
+- Trace plus snapshot dump validates snapshot content and provider state.
 - Trace plus screenshot validates rendered output and active-region trace data.
 - Trace plus config export validates minimal or full config output.
-- Trace plus layout guide sheet validates guide-sheet planning, placement, and trace details.
+- Trace plus layout guide sheet validates layout guide sheet planning, placement, and trace details.
 - Trace plus app icon validates themed icon rendering and output paths.
 - UI-attached diagnostics validate once-per-second refresh behavior when live refresh, hover-only behavior, drag-only behavior, or interactive fake-runtime reloads changed.
 - Headless `/fake /exit` and interactive `/fake` both matter when fake-runtime startup or reload behavior changed.
@@ -137,5 +137,5 @@ Layout-edit validation:
 - Inspect `diagnostics:active_region` lines to verify mouse-reactive region geometry and layout paths.
 - Add `/hover:<x>,<y>` to a traced screenshot command and inspect `diagnostics:hover` when tooltip targeting changed.
 - Use `/edit-layout:<widget-name>` for each widget class whose edit chrome changed.
-- Use `/edit-layout:horizonatal-sizes` or `/edit-layout:vertical-sizes` when ruler grouping changed.
+- Use `/edit-layout:horizontal-sizes` or `/edit-layout:vertical-sizes` when ruler grouping changed.
 - Validate the presence of the intended guide family or ruler grouping rather than re-documenting widget-specific edit semantics here; user-visible layout-edit behavior is defined in [docs/layout_edit.md](layout_edit.md).

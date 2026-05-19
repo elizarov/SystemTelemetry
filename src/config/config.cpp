@@ -80,6 +80,7 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
     settings.board.temperatureSensorNames = config.layout.board.temperatureSensorNames;
     settings.board.fanSensorNames = config.layout.board.fanSensorNames;
     settings.selection = ExtractTelemetrySelectionSettings(config);
+    settings.collectPresentedFps = config.layout.presentedFpsRequested;
     return settings;
 }
 

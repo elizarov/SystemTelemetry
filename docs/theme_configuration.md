@@ -175,13 +175,13 @@ The `Theme` submenu:
 - Keeps layout-edit mode active when a theme is selected.
 - Uses the same unsaved edit-session behavior as other live configuration edits.
 
-## Edit Configuration Dialog
+## Edit Configuration Window
 
-The modeless `Edit Configuration` dialog exposes theme editing through the existing config tree and live editor pane.
+The modeless `Edit Configuration` window exposes theme editing through the existing config tree and live editor pane.
 
 Theme section behavior:
 
-- The dialog tree follows the embedded config template order; the active theme section appears at the position of the shipped `[theme.<name>]` section group.
+- The config tree follows the embedded config template order; the active theme section appears at the position of the shipped `[theme.<name>]` section group.
 - Only the active `[theme.<name>]` section selected by `[display] theme` appears in the dialog tree.
 - The active theme section description is shown in the right-hand editor pane.
 - Selecting the active theme section shows a theme selector dropdown listing all configured themes. Changing the selector updates `[display] theme`, previews immediately, refreshes the tree to the newly active theme section, and keeps the edit session active.
@@ -203,6 +203,6 @@ Theme section behavior:
 - `alpha` exposes an alpha byte value edit and matching slider from `0x00` to `0xFF`.
 - Valid edits preview immediately. Invalid or incomplete derived expressions do not preview and do not replace the last valid pending value.
 - Per-field revert restores the whole color role expression, including its mode and all transformation controls.
-- The dialog displays the effective resolved color preview for both literal and derived roles. Derived roles also show the resolved `#RRGGBBAA` value as read-only text next to the preview swatch.
+- The window displays the effective resolved color preview for both literal and derived roles. Derived roles also show the resolved `#RRGGBBAA` value as read-only text next to the preview swatch.
 
 `[layout_guide_sheet]` remains diagnostics-only and is not editable through the dialog.

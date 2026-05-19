@@ -38,6 +38,7 @@ constexpr USHORT kD3d9PresentStartEventId = 0x0001;
 constexpr USHORT kDxgKrnlPresentInfoEventId = 0x00b8;
 constexpr double kFpsWindowSeconds = 3.0;
 constexpr double kFpsSmoothingAlpha = 0.35;
+constexpr double kGpu3dSampleMinIntervalSeconds = 0.25;
 constexpr double kProcessSwitchHysteresisRatio = 1.35;
 constexpr double kGpu3dActiveThresholdPercent = 5.0;
 constexpr double kGpu3dDominanceRatio = 3.0;
@@ -301,7 +302,7 @@ public:
         const uint64_t windowTicks = static_cast<uint64_t>(static_cast<double>(qpcFrequency_) * kFpsWindowSeconds);
         const uint64_t minimumQpc = nowQpc > windowTicks ? nowQpc - windowTicks : 0;
 
-        UpdateGpu3dUsageLocked(options);
+        UpdateGpu3dUsageLocked(options, nowQpc);
         const bool requireSelectedGpuActivity = !options.gpuAdapterLuidToken.empty();
         const ProcessEventSelection runtimeSelection =
             SelectBestProcessLocked(runtimeEventsByProcess_, minimumQpc, requireSelectedGpuActivity);
@@ -662,7 +663,16 @@ private:
         SetGpuUsageStatusText(gpuUsageDiagnostics_, "gpu3d_collect", static_cast<long>(collectStatus));
     }
 
-    void UpdateGpu3dUsageLocked(const FpsTelemetrySampleOptions& options) {
+    void UpdateGpu3dUsageLocked(const FpsTelemetrySampleOptions& options, uint64_t nowQpc) {
+        const uint64_t minimumSampleTicks =
+            static_cast<uint64_t>(static_cast<double>(qpcFrequency_) * kGpu3dSampleMinIntervalSeconds);
+        if (lastGpu3dSampleQpc_ != 0 && lastGpu3dAdapterLuidToken_ == options.gpuAdapterLuidToken &&
+            nowQpc >= lastGpu3dSampleQpc_ && nowQpc - lastGpu3dSampleQpc_ < minimumSampleTicks) {
+            return;
+        }
+        lastGpu3dSampleQpc_ = nowQpc;
+        lastGpu3dAdapterLuidToken_ = options.gpuAdapterLuidToken;
+
         InitializeGpu3dUsageLocked();
         gpu3dUsageByProcess_.clear();
         topGpu3dProcessId_ = 0;
@@ -783,6 +793,8 @@ private:
             gpu3dCounter_ = nullptr;
             gpuQueryInitialized_ = false;
         }
+        lastGpu3dSampleQpc_ = 0;
+        lastGpu3dAdapterLuidToken_.clear();
         initialized_ = false;
     }
 
@@ -898,6 +910,7 @@ private:
     std::vector<ProcessGpuUsage> gpu3dUsageByProcess_;
     std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
+    std::string lastGpu3dAdapterLuidToken_;
     PDH_HQUERY gpuQuery_ = nullptr;
     PDH_HCOUNTER gpu3dCounter_ = nullptr;
     DWORD selectedProcessId_ = 0;
@@ -908,6 +921,7 @@ private:
     std::string gpuUsageDiagnostics_;
     uint64_t runtimePresentEvents_ = 0;
     uint64_t kernelPresentEvents_ = 0;
+    uint64_t lastGpu3dSampleQpc_ = 0;
     long long qpcFrequency_ = 0;
     bool dxgiEnabled_ = false;
     bool d3d9Enabled_ = false;

@@ -30,6 +30,15 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; the system binding also accepts motherboard or board sensor names. Otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric. The CPU board temperature binding is requested by `gpu.temp` as the Intel fallback source.
 - The CaseDash service IPC exposes `presented_fps_sample` for FPS and `board_sensors_sample` for board providers that need LocalSystem access to hardware interfaces.
 
+## Provider Validation
+
+Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics commands and validation recipes. The provider troubleshooting sections below list provider-specific runtime checks.
+
+- Run the smallest trace plus snapshot dump flow that exercises the selected GPU or board provider.
+- Inspect trace output for provider state, runtime-loading diagnostics, the provider-specific trace prefixes named below, and unsupported-provider fallback markers.
+- Inspect the snapshot dump for the resolved provider values. GPU providers populate the `gpu.*` values they expose, and board providers populate `board.*` values plus board-backed `gpu.temp` or `gpu.fan` fallbacks when configured.
+- For Intel GPUs, include Level Zero Sysman component counts in the trace review because missing components explain unavailable temperature, fan, or device-local memory values.
+
 ## Adding Hardware Support
 
 - Provider selection stays split into three steps: extract adapter identity, map vendor information to the vendor enum, and create the matching provider with the full adapter identity.
@@ -61,8 +70,6 @@ Troubleshooting:
 
 1. Install or update AMD Software: Adrenalin Edition.
 2. Confirm `amdadlx64.dll` is present in `C:\Windows\System32`.
-3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for the provider state on that machine.
 
 ## Intel
 
@@ -92,8 +99,6 @@ Troubleshooting:
 
 1. Install or update the NVIDIA display driver.
 2. Confirm `nvml.dll` is present in `C:\Windows\System32` or the NVIDIA NVSMI install directory.
-3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
-4. Inspect the exported dump and trace outputs for the provider state on that machine.
 
 ## ASUS
 
@@ -108,8 +113,6 @@ Troubleshooting:
 1. Install or update Armoury Crate or ASUS System Control Interface.
 2. Confirm Armoury Crate can show the machine's fan and temperature telemetry from a normal user session.
 3. Confirm the `\\.\ATKACPI` device opens for the current user; trace output reports `atk_driver_open_failed` when Windows blocks it.
-4. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-5. Inspect the dump for `board.*` values and the trace for `asus_armoury_crate:*` diagnostics.
 
 ## MSI
 
@@ -121,8 +124,6 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install MSI Center with the SDK/runtime components that expose board sensors.
-2. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-3. Inspect the dump for `board.*` values and the trace for `msi_center:*` diagnostics.
 
 ## Gigabyte
 
@@ -143,7 +144,7 @@ Troubleshooting:
 - Supported hardware family: Lenovo board telemetry on systems with the Lenovo Vantage Hardware Scan addin installed under `ProgramData\Lenovo\Vantage\Addins\LenovoHardwareScanAddin`.
 - Runtime dependency: Lenovo Vantage Hardware Scan and its LdeApi diagnostics modules, including `LdeApi.Client.dll`, `LdeApi.Server.exe`, and the Lenovo diagnostics driver components installed by Lenovo platform software. Fan RPM uses Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods.
 - Metrics include requested Hardware Scan temperature telemetry from the storage, CPU, motherboard, video-card, and battery modules. Fan telemetry comes from `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class. CaseDash names those readings as `Disk Temperature`, `CPU Temperature`, `Motherboard Temperature`, `GPU Temperature`, `Battery Temperature`, `Fan`, `CPU Fan`, and `GPU Fan`.
-- The unelevated dashboard starts `CashDashService` `board_sensors_sample` queries asynchronously so the LocalSystem service can run the Lenovo diagnostics addin with the same privilege boundary Lenovo uses for hardware access without blocking dashboard startup. The service keeps accepting presented-FPS and later board-sensor pipe clients while a slow Hardware Scan request is running. The provider reuses the last successful service sample while a refresh is running. When the service becomes absent or unreachable in a non-elevated dashboard, the provider clears cached service readings, marks requested Hardware Scan values with `!admin`, and still tries the GameZone WMI fan path as the last-resort fan source. Elevated runs without the service refresh the same Hardware Scan LdeApi path in the dashboard process in the background, reuse the last successful direct sample, and keep startup and board auto-binding reconfiguration responsive while a slow direct scan is running.
+- The unelevated dashboard starts `CashDashService` `board_sensors_sample` queries asynchronously so the LocalSystem service can run the Lenovo diagnostics addin with the same privilege boundary Lenovo uses for hardware access without blocking dashboard startup. The service keeps accepting presented-FPS and later board-sensor pipe clients while a slow Hardware Scan request is running. The provider reuses the last successful service sample while a refresh is running. When the service becomes absent or unreachable in a non-elevated dashboard, the provider clears cached service readings, marks requested Hardware Scan values with `!admin`, and still tries the GameZone WMI fan path as the last-resort fan source. GameZone WMI fan retries use wall-clock backoff so burst sampling does not repeatedly run the synchronous WMI fallback. Elevated runs without the service refresh the same Hardware Scan LdeApi path in the dashboard process in the background, reuse the last successful direct sample, and keep startup and board auto-binding reconfiguration responsive while a slow direct scan is running.
 - Lenovo Vantage's UI reaches the same diagnostics stack through the trusted `SystemManagement.HardwareScan.General` private RPC contract with the `DoExecutionThermalTool` command. CaseDash does not depend on that private trusted Vantage RPC endpoint or the older firmware interface for board telemetry.
 - Trace output can include `lenovo_hardware_scan:*` provider details, `module_load_result` summaries for requested Lenovo temperature modules, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for fan queries, and `unsupported_board` markers.
 

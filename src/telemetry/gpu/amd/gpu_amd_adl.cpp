@@ -138,8 +138,8 @@ int AmdDeviceMatchRank(const GpuAdapterInfo& adapter, const AdlxGpuIdentity& ide
 
 class AmdAdlxGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    AmdAdlxGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter)
-        : trace_(trace), adapter_(std::move(adapter)) {}
+    AmdAdlxGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps)
+        : trace_(trace), adapter_(std::move(adapter)), collectPresentedFps_(collectPresentedFps) {}
 
     ~AmdAdlxGpuTelemetryProvider() override {
         metricsSupport_ = nullptr;
@@ -253,15 +253,19 @@ public:
             fanResult,
             vramSupported,
             vramResult);
-        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
-        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+        if (collectPresentedFps_) {
+            fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
+            if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+                fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+            } else {
+                const FpsTelemetrySample fpsSample =
+                    fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+                fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                      ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                      : fpsSample.diagnostics;
+            }
         } else {
-            const FpsTelemetrySample fpsSample =
-                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS collection not requested by layout."));
         }
         initialized_ = true;
         trace().WriteFmt(TracePrefix::AmdAdlx,
@@ -503,12 +507,13 @@ private:
     bool clockSupported_ = false;
     bool fanSupported_ = false;
     bool vramSupported_ = false;
+    bool collectPresentedFps_ = false;
     bool initialized_ = false;
 };
 
 }  // namespace
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateAmdGpuTelemetryProvider(
-    Trace& trace, std::optional<GpuAdapterInfo> adapter) {
-    return std::make_unique<AmdAdlxGpuTelemetryProvider>(trace, std::move(adapter));
+    Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
+    return std::make_unique<AmdAdlxGpuTelemetryProvider>(trace, std::move(adapter), collectPresentedFps);
 }

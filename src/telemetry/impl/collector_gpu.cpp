@@ -260,7 +260,8 @@ void ResolveGpuSelection(RealTelemetryCollectorState& state) {
 }
 
 void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
-    state.gpu_.provider = CreateGpuVendorTelemetryProvider(state.trace_, state.gpu_.selectedAdapter);
+    state.gpu_.provider =
+        CreateGpuVendorTelemetryProvider(state.trace_, state.gpu_.selectedAdapter, state.settings_.collectPresentedFps);
     if (state.gpu_.provider == nullptr) {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_provider_create result=null"));
         return;
@@ -284,6 +285,9 @@ void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
             RES_STR("gpu_provider_initialize_failed provider=%s diagnostics=\"%s\""),
             state.gpu_.providerName.c_str(),
             state.gpu_.providerDiagnostics.c_str());
+        if (!state.settings_.collectPresentedFps) {
+            return;
+        }
         state.gpu_.fallbackFpsProvider = CreatePresentedFpsProvider(state.trace_, state.gpu_.selectedAdapter);
         if (state.gpu_.fallbackFpsProvider != nullptr) {
             const bool fpsInitialized = state.gpu_.fallbackFpsProvider->Initialize();
@@ -295,7 +299,8 @@ void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
 }
 
 void ApplyFallbackFpsSample(RealTelemetryCollectorState& state) {
-    if (state.snapshot_.gpu.fps.value.has_value() || state.gpu_.fallbackFpsProvider == nullptr) {
+    if (!state.settings_.collectPresentedFps || state.snapshot_.gpu.fps.value.has_value() ||
+        state.gpu_.fallbackFpsProvider == nullptr) {
         return;
     }
 
@@ -316,7 +321,7 @@ void ApplyFallbackFpsSample(RealTelemetryCollectorState& state) {
 }
 
 void ApplyPoweredOffGpuFpsZero(RealTelemetryCollectorState& state) {
-    if (state.snapshot_.gpu.fps.value.has_value()) {
+    if (!state.settings_.collectPresentedFps || state.snapshot_.gpu.fps.value.has_value()) {
         return;
     }
     const std::optional<double> clockMhz = state.snapshot_.gpu.clock.value;

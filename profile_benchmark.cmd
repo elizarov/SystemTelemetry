@@ -9,9 +9,11 @@ set "ITERATIONS="
 set "RENDER_SCALE="
 set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
+set "BENCHMARK_EXTRA_ARGS="
 set "ARGUMENT_ERROR="
 set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, mouse-hover, snapshot-handoff, theme-change, update-telemetry"
 set "COMMAND=run"
+set "REQUEST_PROFILE=1"
 set "REQUEST_ELEVATION=0"
 set "IS_ELEVATED_RELAUNCH=0"
 set "REQUEST_ID="
@@ -44,6 +46,11 @@ if /i "%~1"=="/run-request" (
     set "COMMAND=run_request"
     set "REQUEST_DIR=%~2"
     shift
+    shift
+    goto parse_args
+)
+if /i "%~1"=="/direct" (
+    set "REQUEST_PROFILE=0"
     shift
     goto parse_args
 )
@@ -106,6 +113,12 @@ if not defined ITERATIONS (
     set "ITERATIONS=%~1"
 ) else if not defined RENDER_SCALE (
     set "RENDER_SCALE=%~1"
+) else (
+    if defined BENCHMARK_EXTRA_ARGS (
+        set "BENCHMARK_EXTRA_ARGS=!BENCHMARK_EXTRA_ARGS! %~1"
+    ) else (
+        set "BENCHMARK_EXTRA_ARGS=%~1"
+    )
 )
 shift
 goto parse_args
@@ -196,6 +209,8 @@ if not defined REQUEST_DIR (
 if exist "%REQUEST_DIR%\request.env" (
     for /f "usebackq tokens=1,* delims==" %%A in ("%REQUEST_DIR%\request.env") do (
         if /i "%%A"=="benchmark" set "BENCHMARK_NAME=%%B"
+        if /i "%%A"=="profile" set "REQUEST_PROFILE=%%B"
+        if /i "%%A"=="extra_args" set "BENCHMARK_EXTRA_ARGS=%%B"
     )
 )
 if not defined BENCHMARK_NAME (
@@ -212,14 +227,20 @@ set "TRACE_HOTSPOTS=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_hotspots.txt"
 set "BENCHMARK_OUTPUT=%REQUEST_DIR%\%BENCHMARK_STEM%_benchmark_stdout.txt"
 del /q "%REQUEST_DIR%\done.env" >nul 2>nul
 del /q "%REQUEST_DIR%\error.txt" >nul 2>nul
-call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%TRACE_HOTSPOTS%" "%BENCHMARK_OUTPUT%"
+if "%REQUEST_PROFILE%"=="0" (
+    call :run_direct_benchmark "%BENCHMARK_OUTPUT%"
+) else (
+    call :run_benchmark "%TRACE_ETL%" "%TRACE_TXT%" "%TRACE_CALLTREE_HTML%" "%TRACE_HOTSPOTS%" "%BENCHMARK_OUTPUT%"
+)
 set "REQUEST_EXIT_CODE=%errorlevel%"
 > "%REQUEST_DIR%\done.env" (
     echo exit_code=%REQUEST_EXIT_CODE%
-    echo etl=%TRACE_ETL%
-    echo summary=%TRACE_TXT%
-    echo calltree=%TRACE_CALLTREE_HTML%
-    echo hotspots=%TRACE_HOTSPOTS%
+    if "%REQUEST_PROFILE%"=="1" (
+        echo etl=%TRACE_ETL%
+        echo summary=%TRACE_TXT%
+        echo calltree=%TRACE_CALLTREE_HTML%
+        echo hotspots=%TRACE_HOTSPOTS%
+    )
     echo benchmark_output=%BENCHMARK_OUTPUT%
 )
 exit /b %REQUEST_EXIT_CODE%
@@ -282,8 +303,14 @@ if errorlevel 1 (
     echo benchmark=%BENCHMARK_NAME%
     echo iterations=%ITERATIONS%
     echo render_scale=%RENDER_SCALE%
+    echo profile=%REQUEST_PROFILE%
+    if defined BENCHMARK_EXTRA_ARGS echo extra_args=%BENCHMARK_EXTRA_ARGS%
 )
-echo Waiting for benchmark daemon request %REQUEST_ID% benchmark=%BENCHMARK_NAME%...
+if "%REQUEST_PROFILE%"=="0" (
+    echo Waiting for benchmark daemon direct request %REQUEST_ID% benchmark=%BENCHMARK_NAME%...
+) else (
+    echo Waiting for benchmark daemon profile request %REQUEST_ID% benchmark=%BENCHMARK_NAME%...
+)
 call :wait_for_request_completion "%REQUEST_DIR%" 600
 call :read_request_exit_code "%REQUEST_DIR%\done.env"
 exit /b %REQUEST_RESULT_CODE%
@@ -420,13 +447,13 @@ if errorlevel 1 (
     exit /b %errorlevel%
 )
 
-echo Running benchmark iterations=%ITERATIONS% scale=%RENDER_SCALE%...
+echo Running benchmark iterations=%ITERATIONS% scale=%RENDER_SCALE% extra_args=%BENCHMARK_EXTRA_ARGS%...
 if defined BENCHMARK_OUTPUT (
     set "PROFILE_BENCHMARK_STDOUT=%BENCHMARK_OUTPUT%"
     set "PROFILE_BENCHMARK_NAME=%BENCHMARK_NAME%"
-    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE $env:PROFILE_BENCHMARK_NAME %ITERATIONS% %RENDER_SCALE% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE $env:PROFILE_BENCHMARK_NAME %ITERATIONS% %RENDER_SCALE% %BENCHMARK_EXTRA_ARGS% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
 ) else (
-    "%BENCHMARK_EXE%" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE%
+    "%BENCHMARK_EXE%" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE% %BENCHMARK_EXTRA_ARGS%
 )
 set "BENCHMARK_RC=%errorlevel%"
 
@@ -457,6 +484,30 @@ if errorlevel 1 (
     exit /b %errorlevel%
 )
 exit /b %BENCHMARK_RC%
+
+:run_direct_benchmark
+set "BENCHMARK_OUTPUT=%~1"
+set "BENCHMARK_EXE=%REPO_ROOT%\build\CaseDashBenchmarks.exe"
+set "FORCE_BUILD=%PROFILE_BENCHMARK_FORCE_BUILD%"
+if /i "%FORCE_BUILD%"=="1" (
+    echo Building Release benchmark binaries before direct benchmark run...
+    call "%REPO_ROOT%\build.cmd" Release /benchmarks
+    if errorlevel 1 exit /b %errorlevel%
+) else if not exist "%BENCHMARK_EXE%" (
+    call "%REPO_ROOT%\build.cmd" Release /benchmarks
+    if errorlevel 1 exit /b %errorlevel%
+)
+
+if defined BENCHMARK_OUTPUT del /q "%BENCHMARK_OUTPUT%" >nul 2>nul
+echo Running direct benchmark iterations=%ITERATIONS% scale=%RENDER_SCALE% extra_args=%BENCHMARK_EXTRA_ARGS%...
+if defined BENCHMARK_OUTPUT (
+    set "PROFILE_BENCHMARK_STDOUT=%BENCHMARK_OUTPUT%"
+    set "PROFILE_BENCHMARK_NAME=%BENCHMARK_NAME%"
+    powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & $env:BENCHMARK_EXE $env:PROFILE_BENCHMARK_NAME %ITERATIONS% %RENDER_SCALE% %BENCHMARK_EXTRA_ARGS% 2>&1 | Tee-Object -FilePath $env:PROFILE_BENCHMARK_STDOUT; exit $LASTEXITCODE }"
+) else (
+    "%BENCHMARK_EXE%" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE% %BENCHMARK_EXTRA_ARGS%
+)
+exit /b %errorlevel%
 
 :relaunch_elevated
 if "%IS_ELEVATED_RELAUNCH%"=="1" (

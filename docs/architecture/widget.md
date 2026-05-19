@@ -1,6 +1,6 @@
 # Widget Package
 
-`src/widget/` owns widget contracts, widget-local layout and drawing behavior, widget factories, widget-facing layout-edit DTOs, shared card-chrome geometry, and programmatic app-icon geometry.
+`src/widget/` owns widget contracts, widget-local layout and drawing behavior, widget factories, widget-facing layout-edit DTOs, shared card-chrome geometry, and programmatic app icon geometry.
 
 ## Responsibilities
 

@@ -8,6 +8,7 @@
 struct LayoutBindingSelection {
     std::vector<std::string> boardTemperatureNames;
     std::vector<std::string> boardFanNames;
+    bool presentedFpsRequested = false;
 };
 
 LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout);

@@ -7,4 +7,4 @@
 #include "util/trace.h"
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateNvidiaGpuTelemetryProvider(
-    Trace& trace, std::optional<GpuAdapterInfo> adapter);
+    Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps);

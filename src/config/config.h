@@ -388,6 +388,7 @@ struct LayoutConfig {
 
     LayoutSectionConfig structure{};
     LayoutNodeConfig cardsLayout;
+    bool presentedFpsRequested = false;
 };
 
 struct AppConfig {

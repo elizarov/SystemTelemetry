@@ -81,6 +81,19 @@ TEST(ConfigResolution, CollectsCpuTemperatureFallbackBoardBindingFromGpuTemperat
     EXPECT_EQ(selection.boardTemperatureNames[1], "vrm");
 }
 
+TEST(ConfigResolution, CollectsPresentedFpsRequestFromGpuFpsMetric) {
+    LayoutConfig layout;
+    LayoutCardConfig card;
+    card.id = "gpu";
+    card.layout = MakeContainerNode(
+        "rows", {MakeWidgetNode("metric_list", "gpu.load, gpu.fps"), MakeWidgetNode("text", "network.down")});
+    layout.cards.push_back(card);
+
+    const LayoutBindingSelection selection = CollectLayoutBindings(layout);
+
+    EXPECT_TRUE(selection.presentedFpsRequested);
+}
+
 TEST(ConfigResolution, NormalizesConfiguredDrivesAndRemovesDuplicates) {
     const std::vector<std::string> drives = NormalizeConfiguredDrives({" c", "D:", "c\\", "", "1", "d"});
 
@@ -108,11 +121,12 @@ TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
     EXPECT_EQ(config.layout.structure.cardsLayout.name, "rows");
 }
 
-TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInputs) {
+TEST(ConfigResolution, ExtractTelemetrySettingsIncludesBoardSelectionAndPresentedFpsInputs) {
     AppConfig config;
     config.network.adapterName = "Ethernet";
     config.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
     config.storage.drives = {"C", "D"};
+    config.layout.presentedFpsRequested = true;
     config.layout.board.requestedTemperatureNames = {"cpu"};
     config.layout.board.requestedFanNames = {"system"};
     config.layout.board.temperatureSensorNames["cpu"] = "CPU";
@@ -130,6 +144,7 @@ TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInpu
     EXPECT_EQ(settings.board.requestedFanNames, (std::vector<std::string>{"system"}));
     EXPECT_EQ(settings.board.temperatureSensorNames.at("cpu"), "CPU");
     EXPECT_EQ(settings.board.fanSensorNames.at("system"), "SYS_FAN");
+    EXPECT_TRUE(settings.collectPresentedFps);
 }
 
 TEST(ConfigResolution, EffectiveRuntimeConfigPreservesUiEditsWhileOverlayingResolvedSelections) {

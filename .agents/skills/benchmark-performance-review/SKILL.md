@@ -7,17 +7,18 @@ description: "Use only when explicitly invoked: review CaseDash benchmark perfor
 
 ## Overview
 
-Use this skill to verify that CaseDash performance still matches the maintained benchmark baselines, then fix repeatable regressions with measured, narrowly scoped changes.
+Use this skill to verify that CaseDash performance still matches the maintained machine-specific benchmark ranges, then fix repeatable regressions with measured, narrowly scoped changes.
 
 ## Required Context
 
 1. Read `AGENTS.md`.
-2. Read `docs/profile_benchmark.md` before forming conclusions. Treat it as the source of truth for benchmark commands, current baselines, confirmed hotspots, kept optimizations, rejected experiments, and practical guidance.
-3. Read `docs/build.md` for build and validation entrypoints.
-4. Read relevant architecture docs before changing subsystem boundaries:
+2. Read `docs/profile_benchmark.md` before forming conclusions. Treat it as the source of truth for benchmark commands, shared hotspot models, kept optimizations, rejected experiments, and practical guidance.
+3. Read the matching `docs/performance/<machine>.md` file for the current machine's benchmark ranges, bottlenecks, and research directions.
+4. Read `docs/build.md` for build and validation entrypoints.
+5. Read relevant architecture docs before changing subsystem boundaries:
    - `docs/architecture.md`
    - `docs/architecture/*.md` for the touched package
-5. Read owning behavior docs before changing user-visible behavior, diagnostics output, provider behavior, layout-edit behavior, or layout-guide-sheet behavior.
+6. Read owning behavior docs before changing user-visible behavior, diagnostics output, provider behavior, layout-edit behavior, or layout-guide-sheet behavior.
 
 ## Baseline Review
 
@@ -30,18 +31,18 @@ Use this skill to verify that CaseDash performance still matches the maintained 
 
 3. Run every maintained direct benchmark listed in the `Benchmark Workflow` section of `docs/profile_benchmark.md` sequentially from the fresh build. Do not duplicate the command list here; `docs/profile_benchmark.md` is the owning source of truth.
 
-4. Compare direct-run timing lines with the `Current Known Baseline` section in `docs/profile_benchmark.md`. Compare like with like: primary loop metrics, named submetrics, same benchmark name, same iteration count, and same warmup count.
+4. Compare direct-run timing lines with the current known range in the matching `docs/performance/<machine>.md` file. Compare like with like: primary loop metrics, named submetrics, same benchmark name, same iteration count, and same warmup count.
 5. Treat a single noisy run as inconclusive. When a metric looks slow, rerun the same direct benchmark at least twice and compare the median or the stable range.
-6. Treat a regression as actionable when the primary loop metric or an important submetric is repeatably worse than the documented current baseline beyond normal noise, especially when a hot UI-path metric moves by roughly `10%` or more, a guide-sheet metric moves by several milliseconds, or the regression changes the known hotspot shape.
+6. Treat a regression as actionable when the primary loop metric or an important submetric is repeatably worse than the documented current range beyond normal noise, especially when a hot UI-path metric moves by roughly `10%` or more, a guide-sheet metric moves by several milliseconds, or the regression changes the known hotspot shape.
 7. Use direct `build\CaseDashBenchmarks.exe` runs as the repeatable baseline. Use `profile_benchmark.cmd` timings only as profiler-instrumented confirmation, not as the baseline comparison.
 
 ## Regression Investigation
 
 1. Isolate the changed benchmark and the first metric that moved. Prefer the smallest repeatable direct benchmark loop while investigating.
-2. Review the matching sections in `docs/profile_benchmark.md`:
-   - `Current Confirmed Hotspots`
+2. Review the matching machine file under `docs/performance/` and the shared sections in `docs/profile_benchmark.md`:
+   - `Shared Hotspot Model`
    - `Kept Optimizations`
-   - `Tested Hypotheses`
+   - `Research Journal`
    - `Practical Guidance For Future Experiments`
 3. Do not retry experiments that the log rejects unless surrounding code changed enough to make the old result stale. Record why the retry is justified.
 4. Capture a benchmark-focused profile when direct runs show a material regression or when hotspot attribution is needed. Use the matching `profile_benchmark.cmd` command documented in the `Benchmark Workflow` section of `docs/profile_benchmark.md`.
@@ -56,7 +57,7 @@ Use this skill to verify that CaseDash performance still matches the maintained 
 2. Keep edits scoped to the owning subsystem and the regressed benchmark path.
 3. Preserve user-visible behavior unless the user explicitly asks for a behavior change; update the owning behavior docs when behavior changes.
 4. Rebuild and rerun the affected benchmark after each serious experiment.
-5. If an experiment regresses, is neutral without improving code clarity, or contradicts the benchmark log, revert only your own experiment changes and record the rejected result in `docs/profile_benchmark.md`.
+5. If an experiment regresses, is neutral without improving code clarity, or contradicts the benchmark log, revert only your own experiment changes and record the rejected shared result in `docs/profile_benchmark.md`.
 6. Keep retained optimizations only when direct benchmark data supports them and the final validation set remains healthy.
 7. Add concise comments only where a non-obvious code shape preserves a measured performance invariant.
 
@@ -70,9 +71,13 @@ Use this skill to verify that CaseDash performance still matches the maintained 
 
 ## Documentation
 
+Update the matching `docs/performance/<machine>.md` file when:
+
+- A benchmark range changes and the new result becomes the maintained current-tree range.
+- A current bottleneck or machine-specific research direction changes.
+
 Update `docs/profile_benchmark.md` when:
 
-- A benchmark baseline changes and the new result becomes the maintained current-tree baseline.
 - A retained optimization changes benchmark performance or hotspot shape.
 - A rejected or reverted experiment should not be repeated.
 - A new recurring performance pitfall is discovered.
@@ -88,6 +93,6 @@ Summarize:
 - Build command and benchmark commands run.
 - Baseline comparison for every benchmark, including any repeated noisy runs.
 - Regressions found, root cause, and files changed.
-- Final benchmark timing lines and whether they are at or better than the maintained baseline.
+- Final benchmark timing lines and whether they are within or better than the maintained range.
 - Profiling evidence used, if any.
 - Docs and validation commands run.

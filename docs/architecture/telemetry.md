@@ -1,6 +1,6 @@
 # Telemetry Package
 
-`src/telemetry/` owns live collection, fake collection, the telemetry runtime thread, snapshot and dump-facing telemetry types, provider bridges, retained histories, the production metric catalog, FPS provider contracts, and the service IPC protocol.
+`src/telemetry/` owns live collection, fake collection, the telemetry runtime thread, telemetry snapshot contracts, snapshot dump-facing telemetry types, provider bridges, retained histories, the production metric catalog, FPS provider contracts, and the service IPC protocol.
 
 ## Responsibilities
 

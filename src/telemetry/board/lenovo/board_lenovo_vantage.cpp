@@ -38,6 +38,7 @@ constexpr DWORD kPipeConnectTimeoutMs = 100;
 constexpr DWORD kPipeReadChunkBytes = 4096;
 constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kSensorRetrySampleInterval = 10;
+constexpr std::chrono::seconds kGameZoneFanRetryInterval{10};
 constexpr std::chrono::seconds kDirectSnapshotRefreshInterval{5};
 constexpr DWORD kWmiQueryTimeoutMs = 1500;
 constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";
@@ -1170,29 +1171,27 @@ private:
             return {};
         }
         if (!gameZoneFanUsable_) {
-            ++gameZoneFanRetrySample_;
-            if (gameZoneFanRetrySample_ < kSensorRetrySampleInterval) {
+            const auto now = std::chrono::steady_clock::now();
+            if (lastGameZoneFanAttempt_.has_value() && now - *lastGameZoneFanAttempt_ < kGameZoneFanRetryInterval) {
                 diagnostics = ResourceStringText(RES_STR("Lenovo GameZone WMI fan query is waiting for retry."));
                 return {};
             }
-            gameZoneFanRetrySample_ = 0;
         }
 
+        lastGameZoneFanAttempt_ = std::chrono::steady_clock::now();
         LenovoHardwareScanSnapshot snapshot = CaptureLenovoGameZoneWmiFans(trace_);
         diagnostics = snapshot.diagnostics;
         if (!snapshot.success) {
             gameZoneFanUsable_ = false;
-            gameZoneFanRetrySample_ = 0;
             return {};
         }
         if (!HasAvailableFanReading(snapshot)) {
             gameZoneFanUsable_ = false;
-            gameZoneFanRetrySample_ = 0;
             return snapshot;
         }
 
         gameZoneFanUsable_ = true;
-        gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
+        lastGameZoneFanAttempt_.reset();
         return snapshot;
     }
 
@@ -1233,8 +1232,8 @@ private:
     std::future<LenovoHardwareScanSnapshot> pendingDirectSnapshot_;
     std::optional<std::chrono::steady_clock::time_point> lastServiceSnapshotStart_;
     std::optional<std::chrono::steady_clock::time_point> lastDirectSnapshotStart_;
+    std::optional<std::chrono::steady_clock::time_point> lastGameZoneFanAttempt_;
     int serviceRetrySample_ = kSensorRetrySampleInterval;
-    int gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
     bool serviceUsable_ = true;
     bool gameZoneFanUsable_ = true;
     bool wantsGameZoneFans_ = false;

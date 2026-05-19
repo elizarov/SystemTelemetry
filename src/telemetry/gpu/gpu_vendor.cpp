@@ -57,23 +57,27 @@ using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
 
 class UnsupportedGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    UnsupportedGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter)
-        : trace_(trace), adapter_(std::move(adapter)) {}
+    UnsupportedGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps)
+        : trace_(trace), adapter_(std::move(adapter)), collectPresentedFps_(collectPresentedFps) {}
 
     bool Initialize() override {
         sample_.providerName = "Unsupported GPU";
         sample_.available = false;
         sample_.diagnostics =
             ResourceStringText(RES_STR("No supported GPU telemetry provider matches the selected adapter vendor."));
-        fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
-        if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
-            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+        if (collectPresentedFps_) {
+            fpsProvider_ = CreatePresentedFpsProvider(trace_, adapter_);
+            if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
+                fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
+            } else {
+                const FpsTelemetrySample fpsSample =
+                    fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
+                fpsDiagnostics_ = fpsSample.diagnostics.empty()
+                                      ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                                      : fpsSample.diagnostics;
+            }
         } else {
-            const FpsTelemetrySample fpsSample =
-                fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+            fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS collection not requested by layout."));
         }
 
         const std::string adapterName = adapter_.has_value() ? adapter_->adapterName : std::string();
@@ -119,20 +123,21 @@ private:
     GpuVendorTelemetrySample sample_;
     std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
+    bool collectPresentedFps_ = false;
 };
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(
-    Trace& trace, GpuVendor vendor, std::optional<GpuAdapterInfo> adapter) {
+    Trace& trace, GpuVendor vendor, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
     if (vendor == GpuVendor::Nvidia) {
-        return CreateNvidiaGpuTelemetryProvider(trace, adapter);
+        return CreateNvidiaGpuTelemetryProvider(trace, adapter, collectPresentedFps);
     }
     if (vendor == GpuVendor::Amd) {
-        return CreateAmdGpuTelemetryProvider(trace, adapter);
+        return CreateAmdGpuTelemetryProvider(trace, adapter, collectPresentedFps);
     }
     if (vendor == GpuVendor::Intel) {
-        return CreateIntelGpuTelemetryProvider(trace, adapter);
+        return CreateIntelGpuTelemetryProvider(trace, adapter, collectPresentedFps);
     }
-    return std::make_unique<UnsupportedGpuTelemetryProvider>(trace, std::move(adapter));
+    return std::make_unique<UnsupportedGpuTelemetryProvider>(trace, std::move(adapter), collectPresentedFps);
 }
 
 int PreferredGpuAdapterMatchRank(const std::string& adapterName, std::string_view preferredAdapterName) {
@@ -322,11 +327,12 @@ std::optional<GpuAdapterInfo> ExtractPrimaryGpuAdapterInfo(Trace& trace) {
 }
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
-    Trace& trace, const std::optional<GpuAdapterInfo>& adapter) {
+    Trace& trace, const std::optional<GpuAdapterInfo>& adapter, bool collectPresentedFps) {
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
     trace.WriteFmt(TracePrefix::GpuVendor,
-        RES_STR("create vendor=%s adapter=\"%s\""),
+        RES_STR("create vendor=%s adapter=\"%s\" collect_presented_fps=%s"),
         GpuVendorName(vendor),
-        adapter.has_value() ? adapter->adapterName.c_str() : "");
-    return CreateGpuVendorProviderForVendor(trace, vendor, adapter);
+        adapter.has_value() ? adapter->adapterName.c_str() : "",
+        Trace::BoolText(collectPresentedFps));
+    return CreateGpuVendorProviderForVendor(trace, vendor, adapter, collectPresentedFps);
 }
