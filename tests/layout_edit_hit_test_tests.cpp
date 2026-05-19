@@ -5,9 +5,9 @@
 #include <string>
 #include <vector>
 
-#include "config/config_telemetry.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "dashboard_renderer/impl/layout_edit_overlay_renderer.h"
 #include "layout_edit/layout_edit_hit_test.h"

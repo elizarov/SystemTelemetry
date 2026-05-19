@@ -6,8 +6,8 @@
 #include <string>
 #include <string_view>
 
-#include "config/config_schema.h"
 #include "config/config_runtime_fields.h"
+#include "config/config_schema.h"
 #include "widget/layout_edit_parameter_id.h"
 
 struct LayoutEditTooltipDescriptor {

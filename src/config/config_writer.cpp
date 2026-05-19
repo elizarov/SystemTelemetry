@@ -1,9 +1,9 @@
 #include "config/config_writer.h"
 
-#include "config/config_telemetry.h"
 #include "config/config_file_io.h"
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
+#include "config/config_telemetry.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 

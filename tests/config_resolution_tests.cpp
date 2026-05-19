@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 
-#include "config/config_telemetry.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 
 namespace {
 
