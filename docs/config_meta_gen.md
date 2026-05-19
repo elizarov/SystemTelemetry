@@ -1,30 +1,32 @@
 # Config Metadata Generation
 
-This document describes the maintained config metadata generator and its ownership boundaries. `src/config/config_desc.h` is the single source for schema-shaped config structs, section names, dynamic-section prefixes, runtime field metadata, and generated layout-edit field metadata.
+`tools/config_meta_gen.py` generates CaseDash config schema structs, runtime config field metadata, a review manifest, and layout-edit field metadata from `src/config/config_desc.h`. The descriptor is the maintained source for schema-shaped config structs, section names, dynamic-section prefixes, field keys, field policies, and generated layout-edit config-field mappings.
 
-## Generated Outputs
+`src/config/config.h` owns hand-authored value types and codec-owned payloads, then includes `config/config_meta.generated.h` for generated schema structs. `ColorConfig`, `UiFontConfig`, `LogicalPointConfig`, `LogicalSizeConfig`, `LayoutNodeConfig`, `MetricDefinitionConfig`, `BoardConfig`, and `MetricsSectionConfig` stay hand-authored because they carry behavior or storage that is not a fixed field list.
 
-CMake runs `tools/config_meta_gen.py` during normal builds. The generator writes:
+## Build Integration
 
-- `build/cmake/generated/config/config_meta.generated.h`
-- `build/cmake/generated/config/config_meta.generated.cpp`
-- `build/cmake/generated/config/config_meta.generated.json`
-- `build/cmake/generated/layout_model/layout_edit_parameter_metadata.generated.h`
-- `build/cmake/generated/layout_model/layout_edit_parameter_metadata.generated.cpp`
+CMake runs the generator as a custom command during normal builds. The command depends on `tools/config_meta_gen.py`, `src/config/config_desc.h`, and `resources/config.ini`, so CMake regenerates metadata when the generator, descriptor, or embedded config template changes.
 
-`src/config/config.h` owns hand-authored value types and custom codec payloads, then includes `config/config_meta.generated.h` for the generated schema structs. `ColorConfig`, `UiFontConfig`, `LogicalPointConfig`, `LogicalSizeConfig`, `LayoutNodeConfig`, `MetricDefinitionConfig`, `BoardConfig`, and `MetricsSectionConfig` stay hand-authored because they carry behavior or codec-owned storage that is not a fixed schema field list.
+The generator writes these files under `build/cmake/generated/`:
 
-The generated config `.cpp` owns the runtime field tables and flattened section descriptor table consumed by the parser, writer, color resolver, and metadata tests. The generated layout-edit `.cpp` owns only layout-edit config field metadata. The `LayoutEditParameter` enum stays hand-authored in `src/widget/layout_edit_parameter_id.h` because its order is a UI contract for hit-test priority.
+- `config/config_meta.generated.h`
+- `config/config_meta.generated.cpp`
+- `config/config_meta.generated.json`
+- `layout_model/layout_edit_parameter_metadata.generated.h`
+- `layout_model/layout_edit_parameter_metadata.generated.cpp`
 
-## Descriptor Input
+Generated C++ is compiled into the app, tests, and benchmarks. The JSON manifest records sections, dynamic sections, custom codecs, editable fields, and layout-edit parameter mappings for review and tooling. The generator writes outputs only when content changes, which keeps rebuilds focused.
 
-`src/config/config_desc.h` is a C++-like descriptor file parsed by the generator. It is readable next to the real config source but is not compiled directly. The parser is intentionally line-oriented and accepts only the small descriptor shape used by the project:
+## Descriptor Source
+
+`src/config/config_desc.h` is a C++-like descriptor file. It is readable beside the real config source but is parsed by the generator instead of compiled directly. The parser is intentionally line-oriented and accepts only the descriptor shape used by the project:
 
 ```text
 descriptor        := (blank | comment | include | namespace_alias | struct_decl)*
 include           := "#include" quoted_path
 namespace_alias   := "namespace" identifier "=" qualified_identifier ";"
-struct_decl       := struct_directive? "struct" type_name "{" field_decl* "};"
+struct_decl        := struct_directive? "struct" type_name "{" field_decl* "};"
 struct_directive  := "// config_meta:" struct_kind
 struct_kind       := "static" section_name
                    | "dynamic_section" section_pattern "key=" identifier
@@ -41,9 +43,9 @@ section_name      := "[" literal "]"
 codec_name        := "board" | "metrics"
 ```
 
-The generator validates duplicate section names, duplicate field keys, missing dynamic key fields, malformed directives, unknown policies, unknown custom codecs, unsupported field types, and generated config spellings that do not match `resources/config.ini`.
+Field keys default to snake case derived from lower-camel C++ member names. `rename=` supplies the persisted key when a source member needs a different spelling. `FontsConfig::smallText` maps to the `[fonts] small` key this way, keeping the Win32 RPC `small` token out of the config schema.
 
-## Section Kinds
+## Section Models
 
 Static sections map one generated struct to one persisted section:
 
@@ -55,9 +57,7 @@ struct FontsConfig {
 };
 ```
 
-Field keys are derived by converting lower-camel C++ member names to snake case. Use `rename=` only when a C++ identifier must differ from the persisted key. `FontsConfig::smallText` uses `rename=small` so config files keep the `[fonts] small` key while source avoids the Win32 RPC `small` token.
-
-Dynamic sections map a vector item type to a section prefix and key field:
+Dynamic sections map a vector item type to a section prefix and string key field:
 
 ```cpp
 // config_meta: dynamic_section [theme.$name] key=name
@@ -68,9 +68,9 @@ struct ThemeConfig {
 };
 ```
 
-The generated section table includes typed callbacks to find, ensure, and enumerate dynamic items. Parser dispatch uses ensure semantics because a parsed dynamic section creates or updates a keyed item. Writer dispatch enumerates existing keyed items.
+The dynamic key member comes from the section suffix, so it is not emitted as a configurable field. The generated section descriptor includes callbacks to ensure an item during parsing, find an item by key, and enumerate existing items during writing.
 
-Custom sections describe codecs that own their own key space:
+Custom sections reserve section order and codec dispatch for hand-authored parsers:
 
 ```cpp
 // config_meta: custom_section [board] codec=board
@@ -80,13 +80,28 @@ struct BoardConfig {};
 struct MetricsSectionConfig {};
 ```
 
-`[board]` and `[metrics]` participate in the generated section order, but they do not receive generic field tables or generated `Section` aliases. Their parse and save behavior stays in hand-authored codec functions because board sensor bindings and metric definitions are not fixed fields.
+`[board]` and `[metrics]` do not receive generic field tables because board sensor bindings and metric definitions have codec-owned key spaces.
 
-Container and root structs describe ownership and traversal order. `AppConfig` is the only root. Nested owners such as `LayoutConfig` use `container`. Fields marked `runtime_only` stay in the generated schema struct but are excluded from parser, writer, manifest, and layout-edit field metadata.
+Container and root structs describe ownership and traversal order. `AppConfig` is the only root, and nested owners such as `LayoutConfig` use `container`. `runtime_only` fields stay in the generated schema struct but are excluded from runtime field metadata, writer output, the JSON manifest, and layout-edit field metadata.
+
+## Generated Schema Structs
+
+`config_meta.generated.h` defines schema structs for non-custom descriptor entries. Fields are default-initialized, and each generated struct has a defaulted equality operator. Custom section structs are skipped because their storage is hand-authored in `src/config/config.h`.
+
+The generated header contains data layout only. Parsing, encoding, clamping, color formatting, layout-expression formatting, and field comparison stay in hand-authored config code.
 
 ## Runtime Metadata
 
-Generated runtime metadata is table-driven. Public consumers use:
+`config_meta.generated.cpp` emits a field array for each static and dynamic section, then flattens the root ownership tree into one runtime section descriptor table. The table preserves descriptor traversal order and records:
+
+- Section name or dynamic prefix.
+- Root offset for the owning struct.
+- Section kind: static, dynamic, or custom.
+- Codec kind: structured, board, or metrics.
+- Field span for structured sections.
+- Dynamic item size, key offset, and callbacks for dynamic sections.
+
+Public runtime consumers use:
 
 - `RuntimeConfigSectionDescriptors()`
 - `RuntimeConfigFields(section)`
@@ -94,41 +109,25 @@ Generated runtime metadata is table-driven. Public consumers use:
 - `FindRuntimeConfigDynamicSection(sectionName)`
 - `FindRuntimeConfigSectionByName(sectionName)`
 
-The flattened section descriptor table records section name or prefix, section kind, codec kind, root owner offset, field span, and dynamic callbacks. Parser and writer dispatch through this table instead of recursive template metadata.
-
-Field descriptors record key text, owner offset, value kind, and clamp policy. The generated layout-edit metadata separately records value format and the `LayoutEditParameter` entry that uses the field.
-
-`src/config/config_schema.h` contains only shared non-template metadata enums. Config schema fields and section metadata live in generated tables, not macro-expanded field lists or type-level descriptors.
+`RuntimeConfigFieldDescriptor` records key text, owner offset, value kind, and clamp policy. `DecodeRuntimeConfigField`, `EncodeRuntimeConfigField`, and `RuntimeConfigFieldEquals` interpret those descriptors for parser, writer, save comparison, and layout-edit mutation paths. Shared non-template enums such as `configschema::ValueFormat` live in hand-authored headers; generated files provide the table data.
 
 ## Layout-Edit Metadata
 
-The layout-edit generator output maps hand-authored `LayoutEditParameter` values to generated config field metadata. It keeps metadata separate from the runtime section table because only layout edit needs parameter ordering, display names, tooltip formats, and hit-target field lookup.
+The generator emits layout-edit config-field metadata separately from the runtime section table because layout edit needs direct `AppConfig` root offsets indexed by `LayoutEditParameter`.
 
-The generator preserves the current active parameter order from `src/widget/layout_edit_parameter_id.h`. New active parameters must be added to the enum in the exact hit-test priority position expected by layout edit, then the descriptor metadata can map them to section and field keys.
+`tools/config_meta_gen.py` keeps the active layout-edit field list in `ACTIVE_PARAMETERS`. Each entry names a `LayoutEditParameter` enum value, a static-section owner type, and a descriptor field. The generated table follows that list order, and the generated `.cpp` contains a `static_assert` that its row count matches `LayoutEditParameter::Count`. `src/widget/layout_edit_parameter_id.h` remains the authoritative enum and hit-test priority contract, so the enum order and `ACTIVE_PARAMETERS` order stay aligned.
 
-Layout edit reads generated metadata through:
+Generated layout-edit rows include section name, persisted field key, value format, runtime value kind, clamp policy, and root offset. Layout edit reads the table through:
 
 - `GetLayoutEditParameterInfo`
 - `GetLayoutEditConfigFieldMetadata`
 - `FindLayoutEditParameterByConfigField`
 - `FindLayoutEditTooltipDescriptor`
 
-## Validation
+Hand-authored layout-edit code uses this metadata for hit targets, tooltip config paths, numeric and color edits, font edits, and dirty comparison.
 
-Use the maintained validation entrypoints after config metadata changes:
+## Consistency Checks
 
-```bat
-build.cmd
-test.cmd
-format.cmd
-```
+The generator rejects malformed descriptors before writing outputs. It checks duplicate structs, duplicate sections, duplicate field keys, missing dynamic key fields, unknown field types, unknown field policies, unknown custom codecs, unsupported owner links, invalid `rename=` keys, and `runtime_only` fields that also declare `rename=`.
 
-Run focused headless diagnostics against the fresh build when parser, writer, color, or layout-edit metadata behavior changes:
-
-```bat
-build\CaseDash.exe /default-config /fake /exit /trace:build\config_meta_trace.txt /save-full-config:build\config_meta_full.ini
-build\CaseDash.exe /default-config /fake /exit /edit-layout /trace:build\config_meta_edit_trace.txt /screenshot:build\config_meta_edit.png
-build\CaseDash.exe /default-config /fake /exit /edit-layout /trace:build\config_meta_guide_trace.txt /layout-guide-sheet:build\config_meta_guide.png
-```
-
-Inspect the saved full config for section order, dynamic section names, derived color expressions, and custom `[board]` or `[metrics]` behavior. Inspect layout-edit traces for expected config paths, active-region metadata, and generated field names.
+The generator also compares generated section and field spellings with `resources/config.ini`. Static sections must match the template section keys exactly. Dynamic sections must have at least one representative template section, and the union of representative keys must match the descriptor fields. Custom sections must be present in the template so generated section order stays aligned with the embedded config.
