@@ -1,5 +1,7 @@
 #include "config/config_io.h"
 
+#include <windows.h>
+
 #include <string>
 
 #include "config/config_parser.h"
