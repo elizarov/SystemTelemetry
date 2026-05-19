@@ -2,9 +2,11 @@
 
 #include <string>
 
-#include "config/config.h"
 #include "config/metric_catalog.h"
 #include "util/file_path.h"
+
+struct AppConfig;
+struct LayoutConfig;
 
 enum class ConfigSaveShape {
     UpdateOrAppend,

@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include "config/config.h"
 #include "config/config_resolution.h"
 
 namespace {

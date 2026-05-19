@@ -2,6 +2,8 @@
 
 #include <algorithm>
 
+#include "config/config.h"
+
 namespace {
 
 LayoutCardConfig* FindCardLayoutById(LayoutConfig& layout, const std::string& cardId) {

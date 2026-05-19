@@ -6,7 +6,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "config/config_schema.h"
 #include "config/metric_display_style.h"
 #include "config/telemetry_settings.h"
 

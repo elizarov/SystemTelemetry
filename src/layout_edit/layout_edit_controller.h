@@ -7,12 +7,13 @@
 #include <string>
 #include <vector>
 
-#include "config/config.h"
 #include "layout_model/dashboard_overlay_state.h"
 #include "layout_model/layout_edit_active_region.h"
 #include "layout_model/layout_edit_layout_target.h"
 #include "widget/layout_edit_parameter_id.h"
 #include "widget/layout_edit_types.h"
+
+struct AppConfig;
 
 class LayoutEditHost {
 public:

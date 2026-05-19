@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "config/config.h"
 #include "layout_edit/layout_edit_controller.h"
 
 namespace {

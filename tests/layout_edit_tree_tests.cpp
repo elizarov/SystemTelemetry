@@ -3,6 +3,7 @@
 #include <sstream>
 #include <vector>
 
+#include "config/config.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "util/file_path.h"
 #include "util/localization_catalog.h"

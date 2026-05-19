@@ -5,7 +5,6 @@
 #include <cstdlib>
 #include <set>
 #include <string_view>
-#include <type_traits>
 
 #include "config/color_resolver.h"
 #include "config/config_file_io.h"

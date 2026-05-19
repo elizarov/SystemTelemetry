@@ -5,8 +5,9 @@
 #include <optional>
 #include <string>
 
-#include "config/config.h"
 #include "util/scale.h"
+
+struct AppConfig;
 
 struct MonitorPlacementInfo {
     std::string deviceName;

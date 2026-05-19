@@ -1,5 +1,7 @@
 #include "renderer/impl/palette.h"
 
+#include "config/config.h"
+
 namespace {
 
 RenderColor ToRenderColor(ColorConfig color) {
