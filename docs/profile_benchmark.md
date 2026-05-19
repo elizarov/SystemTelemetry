@@ -7,6 +7,12 @@ See also: [docs/build.md](build.md) for build and tooling entrypoints, [docs/opt
 
 This file keeps the shared optimization journal useful across test machines. It records benchmark commands, cross-machine rules, retained optimization decisions, rejected hypotheses that should not be repeated blindly, and practical guidance for new experiments.
 
+## Telemetry Benchmark Invariant
+
+- `update-telemetry` intentionally stresses the real synchronous provider path back-to-back. Do not add benchmark-only cadence gates, retry delays, cached provider samples, or config variants that skip requested telemetry measurements and then treat the result as an optimization.
+- A retained telemetry optimization must reduce CPU work paid by the real app for each 250 ms metrics collection, or it must deliberately change production behavior with the owning spec updated in the same change.
+- Overlay configs that remove metrics are useful for isolating bottlenecks, but their results are diagnostic variants only. Keep the default benchmark range on the real requested metric set.
+
 ## Performance Documentation Rules
 
 - Machine performance files live under `docs/performance/<machine>.md`.

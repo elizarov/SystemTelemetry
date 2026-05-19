@@ -22,7 +22,7 @@ namespace {
 constexpr DWORD kPipeConnectTimeoutMs = 100;
 constexpr DWORD kPipeReadChunkBytes = 4096;
 constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
-constexpr ULONGLONG kServiceRetryIntervalMs = 10'000;
+constexpr int kServiceRetrySampleInterval = 10;
 
 std::string CleanProcessDisplayName(std::string processName) {
     const size_t slash = processName.find_last_of("\\/");
@@ -218,7 +218,9 @@ public:
             return serviceProvider_->Sample(effectiveOptions);
         }
 
-        if (ShouldRetryServiceProvider()) {
+        ++serviceRetrySample_;
+        if (serviceRetrySample_ >= kServiceRetrySampleInterval) {
+            serviceRetrySample_ = 0;
             if (TryInitializeServiceProvider()) {
                 trace_.Write(TracePrefix::FpsProvider, RES_STR("service_recovered"));
                 return serviceProvider_->Sample(effectiveOptions);
@@ -235,23 +237,13 @@ public:
     }
 
 private:
-    bool ShouldRetryServiceProvider() const {
-        return nextServiceRetryTickMs_ == 0 || GetTickCount64() >= nextServiceRetryTickMs_;
-    }
-
-    void ScheduleServiceRetry() {
-        nextServiceRetryTickMs_ = GetTickCount64() + kServiceRetryIntervalMs;
-    }
-
     bool TryInitializeServiceProvider() {
         auto provider = CreateFpsServiceClientProvider(trace_, defaultOptions_);
         if (provider != nullptr && provider->Initialize()) {
             serviceProvider_ = std::move(provider);
-            nextServiceRetryTickMs_ = 0;
             return true;
         }
 
-        ScheduleServiceRetry();
         trace_.Write(TracePrefix::FpsProvider, RES_STR("service_unavailable fallback=local_etw"));
         return false;
     }
@@ -260,7 +252,7 @@ private:
     FpsTelemetrySampleOptions defaultOptions_;
     std::unique_ptr<FpsTelemetryProvider> serviceProvider_;
     std::unique_ptr<FpsTelemetryProvider> localProvider_;
-    ULONGLONG nextServiceRetryTickMs_ = 0;
+    int serviceRetrySample_ = kServiceRetrySampleInterval;
     bool localProviderInitialized_ = false;
     bool initialized_ = false;
 };
