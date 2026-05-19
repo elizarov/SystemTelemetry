@@ -27,7 +27,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy. `format.cmd` owns narrow exclusions for mixed-mode C++/CLI bridge `.cpp` files that clang-format versions do not format consistently.
-- `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and tidy automation.
+- `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
+- `.github/workflows/full-tidy.yml` is the single maintained source of truth for manual full clang-tidy automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
 
@@ -43,7 +44,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
-- Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and tidy checks on the Windows runner before merge.
+- Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and unused-include checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
 - Keep local `NOLINT` suppressions out of source files; maintained clang-tidy false positives live in the lint tool allowlist.
@@ -98,7 +99,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
 - Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
-- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_TIDY_TIMEOUT_SECONDS` for the tidy sweep.
+- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_TIDY_TIMEOUT_SECONDS` and `CASEDASH_TIDY_MAX_PARALLEL` for clang-tidy-backed include checks.
 - `for /f` commands invoke `vswhere.exe` through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
 - Config-schema reflection descriptors stay type-derived and default-initialized because the GitHub Visual Studio runner can lag the local MSVC toolset.
 - The repo uses CRLF text checkouts; `.githooks/pre-commit` stays a minimal CRLF-tolerant shell launcher, and multi-line hook logic lives in PowerShell.

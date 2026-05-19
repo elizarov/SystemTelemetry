@@ -1,0 +1,58 @@
+name: Full Clang-Tidy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  full-tidy:
+    name: Full Clang-Tidy
+    runs-on: windows-2025-vs2026
+    timeout-minutes: 240
+
+    env:
+      CASEDASH_TIDY_TIMEOUT_SECONDS: 1800
+      CASEDASH_TIDY_MAX_PARALLEL: 4
+      CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Restore vcpkg caches
+        id: vcpkg-cache-restore
+        uses: actions/cache/restore@v5
+        continue-on-error: true
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-full-tidy-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/full-tidy.yml') }}-${{ github.run_id }}
+          restore-keys: |
+            vcpkg-windows-2025-vs2026-full-tidy-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/full-tidy.yml') }}-
+            vcpkg-windows-2025-vs2026-
+
+      - name: Build
+        shell: cmd
+        run: build.cmd
+
+      - name: Run full clang-tidy
+        shell: cmd
+        run: lint.cmd tidy
+
+      - name: Upload clang-tidy report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: clang-tidy-report
+          path: build/clang_tidy_report.txt
+          if-no-files-found: ignore
+
+      - name: Save vcpkg caches
+        if: always()
+        uses: actions/cache/save@v5
+        continue-on-error: true
+        with:
+          path: |
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\downloads
+            ${{ github.workspace }}\.github-cache\CaseDash\vcpkg\registries
+          key: vcpkg-windows-2025-vs2026-full-tidy-${{ hashFiles('vcpkg.json', 'build.cmd', '.github/workflows/full-tidy.yml') }}-${{ github.run_id }}

@@ -20,8 +20,6 @@ jobs:
       contents: write
 
     env:
-      CASEDASH_TIDY_TIMEOUT_SECONDS: 1800
-      CASEDASH_TIDY_MAX_PARALLEL: 4
       CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
 
     steps:

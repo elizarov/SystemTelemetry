@@ -8,6 +8,9 @@ param(
     [ValidateSet('all', 'changed')]
     [string]$Scope = 'all',
 
+    [ValidateSet('full', 'includes')]
+    [string]$CheckSet = 'full',
+
     [int]$MaxParallel = 0,
 
     [int]$TimeoutSeconds = 240
@@ -86,12 +89,44 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'
 )
 
+$clangTidyIgnoredUnusedIncludeWarningSet = [System.Collections.Generic.HashSet[string]]::new(
+    [System.StringComparer]::OrdinalIgnoreCase)
+foreach ($warning in $clangTidyIgnoredUnusedIncludeWarnings) {
+    [void]$clangTidyIgnoredUnusedIncludeWarningSet.Add($warning)
+}
+
 function ConvertTo-RepoSlashPath {
     param(
         [string]$Path
     )
 
     return $Path -replace '\\', '/'
+}
+
+function Get-HeaderKeyLeaf {
+    param(
+        [string]$Header
+    )
+
+    $normalizedHeader = ConvertTo-RepoSlashPath -Path $Header
+    $parts = $normalizedHeader -split '/'
+    return $parts[$parts.Count - 1]
+}
+
+function Test-IgnoredUnusedIncludeKey {
+    param(
+        [string]$RelativePath,
+        [string]$Header
+    )
+
+    $relativeSlashPath = ConvertTo-RepoSlashPath -Path $RelativePath
+    $normalizedHeader = ConvertTo-RepoSlashPath -Path $Header
+    if ($clangTidyIgnoredUnusedIncludeWarningSet.Contains("$relativeSlashPath|$normalizedHeader")) {
+        return $true
+    }
+
+    $headerLeaf = Get-HeaderKeyLeaf -Header $normalizedHeader
+    return $clangTidyIgnoredUnusedIncludeWarningSet.Contains("$relativeSlashPath|$headerLeaf")
 }
 
 function Test-IgnoredUnusedIncludeDiagnostic {
@@ -108,8 +143,7 @@ function Test-IgnoredUnusedIncludeDiagnostic {
     }
 
     $relativePath = ConvertTo-RepoSlashPath -Path (Get-RelativeRepoPath -RepoRoot $RepoRoot -FullPath $match.Groups['file'].Value)
-    $key = "$relativePath|$($match.Groups['header'].Value)"
-    return $key -in $clangTidyIgnoredUnusedIncludeWarnings
+    return Test-IgnoredUnusedIncludeKey -RelativePath $relativePath -Header $match.Groups['header'].Value
 }
 
 function Test-TidyStateReady {
@@ -429,7 +463,8 @@ function New-ReportWriter {
         }
     } catch {
         $directory = Split-Path -Path $PreferredPath -Parent
-        $fallbackPath = Join-Path $directory ("clang_tidy_report_{0}_{1}.txt" -f (Get-Date -Format 'yyyyMMdd_HHmmss'), $PID)
+        $reportBaseName = [System.IO.Path]::GetFileNameWithoutExtension($PreferredPath)
+        $fallbackPath = Join-Path $directory ("{0}_{1}_{2}.txt" -f $reportBaseName, (Get-Date -Format 'yyyyMMdd_HHmmss'), $PID)
         $writer = [System.IO.StreamWriter]::new($fallbackPath, $false, $utf8NoBom)
         return @{
             Path = $fallbackPath
@@ -458,12 +493,52 @@ function Get-RelativeRepoPath {
     return $normalizedPath
 }
 
+function Get-IncludeCleanerLineFilter {
+    param(
+        [string]$RepoRoot,
+        [string]$RelativePath
+    )
+
+    $fullPath = Join-Path $RepoRoot $RelativePath
+    if (-not (Test-Path -LiteralPath $fullPath)) {
+        return $null
+    }
+
+    $relativeSlashPath = ConvertTo-RepoSlashPath -Path $RelativePath
+    $ranges = [System.Collections.Generic.List[string]]::new()
+    $lineNumber = 0
+    foreach ($line in [System.IO.File]::ReadLines($fullPath)) {
+        $lineNumber++
+        $match = [regex]::Match($line, '^\s*#\s*include\s*[<"](?<header>[^>"]+)[>"]')
+        if (-not $match.Success) {
+            continue
+        }
+
+        $header = ConvertTo-RepoSlashPath -Path $match.Groups['header'].Value
+        if (Test-IgnoredUnusedIncludeKey -RelativePath $relativeSlashPath -Header $header) {
+            continue
+        }
+
+        $ranges.Add("[$lineNumber,$lineNumber]")
+    }
+
+    if ($ranges.Count -eq 0) {
+        return $null
+    }
+
+    $lineFilterPath = $RelativePath -replace '/', '\'
+    $escapedPath = $lineFilterPath.Replace('\', '\\').Replace('"', '\"')
+    return '[{"name":"' + $escapedPath + '","lines":[' + ($ranges -join ',') + ']}]'
+}
+
 function Start-TidyProcess {
     param(
         [string]$ClangTidyPath,
         [string]$RepoRoot,
         [string]$RelativePath,
         [string]$Mode,
+        [string]$CheckSet,
+        [string]$LineFilter,
         [int]$Index
     )
 
@@ -480,11 +555,23 @@ function Start-TidyProcess {
         '--quiet',
         '-p', (Join-Path $RepoRoot 'build\cmake')
     )
-    if ([System.IO.Path]::GetExtension($RelativePath) -eq '.h') {
-        $commandArgs += '--extra-arg=-Wunused-function'
+
+    if ($CheckSet -eq 'includes') {
+        $commandArgs += @(
+            '-checks=-*,misc-include-cleaner',
+            '-warnings-as-errors=misc-include-cleaner'
+        )
+        if (-not [string]::IsNullOrWhiteSpace($LineFilter)) {
+            $commandArgs += "--line-filter=$LineFilter"
+        }
     } else {
-        $commandArgs += '--extra-arg=/clang:-Wunused-function'
+        if ([System.IO.Path]::GetExtension($RelativePath) -eq '.h') {
+            $commandArgs += '--extra-arg=-Wunused-function'
+        } else {
+            $commandArgs += '--extra-arg=/clang:-Wunused-function'
+        }
     }
+
     if ($Mode -eq 'fix') {
         $commandArgs += @('-fix', '--format-style=none')
     }
@@ -633,12 +720,55 @@ function Complete-TidyProcess {
     }
 }
 
+function Test-IncludeFixOutputSucceeded {
+    param(
+        [string[]]$Lines
+    )
+
+    $unusedIncludeDiagnostics = 0
+    $appliedFixes = -1
+    $totalFixes = -1
+
+    foreach ($entry in $Lines) {
+        $text = if ($null -eq $entry) { '' } else { $entry.ToString() }
+        if ([string]::IsNullOrWhiteSpace($text)) {
+            continue
+        }
+        if ($text -match '^(?<file>.*\.(?:cpp|h)):\d+:\d+: (?:warning|error): included header (?<header>\S+) is not used directly \[misc-include-cleaner(?:,-warnings-as-errors)?\]$') {
+            $unusedIncludeDiagnostics++
+            continue
+        }
+        if ($text -match '^\s*\d+\s*\|') {
+            continue
+        }
+        if ($text -match '^\s*\|') {
+            continue
+        }
+        if ($text -match ':\d+:\d+: note: FIX-IT applied suggested code changes$') {
+            continue
+        }
+
+        $summary = [regex]::Match($text, '^clang-tidy applied (?<applied>\d+) of (?<total>\d+) suggested fixes\.$')
+        if ($summary.Success) {
+            $appliedFixes = [int]$summary.Groups['applied'].Value
+            $totalFixes = [int]$summary.Groups['total'].Value
+            continue
+        }
+
+        return $false
+    }
+
+    return $unusedIncludeDiagnostics -gt 0 -and $totalFixes -gt 0 -and $appliedFixes -eq $totalFixes
+}
+
 function Write-TidyResult {
     param(
         [System.IO.StreamWriter]$Writer,
         [hashtable]$Result,
         [int]$FileCount,
         [int]$TimeoutSeconds,
+        [string]$Mode,
+        [string]$CheckSet,
         [ref]$TidyFailed
     )
 
@@ -665,9 +795,16 @@ function Write-TidyResult {
         }
     }
 
-    if ($Result.ExitCode -ne 0 -and ($Result.TimedOut -or $Result.HasReportableOutput)) {
+    $includeFixSucceeded = $false
+    if ($Mode -eq 'fix' -and $CheckSet -eq 'includes' -and -not $Result.TimedOut) {
+        $includeFixSucceeded = Test-IncludeFixOutputSucceeded -Lines $Result.OutputLines
+    }
+
+    if ($Result.ExitCode -ne 0 -and ($Result.TimedOut -or $Result.HasReportableOutput) -and -not $includeFixSucceeded) {
         $TidyFailed.Value = $true
         $Writer.WriteLine("clang-tidy exit code: $($Result.ExitCode)")
+    } elseif ($Result.ExitCode -ne 0 -and $includeFixSucceeded) {
+        $Writer.WriteLine("clang-tidy exit code ignored after applying unused include fixes: $($Result.ExitCode)")
     } elseif ($Result.ExitCode -ne 0) {
         $Writer.WriteLine("clang-tidy exit code ignored after filtering: $($Result.ExitCode)")
     }
@@ -678,7 +815,8 @@ function Write-TidyResult {
 
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
 $compileCommands = Join-Path $resolvedRoot 'build\cmake\compile_commands.json'
-$preferredReportPath = Join-Path $resolvedRoot 'build\clang_tidy_report.txt'
+$reportFileName = if ($CheckSet -eq 'includes') { 'clang_include_cleaner_report.txt' } else { 'clang_tidy_report.txt' }
+$preferredReportPath = Join-Path $resolvedRoot "build\$reportFileName"
 $clangTidy = Resolve-ClangTidyPath -RepoRoot $resolvedRoot -CompileCommandsPath $compileCommands
 
 if (-not $clangTidy) {
@@ -696,6 +834,7 @@ $files = if ($Scope -eq 'changed') {
 } else {
     @(Get-TrackedTidyFiles -RepoRoot $resolvedRoot)
 }
+
 if ($files.Count -eq 0) {
     if ($Scope -eq 'changed') {
         Write-Host 'No eligible changed project source or header files were found.'
@@ -704,6 +843,31 @@ if ($files.Count -eq 0) {
 
     Write-Host 'No eligible project source or header files were found.'
     exit 1
+}
+
+$lineFiltersByPath = @{}
+if ($CheckSet -eq 'includes') {
+    $includeFiles = [System.Collections.Generic.List[object]]::new()
+    foreach ($file in $files) {
+        $relativePath = Get-RelativeRepoPath -RepoRoot $resolvedRoot -FullPath $file.FullName
+        $lineFilter = Get-IncludeCleanerLineFilter -RepoRoot $resolvedRoot -RelativePath $relativePath
+        if ([string]::IsNullOrWhiteSpace($lineFilter)) {
+            continue
+        }
+
+        $lineFiltersByPath[$relativePath] = $lineFilter
+        $includeFiles.Add($file)
+    }
+
+    $files = @($includeFiles.ToArray())
+    if ($files.Count -eq 0) {
+        if ($Scope -eq 'changed') {
+            Write-Host 'No eligible changed project source or header files with non-ignored include lines were found.'
+        } else {
+            Write-Host 'No eligible project source or header files with non-ignored include lines were found.'
+        }
+        exit 0
+    }
 }
 
 $parallelism = $MaxParallel
@@ -719,15 +883,23 @@ try {
     $writer.WriteLine('clang-tidy report')
     $writer.WriteLine("Mode: $Mode")
     $writer.WriteLine("Scope: $Scope")
+    $writer.WriteLine("Check set: $CheckSet")
     $writer.WriteLine("Max parallel: $parallelism")
     $writer.WriteLine("Timeout seconds: $TimeoutSeconds")
     $writer.WriteLine("Generated: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss.fff')")
     $writer.WriteLine("Using clang-tidy: $clangTidy")
     $writer.WriteLine("Build database: $compileCommands")
+    if ($CheckSet -eq 'includes') {
+        $writer.WriteLine('Line filter: non-ignored include directives only')
+    }
     $writer.WriteLine()
 
     Write-Host "Using clang-tidy: $clangTidy"
-    Write-Host "Running optional clang-tidy sweep for $($files.Count) source and header files with parallelism=$parallelism..."
+    if ($CheckSet -eq 'includes') {
+        Write-Host "Running clang-tidy include-cleaner unused-include sweep for $($files.Count) source and header files with parallelism=$parallelism..."
+    } else {
+        Write-Host "Running optional clang-tidy sweep for $($files.Count) source and header files with parallelism=$parallelism..."
+    }
     if ($report.UsedFallback) {
         Write-Host "Primary report path is locked; writing to $reportPath instead."
     }
@@ -739,9 +911,10 @@ try {
     for ($index = 0; $index -lt $files.Count; $index++) {
         $file = $files[$index]
         $relativePath = Get-RelativeRepoPath -RepoRoot $resolvedRoot -FullPath $file.FullName
+        $lineFilter = if ($lineFiltersByPath.ContainsKey($relativePath)) { $lineFiltersByPath[$relativePath] } else { $null }
 
         Write-Host "[$($index + 1)/$($files.Count)] queued $relativePath"
-        $active.Add((Start-TidyProcess -ClangTidyPath $clangTidy -RepoRoot $resolvedRoot -RelativePath $relativePath -Mode $Mode -Index $index))
+        $active.Add((Start-TidyProcess -ClangTidyPath $clangTidy -RepoRoot $resolvedRoot -RelativePath $relativePath -Mode $Mode -CheckSet $CheckSet -LineFilter $lineFilter -Index $index))
 
         while ($active.Count -ge $parallelism) {
             $finishedState = $null
@@ -759,7 +932,7 @@ try {
 
             [void]$active.Remove($finishedState)
             $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds -RepoRoot $resolvedRoot
-            Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
+            Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -Mode $Mode -CheckSet $CheckSet -TidyFailed ([ref]$tidyFailed)
         }
     }
 
@@ -779,7 +952,7 @@ try {
 
         [void]$active.Remove($finishedState)
         $result = Complete-TidyProcess -State $finishedState -TimeoutSeconds $TimeoutSeconds -RepoRoot $resolvedRoot
-        Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -TidyFailed ([ref]$tidyFailed)
+        Write-TidyResult -Writer $writer -Result $result -FileCount $files.Count -TimeoutSeconds $TimeoutSeconds -Mode $Mode -CheckSet $CheckSet -TidyFailed ([ref]$tidyFailed)
     }
 
     if ($tidyFailed) {
