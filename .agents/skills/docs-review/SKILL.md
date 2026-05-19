@@ -26,24 +26,31 @@ Use this skill to make repository docs factual, current, and easy to maintain. A
    - Rewrite into present-tense steady-state statements.
    - Keep history only when the document explicitly exists as a changelog, release note, migration note, or retrospective.
 
-4. Review concision.
+4. Review terminology.
+   - Check project-specific terms against `docs/glossary.md`.
+   - Prefer canonical glossary terms and context-specific spellings over synonyms.
+   - When documentation introduces a new project-specific concept, either add it to the glossary in the same pass or rewrite the text to use an existing term.
+   - Preserve exact source identifiers, config tokens, switches, trace prefixes, benchmark names, and user-visible labels when those are the intended subject.
+
+5. Review concision.
    - Prefer short factual sentences.
    - Remove marketing phrasing, embellishment, praise, and implementation trivia that does not help the reader use or maintain the project.
    - Preserve intentional README voice when it helps introduce the project, author, motivation, or contribution path.
    - Keep examples only when they are the maintained source of truth or materially clarify behavior.
 
-5. Review structure.
+6. Review structure.
    - Split long sections when they mix unrelated topics.
    - Convert dense paragraphs into bullets or tables when that improves scanning.
    - Merge tiny repeated sections when a single heading is clearer.
    - Keep headings descriptive and parallel.
+   - Keep section headings non-numbered so docs can be reordered without renumbering churn.
 
-6. Edit docs directly.
+7. Edit docs directly.
    - Preserve the repository's existing tone and formatting conventions.
    - Update all affected docs in the same pass so they stay consistent.
    - Avoid broad rewrites when targeted edits solve the issue.
 
-7. Validate.
+8. Validate.
    - Re-read changed docs for duplicate facts, historical wording, broken references, and awkward structure.
    - Run available docs checks only when the repository defines them or the user requests them.
 

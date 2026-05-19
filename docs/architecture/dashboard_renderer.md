@@ -6,7 +6,7 @@
 
 - Convert the active config into resolved dashboard, card, widget, guide, anchor, and dynamic edit-artifact geometry.
 - Implement `WidgetHost` for widget drawing and layout-edit artifact registration.
-- Own the registered artifact storage, shared affordance presets, and low-level anchor-region construction used by layout editing.
+- Own the registered artifact storage, shared affordance presets, and low-level anchor-region construction used by layout-edit mode.
 - Own the fixed-slot metric definition and sample-text lookup cache in `impl/metric_lookup_cache.*`.
 - Build live dashboard frames as an ordered snapshot bitmap, optional overlay bitmap, and per-layer widget animation lists. `DashboardOverlayState::ShouldDrawOverlayLayer()` is the renderer gate that skips overlay bitmap construction when no overlay content is visible.
 - Own the cross-thread live-layer bitmap pool: the main thread acquires writable `RenderBitmapStorage::LiveLayer` bitmaps before live drawing, while the render thread returns superseded active or pending frame layers after they are no longer presented. Deterministic screenshots and offscreen validation use generic bitmaps and do not enter this pool.
@@ -18,8 +18,8 @@
 - Keep snapshot and overlay widget animation lists separate while resolving both lists through the same render-thread keyed timeline, so layout edits can move widget content between layers without restarting data animation.
 - Keep widget animation sample types, transition details, and render geometry payloads out of the dashboard-renderer boundary; those details stay package-private under `widget`.
 - Render selected and hovered layout-edit highlights, layout and widget guides, gap anchors, size-similarity indicators, dotted outlines, and dragged container-child replay.
-- Produce copied `LayoutEditActiveRegions` snapshots for live layout editing and diagnostics screenshot validation.
-- Supply resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by the layout-guide-sheet package.
+- Produce copied `LayoutEditActiveRegions` snapshots for live layout-edit mode and diagnostics screenshot validation.
+- Supply resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by the `layout_guide_sheet` package.
 
 ## Boundaries
 

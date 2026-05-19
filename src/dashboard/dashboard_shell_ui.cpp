@@ -21,9 +21,12 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
 #include "telemetry/metrics.h"
+#include "util/command_line.h"
+#include "util/elevated_process.h"
 #include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/numeric_format.h"
+#include "util/paths.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "util/utf8.h"
@@ -289,6 +292,22 @@ std::string BuildLayoutGuideEditLabel(const LayoutEditGuide& guide) {
     return guide.editCardId.empty() ? "cards weights" : "layout weights";
 }
 
+void AppendQuotedCommandLineArgument(std::string& parameters, std::string_view argument) {
+    if (!parameters.empty()) {
+        AppendFormat(parameters, " ");
+    }
+    AppendFormat(parameters, "%s", QuoteCommandLineArgument(argument).c_str());
+}
+
+std::string BuildElevatedRestartParameters() {
+    const CommandLineArguments arguments = GetCommandLineArguments();
+    std::string parameters = BuildCommandLineExcludingSwitch(arguments, "/elevate");
+    if (!HasSwitch(arguments, "/bring-to-front")) {
+        AppendQuotedCommandLineArgument(parameters, "/bring-to-front");
+    }
+    return parameters;
+}
+
 struct CustomScaleDialogState {
     const DashboardApp* app = nullptr;
     double initialScale = 1.0;
@@ -424,6 +443,10 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
             state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_title"));
             state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_content"));
             break;
+        case UnsavedLayoutEditPrompt::RunAsAdministrator:
+            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_elevate_prompt_title"));
+            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_elevate_prompt_content"));
+            break;
     }
 
     DialogBoxParamW(app_.instance_,
@@ -479,6 +502,21 @@ bool DashboardShellUi::HandleEditLayoutToggle() {
     }
 
     return StopLayoutEditSession(UnsavedLayoutEditPrompt::StopEditing);
+}
+
+bool DashboardShellUi::HandleRunAsAdministrator() {
+    if (!StopLayoutEditSession(UnsavedLayoutEditPrompt::RunAsAdministrator)) {
+        return false;
+    }
+
+    if (!RunElevatedSelf(app_.hwnd_, BuildElevatedRestartParameters(), GetWorkingDirectory(), SW_SHOWNORMAL)) {
+        MessageBoxUtf8(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.run_as_administrator_failed")), MB_ICONERROR);
+        return false;
+    }
+
+    DestroyWindow(app_.hwnd_);
+    return true;
 }
 
 bool DashboardShellUi::OpenLayoutEditDialog() {
@@ -885,6 +923,9 @@ void DashboardShellUi::ExecuteCommand(
         case kCommandBringOnTop:
             app_.BringOnTop();
             break;
+        case kCommandRunAsAdministrator:
+            HandleRunAsAdministrator();
+            break;
         case kCommandReloadConfig:
             HandleReloadConfig();
             break;
@@ -1155,6 +1196,10 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuUtf8(editLayoutMenu, MF_STRING, kCommandEditLayoutDialog, "Layout Editor...");
     AppendMenuUtf8(editLayoutMenu, MF_STRING, kCommandSaveConfig, "Save Config");
     if (advancedMenu != nullptr) {
+        const UINT runAsAdministratorFlags =
+            MF_STRING | (IsCurrentProcessElevated() ? (MF_CHECKED | MF_GRAYED) : MF_UNCHECKED);
+        AppendMenuUtf8(advancedMenu, runAsAdministratorFlags, kCommandRunAsAdministrator, "Run as administrator");
+        AppendMenuW(advancedMenu, MF_SEPARATOR, 0, nullptr);
         AppendMenuUtf8(advancedMenu, MF_STRING, kCommandReloadConfig, "Reload Config");
         AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveConfig, "Save Config");
         AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");

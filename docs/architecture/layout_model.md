@@ -1,6 +1,6 @@
 # Layout Model Package
 
-`src/layout_model/` owns renderer-safe layout-edit contracts and shared behavior used by dashboard rendering, layout editing, and the modeless editor.
+`src/layout_model/` owns renderer-safe layout-edit contracts and shared behavior used by dashboard rendering, layout-edit mode, and the modeless editor.
 
 ## Responsibilities
 

@@ -1,7 +1,7 @@
 # CaseDash Layout Language
 
 This document owns the config language, section ownership, syntax, and validation rules.
-See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/theme_configuration.md](theme_configuration.md) for theme and color value syntax, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.
+See also: [resources/config.ini](../resources/config.ini) for the maintained shipped example and entry spellings, [docs/glossary.md](glossary.md) for project terminology, [docs/theme_configuration.md](theme_configuration.md) for theme and color value syntax, [docs/specifications.md](specifications.md) for runtime behavior, and [docs/diagnostics.md](diagnostics.md) for diagnostics-only switches and workflows.
 
 ## Purpose And Scope
 
@@ -33,7 +33,7 @@ The language is divided by responsibility:
 - `[card_style]` owns shared card chrome and in-card spacing.
 - `[colors]` owns the shared dashboard palette.
 - Color values use the literal and derived color syntax defined in [docs/theme_configuration.md](theme_configuration.md).
-- `[layout_guide_sheet]` owns diagnostics-only guide-sheet callout colors and layout constants; these fields are loaded from config but are not editable through the layout-edit dialog.
+- `[layout_guide_sheet]` owns diagnostics-only layout guide sheet callout colors and layout constants; these fields are loaded from config but are not editable through the layout-edit dialog.
 - `[fonts]` owns the shared font roles.
 - `[card.<id>]` owns card-local title, icon, and inner layout composition.
 
