@@ -1,5 +1,6 @@
 #include "dashboard/fps_service.h"
 
+#include <algorithm>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -19,7 +20,9 @@
 
 namespace {
 
+constexpr DWORD kServiceStartWaitMs = 10000;
 constexpr DWORD kServiceStopWaitMs = 10000;
+constexpr DWORD kServiceDeleteWaitMs = 5000;
 constexpr DWORD kPipeBufferBytes = 4096;
 constexpr DWORD kPipeRequestBytes = 128;
 constexpr char kFpsServiceDisplayName[] = "CaseDash Service";
@@ -167,6 +170,27 @@ DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceH
     return service.Get() != nullptr ? ERROR_SUCCESS : GetLastError();
 }
 
+bool IsServiceAbsentOrPendingDelete(DWORD status) {
+    return status == ERROR_SERVICE_DOES_NOT_EXIST || status == ERROR_SERVICE_MARKED_FOR_DELETE;
+}
+
+DWORD WaitForServiceDeletedOrPendingDelete() {
+    const DWORD startedAt = GetTickCount();
+    while (GetTickCount() - startedAt < kServiceDeleteWaitMs) {
+        ServiceHandle manager;
+        ServiceHandle service;
+        const DWORD status = OpenInstalledService(manager, SERVICE_QUERY_STATUS, service);
+        if (IsServiceAbsentOrPendingDelete(status)) {
+            return ERROR_SUCCESS;
+        }
+        if (status != ERROR_SUCCESS) {
+            return status;
+        }
+        Sleep(100);
+    }
+    return ERROR_TIMEOUT;
+}
+
 bool IsExpectedServiceBinaryPath(const std::string& command) {
     const std::string expected = BuildFpsServiceBinaryPath();
     return !expected.empty() && NormalizeCommandPath(command) == NormalizeCommandPath(expected);
@@ -188,23 +212,97 @@ std::optional<std::string> QueryServiceBinaryPath(SC_HANDLE service) {
     return Utf8FromWide(config->lpBinaryPathName);
 }
 
-DWORD StartServiceIfNeeded(SC_HANDLE service) {
-    if (StartServiceW(service, 0, nullptr)) {
-        return ERROR_SUCCESS;
-    }
-    const DWORD error = GetLastError();
-    return error == ERROR_SERVICE_ALREADY_RUNNING ? ERROR_SUCCESS : error;
-}
-
-DWORD StopServiceIfRunning(SC_HANDLE service) {
-    SERVICE_STATUS_PROCESS status{};
+DWORD QueryServiceStatusProcess(SC_HANDLE service, SERVICE_STATUS_PROCESS& status) {
     DWORD bytesNeeded = 0;
     if (!QueryServiceStatusEx(
             service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)) {
         return GetLastError();
     }
+    return ERROR_SUCCESS;
+}
+
+DWORD StoppedServiceStatusCode(const SERVICE_STATUS_PROCESS& status) {
+    return status.dwWin32ExitCode != NO_ERROR ? status.dwWin32ExitCode : ERROR_SERVICE_NOT_ACTIVE;
+}
+
+DWORD ServicePollIntervalMs(const SERVICE_STATUS_PROCESS& status) {
+    if (status.dwWaitHint == 0) {
+        return 100;
+    }
+    return std::clamp(status.dwWaitHint / 10, static_cast<DWORD>(100), static_cast<DWORD>(1000));
+}
+
+DWORD WaitForServiceState(SC_HANDLE service, DWORD expectedState, DWORD timeoutMs) {
+    const DWORD startedAt = GetTickCount();
+    while (GetTickCount() - startedAt < timeoutMs) {
+        SERVICE_STATUS_PROCESS status{};
+        const DWORD queryStatus = QueryServiceStatusProcess(service, status);
+        if (queryStatus != ERROR_SUCCESS) {
+            return queryStatus;
+        }
+        if (status.dwCurrentState == expectedState) {
+            return ERROR_SUCCESS;
+        }
+        if (status.dwCurrentState == SERVICE_STOPPED && expectedState != SERVICE_STOPPED) {
+            return StoppedServiceStatusCode(status);
+        }
+        Sleep(ServicePollIntervalMs(status));
+    }
+
+    SERVICE_STATUS_PROCESS status{};
+    const DWORD queryStatus = QueryServiceStatusProcess(service, status);
+    if (queryStatus != ERROR_SUCCESS) {
+        return queryStatus;
+    }
+    if (status.dwCurrentState == expectedState) {
+        return ERROR_SUCCESS;
+    }
+    if (status.dwCurrentState == SERVICE_STOPPED && expectedState != SERVICE_STOPPED) {
+        return StoppedServiceStatusCode(status);
+    }
+    return ERROR_TIMEOUT;
+}
+
+DWORD StartServiceIfNeeded(SC_HANDLE service) {
+    SERVICE_STATUS_PROCESS status{};
+    DWORD statusResult = QueryServiceStatusProcess(service, status);
+    if (statusResult != ERROR_SUCCESS) {
+        return statusResult;
+    }
+    if (status.dwCurrentState == SERVICE_RUNNING) {
+        return ERROR_SUCCESS;
+    }
+    if (status.dwCurrentState == SERVICE_START_PENDING) {
+        return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
+    }
+    if (status.dwCurrentState == SERVICE_STOP_PENDING) {
+        statusResult = WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
+        if (statusResult != ERROR_SUCCESS) {
+            return statusResult;
+        }
+    }
+
+    if (StartServiceW(service, 0, nullptr)) {
+        return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
+    }
+    const DWORD error = GetLastError();
+    if (error == ERROR_SERVICE_ALREADY_RUNNING) {
+        return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
+    }
+    return error;
+}
+
+DWORD StopServiceIfRunning(SC_HANDLE service) {
+    SERVICE_STATUS_PROCESS status{};
+    DWORD statusResult = QueryServiceStatusProcess(service, status);
+    if (statusResult != ERROR_SUCCESS) {
+        return statusResult;
+    }
     if (status.dwCurrentState == SERVICE_STOPPED) {
         return ERROR_SUCCESS;
+    }
+    if (status.dwCurrentState == SERVICE_STOP_PENDING) {
+        return WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
     }
 
     SERVICE_STATUS stopStatus{};
@@ -215,18 +313,7 @@ DWORD StopServiceIfRunning(SC_HANDLE service) {
         }
     }
 
-    const DWORD startedAt = GetTickCount();
-    while (GetTickCount() - startedAt < kServiceStopWaitMs) {
-        if (!QueryServiceStatusEx(
-                service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)) {
-            return GetLastError();
-        }
-        if (status.dwCurrentState == SERVICE_STOPPED) {
-            return ERROR_SUCCESS;
-        }
-        Sleep(100);
-    }
-    return ERROR_TIMEOUT;
+    return WaitForServiceState(service, SERVICE_STOPPED, kServiceStopWaitMs);
 }
 
 SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
@@ -424,6 +511,8 @@ DWORD InstallOrUpdateFpsService() {
     const std::wstring wideBinaryPath = WideFromUtf8(binaryPath);
     const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
     const std::wstring serviceDisplayName = WideFromUtf8(kFpsServiceDisplayName);
+    constexpr DWORD kServiceAccess =
+        SERVICE_CHANGE_CONFIG | SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
 
     ServiceHandle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
     if (manager.Get() == nullptr) {
@@ -433,7 +522,7 @@ DWORD InstallOrUpdateFpsService() {
     ServiceHandle service(CreateServiceW(manager.Get(),
         serviceName.c_str(),
         serviceDisplayName.c_str(),
-        SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START,
+        kServiceAccess,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
         SERVICE_ERROR_NORMAL,
@@ -449,11 +538,13 @@ DWORD InstallOrUpdateFpsService() {
         if (createError != ERROR_SERVICE_EXISTS) {
             return createError;
         }
-        service = ServiceHandle(OpenServiceW(
-            manager.Get(), serviceName.c_str(), SERVICE_CHANGE_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START));
+        service = ServiceHandle(OpenServiceW(manager.Get(), serviceName.c_str(), kServiceAccess));
         if (service.Get() == nullptr) {
             return GetLastError();
         }
+        const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
+        const bool binaryPathChanged =
+            !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
         if (!ChangeServiceConfigW(service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
@@ -467,6 +558,12 @@ DWORD InstallOrUpdateFpsService() {
                 serviceDisplayName.c_str())) {
             return GetLastError();
         }
+        if (binaryPathChanged) {
+            const DWORD stopStatus = StopServiceIfRunning(service.Get());
+            if (stopStatus != ERROR_SUCCESS && stopStatus != ERROR_SERVICE_NOT_ACTIVE) {
+                return stopStatus;
+            }
+        }
     }
 
     return StartServiceIfNeeded(service.Get());
@@ -476,22 +573,21 @@ DWORD StopAndDeleteFpsService() {
     ServiceHandle manager;
     ServiceHandle service;
     DWORD status = OpenInstalledService(manager, SERVICE_STOP | DELETE | SERVICE_QUERY_STATUS, service);
-    if (status == ERROR_SERVICE_DOES_NOT_EXIST) {
+    if (IsServiceAbsentOrPendingDelete(status)) {
         return ERROR_SUCCESS;
     }
     if (status != ERROR_SUCCESS) {
         return status;
     }
 
-    status = StopServiceIfRunning(service.Get());
-    if (status != ERROR_SUCCESS && status != ERROR_SERVICE_NOT_ACTIVE) {
-        return status;
-    }
+    (void)StopServiceIfRunning(service.Get());
+    // SCM stop completion can lag; still request deletion so a late stop cannot leave auto-start installed.
     if (!DeleteService(service.Get())) {
         const DWORD deleteError = GetLastError();
         return deleteError == ERROR_SERVICE_MARKED_FOR_DELETE ? ERROR_SUCCESS : deleteError;
     }
-    return ERROR_SUCCESS;
+    service = ServiceHandle();
+    return WaitForServiceDeletedOrPendingDelete();
 }
 
 bool IsFpsServiceRunningForCurrentExecutable() {
@@ -508,12 +604,7 @@ bool IsFpsServiceRunningForCurrentExecutable() {
     }
 
     SERVICE_STATUS_PROCESS serviceStatus{};
-    DWORD bytesNeeded = 0;
-    if (!QueryServiceStatusEx(service.Get(),
-            SC_STATUS_PROCESS_INFO,
-            reinterpret_cast<LPBYTE>(&serviceStatus),
-            sizeof(serviceStatus),
-            &bytesNeeded)) {
+    if (QueryServiceStatusProcess(service.Get(), serviceStatus) != ERROR_SUCCESS) {
         return false;
     }
     return serviceStatus.dwCurrentState == SERVICE_RUNNING;

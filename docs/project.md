@@ -92,6 +92,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Mouse-driven visual feedback cannot rely only on `WM_TIMER` or queued `WM_PAINT`; continuous pointer input can starve low-priority messages, so move mode and active drags update or redraw from processed pointer messages.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
+- Auto-start service changes wait for the SCM running, stopped, or deletion state instead of trusting asynchronous `StartServiceW`, `ControlService`, or `DeleteService` return values; missing and deletion-pending services count as disabled while SCM finishes cleanup. Enable failures after service mutation must roll back the machine Run entry and service so a partial Start with Windows attempt does not leave background startup pieces behind.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
 - Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific lessons stay grouped in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
