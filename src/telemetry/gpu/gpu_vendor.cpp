@@ -51,6 +51,12 @@ struct D3DkmtCloseAdapter {
     D3DkmtHandle adapter = 0;
 };
 
+struct EnumeratedGpuAdapter {
+    GpuAdapterInfo info;
+    GpuVendor vendor = GpuVendor::Unknown;
+    int matchRank = 0;
+};
+
 using D3DkmtOpenAdapterFromLuidFn = NtStatus(WINAPI*)(D3DkmtOpenAdapterFromLuid*);
 using D3DkmtQueryAdapterInfoFn = NtStatus(WINAPI*)(const D3DkmtQueryAdapterInfo*);
 using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
@@ -150,6 +156,26 @@ double DedicatedVideoMemoryGb(std::uint64_t bytes) {
     return static_cast<double>(bytes) / (1024.0 * 1024.0 * 1024.0);
 }
 
+std::optional<size_t> FindDuplicateGpuAdapterIndex(
+    const std::vector<EnumeratedGpuAdapter>& adapters, const GpuAdapterInfo& info) {
+    for (size_t i = 0; i < adapters.size(); ++i) {
+        if (GpuAdapterViewsReferToSameHardware(adapters[i].info, info)) {
+            return i;
+        }
+    }
+    return std::nullopt;
+}
+
+GpuAdapterCandidate MakeGpuAdapterCandidate(const EnumeratedGpuAdapter& adapter, bool selected) {
+    GpuAdapterCandidate candidate;
+    candidate.adapterName = adapter.info.adapterName;
+    candidate.vendorName = GpuVendorName(adapter.vendor);
+    candidate.vendorId = adapter.info.vendorId;
+    candidate.dedicatedVramGb = DedicatedVideoMemoryGb(adapter.info.dedicatedVideoMemoryBytes);
+    candidate.selected = selected;
+    return candidate;
+}
+
 void PopulateAdapterPciAddress(GpuAdapterInfo& info, LUID adapterLuid) {
     HMODULE gdi = GetModuleHandleW(kGdi32LibraryName);
     if (gdi == nullptr) {
@@ -180,10 +206,11 @@ void PopulateAdapterPciAddress(GpuAdapterInfo& info, LUID adapterLuid) {
     query.privateDriverData = &address;
     query.privateDriverDataSize = sizeof(address);
     if (queryAdapter(&query) >= 0) {
-        info.hasPciAddress = true;
         info.pciBus = address.busNumber;
         info.pciDevice = address.deviceNumber;
         info.pciFunction = address.functionNumber;
+        info.hasPciAddress = true;
+        info.hasPciAddress = HasUsableGpuPciAddress(info);
     }
 
     D3DkmtCloseAdapter close{};
@@ -195,6 +222,7 @@ void PopulateAdapterPciAddress(GpuAdapterInfo& info, LUID adapterLuid) {
 
 GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view preferredAdapterName) {
     GpuAdapterSelection selection;
+    std::vector<EnumeratedGpuAdapter> adapters;
     IDXGIFactory1* factory = nullptr;
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
@@ -203,8 +231,6 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
         return selection;
     }
 
-    std::optional<size_t> selectedCandidateIndex;
-    int selectedMatchRank = 0;
     for (UINT adapterIndex = 0;; ++adapterIndex) {
         IDXGIAdapter1* adapter = nullptr;
         const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
@@ -236,24 +262,37 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             PopulateAdapterPciAddress(info, desc.AdapterLuid);
             const GpuVendor vendor = SelectGpuVendor(info);
             const int matchRank = PreferredGpuAdapterMatchRank(adapterName, preferredAdapterName);
-            const bool select = !selection.selectedAdapter.has_value() ||
-                                (!preferredAdapterName.empty() && matchRank > selectedMatchRank);
-            if (select) {
-                if (selectedCandidateIndex.has_value()) {
-                    selection.candidates[*selectedCandidateIndex].selected = false;
+            const std::optional<size_t> duplicateIndex = FindDuplicateGpuAdapterIndex(adapters, info);
+            if (duplicateIndex.has_value()) {
+                const bool replace =
+                    !HasUsableGpuPciAddress(adapters[*duplicateIndex].info) && HasUsableGpuPciAddress(info);
+                trace.WriteFmt(TracePrefix::GpuVendor,
+                    RES_STR("adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
+                            "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
+                            "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
+                    adapterIndex,
+                    adapters[*duplicateIndex].info.adapterIndex,
+                    Trace::BoolText(replace),
+                    desc.VendorId,
+                    desc.DeviceId,
+                    desc.SubSysId,
+                    desc.Revision,
+                    info.pciDomain,
+                    info.pciBus,
+                    info.pciDevice,
+                    info.pciFunction,
+                    GpuVendorName(vendor),
+                    matchRank,
+                    DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
+                    adapterName.c_str());
+                if (replace) {
+                    adapters[*duplicateIndex] = EnumeratedGpuAdapter{info, vendor, matchRank};
                 }
-                selection.selectedAdapter = info;
-                selectedMatchRank = matchRank;
-                selectedCandidateIndex = selection.candidates.size();
+                adapter->Release();
+                continue;
             }
 
-            GpuAdapterCandidate candidate;
-            candidate.adapterName = adapterName;
-            candidate.vendorName = GpuVendorName(vendor);
-            candidate.vendorId = desc.VendorId;
-            candidate.dedicatedVramGb = DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes);
-            candidate.selected = select;
-            selection.candidates.push_back(std::move(candidate));
+            adapters.push_back(EnumeratedGpuAdapter{info, vendor, matchRank});
 
             trace.WriteFmt(TracePrefix::GpuVendor,
                 RES_STR(
@@ -286,6 +325,23 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
     }
 
     factory->Release();
+    selection.candidates.reserve(adapters.size());
+    std::optional<size_t> selectedCandidateIndex;
+    int selectedMatchRank = 0;
+    for (size_t i = 0; i < adapters.size(); ++i) {
+        const bool select = !selection.selectedAdapter.has_value() ||
+                            (!preferredAdapterName.empty() && adapters[i].matchRank > selectedMatchRank);
+        if (select) {
+            selection.selectedAdapter = adapters[i].info;
+            selectedMatchRank = adapters[i].matchRank;
+            selectedCandidateIndex = i;
+        }
+    }
+    for (size_t i = 0; i < adapters.size(); ++i) {
+        selection.candidates.push_back(
+            MakeGpuAdapterCandidate(adapters[i], selectedCandidateIndex.has_value() && i == *selectedCandidateIndex));
+    }
+
     if (selection.selectedAdapter.has_value()) {
         const GpuVendor vendor = SelectGpuVendor(*selection.selectedAdapter);
         trace.WriteFmt(TracePrefix::GpuVendor,

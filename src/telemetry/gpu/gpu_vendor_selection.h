@@ -38,3 +38,5 @@ struct GpuAdapterCandidate {
 
 const char* GpuVendorName(GpuVendor vendor);
 GpuVendor SelectGpuVendor(const GpuVendorInfo& info);
+bool HasUsableGpuPciAddress(const GpuAdapterInfo& info);
+bool GpuAdapterViewsReferToSameHardware(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs);

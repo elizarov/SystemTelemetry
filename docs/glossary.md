@@ -173,7 +173,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | telemetry cadence | The shared 250 ms collection cadence. |
 | Windows-native telemetry | CPU, memory, network, storage, drive activity, clock, and presented-FPS data collected without vendor SDKs. |
 | hardware provider | A provider that adds GPU or board metrics when matching hardware and runtime dependencies are available. |
-| GPU provider | A provider selected from the configured non-software DXGI adapter identity. |
+| GPU provider | A provider selected from the configured unique non-software DXGI adapter identity. |
 | board provider | A provider selected from the baseboard manufacturer. |
 | vendor provider | A supported GPU or board provider created after vendor mapping. |
 | unsupported GPU provider | The fallback GPU provider that keeps provider-owned metrics unavailable when no supported GPU provider matches. |

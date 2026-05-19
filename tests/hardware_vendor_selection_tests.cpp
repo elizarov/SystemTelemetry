@@ -29,6 +29,21 @@ const KnownTestBoard kKnownTestBoards[] = {
     {BoardVendorInfo{"Micro-Star International Co., Ltd.", "MPG Z690 CARBON WIFI (MS-7D30)"}, BoardVendor::Msi},
 };
 
+GpuAdapterInfo MakeRadeonRx6800Adapter(unsigned int bus, unsigned int device, unsigned int function) {
+    GpuAdapterInfo info;
+    info.vendorId = 0x1002u;
+    info.adapterName = "AMD Radeon RX 6800";
+    info.dedicatedVideoMemoryBytes = 17131868160ull;
+    info.deviceId = 0x73bfu;
+    info.subSysId = 0x23271458u;
+    info.revision = 0xc3u;
+    info.hasPciAddress = true;
+    info.pciBus = bus;
+    info.pciDevice = device;
+    info.pciFunction = function;
+    return info;
+}
+
 }  // namespace
 
 TEST(HardwareVendorSelection, SelectsExpectedGpuProvidersForKnownTestMachines) {
@@ -41,4 +56,30 @@ TEST(HardwareVendorSelection, SelectsExpectedBoardProvidersForKnownTestMachines)
     for (const KnownTestBoard& board : kKnownTestBoards) {
         EXPECT_EQ(SelectBoardVendor(board.board), board.expectedBoardVendor);
     }
+}
+
+TEST(HardwareVendorSelection, TreatsInvalidGpuPciSentinelAsUnusable) {
+    const GpuAdapterInfo adapter = MakeRadeonRx6800Adapter(0x00u, 0xffffu, 0xffffu);
+
+    EXPECT_FALSE(HasUsableGpuPciAddress(adapter));
+}
+
+TEST(HardwareVendorSelection, MatchesDuplicateGpuAdapterViewWithInvalidPciAddress) {
+    const GpuAdapterInfo physicalAdapter = MakeRadeonRx6800Adapter(0x0bu, 0x00u, 0x00u);
+    GpuAdapterInfo duplicateView = MakeRadeonRx6800Adapter(0x00u, 0xffffu, 0xffffu);
+    duplicateView.adapterIndex = 1;
+
+    EXPECT_TRUE(HasUsableGpuPciAddress(physicalAdapter));
+    EXPECT_FALSE(HasUsableGpuPciAddress(duplicateView));
+    EXPECT_TRUE(GpuAdapterViewsReferToSameHardware(physicalAdapter, duplicateView));
+}
+
+TEST(HardwareVendorSelection, KeepsDistinctGpuAdaptersWithDifferentUsablePciAddresses) {
+    const GpuAdapterInfo firstAdapter = MakeRadeonRx6800Adapter(0x0bu, 0x00u, 0x00u);
+    GpuAdapterInfo secondAdapter = MakeRadeonRx6800Adapter(0x0cu, 0x00u, 0x00u);
+    secondAdapter.adapterIndex = 1;
+
+    EXPECT_TRUE(HasUsableGpuPciAddress(firstAdapter));
+    EXPECT_TRUE(HasUsableGpuPciAddress(secondAdapter));
+    EXPECT_FALSE(GpuAdapterViewsReferToSameHardware(firstAdapter, secondAdapter));
 }

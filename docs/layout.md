@@ -43,7 +43,7 @@ The language is divided by responsibility:
 
 `[display]` selects the target monitor, active named layout, wallpaper, placement, and optional explicit render scale.
 
-`[gpu]` selects the preferred GPU adapter by display name. An empty or missing `adapter_name` means the runtime selects the first non-software DXGI adapter.
+`[gpu]` selects the preferred GPU adapter by display name. An empty or missing `adapter_name` means the runtime selects the first unique non-software DXGI adapter.
 
 `[network]` selects the preferred runtime adapter.
 

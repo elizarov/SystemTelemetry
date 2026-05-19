@@ -19,7 +19,8 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Hardware providers add hardware-specific GPU and board metrics when the matching driver, SDK, or utility is installed.
 - The fake provider uses built-in synthetic telemetry when `/fake` has no path. Headless `/fake /exit` uses the static baseline, while UI fake mode and benchmark fake mode use the live synthetic source. UI fake mode advances at the same 250 ms cadence and retained-throughput smoothing as real telemetry.
 - Unsupported or unavailable hardware providers do not prevent the dashboard from running; their provider-owned values render as unavailable.
-- GPU telemetry selects the supported hardware provider from the configured GPU adapter identity. Empty GPU configuration selects the first non-software DXGI adapter.
+- GPU telemetry selects the supported hardware provider from the configured GPU adapter identity. Empty GPU configuration selects the first unique non-software DXGI adapter.
+- GPU adapter selection collapses duplicate DXGI adapter views that describe the same hardware identity, including duplicate views where Windows reports a PCI sentinel instead of a usable bus address.
 - On hybrid laptops, the integrated adapter can be the first DXGI adapter even when a discrete GPU is also installed; selecting a different adapter in the dashboard devices menu recreates the matching vendor provider for that adapter.
 - The displayed GPU product name uses the selected DXGI adapter description when available; provider diagnostics can still include lower-level runtime device names.
 - Vendor GPU providers match their runtime device handle to the selected DXGI adapter by PCI identity when the driver API exposes enough detail, then fall back to provider name matching.
@@ -40,7 +41,7 @@ Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics command
 ## Adding Hardware Support
 
 - Provider selection stays split into three steps: extract adapter identity, map vendor information to the vendor enum, and create the matching provider with the full adapter identity.
-- GPU extraction reads the selected non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, PCI bus address when Windows reports it, adapter index, dedicated-memory size, and adapter name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
+- GPU extraction reads the selected unique non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, PCI bus address when Windows reports a usable address, adapter index, dedicated-memory size, and adapter name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
 - Board extraction reads baseboard registry strings into `BoardVendorInfo`, including manufacturer and product.
 - Vendor mapping lives in `src/telemetry/gpu/gpu_vendor_selection.*` and `src/telemetry/board/board_vendor_selection.*`; provider factories instantiate modules only after that mapping returns a supported enum value.
 - Each added GPU or board hardware module extends `tests/hardware_vendor_selection_tests.cpp` with a known-machine fixture from hardware that has actually run CaseDash. Record the GPU vendor id and adapter string for GPU support, the board manufacturer and product strings for board support, and the expected vendor enum values.
