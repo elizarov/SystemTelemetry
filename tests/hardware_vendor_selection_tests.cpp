@@ -1,4 +1,6 @@
 #include <gtest/gtest.h>
+#include <string>
+#include <vector>
 
 #include "telemetry/board/board_vendor_selection.h"
 #include "telemetry/gpu/gpu_vendor_selection.h"
@@ -82,4 +84,45 @@ TEST(HardwareVendorSelection, KeepsDistinctGpuAdaptersWithDifferentUsablePciAddr
     EXPECT_TRUE(HasUsableGpuPciAddress(firstAdapter));
     EXPECT_TRUE(HasUsableGpuPciAddress(secondAdapter));
     EXPECT_FALSE(GpuAdapterViewsReferToSameHardware(firstAdapter, secondAdapter));
+}
+
+TEST(HardwareVendorSelection, LeavesUniqueGpuAdapterSelectionNamesUnnumbered) {
+    GpuAdapterInfo radeon = MakeRadeonRx6800Adapter(0x0bu, 0x00u, 0x00u);
+    GpuAdapterInfo nvidia;
+    nvidia.vendorId = 0x10deu;
+    nvidia.adapterName = "NVIDIA GeForce RTX 4070";
+    nvidia.hasPciAddress = true;
+    nvidia.pciBus = 0x0cu;
+
+    const std::vector<std::string> names = BuildGpuAdapterSelectionNames({radeon, nvidia});
+
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "AMD Radeon RX 6800");
+    EXPECT_EQ(names[1], "NVIDIA GeForce RTX 4070");
+}
+
+TEST(HardwareVendorSelection, NumbersDuplicateGpuAdapterSelectionNamesByStablePciOrder) {
+    GpuAdapterInfo laterBus = MakeRadeonRx6800Adapter(0x0cu, 0x00u, 0x00u);
+    GpuAdapterInfo earlierBus = MakeRadeonRx6800Adapter(0x0bu, 0x00u, 0x00u);
+    laterBus.adapterIndex = 0;
+    earlierBus.adapterIndex = 1;
+
+    const std::vector<std::string> names = BuildGpuAdapterSelectionNames({laterBus, earlierBus});
+
+    ASSERT_EQ(names.size(), 2u);
+    EXPECT_EQ(names[0], "AMD Radeon RX 6800 #2");
+    EXPECT_EQ(names[1], "AMD Radeon RX 6800 #1");
+}
+
+TEST(HardwareVendorSelection, MatchesNumberedGpuAdapterSelectionNameBeforePhysicalName) {
+    GpuAdapterInfo firstAdapter = MakeRadeonRx6800Adapter(0x0bu, 0x00u, 0x00u);
+    GpuAdapterInfo secondAdapter = MakeRadeonRx6800Adapter(0x0cu, 0x00u, 0x00u);
+    const std::vector<std::string> names = BuildGpuAdapterSelectionNames({firstAdapter, secondAdapter});
+    firstAdapter.selectionName = names[0];
+    secondAdapter.selectionName = names[1];
+
+    EXPECT_LT(GpuAdapterSelectionMatchRank(firstAdapter, "AMD Radeon RX 6800 #2"),
+        GpuAdapterSelectionMatchRank(secondAdapter, "AMD Radeon RX 6800 #2"));
+    EXPECT_EQ(GpuAdapterSelectionName(secondAdapter), "AMD Radeon RX 6800 #2");
+    EXPECT_EQ(secondAdapter.adapterName, "AMD Radeon RX 6800");
 }
