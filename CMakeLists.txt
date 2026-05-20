@@ -545,6 +545,7 @@ target_link_options(CaseDash PRIVATE
 target_link_libraries(CaseDash PRIVATE
     user32
     dwmapi
+    uxtheme
     gdi32
     d3d11
     d2d1
@@ -756,6 +757,7 @@ target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
     dwmapi
+    uxtheme
     gdi32
     advapi32
     d3d11

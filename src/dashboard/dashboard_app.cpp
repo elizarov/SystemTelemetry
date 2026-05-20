@@ -49,6 +49,9 @@ constexpr int kTitlebarThemeComboWidthLogical = 112;
 constexpr int kTitlebarComboHeightLogical = 22;
 constexpr int kTitlebarComboVisibleRows = 8;
 constexpr int kTitlebarComboDropPaddingLogical = 6;
+constexpr COLORREF kTitlebarCloseButtonFallbackHoverColor = RGB(232, 17, 35);
+constexpr COLORREF kTitlebarCloseButtonFallbackPressedColor = RGB(196, 43, 28);
+constexpr COLORREF kTitlebarCloseButtonFallbackGlyphColor = RGB(255, 255, 255);
 
 using AdjustWindowRectExForDpiFn = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
 
@@ -70,6 +73,10 @@ bool IsRectUsable(const RECT& rect) {
 
 bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+}
+
+int NativeTitlebarGlyphSize(UINT dpi) {
+    return std::max(8, ScaleLogicalToPhysical(10, dpi));
 }
 
 std::string TitlebarThemeDisplayName(std::string_view name) {
@@ -1046,6 +1053,7 @@ RECT DashboardApp::NativeTitlebarLayoutComboRect() const {
 
     RECT clientRect{};
     GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
+    const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
     const RECT themeRect = NativeTitlebarThemeComboRect();
     const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
     const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
@@ -1055,7 +1063,8 @@ RECT DashboardApp::NativeTitlebarLayoutComboRect() const {
                                                   : closeRect.left - gap;
     const int minWidth = ScaleLogicalToPhysical(58, CurrentWindowDpi());
     const int desiredWidth = ScaleLogicalToPhysical(kTitlebarLayoutComboWidthLogical, CurrentWindowDpi());
-    const int availableWidth = right - clientRect.left;
+    const LONG leftLimit = IsRectUsable(appMenuRect) ? appMenuRect.right + gap : clientRect.left;
+    const int availableWidth = right - leftLimit;
     if (availableWidth < minWidth || RectHeight(clientRect) <= 0) {
         return {};
     }
@@ -1072,13 +1081,15 @@ RECT DashboardApp::NativeTitlebarThemeComboRect() const {
 
     RECT clientRect{};
     GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
+    const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
     const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
     const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
     const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
     const int right = IsRectUsable(displayRect) ? displayRect.left - gap : closeRect.left - gap;
     const int minWidth = ScaleLogicalToPhysical(76, CurrentWindowDpi());
     const int desiredWidth = ScaleLogicalToPhysical(kTitlebarThemeComboWidthLogical, CurrentWindowDpi());
-    const int availableWidth = right - clientRect.left;
+    const LONG leftLimit = IsRectUsable(appMenuRect) ? appMenuRect.right + gap : clientRect.left;
+    const int availableWidth = right - leftLimit;
     if (availableWidth < minWidth || RectHeight(clientRect) <= 0) {
         return {};
     }
@@ -1102,6 +1113,11 @@ RECT DashboardApp::NativeTitlebarButtonRect(NativeTitlebarButton button) const {
 
     const int minimumButtonWidth = ScaleLogicalToPhysical(36, CurrentWindowDpi());
     const int closeButtonWidth = std::min(width, std::max(height, minimumButtonWidth));
+    if (button == NativeTitlebarButton::AppMenu) {
+        rect.right = std::min(rect.right, rect.left + closeButtonWidth);
+        return rect;
+    }
+
     if (button == NativeTitlebarButton::Close) {
         rect.left = rect.right - closeButtonWidth;
         return rect;
@@ -1110,7 +1126,7 @@ RECT DashboardApp::NativeTitlebarButtonRect(NativeTitlebarButton button) const {
     if (button == NativeTitlebarButton::Display) {
         const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
         const int right = rect.right - closeButtonWidth - gap;
-        const int availableWidth = right - rect.left;
+        const int availableWidth = right - (rect.left + closeButtonWidth + gap);
         if (availableWidth < closeButtonWidth) {
             return {};
         }
@@ -1193,6 +1209,11 @@ DashboardApp::NativeTitlebarButton DashboardApp::HitTestNativeTitlebarButton(POI
         return NativeTitlebarButton::Display;
     }
 
+    const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
+    if (IsRectUsable(appMenuRect) && PtInRect(&appMenuRect, clientPoint) != FALSE) {
+        return NativeTitlebarButton::AppMenu;
+    }
+
     return NativeTitlebarButton::None;
 }
 
@@ -1208,10 +1229,13 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
     }
 
     FillRectWithColor(hdc, clientRect, nativeTitlebarPalette_.background);
+    PaintNativeTitlebarButton(hdc, NativeTitlebarButton::AppMenu);
     PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Display);
     PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Close);
 
     const int padding = ScaleLogicalToPhysical(kTitlebarHorizontalPaddingLogical, CurrentWindowDpi());
+    const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
+    const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
     const RECT layoutRect = NativeTitlebarLayoutComboRect();
     const RECT themeRect = NativeTitlebarThemeComboRect();
     const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
@@ -1226,7 +1250,8 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
     if (IsRectUsable(layoutRect)) {
         controlsLeft = std::min(controlsLeft, layoutRect.left);
     }
-    RECT textRect{clientRect.left + padding, clientRect.top, controlsLeft - padding, clientRect.bottom};
+    const LONG titleLeft = IsRectUsable(appMenuRect) ? appMenuRect.right + gap : clientRect.left + padding;
+    RECT textRect{titleLeft, clientRect.top, controlsLeft - padding, clientRect.bottom};
     if (textRect.right > textRect.left) {
         HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
         const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
@@ -1248,17 +1273,38 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
 
     const bool hovered = nativeTitlebarHoveredButton_ == button;
     const bool pressed = nativeTitlebarPressedButton_ == button && hovered;
-    if (pressed) {
+    const bool nativeCloseButtonDrawn =
+        button == NativeTitlebarButton::Close && (hovered || pressed) &&
+        PaintDashboardNativeCloseButtonBackground(titlebarHoverProbeHwnd_, hdc, buttonRect, pressed);
+    if (!nativeCloseButtonDrawn && button == NativeTitlebarButton::Close && pressed) {
+        FillRectWithColor(hdc, buttonRect, kTitlebarCloseButtonFallbackPressedColor);
+    } else if (!nativeCloseButtonDrawn && button == NativeTitlebarButton::Close && hovered) {
+        FillRectWithColor(hdc, buttonRect, kTitlebarCloseButtonFallbackHoverColor);
+    } else if (pressed) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonPressed);
     } else if (hovered) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonHover);
     }
+    if (nativeCloseButtonDrawn) {
+        return;
+    }
 
     HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
     const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-    const COLORREF oldTextColor = SetTextColor(hdc, nativeTitlebarPalette_.buttonGlyph);
+    const COLORREF glyphColor = button == NativeTitlebarButton::Close && (hovered || pressed)
+                                    ? kTitlebarCloseButtonFallbackGlyphColor
+                                    : nativeTitlebarPalette_.buttonGlyph;
+    const COLORREF oldTextColor = SetTextColor(hdc, glyphColor);
 
-    if (button == NativeTitlebarButton::Display) {
+    if (button == NativeTitlebarButton::AppMenu) {
+        const int iconSize = NativeTitlebarGlyphSize(CurrentWindowDpi());
+        const int iconLeft = (buttonRect.left + buttonRect.right - iconSize) / 2;
+        const int iconTop = (buttonRect.top + buttonRect.bottom - iconSize) / 2;
+        HICON icon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconA(nullptr, IDI_APPLICATION);
+        if (icon != nullptr) {
+            DrawIconEx(hdc, iconLeft, iconTop, icon, iconSize, iconSize, 0, nullptr, DI_NORMAL);
+        }
+    } else if (button == NativeTitlebarButton::Display) {
         const int screenWidth = std::max(14, ScaleLogicalToPhysical(16, CurrentWindowDpi()));
         const int screenHeight = std::max(9, ScaleLogicalToPhysical(10, CurrentWindowDpi()));
         const int centerX = (buttonRect.left + buttonRect.right) / 2;
@@ -1267,8 +1313,7 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
             centerY - screenHeight / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi()),
             centerX + (screenWidth + 1) / 2,
             centerY + (screenHeight + 1) / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi())};
-        HPEN pen = CreatePen(
-            PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), nativeTitlebarPalette_.buttonGlyph);
+        HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), glyphColor);
         HGDIOBJ oldPen = SelectObject(hdc, pen);
         HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
         Rectangle(hdc, screenRect.left, screenRect.top, screenRect.right, screenRect.bottom);
@@ -1289,12 +1334,11 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
         }
         DeleteObject(pen);
     } else if (button == NativeTitlebarButton::Close) {
-        const int glyphSize = std::max(8, ScaleLogicalToPhysical(10, CurrentWindowDpi()));
+        const int glyphSize = NativeTitlebarGlyphSize(CurrentWindowDpi());
         const int halfGlyph = glyphSize / 2;
         const int centerX = (buttonRect.left + buttonRect.right) / 2;
         const int centerY = (buttonRect.top + buttonRect.bottom) / 2;
-        HPEN pen = CreatePen(
-            PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), nativeTitlebarPalette_.buttonGlyph);
+        HPEN pen = CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), glyphColor);
         HGDIOBJ oldPen = SelectObject(hdc, pen);
         MoveToEx(hdc, centerX - halfGlyph, centerY - halfGlyph, nullptr);
         LineTo(hdc, centerX + halfGlyph + 1, centerY + halfGlyph + 1);
@@ -1376,6 +1420,17 @@ void DashboardApp::InvokeNativeTitlebarButton(NativeTitlebarButton button) {
         POINT menuPoint{displayRect.left, displayRect.bottom};
         ClientToScreen(titlebarHoverProbeHwnd_, &menuPoint);
         shellUi_->ShowTitlebarConfigureDisplayMenu(menuPoint);
+        UpdateNativeTitlebarHoverFromCursor();
+    }
+
+    if (button == NativeTitlebarButton::AppMenu && shellUi_ != nullptr && titlebarHoverProbeHwnd_ != nullptr) {
+        const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
+        if (!IsRectUsable(appMenuRect)) {
+            return;
+        }
+        POINT menuPoint{appMenuRect.left, appMenuRect.bottom};
+        ClientToScreen(titlebarHoverProbeHwnd_, &menuPoint);
+        shellUi_->ShowContextMenu(DashboardShellUi::MenuSource::AppWindow, menuPoint, nullptr);
         UpdateNativeTitlebarHoverFromCursor();
     }
 }

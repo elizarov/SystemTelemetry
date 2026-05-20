@@ -2,6 +2,8 @@
 
 #include <algorithm>
 #include <dwmapi.h>
+#include <uxtheme.h>
+#include <vssym32.h>
 
 namespace {
 
@@ -17,6 +19,7 @@ constexpr int kNativeTitlebarCornerRadiusLogical = 8;
 constexpr UINT kDefaultDpi = 96;
 constexpr UINT kMaxReasonableDpi = 960;
 constexpr COLORREF kDwmColorDefault = 0xFFFFFFFF;
+constexpr wchar_t kWindowThemeClassName[] = L"WINDOW";  // UxTheme exposes only UTF-16 class names.
 
 int ColorChannel(COLORREF color, int shift) {
     return static_cast<int>((color >> shift) & 0xFF);
@@ -83,6 +86,18 @@ DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF 
 int ResolveDashboardTitlebarCornerRadius(UINT dpi) {
     const UINT effectiveDpi = dpi == 0 ? kDefaultDpi : std::min(dpi, kMaxReasonableDpi);
     return std::max(1, MulDiv(kNativeTitlebarCornerRadiusLogical, static_cast<int>(effectiveDpi), kDefaultDpi));
+}
+
+bool PaintDashboardNativeCloseButtonBackground(HWND hwnd, HDC hdc, const RECT& rect, bool pressed) {
+    HTHEME theme = OpenThemeData(hwnd, kWindowThemeClassName);
+    if (theme == nullptr) {
+        return false;
+    }
+
+    const HRESULT result =
+        DrawThemeBackground(theme, hdc, WP_CLOSEBUTTON, pressed ? CBS_PUSHED : CBS_HOT, &rect, nullptr);
+    CloseThemeData(theme);
+    return SUCCEEDED(result);
 }
 
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible) {

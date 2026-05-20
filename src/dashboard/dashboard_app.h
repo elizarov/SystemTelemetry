@@ -61,6 +61,7 @@ private:
 
     enum class NativeTitlebarButton {
         None,
+        AppMenu,
         Display,
         Close,
     };

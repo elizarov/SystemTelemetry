@@ -90,11 +90,12 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - When supported by Windows DWM, the visible titlebar state asks Windows for native rounded top-level window corners, the system default border, the system default caption and text colors, and dark-mode-aware frame rendering. The custom hover strip preserves rounded top corners while it covers the native caption. Unsupported DWM chrome attributes fail open and leave the existing rectangular strip behavior.
 - The visible titlebar strip uses the dashboard width and stays hidden when its native frame would extend above the monitor or past the monitor sides, including fitted full-monitor dashboard placement. Bottom-frame overflow from a dashboard placement that is taller than the monitor does not by itself suppress the titlebar.
 - Leaving the dashboard, titlebar, or virtual titlebar band hides the strip unless a titlebar control dropdown, titlebar menu, close action, or titlebar move interaction is in progress.
+- The left side of the titlebar shows a small CaseDash icon button before the `CaseDash` title; left-clicking it opens the same full menu as right-clicking the dashboard.
 - Right-aligned titlebar controls appear left to right as a layout dropdown, a theme dropdown, a display setup button, and a close button.
 - The layout dropdown is a native Windows dropdown, shows layout names only, reflects the active layout, and applies a new layout through the same behavior as the `Layout` submenu.
 - The theme dropdown is a native Windows dropdown, shows theme names with spaces such as `dark cyan`, reflects the active theme, and applies a new theme through the same behavior as the `Theme` submenu.
 - The display setup button is a custom gray titlebar button with a minimal monitor glyph, shares hover and pressed feedback with the close button, and opens the same target-display entries as `Display` > `Configure Display`.
-- The close button is a custom gray `X` button and exits through the same save-or-discard prompt used by `Exit` when layout-edit changes are unsaved.
+- The close button is a custom `X` button, uses the native Windows close-button hover or pressed background when available, and exits through the same save-or-discard prompt used by `Exit` when layout-edit changes are unsaved.
 - Dragging empty titlebar space starts dashboard move mode with the usual monitor, scale, and coordinate overlay, and the overlay prompts `Release to place` because releasing the pointer completes placement. Other move-mode entry points prompt `Left-click to place`.
 
 ## Telemetry And Content Behavior
