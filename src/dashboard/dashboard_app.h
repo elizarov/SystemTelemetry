@@ -128,8 +128,10 @@ private:
     void UpdateNativeTitlebarCloseButtonHover(POINT screenPoint);
     void StartNativeTitlebarHoverTimer();
     void StopNativeTitlebarHoverTimer();
-    void StartMoveMode(
-        bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint, bool clampCursorAnchorClientPoint);
+    void StartMoveMode(bool hasCursorAnchorClientPoint,
+        POINT cursorAnchorClientPoint,
+        bool clampCursorAnchorClientPoint,
+        bool placeOnRelease);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;

@@ -1014,15 +1014,17 @@ void DashboardApp::RemoveTrayIcon() {
 }
 
 void DashboardApp::StartMoveMode() {
-    StartMoveMode(false, POINT{}, true);
+    StartMoveMode(false, POINT{}, true, false);
 }
 
 void DashboardApp::StartMoveModeAt(POINT cursorAnchorClientPoint) {
-    StartMoveMode(true, cursorAnchorClientPoint, true);
+    StartMoveMode(true, cursorAnchorClientPoint, true, false);
 }
 
-void DashboardApp::StartMoveMode(
-    bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint, bool clampCursorAnchorClientPoint) {
+void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
+    POINT cursorAnchorClientPoint,
+    bool clampCursorAnchorClientPoint,
+    bool placeOnRelease) {
     if (controller_.State().isEditingLayout) {
         layoutEditController_.CancelInteraction();
     }
@@ -1031,7 +1033,7 @@ void DashboardApp::StartMoveMode(
     hasMoveCursorAnchorClientPoint_ = hasCursorAnchorClientPoint;
     clampMoveCursorAnchorClientPoint_ = clampCursorAnchorClientPoint;
     suppressMoveStopOnNextLeftButtonUp_ = false;
-    stopMoveModeWhenLeftButtonReleased_ = false;
+    stopMoveModeWhenLeftButtonReleased_ = placeOnRelease;
     controller_.State().isMoving = true;
     StopNativeTitlebarHoverTimer();
     UpdateNativeTitlebarProbe();
@@ -1044,8 +1046,7 @@ void DashboardApp::StartMoveMode(
 void DashboardApp::StartMoveModeFromNativeTitlebar(POINT screenPoint) {
     POINT clientPoint = screenPoint;
     ScreenToClient(hwnd_, &clientPoint);
-    StartMoveMode(true, clientPoint, false);
-    stopMoveModeWhenLeftButtonReleased_ = true;
+    StartMoveMode(true, clientPoint, false, true);
 }
 
 void DashboardApp::StopMoveMode() {
@@ -1111,6 +1112,7 @@ void DashboardApp::SyncDashboardMoveOverlayState() {
     }
 
     overlayState.visible = true;
+    overlayState.placeOnRelease = stopMoveModeWhenLeftButtonReleased_;
     overlayState.monitorName = movePlacementInfo_.monitorName;
     overlayState.relativePosition = RenderPoint{static_cast<int>(movePlacementInfo_.relativePosition.x),
         static_cast<int>(movePlacementInfo_.relativePosition.y)};

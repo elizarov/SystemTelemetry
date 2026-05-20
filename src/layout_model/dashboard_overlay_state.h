@@ -14,6 +14,7 @@ enum class LayoutSimilarityIndicatorMode {
 
 struct DashboardMoveOverlayState {
     bool visible = false;
+    bool placeOnRelease = false;
     std::string monitorName;
     RenderPoint relativePosition{};
     double monitorScale = 1.0;

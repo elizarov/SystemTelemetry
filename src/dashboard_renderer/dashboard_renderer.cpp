@@ -339,7 +339,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
         FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
     const std::string scaleText =
         FormatText("Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
-    const std::string hintText = "Left-click to place. Copy monitor name, scale, and x/y into config.";
+    const std::string hintText = overlayState.placeOnRelease ? "Release to place" : "Left-click to place";
 
     const int minContentWidth = ScaleLogical(220);
     const int maxContentWidth = (std::max)(minContentWidth, WindowWidth() - margin * 2 - padding * 2);
