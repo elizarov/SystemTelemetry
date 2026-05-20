@@ -188,9 +188,12 @@ private:
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     bool stopMoveModeWhenLeftButtonReleased_ = false;
     HWND titlebarHoverProbeHwnd_ = nullptr;
+    RECT nativeTitlebarProbeRect_{};
     bool nativeTitlebarVisible_ = false;
     bool nativeTitlebarProbeVisible_ = false;
+    bool nativeTitlebarProbeRectValid_ = false;
     bool nativeTitlebarHoverTimerActive_ = false;
+    BYTE nativeTitlebarProbeAlpha_ = 0;
     bool nativeTitlebarCloseHovered_ = false;
     bool nativeTitlebarClosePressed_ = false;
     LightweightMutex pendingTelemetryLock_;

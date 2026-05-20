@@ -64,6 +64,10 @@ bool IsRectUsable(const RECT& rect) {
     return RectWidth(rect) > 0 && RectHeight(rect) > 0;
 }
 
+bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
+    return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+}
+
 bool AdjustDashboardWindowRectForDpi(RECT& rect, DWORD style, DWORD exStyle, UINT dpi) {
     static AdjustWindowRectExForDpiFn adjustWindowRectExForDpi = []() -> AdjustWindowRectExForDpiFn {
         HMODULE user32 = GetModuleHandleA("user32.dll");
@@ -668,6 +672,7 @@ bool DashboardApp::CreateNativeTitlebarProbe() {
         return false;
     }
     SetLayeredWindowAttributes(titlebarHoverProbeHwnd_, 0, kTitlebarProbeAlpha, LWA_ALPHA);
+    nativeTitlebarProbeAlpha_ = kTitlebarProbeAlpha;
     UpdateNativeTitlebarProbe();
     return true;
 }
@@ -678,6 +683,7 @@ void DashboardApp::DestroyNativeTitlebarProbe() {
         titlebarHoverProbeHwnd_ = nullptr;
     }
     nativeTitlebarProbeVisible_ = false;
+    nativeTitlebarProbeRectValid_ = false;
 }
 
 void DashboardApp::UpdateNativeTitlebarProbe() {
@@ -686,35 +692,61 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
     }
     if (hwnd_ == nullptr || !IsWindowVisible(hwnd_) ||
         (!nativeTitlebarVisible_ && (controller_.State().isMoving || layoutEditModalUiDepth_ > 0))) {
-        ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
+        if (nativeTitlebarProbeVisible_) {
+            ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
+        }
         nativeTitlebarProbeVisible_ = false;
+        nativeTitlebarProbeRectValid_ = false;
         ResetNativeTitlebarCloseButtonState();
         return;
     }
 
     const DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(DashboardClientScreenRect());
     if (!geometry.canShow) {
-        ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
+        if (nativeTitlebarProbeVisible_) {
+            ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
+        }
         nativeTitlebarProbeVisible_ = false;
+        nativeTitlebarProbeRectValid_ = false;
         ResetNativeTitlebarCloseButtonState();
         return;
     }
 
-    const int width = RectWidth(geometry.virtualHoverRect);
-    const int height = RectHeight(geometry.virtualHoverRect);
-    SetLayeredWindowAttributes(
-        titlebarHoverProbeHwnd_, 0, nativeTitlebarVisible_ ? kTitlebarVisibleAlpha : kTitlebarProbeAlpha, LWA_ALPHA);
-    SetWindowPos(titlebarHoverProbeHwnd_,
-        HWND_TOP,
-        geometry.virtualHoverRect.left,
-        geometry.virtualHoverRect.top,
-        width,
-        height,
-        SWP_NOACTIVATE | SWP_NOOWNERZORDER);
-    ShowWindow(titlebarHoverProbeHwnd_, SW_SHOWNOACTIVATE);
+    const BYTE targetAlpha = nativeTitlebarVisible_ ? kTitlebarVisibleAlpha : kTitlebarProbeAlpha;
+    const bool alphaChanged = nativeTitlebarProbeAlpha_ != targetAlpha;
+    if (alphaChanged) {
+        SetLayeredWindowAttributes(titlebarHoverProbeHwnd_, 0, targetAlpha, LWA_ALPHA);
+        nativeTitlebarProbeAlpha_ = targetAlpha;
+    }
+
+    const bool rectChanged =
+        !nativeTitlebarProbeRectValid_ || !TitlebarRectsEqual(nativeTitlebarProbeRect_, geometry.virtualHoverRect);
+    const bool wasVisible = nativeTitlebarProbeVisible_;
+    if (rectChanged || !wasVisible) {
+        const int width = RectWidth(geometry.virtualHoverRect);
+        const int height = RectHeight(geometry.virtualHoverRect);
+        UINT flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+        if (wasVisible) {
+            flags |= SWP_NOZORDER;
+        }
+        SetWindowPos(titlebarHoverProbeHwnd_,
+            wasVisible ? nullptr : HWND_TOP,
+            geometry.virtualHoverRect.left,
+            geometry.virtualHoverRect.top,
+            width,
+            height,
+            flags);
+        nativeTitlebarProbeRect_ = geometry.virtualHoverRect;
+        nativeTitlebarProbeRectValid_ = true;
+    }
+    if (!wasVisible) {
+        ShowWindow(titlebarHoverProbeHwnd_, SW_SHOWNOACTIVATE);
+    }
     nativeTitlebarProbeVisible_ = true;
     if (nativeTitlebarVisible_) {
-        InvalidateRect(titlebarHoverProbeHwnd_, nullptr, TRUE);
+        if (!wasVisible || rectChanged || alphaChanged) {
+            InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
+        }
     } else {
         ResetNativeTitlebarCloseButtonState();
     }
@@ -730,8 +762,11 @@ void DashboardApp::ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry)
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardVisibleTitlebarStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = true;
-    ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
-    nativeTitlebarProbeVisible_ = false;
+    if (nativeTitlebarProbeVisible_) {
+        ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
+        nativeTitlebarProbeVisible_ = false;
+        nativeTitlebarProbeRectValid_ = false;
+    }
 
     SetWindowPos(hwnd_,
         nullptr,
