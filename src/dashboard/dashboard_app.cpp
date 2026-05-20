@@ -34,21 +34,9 @@ RECT RectFromPoint(RenderPoint point, int radius) {
 
 constexpr double kScaleEpsilon = 0.0001;
 constexpr int kBringToFrontRetryCount = 8;
-constexpr WORD kCursorArrowResourceId = 32512;
-constexpr WORD kDefaultApplicationIconResourceId = 32512;
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
-}
-
-HCURSOR LoadSystemCursorA(WORD resourceId) {
-    // Explicit A APIs need A resource pointers because UNICODE makes stock IDC_* macros wide.
-    return LoadCursorA(nullptr, MAKEINTRESOURCEA(resourceId));
-}
-
-HICON LoadSystemIconA(WORD resourceId) {
-    // Explicit A APIs need A resource pointers because UNICODE makes stock IDI_* macros wide.
-    return LoadIconA(nullptr, MAKEINTRESOURCEA(resourceId));
 }
 
 const char* TraceTimingOperationName(LayoutEditHost::TracePhase phase) {
@@ -227,7 +215,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
     wc.lpszClassName = kWindowClassName;
-    wc.hCursor = LoadSystemCursorA(kCursorArrowResourceId);
+    wc.hCursor = LoadCursorA(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
     if (appIconLarge_ == nullptr) {
         appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
@@ -609,7 +597,7 @@ bool DashboardApp::CreateTrayIcon() {
     trayIcon_.uID = 1;
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     trayIcon_.uCallbackMessage = kTrayMessage;
-    trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadSystemIconA(kDefaultApplicationIconResourceId);
+    trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconA(nullptr, IDI_APPLICATION);
     strcpy_s(trayIcon_.szTip, kAppTitle);
     return Shell_NotifyIconA(NIM_ADD, &trayIcon_) == TRUE;
 }

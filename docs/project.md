@@ -99,7 +99,6 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
 - Clangd include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
 - GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS` and `CASEDASH_INCLUDE_LINT_MAX_PARALLEL` for include checks.
-- Explicit Win32 `A` APIs that take stock resource pointers use `MAKEINTRESOURCEA` with numeric stock ids instead of `IDC_*`, `IDI_*`, or `RT_*` macros because `UNICODE` makes those stock macros wide and clang rejects the mixed pointer type even when MSVC accepts it.
 - `for /f` commands invoke `vswhere.exe` through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
 - Config metadata is generated into table descriptors from `src/config/config.h` and custom-section annotations in `src/config/config_primitives.h`; keep parser, writer, color, and layout-edit metadata consumers on the non-template runtime table APIs.
 - Font config keeps the C++ member `smallText` and maps it to the persisted `small` key with `config_meta: rename=small`, so Win32 RPC `small` macro handling stays outside the config schema.
