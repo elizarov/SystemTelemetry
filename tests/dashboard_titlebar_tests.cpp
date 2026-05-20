@@ -106,6 +106,13 @@ TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
     EXPECT_EQ(palette.buttonPressed, RGB(81, 81, 81));
 }
 
+TEST(DashboardTitlebarChrome, ScalesTopCornerRadiusWithDpi) {
+    EXPECT_EQ(ResolveDashboardTitlebarCornerRadius(96), 8);
+    EXPECT_EQ(ResolveDashboardTitlebarCornerRadius(120), 10);
+    EXPECT_EQ(ResolveDashboardTitlebarCornerRadius(144), 12);
+    EXPECT_EQ(ResolveDashboardTitlebarCornerRadius(0), 8);
+}
+
 TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
     const DashboardTitlebarChromeResult result = ApplyDashboardTitlebarChrome(nullptr, true);
 

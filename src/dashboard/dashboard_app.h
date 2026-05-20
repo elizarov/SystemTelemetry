@@ -126,6 +126,8 @@ private:
     void UpdateNativeTitlebarProbe();
     bool CreateNativeTitlebarProbe();
     void DestroyNativeTitlebarProbe();
+    void ClearNativeTitlebarProbeRegion();
+    void UpdateNativeTitlebarProbeRegion(int width, int height);
     void ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry);
     void HideNativeTitlebar();
     bool CreateNativeTitlebarControls();
@@ -223,6 +225,9 @@ private:
     bool nativeTitlebarVisible_ = false;
     bool nativeTitlebarProbeVisible_ = false;
     bool nativeTitlebarProbeRectValid_ = false;
+    bool nativeTitlebarProbeRounded_ = false;
+    int nativeTitlebarProbeRegionWidth_ = 0;
+    int nativeTitlebarProbeRegionHeight_ = 0;
     bool nativeTitlebarHoverInside_ = false;
     bool nativeTitlebarHoverTimerActive_ = false;
     bool nativeTitlebarControlsVisible_ = false;

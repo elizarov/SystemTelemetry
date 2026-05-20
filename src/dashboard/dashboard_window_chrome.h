@@ -20,5 +20,6 @@ struct DashboardTitlebarChromeResult {
 
 DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND hwnd);
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF background, COLORREF text);
+int ResolveDashboardTitlebarCornerRadius(UINT dpi);
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible);
 bool DashboardTitlebarChromeSucceeded(const DashboardTitlebarChromeResult& result);

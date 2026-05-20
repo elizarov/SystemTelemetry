@@ -693,6 +693,7 @@ bool DashboardApp::CreateNativeTitlebarProbe() {
 
 void DashboardApp::DestroyNativeTitlebarProbe() {
     DestroyNativeTitlebarControls();
+    ClearNativeTitlebarProbeRegion();
     if (titlebarHoverProbeHwnd_ != nullptr) {
         DestroyWindow(titlebarHoverProbeHwnd_);
         titlebarHoverProbeHwnd_ = nullptr;
@@ -700,6 +701,42 @@ void DashboardApp::DestroyNativeTitlebarProbe() {
     nativeTitlebarHoverInside_ = false;
     nativeTitlebarProbeVisible_ = false;
     nativeTitlebarProbeRectValid_ = false;
+}
+
+void DashboardApp::ClearNativeTitlebarProbeRegion() {
+    if (titlebarHoverProbeHwnd_ != nullptr && nativeTitlebarProbeRounded_) {
+        SetWindowRgn(titlebarHoverProbeHwnd_, nullptr, TRUE);
+    }
+    nativeTitlebarProbeRounded_ = false;
+    nativeTitlebarProbeRegionWidth_ = 0;
+    nativeTitlebarProbeRegionHeight_ = 0;
+}
+
+void DashboardApp::UpdateNativeTitlebarProbeRegion(int width, int height) {
+    if (titlebarHoverProbeHwnd_ == nullptr) {
+        return;
+    }
+    if (!nativeTitlebarVisible_ || width <= 0 || height <= 0) {
+        ClearNativeTitlebarProbeRegion();
+        return;
+    }
+    if (nativeTitlebarProbeRounded_ && nativeTitlebarProbeRegionWidth_ == width &&
+        nativeTitlebarProbeRegionHeight_ == height) {
+        return;
+    }
+
+    const int radius = std::clamp(ResolveDashboardTitlebarCornerRadius(CurrentWindowDpi()), 1, std::min(width, height));
+    HRGN region = CreateRoundRectRgn(0, 0, width + 1, height + radius + 1, radius * 2, radius * 2);
+    if (region == nullptr) {
+        return;
+    }
+    if (SetWindowRgn(titlebarHoverProbeHwnd_, region, TRUE) == 0) {
+        DeleteObject(region);
+        return;
+    }
+    nativeTitlebarProbeRounded_ = true;
+    nativeTitlebarProbeRegionWidth_ = width;
+    nativeTitlebarProbeRegionHeight_ = height;
 }
 
 void DashboardApp::UpdateNativeTitlebarProbe() {
@@ -711,6 +748,7 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         if (nativeTitlebarProbeVisible_) {
             ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
         }
+        ClearNativeTitlebarProbeRegion();
         nativeTitlebarHoverInside_ = false;
         nativeTitlebarProbeVisible_ = false;
         nativeTitlebarProbeRectValid_ = false;
@@ -724,6 +762,7 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         if (nativeTitlebarProbeVisible_) {
             ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
         }
+        ClearNativeTitlebarProbeRegion();
         nativeTitlebarProbeVisible_ = false;
         nativeTitlebarProbeRectValid_ = false;
         ShowNativeTitlebarControls(false);
@@ -741,9 +780,9 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
     const bool rectChanged =
         !nativeTitlebarProbeRectValid_ || !TitlebarRectsEqual(nativeTitlebarProbeRect_, geometry.virtualHoverRect);
     const bool wasVisible = nativeTitlebarProbeVisible_;
+    const int width = RectWidth(geometry.virtualHoverRect);
+    const int height = RectHeight(geometry.virtualHoverRect);
     if (rectChanged || !wasVisible) {
-        const int width = RectWidth(geometry.virtualHoverRect);
-        const int height = RectHeight(geometry.virtualHoverRect);
         UINT flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
         if (wasVisible) {
             flags |= SWP_NOZORDER;
@@ -758,6 +797,7 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         nativeTitlebarProbeRect_ = geometry.virtualHoverRect;
         nativeTitlebarProbeRectValid_ = true;
     }
+    UpdateNativeTitlebarProbeRegion(width, height);
     if (!wasVisible) {
         ShowWindow(titlebarHoverProbeHwnd_, SW_SHOWNOACTIVATE);
     }

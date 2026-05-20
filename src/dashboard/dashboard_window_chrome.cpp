@@ -13,6 +13,9 @@ constexpr DWORD kDwmTextColorAttribute = 36;
 
 constexpr UINT kDwmCornerPreferenceDoNotRound = 1;
 constexpr UINT kDwmCornerPreferenceRound = 2;
+constexpr int kNativeTitlebarCornerRadiusLogical = 8;
+constexpr UINT kDefaultDpi = 96;
+constexpr UINT kMaxReasonableDpi = 960;
 constexpr COLORREF kDwmColorDefault = 0xFFFFFFFF;
 
 int ColorChannel(COLORREF color, int shift) {
@@ -75,6 +78,11 @@ DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF 
     palette.buttonPressed = BlendColor(background, text, 22);
     palette.buttonGlyph = text;
     return palette;
+}
+
+int ResolveDashboardTitlebarCornerRadius(UINT dpi) {
+    const UINT effectiveDpi = dpi == 0 ? kDefaultDpi : std::min(dpi, kMaxReasonableDpi);
+    return std::max(1, MulDiv(kNativeTitlebarCornerRadiusLogical, static_cast<int>(effectiveDpi), kDefaultDpi));
 }
 
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible) {
