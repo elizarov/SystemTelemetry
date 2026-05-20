@@ -4,7 +4,6 @@
 #include "util/command_line.h"
 #include "util/elevated_process.h"
 #include "util/paths.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -66,35 +65,33 @@ AutoStartUpdateResult DisableAutoStartRegistration() {
 }  // namespace
 
 std::optional<std::string> ReadAutoStartCommand() {
-    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
-    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
-    const LSTATUS openStatus = RegOpenKeyExW(HKEY_LOCAL_MACHINE, runSubKey.c_str(), 0, KEY_QUERY_VALUE, &key);
+    const LSTATUS openStatus = RegOpenKeyExA(HKEY_LOCAL_MACHINE, kAutoStartRunSubKey, 0, KEY_QUERY_VALUE, &key);
     if (openStatus != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
     DWORD type = 0;
     DWORD size = 0;
-    const LSTATUS queryStatus = RegQueryValueExW(key, valueName.c_str(), nullptr, &type, nullptr, &size);
-    if (queryStatus != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) || size < sizeof(wchar_t)) {
+    const LSTATUS queryStatus = RegQueryValueExA(key, kAutoStartValueName, nullptr, &type, nullptr, &size);
+    if (queryStatus != ERROR_SUCCESS || (type != REG_SZ && type != REG_EXPAND_SZ) || size == 0) {
         RegCloseKey(key);
         return std::nullopt;
     }
 
-    std::wstring value(size / sizeof(wchar_t), wchar_t{});
+    std::string value(size, '\0');
     const LSTATUS readStatus =
-        RegQueryValueExW(key, valueName.c_str(), nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
+        RegQueryValueExA(key, kAutoStartValueName, nullptr, &type, reinterpret_cast<LPBYTE>(value.data()), &size);
     RegCloseKey(key);
     if (readStatus != ERROR_SUCCESS || value.empty()) {
         return std::nullopt;
     }
 
-    const size_t terminator = value.find(wchar_t{});
-    if (terminator != std::wstring::npos) {
+    const size_t terminator = value.find('\0');
+    if (terminator != std::string::npos) {
         value.resize(terminator);
     }
-    return Utf8FromWide(value);
+    return value;
 }
 
 bool IsAutoStartEnabledForCurrentExecutable() {
@@ -108,12 +105,10 @@ bool IsAutoStartEnabledForCurrentExecutable() {
 }
 
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
-    const std::wstring runSubKey = WideFromUtf8(kAutoStartRunSubKey);
-    const std::wstring valueName = WideFromUtf8(kAutoStartValueName);
     HKEY key = nullptr;
     DWORD disposition = 0;
-    const LSTATUS createStatus = RegCreateKeyExW(HKEY_LOCAL_MACHINE,
-        runSubKey.c_str(),
+    const LSTATUS createStatus = RegCreateKeyExA(HKEY_LOCAL_MACHINE,
+        kAutoStartRunSubKey,
         0,
         nullptr,
         REG_OPTION_NON_VOLATILE,
@@ -132,15 +127,15 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             RegCloseKey(key);
             return ERROR_FILE_NOT_FOUND;
         }
-        const std::wstring command = WideFromUtf8(QuoteCommandLineArgument(executablePath->string()));
-        result = RegSetValueExW(key,
-            valueName.c_str(),
+        const std::string command = QuoteCommandLineArgument(executablePath->string());
+        result = RegSetValueExA(key,
+            kAutoStartValueName,
             0,
             REG_SZ,
             reinterpret_cast<const BYTE*>(command.c_str()),
-            static_cast<DWORD>((command.size() + 1) * sizeof(wchar_t)));
+            static_cast<DWORD>(command.size() + 1));
     } else {
-        result = RegDeleteValueW(key, valueName.c_str());
+        result = RegDeleteValueA(key, kAutoStartValueName);
         if (result == ERROR_FILE_NOT_FOUND) {
             result = ERROR_SUCCESS;
         }

@@ -32,13 +32,12 @@
 #include "util/scale.h"
 #include "util/strings.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
 
 namespace {
 
-constexpr wchar_t kAppendBinaryMode[] = L"ab";  // _wfopen_s mode string follows the widened trace path.
-constexpr wchar_t kWriteBinaryMode[] = L"wb";   // _wfopen_s mode string follows the widened output path.
+constexpr char kAppendBinaryMode[] = "ab";
+constexpr char kWriteBinaryMode[] = "wb";
 
 std::string_view TrimAsciiView(std::string_view text) {
     while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())) != 0) {
@@ -375,8 +374,7 @@ void WriteValidationFailureTrace(
     const FilePath tracePath =
         ResolveDiagnosticsOutputPath(GetWorkingDirectory(), options.tracePath, kDefaultTraceFileName);
     std::FILE* traceFile = nullptr;
-    const std::wstring wideTracePath = tracePath.Wide();
-    if (_wfopen_s(&traceFile, wideTracePath.c_str(), kAppendBinaryMode) != 0 || traceFile == nullptr) {
+    if (fopen_s(&traceFile, tracePath.string().c_str(), kAppendBinaryMode) != 0 || traceFile == nullptr) {
         return;
     }
 
@@ -516,21 +514,21 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
             AppendFormat(message, " Unknown prefix: %s.", options.invalidTracePrefixFilterName.c_str());
         }
         if (!options.trace) {
-            MessageBoxUtf8(message, MB_ICONERROR);
+            ShowAppMessageBox(message, MB_ICONERROR);
         }
         WriteValidationFailureTrace(options, "trace_prefixes", message);
         return false;
     }
     if (options.blank && options.fake) {
         if (!options.trace) {
-            MessageBoxUtf8("/blank cannot be used together with /fake.", MB_ICONERROR);
+            ShowAppMessageBox("/blank cannot be used together with /fake.", MB_ICONERROR);
         }
         WriteValidationFailureTrace(options, "blank_fake_conflict", "/blank cannot be used together with /fake.");
         return false;
     }
     if (options.blank && options.layoutGuideSheet) {
         if (!options.trace) {
-            MessageBoxUtf8("/blank cannot be used together with /layout-guide-sheet.", MB_ICONERROR);
+            ShowAppMessageBox("/blank cannot be used together with /layout-guide-sheet.", MB_ICONERROR);
         }
         WriteValidationFailureTrace(
             options, "blank_layout_guide_sheet_conflict", "/blank cannot be used together with /layout-guide-sheet.");
@@ -538,7 +536,7 @@ bool ValidateDiagnosticsOptions(const DiagnosticsOptions& options) {
     }
     if (options.hasAppIconSize && !IsValidAppIconSize(options.appIconSize)) {
         if (!options.trace) {
-            MessageBoxUtf8("/app-icon-size must be between 16 and 1024 pixels.", MB_ICONERROR);
+            ShowAppMessageBox("/app-icon-size must be between 16 and 1024 pixels.", MB_ICONERROR);
         }
         WriteValidationFailureTrace(options, "app_icon_size", "/app-icon-size must be between 16 and 1024 pixels.");
         return false;
@@ -565,7 +563,7 @@ bool ApplyDiagnosticsLayoutOverride(
         return false;
     }
 
-    MessageBoxUtf8(FormatText("Unknown layout name:\n%s", options.layoutName.c_str()), MB_ICONERROR);
+    ShowAppMessageBox(FormatText("Unknown layout name:\n%s", options.layoutName.c_str()), MB_ICONERROR);
     return false;
 }
 
@@ -592,7 +590,7 @@ bool ApplyDiagnosticsThemeOverride(
         return false;
     }
 
-    MessageBoxUtf8(FormatText("Unknown theme name:\n%s", options.themeName.c_str()), MB_ICONERROR);
+    ShowAppMessageBox(FormatText("Unknown theme name:\n%s", options.themeName.c_str()), MB_ICONERROR);
     return false;
 }
 
@@ -659,8 +657,7 @@ bool DiagnosticsSession::Initialize() {
         }
     }
     if (options_.trace) {
-        const std::wstring wideTracePath = tracePath_.Wide();
-        if (_wfopen_s(&traceFile_, wideTracePath.c_str(), kAppendBinaryMode) != 0 || traceFile_ == nullptr) {
+        if (fopen_s(&traceFile_, tracePath_.string().c_str(), kAppendBinaryMode) != 0 || traceFile_ == nullptr) {
             ShowFileOpenError("trace file", tracePath_);
             return false;
         }
@@ -725,7 +722,7 @@ void DiagnosticsSession::WriteTraceMarkerVFmt(TracePrefix prefix, ResourceString
 void DiagnosticsSession::ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message) {
     WriteTraceMarker(prefix, traceText);
     if (ShouldShowDialogs()) {
-        MessageBoxUtf8(message, MB_ICONERROR);
+        ShowAppMessageBox(message, MB_ICONERROR);
     }
 }
 
@@ -738,7 +735,7 @@ bool DiagnosticsSession::ReportSaveError(ResourceStringId traceEvent,
     const std::string message = FormatText("Failed to %s:\n%s", messageAction, pathText.c_str());
     WriteSaveErrorTrace(*this, traceEvent, pathText, detail, traceSuffix);
     if (ShouldShowDialogs()) {
-        MessageBoxUtf8(message, MB_ICONERROR);
+        ShowAppMessageBox(message, MB_ICONERROR);
     }
     return false;
 }
@@ -746,8 +743,7 @@ bool DiagnosticsSession::ReportSaveError(ResourceStringId traceEvent,
 bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig& config) {
     if (options_.dump) {
         std::FILE* dumpFile = nullptr;
-        const std::wstring wideDumpPath = dumpPath_.Wide();
-        if (_wfopen_s(&dumpFile, wideDumpPath.c_str(), kWriteBinaryMode) != 0 || dumpFile == nullptr) {
+        if (fopen_s(&dumpFile, dumpPath_.string().c_str(), kWriteBinaryMode) != 0 || dumpFile == nullptr) {
             ShowFileOpenError("dump file", dumpPath_);
             return false;
         }
@@ -841,14 +837,14 @@ std::optional<FilePath> PromptSavePath(HWND owner,
     std::string_view defaultFileName,
     std::string_view filter,
     std::string_view defaultExtension) {
-    wchar_t fileBuffer[MAX_PATH] = {};
-    const std::wstring defaultFileNameText = WideFromUtf8(defaultFileName);
-    wcsncpy_s(fileBuffer, defaultFileNameText.c_str(), _TRUNCATE);
+    char fileBuffer[MAX_PATH] = {};
+    const std::string defaultFileNameText(defaultFileName);
+    strncpy_s(fileBuffer, defaultFileNameText.c_str(), _TRUNCATE);
 
-    std::wstring initialDirectoryText = initialDirectory.Wide();
-    std::wstring filterText = WideFromUtf8(filter);
-    std::wstring defaultExtensionText = WideFromUtf8(defaultExtension);
-    OPENFILENAMEW dialog{};
+    const std::string initialDirectoryText = initialDirectory.string();
+    const std::string filterText(filter);
+    const std::string defaultExtensionText(defaultExtension);
+    OPENFILENAMEA dialog{};
     dialog.lStructSize = sizeof(dialog);
     dialog.hwndOwner = owner;
     dialog.lpstrFilter = filterText.empty() ? nullptr : filterText.c_str();
@@ -858,7 +854,7 @@ std::optional<FilePath> PromptSavePath(HWND owner,
     dialog.lpstrDefExt = defaultExtensionText.empty() ? nullptr : defaultExtensionText.c_str();
     dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
 
-    if (!GetSaveFileNameW(&dialog)) {
+    if (!GetSaveFileNameA(&dialog)) {
         return std::nullopt;
     }
     return FilePath(dialog.lpstrFile);
@@ -1105,7 +1101,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
         diagnostics.WriteTraceMarkerWithDetail(
             TracePrefix::Diagnostics, RES_STR("telemetry_initialize_failed"), telemetryError);
         if (diagnostics.ShouldShowDialogs()) {
-            MessageBoxUtf8(FormatTelemetryInitializeError(telemetryError), MB_ICONERROR);
+            ShowAppMessageBox(FormatTelemetryInitializeError(telemetryError), MB_ICONERROR);
         }
         return 1;
     }
@@ -1126,7 +1122,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions) {
                 nullptr,
                 &reloadError)) {
             if (diagnostics.ShouldShowDialogs() && !reloadError.empty()) {
-                MessageBoxUtf8(FormatTelemetryInitializeError(reloadError), MB_ICONERROR);
+                ShowAppMessageBox(FormatTelemetryInitializeError(reloadError), MB_ICONERROR);
             }
             return 1;
         }

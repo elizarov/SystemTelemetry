@@ -16,7 +16,6 @@
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -51,7 +50,7 @@ void SetSupportDiagnostics(std::string& diagnostics,
 }
 
 std::string AdlxString(const char* value) {
-    return value != nullptr && value[0] != '\0' ? Utf8FromAnsi(value) : std::string();
+    return value != nullptr && value[0] != '\0' ? std::string(value) : std::string();
 }
 
 std::optional<unsigned int> ParseHexText(std::string text) {

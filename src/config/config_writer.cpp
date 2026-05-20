@@ -346,12 +346,12 @@ bool LayoutConfigHasDifferences(const LayoutConfig& config, const LayoutConfig& 
 
 bool SaveConfig(const FilePath& path, const AppConfig& config, const ConfigParseContext& context) {
     const AppConfig compareConfig = LoadConfig(path, true, context);
-    const std::string output = BuildSavedConfigText(ReadConfigFileUtf8(path), config, &compareConfig);
-    return WriteConfigFileUtf8(path, output);
+    const std::string output = BuildSavedConfigText(ReadConfigFile(path), config, &compareConfig);
+    return WriteConfigFile(path, output);
 }
 
 bool SaveFullConfig(const FilePath& path, const AppConfig& config) {
     const std::string output =
         BuildSavedConfigText(LoadEmbeddedConfigTemplate(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
-    return WriteConfigFileUtf8(path, output);
+    return WriteConfigFile(path, output);
 }

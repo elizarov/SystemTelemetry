@@ -235,7 +235,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     host_.LayoutDashboardOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
     SyncRendererInteractionState();
     ReleaseCapture();
-    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
     host_.EndLayoutEditTraceSession("session_stop");
     host_.InvalidateLayoutEdit();
 }
@@ -650,7 +650,7 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr,
+        SetCursor(LoadCursorA(nullptr,
             activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
             : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
@@ -658,21 +658,21 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
         return true;
     }
     if (activeMetricListReorderDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr, IDC_SIZENS));
         return true;
     }
     if (activeContainerChildReorderDrag_.has_value()) {
-        SetCursor(LoadCursorW(nullptr, activeContainerChildReorderDrag_->horizontal ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr, activeContainerChildReorderDrag_->horizontal ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
     if (activeGapEditDrag_.has_value()) {
-        SetCursor(LoadCursorW(
+        SetCursor(LoadCursorA(
             nullptr, activeGapEditDrag_->anchor.dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
     if (activeWidgetEditDrag_.has_value()) {
         const auto& guide = activeWidgetEditDrag_->guide;
-        SetCursor(LoadCursorW(nullptr,
+        SetCursor(LoadCursorA(nullptr,
             guide.angularDrag                         ? IDC_CROSS
             : guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
                                                       : IDC_SIZENS));
@@ -680,7 +680,7 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     }
     if (activeLayoutDrag_.has_value()) {
         const auto& guide = activeLayoutDrag_->guide;
-        SetCursor(LoadCursorW(nullptr, guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr, guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return true;
     }
 
@@ -716,7 +716,7 @@ void LayoutEditController::CancelInteraction() {
     }
     SyncRendererInteractionState();
     ReleaseCapture();
-    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
     host_.EndLayoutEditTraceSession("modal_ui");
     host_.InvalidateLayoutEdit();
 }
@@ -924,7 +924,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     if (resolution.actionableGapEditAnchor.has_value()) {
         const LayoutEditGapAnchor* anchor = FindGapEditAnchor(regions, *resolution.actionableGapEditAnchor);
         const auto dragAxis = anchor != nullptr ? anchor->dragAxis : AnchorDragAxis::Vertical;
-        SetCursor(LoadCursorW(nullptr, dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr, dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 
@@ -932,7 +932,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const LayoutEditAnchorRegion* region = FindEditableAnchorRegion(regions, *resolution.actionableAnchorHandle);
         const auto dragAxis = region != nullptr ? region->dragAxis : AnchorDragAxis::Vertical;
         const auto dragMode = region != nullptr ? region->dragMode : AnchorDragMode::AxisDelta;
-        SetCursor(LoadCursorW(nullptr,
+        SetCursor(LoadCursorA(nullptr,
             dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
             : dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
             : dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
@@ -942,7 +942,7 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
 
     if (resolution.hoveredWidgetEditGuide.has_value()) {
         const LayoutEditWidgetGuide& widgetGuide = *resolution.hoveredWidgetEditGuide;
-        SetCursor(LoadCursorW(nullptr,
+        SetCursor(LoadCursorA(nullptr,
             widgetGuide.angularDrag                         ? IDC_CROSS
             : widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
                                                             : IDC_SIZENS));
@@ -951,16 +951,16 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
 
     if (resolution.hoveredLayoutGuide.has_value()) {
         const LayoutEditGuide& layoutGuide = *resolution.hoveredLayoutGuide;
-        SetCursor(LoadCursorW(nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
         return;
     }
 
     if (HitTestEditableColorRegion(regions, clientPoint) != nullptr) {
-        SetCursor(LoadCursorW(nullptr, IDC_CROSS));
+        SetCursor(LoadCursorA(nullptr, IDC_CROSS));
         return;
     }
 
-    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
 }
 
 bool LayoutEditController::FindSnappedLayoutGuideWeights(LayoutDragState& drag, std::vector<int>& weights) {

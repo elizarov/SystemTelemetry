@@ -14,7 +14,6 @@
 #include "util/resource_strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 #include "util/win32_format.h"
 
 namespace {
@@ -64,15 +63,14 @@ private:
 
 std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
     diagnostics.clear();
-    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
-    if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
+    if (!WaitNamedPipeA(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
         diagnostics =
             FormatText(RES_STR("CashDash service pipe is unavailable: %s"), FormatWin32Error(GetLastError()).c_str());
         return std::nullopt;
     }
 
-    Handle pipe(CreateFileW(
-        pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    Handle pipe(CreateFileA(
+        kFpsServicePipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
         diagnostics = FormatText(
             RES_STR("Failed to connect to CashDash service pipe: %s"), FormatWin32Error(GetLastError()).c_str());

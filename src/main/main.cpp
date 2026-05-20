@@ -16,13 +16,11 @@
 #include "util/file_path.h"
 #include "util/message_box.h"
 #include "util/paths.h"
-#include "util/utf8.h"
 
 namespace {
 
 void ShutdownPreviousInstance() {
-    const std::wstring windowClassName = WideFromUtf8(kWindowClassName);
-    HWND existing = FindWindowW(windowClassName.c_str(), nullptr);
+    HWND existing = FindWindowA(kWindowClassName, nullptr);
     if (existing == nullptr) {
         return;
     }
@@ -37,10 +35,10 @@ void ShutdownPreviousInstance() {
         return;
     }
 
-    PostMessageW(existing, WM_CLOSE, 0, 0);
+    PostMessageA(existing, WM_CLOSE, 0, 0);
     for (int attempt = 0; attempt < 40; ++attempt) {
         Sleep(100);
-        existing = FindWindowW(windowClassName.c_str(), nullptr);
+        existing = FindWindowA(kWindowClassName, nullptr);
         if (existing == nullptr) {
             return;
         }
@@ -125,9 +123,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
     if (!app.Initialize(instance)) {
         const std::string& message = app.LastError();
         if (message.empty()) {
-            MessageBoxUtf8("Failed to initialize the telemetry dashboard.", MB_ICONERROR);
+            ShowAppMessageBox("Failed to initialize the telemetry dashboard.", MB_ICONERROR);
         } else {
-            MessageBoxUtf8(message, MB_ICONERROR);
+            ShowAppMessageBox(message, MB_ICONERROR);
         }
         return 1;
     }

@@ -17,9 +17,9 @@
 #include "telemetry/gpu/intel/gpu_intel_level_zero.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
 #include "util/resource_strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -27,7 +27,7 @@ using NtStatus = LONG;
 using D3DkmtHandle = UINT;
 
 constexpr int kD3DkmtQueryAdapterAddress = 6;
-constexpr wchar_t kGdi32LibraryName[] = L"gdi32.dll";  // Win32 module loading requires a UTF-16 DLL name.
+constexpr char kGdi32LibraryName[] = "gdi32.dll";
 
 struct D3DkmtOpenAdapterFromLuid {
     LUID adapterLuid;
@@ -165,9 +165,9 @@ GpuAdapterCandidate MakeGpuAdapterCandidate(const EnumeratedGpuAdapter& adapter,
 }
 
 void PopulateAdapterPciAddress(GpuAdapterInfo& info, LUID adapterLuid) {
-    HMODULE gdi = GetModuleHandleW(kGdi32LibraryName);
+    HMODULE gdi = GetModuleHandleA(kGdi32LibraryName);
     if (gdi == nullptr) {
-        gdi = LoadLibraryW(kGdi32LibraryName);
+        gdi = LoadLibraryA(kGdi32LibraryName);
     }
     if (gdi == nullptr) {
         return;
@@ -237,7 +237,7 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
         DXGI_ADAPTER_DESC1 desc{};
         const HRESULT descHr = adapter->GetDesc1(&desc);
         const bool software = SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
-        const std::string adapterName = SUCCEEDED(descHr) ? Utf8FromWide(desc.Description) : std::string();
+        const std::string adapterName = SUCCEEDED(descHr) ? TextFromWide(desc.Description) : std::string();
         if (SUCCEEDED(descHr) && !software) {
             GpuAdapterInfo info;
             info.vendorId = desc.VendorId;

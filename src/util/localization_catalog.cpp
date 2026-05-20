@@ -51,7 +51,7 @@ void InitializeLocalizationCatalog() {
         return;
     }
 
-    g_localizationCatalog = ParseLocalizationCatalog(LoadUtf8ResourceData(TextResourceId::LocalizationCatalog));
+    g_localizationCatalog = ParseLocalizationCatalog(LoadTextResourceData(TextResourceId::LocalizationCatalog));
     g_localizationCatalogInitialized = true;
 }
 

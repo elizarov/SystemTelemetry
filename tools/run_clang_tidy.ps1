@@ -69,6 +69,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/util/command_line.cpp|windows.h',
     'src/util/high_precision_timer.cpp|windows.h',
     'src/util/message_box.cpp|windows.h',
+    'src/util/paths.cpp|windows.h',
     'src/util/scale.h|windows.h',
     'src/util/lightweight_mutex.cpp|windows.h',
     'src/util/temp_file.cpp|windows.h',
@@ -83,7 +84,7 @@ $clangTidyIgnoredUnusedIncludeWarnings = @(
     'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
     'src/util/resource_strings.h|resource_strings.generated.h',
     'src/util/resource_loader.cpp|windows.h',
-    'src/util/utf8.cpp|windows.h',
+    'src/util/text_encoding.cpp|windows.h',
     'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'
 )
 

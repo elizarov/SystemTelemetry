@@ -1,6 +1,6 @@
 #include "telemetry/impl/collector_gpu.h"
 
-#include <cwchar>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -16,7 +16,7 @@
 
 namespace {
 
-constexpr wchar_t kGpuEngine3dMarker[] = L"engtype_3D";  // PDH GPU engine instance names are UTF-16.
+constexpr char kGpuEngine3dMarker[] = "engtype_3D";
 
 struct CounterArrayTotals {
     double total = 0.0;
@@ -30,7 +30,7 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     }
     DWORD bufferSize = 0;
     DWORD itemCount = 0;
-    PDH_STATUS status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
+    PDH_STATUS status = PdhGetFormattedCounterArrayA(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
     if (status != PDH_MORE_DATA) {
         state.trace_.WriteFmt(
             TracePrefix::Telemetry, RES_STR("pdh_array_prepare status=%ld"), static_cast<long>(status));
@@ -38,8 +38,8 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     }
 
     state.gpu_.counterArrayBuffer.resize(bufferSize);
-    auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_W*>(state.gpu_.counterArrayBuffer.data());
-    status = PdhGetFormattedCounterArrayW(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
+    auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_A*>(state.gpu_.counterArrayBuffer.data());
+    status = PdhGetFormattedCounterArrayA(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
     if (status != ERROR_SUCCESS) {
         state.trace_.WriteFmt(TracePrefix::Telemetry,
             RES_STR("pdh_array_fetch status=%ld count=%lu"),
@@ -49,12 +49,12 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     }
 
     for (DWORD i = 0; i < itemCount; ++i) {
-        const wchar_t* instance = items[i].szName;
+        const char* instance = items[i].szName;
         if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !IsFiniteDouble(items[i].FmtValue.doubleValue)) {
             continue;
         }
         totals.total += items[i].FmtValue.doubleValue;
-        if (instance != nullptr && wcsstr(instance, kGpuEngine3dMarker) != nullptr) {
+        if (instance != nullptr && std::strstr(instance, kGpuEngine3dMarker) != nullptr) {
             totals.total3d += items[i].FmtValue.doubleValue;
         }
     }
@@ -244,7 +244,7 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     ResolveGpuSelection(state);
     InitializeGpuVendorProvider(state);
 
-    const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.gpu_.query);
+    const PDH_STATUS queryStatus = PdhOpenQueryA(nullptr, 0, &state.gpu_.query);
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("pdh_open gpu_query status=%ld"), static_cast<long>(queryStatus));
     const PDH_STATUS loadStatus =
@@ -256,7 +256,7 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("pdh_collect gpu_query status=%ld"), static_cast<long>(collectStatus));
 
-    const PDH_STATUS memoryQueryStatus = PdhOpenQueryW(nullptr, 0, &state.gpu_.memoryQuery);
+    const PDH_STATUS memoryQueryStatus = PdhOpenQueryA(nullptr, 0, &state.gpu_.memoryQuery);
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("pdh_open gpu_memory_query status=%ld"), static_cast<long>(memoryQueryStatus));
     const PDH_STATUS memoryCounterStatus = AddCounterCompat(

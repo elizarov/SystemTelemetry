@@ -35,7 +35,7 @@ void InitializeCpuCollector(RealTelemetryCollectorState& state) {
     }
     state.trace_.WriteFmt(TracePrefix::Telemetry, RES_STR("cpu_name value=\"%s\""), state.snapshot_.cpu.name.c_str());
 
-    const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.cpu_.query);
+    const PDH_STATUS queryStatus = PdhOpenQueryA(nullptr, 0, &state.cpu_.query);
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("pdh_open cpu_query status=%ld"), static_cast<long>(queryStatus));
     const PDH_STATUS loadStatus = AddCounterCompat(

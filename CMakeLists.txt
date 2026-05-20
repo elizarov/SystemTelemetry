@@ -296,7 +296,7 @@ add_executable(CaseDash WIN32
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -460,16 +460,12 @@ target_include_directories(CaseDashMsi PRIVATE
 )
 
 target_compile_definitions(CaseDashGigabyte PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
 )
 
 target_compile_definitions(CaseDashMsi PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
@@ -507,8 +503,6 @@ target_include_directories(CaseDash PRIVATE
 add_dependencies(CaseDash CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 
 target_compile_definitions(CaseDash PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
@@ -717,7 +711,7 @@ add_executable(CaseDashTests
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -729,8 +723,6 @@ target_include_directories(CaseDashTests PRIVATE
 )
 add_dependencies(CaseDashTests CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashTests PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
@@ -894,7 +886,7 @@ add_executable(CaseDashBenchmarks
     src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -924,8 +916,6 @@ target_include_directories(CaseDashBenchmarks PRIVATE
 )
 add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashBenchmarks PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0

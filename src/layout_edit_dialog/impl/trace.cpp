@@ -46,10 +46,8 @@ struct DialogTraceField {
 std::string BuildDialogTraceValues(HWND hwnd, const DialogTraceField* fields, size_t fieldCount) {
     std::string text;
     for (size_t i = 0; i < fieldCount; ++i) {
-        AppendFormat(text,
-            " %s=%s",
-            fields[i].label,
-            QuoteTraceText(ReadDialogControlTextUtf8(hwnd, fields[i].controlId)).c_str());
+        AppendFormat(
+            text, " %s=%s", fields[i].label, QuoteTraceText(ReadDialogControlText(hwnd, fields[i].controlId)).c_str());
     }
     return text;
 }

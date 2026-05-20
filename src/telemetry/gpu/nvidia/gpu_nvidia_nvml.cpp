@@ -14,7 +14,6 @@
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -24,8 +23,8 @@ using NvmlReturn = int;
 constexpr NvmlReturn kNvmlSuccess = 0;
 constexpr unsigned int kNvmlTemperatureGpu = 0;
 constexpr unsigned int kNvmlClockGraphics = 0;
-constexpr wchar_t kNvidiaMlLibraryName[] = L"nvidia-ml.dll";  // LoadLibraryW requires a UTF-16 DLL name.
-constexpr wchar_t kNvmlLibraryName[] = L"nvml.dll";           // LoadLibraryW requires a UTF-16 DLL name.
+constexpr char kNvidiaMlLibraryName[] = "nvidia-ml.dll";
+constexpr char kNvmlLibraryName[] = "nvml.dll";
 
 struct NvmlUtilization {
     unsigned int gpu = 0;
@@ -85,9 +84,9 @@ public:
     }
 
     bool Load(std::string& diagnostics) {
-        module_ = LoadLibraryW(kNvmlLibraryName);
+        module_ = LoadLibraryA(kNvmlLibraryName);
         if (module_ == nullptr) {
-            module_ = LoadLibraryW(kNvidiaMlLibraryName);
+            module_ = LoadLibraryA(kNvidiaMlLibraryName);
         }
         if (module_ == nullptr) {
             diagnostics = ResourceStringText(RES_STR("NVML library not found."));
@@ -138,7 +137,7 @@ public:
         if (errorString_ != nullptr) {
             const char* text = errorString_(result);
             if (text != nullptr && text[0] != '\0') {
-                return Utf8FromAnsi(text);
+                return text;
             }
         }
         return FormatText("%d", result);
@@ -210,7 +209,7 @@ private:
 };
 
 std::string KnownNvmlName(const std::array<char, 128>& name) {
-    return name[0] != '\0' ? Utf8FromAnsi(name.data()) : std::string();
+    return name[0] != '\0' ? std::string(name.data()) : std::string();
 }
 
 bool NvmlPackedDeviceIdMatches(unsigned int pciDeviceId, const GpuAdapterInfo& adapter) {

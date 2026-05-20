@@ -1,11 +1,10 @@
 #include "util/paths.h"
 
+#include <windows.h>
+
 #include <array>
 
 namespace {
-
-extern "C" __declspec(dllimport) unsigned long __stdcall GetModuleFileNameW(
-    void* module, wchar_t* filename, unsigned long size);
 
 constexpr size_t kModulePathBufferLength = 32768;
 
@@ -16,12 +15,12 @@ FilePath CaptureLaunchWorkingDirectory() {
 }  // namespace
 
 FilePath GetExecutableDirectory() {
-    std::array<wchar_t, kModulePathBufferLength> modulePath{};
-    const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
+    std::array<char, kModulePathBufferLength> modulePath{};
+    const auto length = GetModuleFileNameA(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
     if (length == 0 || length >= modulePath.size()) {
         return CurrentDirectoryPath();
     }
-    return FilePath(std::wstring(modulePath.data(), length)).ParentPath();
+    return FilePath(std::string(modulePath.data(), length)).ParentPath();
 }
 
 FilePath GetWorkingDirectory() {
@@ -43,10 +42,10 @@ FilePath ResolveExecutableRelativePath(const FilePath& configuredPath) {
 }
 
 std::optional<FilePath> GetExecutablePath() {
-    std::array<wchar_t, kModulePathBufferLength> modulePath{};
-    const auto length = GetModuleFileNameW(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
+    std::array<char, kModulePathBufferLength> modulePath{};
+    const auto length = GetModuleFileNameA(nullptr, modulePath.data(), static_cast<unsigned long>(modulePath.size()));
     if (length == 0 || length >= modulePath.size()) {
         return std::nullopt;
     }
-    return FilePath(std::wstring(modulePath.data(), length));
+    return FilePath(std::string(modulePath.data(), length));
 }

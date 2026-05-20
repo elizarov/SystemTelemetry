@@ -7,8 +7,8 @@
 #include <utility>
 
 #include "util/strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -49,7 +49,7 @@ CommandLineArguments GetCommandLineArguments() {
     if (wideArguments != nullptr) {
         arguments.reserve(static_cast<size_t>(count));
         for (int i = 0; i < count; ++i) {
-            arguments.push_back(Utf8FromWide(wideArguments[i]));
+            arguments.push_back(TextFromWide(wideArguments[i]));
         }
         LocalFree(wideArguments);
     }

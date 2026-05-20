@@ -9,18 +9,18 @@ class GpuRawCounterMap {
 public:
     void Clear();
     void Reserve(std::size_t count);
-    void Set(const wchar_t* instance, const PDH_RAW_COUNTER& raw);
-    const PDH_RAW_COUNTER* Find(const wchar_t* instance) const;
+    void Set(const char* instance, const PDH_RAW_COUNTER& raw);
+    const PDH_RAW_COUNTER* Find(const char* instance) const;
     void Swap(GpuRawCounterMap& other);
 
 private:
     struct Entry {
-        std::wstring instance;
+        std::string instance;
         PDH_RAW_COUNTER raw{};
         bool occupied = false;
     };
 
-    void Insert(const wchar_t* instance, const PDH_RAW_COUNTER& raw);
+    void Insert(const char* instance, const PDH_RAW_COUNTER& raw);
 
     std::vector<Entry> entries_;
     std::size_t size_ = 0;

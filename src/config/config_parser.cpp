@@ -383,14 +383,14 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
 }  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
-    return LoadUtf8ResourceData(TextResourceId::ConfigTemplate);
+    return LoadTextResourceData(TextResourceId::ConfigTemplate);
 }
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigParseContext& context) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config, context);
     if (includeOverlay) {
-        ApplyConfigText(ReadConfigFileUtf8(path), config, context);
+        ApplyConfigText(ReadConfigFile(path), config, context);
     }
     ResolveConfiguredColors(config);
     MarkCardLayoutReferences(config.layout);

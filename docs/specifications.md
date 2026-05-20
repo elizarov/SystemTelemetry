@@ -12,6 +12,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 ## Runtime Configuration Behavior
 
 - The runtime loads the embedded `resources/config.ini` defaults first, then overlays `config.ini` beside `CaseDash.exe` when that file exists.
+- The executable manifest declares UTF-8 as the process active code page, and runtime Win32 A API text boundaries use the same narrow UTF-8 text as the app model.
 - The embedded template remains the shipped default source, while [resources/config.ini](../resources/config.ini) remains the maintained example and spelling authority for config entries.
 - The runtime treats window size, placement, and UI geometry as logical units and converts them to device pixels through either the current monitor DPI scale or the active explicit scale override.
 - When the configured target monitor is temporarily unavailable, the runtime keeps watching for it and restores the saved placement there once the monitor becomes enumerable.

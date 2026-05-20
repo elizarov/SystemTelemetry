@@ -16,7 +16,6 @@
 #include "util/paths.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -160,13 +159,12 @@ std::string BuildFpsServiceBinaryPath() {
 }
 
 DWORD OpenInstalledService(ServiceHandle& manager, DWORD desiredAccess, ServiceHandle& service) {
-    manager = ServiceHandle(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT));
+    manager = ServiceHandle(OpenSCManagerA(nullptr, nullptr, SC_MANAGER_CONNECT));
     if (manager.Get() == nullptr) {
         return GetLastError();
     }
 
-    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
-    service = ServiceHandle(OpenServiceW(manager.Get(), serviceName.c_str(), desiredAccess));
+    service = ServiceHandle(OpenServiceA(manager.Get(), kFpsServiceName, desiredAccess));
     return service.Get() != nullptr ? ERROR_SUCCESS : GetLastError();
 }
 
@@ -198,18 +196,18 @@ bool IsExpectedServiceBinaryPath(const std::string& command) {
 
 std::optional<std::string> QueryServiceBinaryPath(SC_HANDLE service) {
     DWORD bytesNeeded = 0;
-    QueryServiceConfigW(service, nullptr, 0, &bytesNeeded);
+    QueryServiceConfigA(service, nullptr, 0, &bytesNeeded);
     if (GetLastError() != ERROR_INSUFFICIENT_BUFFER || bytesNeeded == 0) {
         return std::nullopt;
     }
 
     std::vector<BYTE> buffer(bytesNeeded);
-    auto* config = reinterpret_cast<QUERY_SERVICE_CONFIGW*>(buffer.data());
-    if (!QueryServiceConfigW(service, config, static_cast<DWORD>(buffer.size()), &bytesNeeded) ||
+    auto* config = reinterpret_cast<QUERY_SERVICE_CONFIGA*>(buffer.data());
+    if (!QueryServiceConfigA(service, config, static_cast<DWORD>(buffer.size()), &bytesNeeded) ||
         config->lpBinaryPathName == nullptr) {
         return std::nullopt;
     }
-    return Utf8FromWide(config->lpBinaryPathName);
+    return config->lpBinaryPathName;
 }
 
 DWORD QueryServiceStatusProcess(SC_HANDLE service, SERVICE_STATUS_PROCESS& status) {
@@ -282,7 +280,7 @@ DWORD StartServiceIfNeeded(SC_HANDLE service) {
         }
     }
 
-    if (StartServiceW(service, 0, nullptr)) {
+    if (StartServiceA(service, 0, nullptr)) {
         return WaitForServiceState(service, SERVICE_RUNNING, kServiceStartWaitMs);
     }
     const DWORD error = GetLastError();
@@ -318,9 +316,8 @@ DWORD StopServiceIfRunning(SC_HANDLE service) {
 
 SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
     PSECURITY_DESCRIPTOR descriptor = nullptr;
-    const std::wstring securityDescriptorText = WideFromUtf8(kPipeSecurityDescriptor);
-    ConvertStringSecurityDescriptorToSecurityDescriptorW(
-        securityDescriptorText.c_str(), SDDL_REVISION_1, &descriptor, nullptr);
+    ConvertStringSecurityDescriptorToSecurityDescriptorA(
+        kPipeSecurityDescriptor, SDDL_REVISION_1, &descriptor, nullptr);
     securityDescriptor = LocalMemory(descriptor);
 
     SECURITY_ATTRIBUTES attributes{};
@@ -333,8 +330,7 @@ SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
 Handle CreateFpsPipeInstance() {
     LocalMemory securityDescriptor;
     SECURITY_ATTRIBUTES securityAttributes = PipeSecurityAttributes(securityDescriptor);
-    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
-    return Handle(CreateNamedPipeW(pipeName.c_str(),
+    return Handle(CreateNamedPipeA(kFpsServicePipeName,
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
@@ -345,7 +341,7 @@ Handle CreateFpsPipeInstance() {
 }
 
 bool ConnectPipeOrStop(HANDLE pipe, HANDLE stopEvent) {
-    Handle connectedEvent(CreateEventW(nullptr, TRUE, FALSE, nullptr));
+    Handle connectedEvent(CreateEventA(nullptr, TRUE, FALSE, nullptr));
     if (connectedEvent.Get() == nullptr) {
         return false;
     }
@@ -454,15 +450,14 @@ void WINAPI ServiceControlHandler(DWORD control) {
     }
 }
 
-void WINAPI ServiceMain(DWORD, LPWSTR*) {
-    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
-    g_serviceStatusHandle = RegisterServiceCtrlHandlerW(serviceName.c_str(), ServiceControlHandler);
+void WINAPI ServiceMain(DWORD, LPSTR*) {
+    g_serviceStatusHandle = RegisterServiceCtrlHandlerA(kFpsServiceName, ServiceControlHandler);
     if (g_serviceStatusHandle == nullptr) {
         return;
     }
 
     SetServiceStatusState(SERVICE_START_PENDING, NO_ERROR, 3000);
-    g_serviceStopEvent = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    g_serviceStopEvent = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     if (g_serviceStopEvent == nullptr) {
         SetServiceStatusState(SERVICE_STOPPED, GetLastError());
         return;
@@ -495,12 +490,11 @@ bool IsFpsServiceCommandLine(const CommandLineArguments& commandLine) {
 }
 
 int RunFpsServiceMode() {
-    std::wstring serviceName = WideFromUtf8(kFpsServiceName);
-    SERVICE_TABLE_ENTRYW serviceTable[] = {
-        {serviceName.data(), ServiceMain},
+    SERVICE_TABLE_ENTRYA serviceTable[] = {
+        {const_cast<LPSTR>(kFpsServiceName), ServiceMain},
         {nullptr, nullptr},
     };
-    return StartServiceCtrlDispatcherW(serviceTable) ? 0 : 1;
+    return StartServiceCtrlDispatcherA(serviceTable) ? 0 : 1;
 }
 
 DWORD InstallOrUpdateFpsService() {
@@ -508,25 +502,22 @@ DWORD InstallOrUpdateFpsService() {
     if (binaryPath.empty()) {
         return ERROR_FILE_NOT_FOUND;
     }
-    const std::wstring wideBinaryPath = WideFromUtf8(binaryPath);
-    const std::wstring serviceName = WideFromUtf8(kFpsServiceName);
-    const std::wstring serviceDisplayName = WideFromUtf8(kFpsServiceDisplayName);
     constexpr DWORD kServiceAccess =
         SERVICE_CHANGE_CONFIG | SERVICE_QUERY_CONFIG | SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP;
 
-    ServiceHandle manager(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
+    ServiceHandle manager(OpenSCManagerA(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
     if (manager.Get() == nullptr) {
         return GetLastError();
     }
 
-    ServiceHandle service(CreateServiceW(manager.Get(),
-        serviceName.c_str(),
-        serviceDisplayName.c_str(),
+    ServiceHandle service(CreateServiceA(manager.Get(),
+        kFpsServiceName,
+        kFpsServiceDisplayName,
         kServiceAccess,
         SERVICE_WIN32_OWN_PROCESS,
         SERVICE_AUTO_START,
         SERVICE_ERROR_NORMAL,
-        wideBinaryPath.c_str(),
+        binaryPath.c_str(),
         nullptr,
         nullptr,
         nullptr,
@@ -538,24 +529,24 @@ DWORD InstallOrUpdateFpsService() {
         if (createError != ERROR_SERVICE_EXISTS) {
             return createError;
         }
-        service = ServiceHandle(OpenServiceW(manager.Get(), serviceName.c_str(), kServiceAccess));
+        service = ServiceHandle(OpenServiceA(manager.Get(), kFpsServiceName, kServiceAccess));
         if (service.Get() == nullptr) {
             return GetLastError();
         }
         const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
         const bool binaryPathChanged =
             !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
-        if (!ChangeServiceConfigW(service.Get(),
+        if (!ChangeServiceConfigA(service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
                 SERVICE_ERROR_NORMAL,
-                wideBinaryPath.c_str(),
+                binaryPath.c_str(),
                 nullptr,
                 nullptr,
                 nullptr,
                 nullptr,
                 nullptr,
-                serviceDisplayName.c_str())) {
+                kFpsServiceDisplayName)) {
             return GetLastError();
         }
         if (binaryPathChanged) {

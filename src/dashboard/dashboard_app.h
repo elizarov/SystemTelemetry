@@ -136,7 +136,7 @@ private:
     DashboardRenderer renderer_;
     DashboardOverlayState rendererDashboardOverlayState_{};
     DashboardController controller_{};
-    NOTIFYICONDATAW trayIcon_{};
+    NOTIFYICONDATAA trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
     HICON appIconLarge_ = nullptr;
     HICON appIconSmall_ = nullptr;
@@ -148,7 +148,6 @@ private:
     std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
     std::string layoutEditTooltipText_;
-    std::wstring layoutEditTooltipWideText_;
     std::string lastError_;
     bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;

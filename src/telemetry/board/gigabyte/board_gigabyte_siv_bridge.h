@@ -24,7 +24,7 @@ public:
     GigabyteSivRuntime(const GigabyteSivRuntime&) = delete;
     GigabyteSivRuntime& operator=(const GigabyteSivRuntime&) = delete;
 
-    bool Capture(const wchar_t* sivDirectory, GigabyteSivCaptureSink& sink);
+    bool Capture(const char* sivDirectory, GigabyteSivCaptureSink& sink);
 
 private:
     struct Impl;

@@ -49,7 +49,7 @@ std::vector<ResourceStringLookupEntry> BuildResourceStringLookup(
 ResourceStringCatalog LoadResourceStringCatalog() {
     ResourceStringCatalog catalog;
     std::vector<ResourceStringLookupEntry> strings;
-    catalog.storage = LoadUtf8ResourceData(TextResourceId::ResourceStringCatalog);
+    catalog.storage = LoadTextResourceData(TextResourceId::ResourceStringCatalog);
     const char* start = catalog.storage.data();
     for (char& ch : catalog.storage) {
         if (ch != '\n') {

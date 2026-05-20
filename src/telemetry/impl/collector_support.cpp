@@ -2,16 +2,16 @@
 
 #include <array>
 #include <intrin.h>
+#include <string>
 #include <string_view>
 
 #include "telemetry/impl/system_info_support.h"
 #include "util/strings.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
-constexpr wchar_t kPdhLibraryName[] = L"pdh.dll";  // GetModuleHandleW requires a UTF-16 module name.
+constexpr char kPdhLibraryName[] = "pdh.dll";
 
 std::string DetectCpuNameFromCpuid() {
     int maxExtendedLeaf[4]{};
@@ -50,16 +50,16 @@ std::string FormatScalarMetric(const ScalarMetric& metric, int precision) {
     return FormatText("%.*f %.*s", precision, *metric.value, static_cast<int>(unit.size()), unit.data());
 }
 
-typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterWFn)(PDH_HQUERY, LPCWSTR, DWORD_PTR, PDH_HCOUNTER*);
+typedef PDH_STATUS(WINAPI* PdhAddEnglishCounterAFn)(PDH_HQUERY, LPCSTR, DWORD_PTR, PDH_HCOUNTER*);
 
 PDH_STATUS AddCounterCompat(PDH_HQUERY query, std::string_view path, PDH_HCOUNTER* counter) {
-    const std::wstring widePath = WideFromUtf8(path);
-    static PdhAddEnglishCounterWFn addEnglish = reinterpret_cast<PdhAddEnglishCounterWFn>(
-        GetProcAddress(GetModuleHandleW(kPdhLibraryName), "PdhAddEnglishCounterW"));
+    const std::string pathText(path);
+    static PdhAddEnglishCounterAFn addEnglish = reinterpret_cast<PdhAddEnglishCounterAFn>(
+        GetProcAddress(GetModuleHandleA(kPdhLibraryName), "PdhAddEnglishCounterA"));
     if (addEnglish != nullptr) {
-        return addEnglish(query, widePath.c_str(), 0, counter);
+        return addEnglish(query, pathText.c_str(), 0, counter);
     }
-    return PdhAddCounterW(query, widePath.c_str(), 0, counter);
+    return PdhAddCounterA(query, pathText.c_str(), 0, counter);
 }
 
 std::string DetectCpuName() {

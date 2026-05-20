@@ -68,14 +68,14 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 
 ### Boundaries And Formatting
 
-- Keep runtime text and source literals UTF-8 until a Win32, registry, filesystem, or managed bridge boundary needs UTF-16. Convert the command line to a UTF-8 `std::vector<std::string>` once in `main`, and keep command-line switch lookup narrow.
+- Keep runtime text and source literals UTF-8 at Win32, registry, filesystem, and managed-launch boundaries through the manifest-declared UTF-8 active code page. Convert only at wide-native boundaries such as DirectWrite, WIC filenames, Desktop Wallpaper COM, CLR callbacks, and fixed Windows structures with UTF-16 fields.
 - Use `Trace::WriteFmt`, `Trace::WriteLazyFmt`, and resource-string-aware `FormatText`, `AssignFormat`, and `AppendFormat` for shared trace, diagnostics, dump, color, crash-report, metric, and cold UI text.
 - Keep dump escaping local to snapshot dump because dumps are parsed later. Trace quote marks stay in format strings instead of a general trace quote/escape helper.
 - Keep HRESULT formatting on `AppendHresult` and narrow error helpers instead of building temporary strings with repeated concatenation.
 
 ### Cold UI, Diagnostics, And Layout-Edit
 
-- The modeless layout-edit dialog keeps a compact resource shell and creates child controls at runtime from seed tables. Control labels stay UTF-8 until the `CreateWindowExW` boundary.
+- The modeless layout-edit dialog keeps a compact resource shell and creates child controls at runtime from seed tables. Control labels stay UTF-8 through the `CreateWindowExA` boundary.
 - Layout-edit previews mutate the live config through controller methods when the edit is no-fail and local, instead of copying full `AppConfig` snapshots.
 - Large cold payloads cross layout-edit and diagnostics boundaries as borrowed pointers or bool/out-parameters when that avoids copying optional records. Small optional values stay idiomatic `std::optional`.
 - Layout-edit dirty tracking marks mutations as possibly dirty during the edit loop and performs exact saved-layout comparison only at prompt boundaries through config-difference metadata and selected-layout structure comparison.
