@@ -14,13 +14,13 @@ See also: [docs/project.md](project.md) for repository policy, [docs/hardware.md
 - NuGet package restore access for the WiX Toolset SDK when building the MSI package; the installer project accepts the WiX 7 OSMF EULA for non-interactive local and CI builds.
 - Graphviz `dot` available on `PATH` when rendering the optional source dependency SVG
 - Provider software or drivers for optional hardware-provider telemetry as described in [docs/hardware.md](hardware.md)
-- GitHub Actions uses the `windows-2025-vs2026` runner for pull request, main-branch push, and manual build, test, format, lint, and tidy validation.
+- GitHub Actions uses the `windows-2025-vs2026` runner for pull request, main-branch push, and manual build, test, format, lint, and unused-include validation.
 
 ## Current Toolchain
 
 - `devenv.cmd` activates the Visual Studio 2026 Insiders (`18`) x64 developer environment.
 - The active native compiler is MSVC `19.51.36231` for `x64`.
-- The active LLVM tools are `clang-format` `20.1.8` and `clang-tidy` `20.1.8`.
+- The active LLVM tools are `clang-format` `20.1.8` and `clangd` `20.1.8`.
 - The active CMake executable in that environment is `4.2.3-msvc3`.
 
 ## Build
@@ -76,9 +76,8 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - `format.cmd` is the maintained entrypoint for formatting non-vendored C++ sources. Its changed-file mode keeps Git CRLF normalization warnings out of formatter file discovery. Mixed-mode C++/CLI bridge `.cpp` files are excluded because Visual Studio LLVM clang-format versions produce conflicting output for managed handles and `for each` syntax.
 - `test.cmd` is the maintained entrypoint for running the CTest suite against the built Release tree, and it prints verbose CTest output so GitHub runner logs show each test command and its stdout even when tests pass.
 - The repo `pre-commit` hook launches `tools\pre_commit_checks.ps1`, which formats staged eligible C++ files through `tools\run_clang_format.ps1` and runs `lint.cmd` before each commit. Git file discovery starts from all staged `.cpp` and `.h` paths, then the shared formatter filter limits work to maintained non-vendored `src\` and `tests\` files. The hook temporarily stashes unstaged and untracked files while it formats and lints the staged snapshot, restores them before exit, and aborts the commit when formatting or lint checks fail.
-- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, no-local-`NOLINT` checks, header-body checks, source-policy checks such as the project-wide `std::function`, `std::filesystem`, STL threading primitive, `std::hash`, and wide-literal bans, and optional `clang-tidy` runs. The source-policy rationale lives in [docs/source_policy_guardrails.md](source_policy_guardrails.md). Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG.
-- `lint.cmd includes` runs the maintained unused-include check for non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes selected provider bridge files, writes `build\clang_include_cleaner_report.txt`, uses the same `misc-include-cleaner` diagnostics as the full tidy sweep, line-filters clang-tidy to non-ignored `#include` directives, and filters maintained include-cleaner false positives. `lint.cmd includes changed` narrows the same check to changed eligible files, and `lint.cmd includes fix` applies clang-tidy removals only on non-ignored include lines.
-- `lint.cmd tidy` remains the full manually requested `clang-tidy` sweep for maintained non-vendored `.cpp` and `.h` files under `src\` and `tests\`, writes `build\clang_tidy_report.txt`, uses a four-minute per-file timeout, and reports enabled analyzer, bugprone, unused internal function, and unused include findings as errors. The full tidy sweep commonly needs at least eight minutes on the current toolchain before it can report success or failure, so local development avoids it unless explicitly requested.
+- `lint.cmd` is the maintained entrypoint for architecture checks, source dependency graph checks, include-path checks, no-local-`NOLINT` checks, header-body checks, and source-policy checks such as the project-wide `std::function`, `std::filesystem`, STL threading primitive, `std::hash`, and wide-literal bans. The source-policy rationale lives in [docs/source_policy_guardrails.md](source_policy_guardrails.md). Each lint run rebuilds the source dependency DOT and GraphML under `build\architecture\` without rendering SVG.
+- `lint.cmd includes` runs the maintained clangd unused-include check for non-vendored `.cpp` and `.h` files under `src\` and `tests\`, excludes selected provider bridge files, writes `build\clang_include_cleaner_report.txt`, uses `.clangd` `Diagnostics.UnusedIncludes: Strict`, line-filters clangd diagnostics to non-ignored `#include` directives, and filters maintained include-cleaner false positives. `lint.cmd includes changed` narrows the same check to changed eligible files. The clangd include check reports unused-include diagnostics plus clangd parse errors and does not support automatic fixing.
 - `tools\update_readme_images.ps1` is the maintained entrypoint for updating the committed README screenshots under `docs\image\`. It builds the app by default and exports the `dark_cyan` and `blueprint_light` screenshots from built-in synthetic telemetry with fixed `/scale:2` rendering. Pass `-SkipBuild` only when `build\CaseDash.exe` is already current.
 - `tools\optimize_png_resources.py` losslessly recompresses committed PNG resources and PNG-backed ICO frames. `tools\update_app_icon.ps1` runs it after regenerating `resources\app.ico`.
 - `package.cmd` is the maintained local entrypoint for producing the release MSI outside the GitHub Release workflow. It normalizes `major.minor` versions from `VERSION` to `major.minor.0` for Windows Installer product-version rules while keeping the output filename on the original `VERSION` text.
@@ -87,7 +86,7 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - Native C++ targets compile with `/GR-`; production code uses explicit project type tags instead of native RTTI. C++/CLI provider bridges keep managed casts in their `/clr` translation units.
 - Release app and benchmark builds compile size-oriented code with `/Os` and `/GL`, then link with `/LTCG`, `/OPT:REF`, and non-incremental linking so whole-program optimization and reference elimination reduce the shipped executable while benchmarks measure the same optimization profile. The shipped Release app also links with `/DYNAMICBASE:NO` as an explicit executable-size tradeoff tracked in [docs/optimize_size.md](optimize_size.md). Native app code and the C++/CLI bridge targets define `_HAS_EXCEPTIONS=0`; managed bridge `try`/`catch` handling remains enabled for hardware-provider interop. Benchmark-sensitive renderer, widget, layout, telemetry, and benchmark-harness translation units retain `/O2` inside that Release profile so size work does not distort the maintained performance loops. Tests keep the normal Release compile/link path for faster local validation. The benchmark target is opt-in through `build.cmd /benchmarks`; `profile_benchmark.cmd` requests that target when it needs the benchmark executable.
 - `profile_benchmark.cmd` is the maintained entrypoint for elevated benchmark profiling and daemon-backed benchmark requests. Daemon-backed requests write the ETL, xperf detail summary, process-filtered call tree, hotspot summary, and benchmark stdout under `build\profile_benchmark_daemon\requests\`.
-- `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs. GitHub Actions does not use this machine-local script; `build.cmd`, `format.cmd`, `lint.cmd includes`, and `lint.cmd tidy` resolve Visual Studio and LLVM tools from the runner environment.
+- `devenv.cmd` is the maintained environment bootstrap for local builds and tool runs. GitHub Actions does not use this machine-local script; `build.cmd`, `format.cmd`, and `lint.cmd includes` resolve Visual Studio and LLVM tools from the runner environment.
 
 ## GitHub Validation
 
@@ -98,8 +97,7 @@ The `Release` workflow deploys the generated site after a successful tagged rele
 - The workflow uploads `build\CaseDash.exe` as the `CaseDash-exe` artifact after validation succeeds.
 - The workflow uploads `build\CaseDash-<VERSION>.msi` and its checksum as the `CaseDash-msi` artifact after validation succeeds.
 - The workflow uploads `build\clang_include_cleaner_report.txt` as an artifact when it is produced.
-- The manual-only `Full Clang-Tidy` workflow builds through `build.cmd`, runs `lint.cmd tidy`, and uploads `build\clang_tidy_report.txt`.
-- The manual-only `Size Map Artifacts` workflow builds through `build_maps.cmd` without tests, packaging, or tidy, then uploads `CaseDash-size-map-exe` and `CaseDash-size-map` artifacts for executable-size and linker-map comparison across runner toolchains.
+- The manual-only `Size Map Artifacts` workflow builds through `build_maps.cmd` without tests or packaging, then uploads `CaseDash-size-map-exe` and `CaseDash-size-map` artifacts for executable-size and linker-map comparison across runner toolchains.
 
 ## Releases
 

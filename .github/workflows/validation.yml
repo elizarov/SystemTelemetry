@@ -16,8 +16,8 @@ jobs:
     timeout-minutes: 240
 
     env:
-      CASEDASH_TIDY_TIMEOUT_SECONDS: 1800
-      CASEDASH_TIDY_MAX_PARALLEL: 4
+      CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS: 1800
+      CASEDASH_INCLUDE_LINT_MAX_PARALLEL: 4
       CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
 
     steps:

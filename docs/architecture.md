@@ -25,10 +25,10 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, clang-tidy, profiling, generated asset, and source dependency graph helper scripts.
+- `tools/` contains shared formatting, lint, profiling, generated asset, and source dependency graph helper scripts.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
-- `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, manual full clang-tidy, package, release, and website deployment automation.
+- `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, package, release, and website deployment automation.
 
 ## Layered Core
 
