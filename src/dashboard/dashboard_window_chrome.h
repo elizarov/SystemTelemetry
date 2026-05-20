@@ -3,11 +3,11 @@
 #include <windows.h>
 
 struct DashboardTitlebarPalette {
-    COLORREF background = RGB(240, 240, 240);
-    COLORREF text = RGB(32, 32, 32);
-    COLORREF buttonHover = RGB(224, 224, 224);
-    COLORREF buttonPressed = RGB(204, 204, 204);
-    COLORREF buttonGlyph = RGB(32, 32, 32);
+    COLORREF background = RGB(243, 243, 243);
+    COLORREF text = RGB(0, 0, 0);
+    COLORREF buttonHover = RGB(228, 228, 228);
+    COLORREF buttonPressed = RGB(213, 213, 213);
+    COLORREF buttonGlyph = RGB(0, 0, 0);
 };
 
 struct DashboardTitlebarChromeResult {

@@ -98,6 +98,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Custom hover-titlebar buttons share one hit-test, hover, press, and paint path so the display setup button and close button do not drift in behavior as the titlebar grows more controls.
 - DWM rounded-corner, border-color, caption-color, text-color, and dark-mode titlebar attributes are best-effort hints on supported Windows versions. Keep hover-titlebar chrome native-first, but tolerate unsupported attributes without replacing them with hand-drawn rounded corners.
 - The visible hover-titlebar probe covers the native caption area and can mask DWM's top corners; keep its visible window region top-rounded while leaving its invisible hover-probe state rectangular.
+- UxTheme `WINDOW` caption fill hints may report legacy accent colors on Windows 11 instead of the DWM-rendered neutral caption surface; keep the hover-titlebar probe palette on the modern light or dark caption fallback unless a more reliable native color source is introduced.
 - The hover-titlebar close button asks UxTheme to draw the current Windows close-button hot or pressed background, with local colors only as fallback when themed drawing is unavailable.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.

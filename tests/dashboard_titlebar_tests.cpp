@@ -91,8 +91,8 @@ TEST(DashboardTitlebarPalette, DerivesButtonColorsFromBaseColors) {
     EXPECT_EQ(palette.background, RGB(240, 240, 240));
     EXPECT_EQ(palette.text, RGB(40, 40, 40));
     EXPECT_EQ(palette.buttonGlyph, RGB(40, 40, 40));
-    EXPECT_EQ(palette.buttonHover, RGB(216, 216, 216));
-    EXPECT_EQ(palette.buttonPressed, RGB(196, 196, 196));
+    EXPECT_EQ(palette.buttonHover, RGB(228, 228, 228));
+    EXPECT_EQ(palette.buttonPressed, RGB(216, 216, 216));
 }
 
 TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
@@ -102,8 +102,8 @@ TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
     EXPECT_EQ(palette.background, RGB(32, 32, 32));
     EXPECT_EQ(palette.text, RGB(255, 255, 255));
     EXPECT_EQ(palette.buttonGlyph, RGB(255, 255, 255));
-    EXPECT_EQ(palette.buttonHover, RGB(58, 58, 58));
-    EXPECT_EQ(palette.buttonPressed, RGB(81, 81, 81));
+    EXPECT_EQ(palette.buttonHover, RGB(45, 45, 45));
+    EXPECT_EQ(palette.buttonPressed, RGB(58, 58, 58));
 }
 
 TEST(DashboardTitlebarChrome, ScalesTopCornerRadiusWithDpi) {

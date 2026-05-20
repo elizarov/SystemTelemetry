@@ -20,9 +20,15 @@ constexpr UINT kDefaultDpi = 96;
 constexpr UINT kMaxReasonableDpi = 960;
 constexpr COLORREF kDwmColorDefault = 0xFFFFFFFF;
 constexpr wchar_t kWindowThemeClassName[] = L"WINDOW";  // UxTheme exposes only UTF-16 class names.
+constexpr COLORREF kModernLightCaptionBackground = RGB(243, 243, 243);
+constexpr COLORREF kModernLightCaptionText = RGB(0, 0, 0);
+constexpr COLORREF kModernDarkCaptionBackground = RGB(32, 32, 32);
+constexpr COLORREF kModernDarkCaptionText = RGB(255, 255, 255);
 constexpr COLORREF kDefaultCloseButtonHoverColor = RGB(232, 17, 35);
 constexpr COLORREF kDefaultCloseButtonPressedColor = RGB(196, 43, 28);
 constexpr COLORREF kDefaultCloseButtonGlyphColor = RGB(255, 255, 255);
+constexpr int kTitlebarButtonHoverBlendPercent = 6;
+constexpr int kTitlebarButtonPressedBlendPercent = 12;
 
 int ColorChannel(COLORREF color, int shift) {
     return static_cast<int>((color >> shift) & 0xFF);
@@ -76,19 +82,20 @@ DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND) {
         return ResolveDashboardTitlebarPaletteFromBaseColors(GetSysColor(COLOR_WINDOW), GetSysColor(COLOR_WINDOWTEXT));
     }
 
-    if (!SystemAppsUseLightTheme()) {
-        return ResolveDashboardTitlebarPaletteFromBaseColors(RGB(32, 32, 32), RGB(255, 255, 255));
-    }
-
-    return ResolveDashboardTitlebarPaletteFromBaseColors(GetSysColor(COLOR_3DFACE), GetSysColor(COLOR_WINDOWTEXT));
+    // UxTheme's WINDOW caption fill hint can still report legacy accent colors on Windows 11, while DWM renders the
+    // modern neutral caption surface. Use the same neutral fallback family for the probe that covers that native caption.
+    const bool lightTheme = SystemAppsUseLightTheme();
+    return ResolveDashboardTitlebarPaletteFromBaseColors(
+        lightTheme ? kModernLightCaptionBackground : kModernDarkCaptionBackground,
+        lightTheme ? kModernLightCaptionText : kModernDarkCaptionText);
 }
 
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF background, COLORREF text) {
     DashboardTitlebarPalette palette;
     palette.background = background;
     palette.text = text;
-    palette.buttonHover = BlendColor(background, text, 12);
-    palette.buttonPressed = BlendColor(background, text, 22);
+    palette.buttonHover = BlendColor(background, text, kTitlebarButtonHoverBlendPercent);
+    palette.buttonPressed = BlendColor(background, text, kTitlebarButtonPressedBlendPercent);
     palette.buttonGlyph = text;
     return palette;
 }
