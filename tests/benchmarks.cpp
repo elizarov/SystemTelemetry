@@ -32,7 +32,6 @@
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
     X(Animation, "animation")                                                                                          \
@@ -324,9 +323,9 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
 void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
     while (Clock::now() < deadline) {
         MSG message{};
-        while (PeekMessageW(&message, nullptr, 0, 0, PM_REMOVE)) {
+        while (PeekMessageA(&message, nullptr, 0, 0, PM_REMOVE)) {
             TranslateMessage(&message);
-            DispatchMessageW(&message);
+            DispatchMessageA(&message);
         }
         const auto now = Clock::now();
         if (now >= deadline) {
@@ -341,10 +340,9 @@ void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
 }
 
 HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
-    const std::wstring staticClass = WideFromUtf8("STATIC");
-    const std::wstring windowTitle = WideFromUtf8(title);
-    return CreateWindowExW(WS_EX_TOOLWINDOW,
-        staticClass.c_str(),
+    const std::string windowTitle(title);
+    return CreateWindowExA(WS_EX_TOOLWINDOW,
+        "STATIC",
         windowTitle.c_str(),
         WS_POPUP,
         0,
@@ -353,7 +351,7 @@ HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
         height,
         nullptr,
         nullptr,
-        GetModuleHandleW(nullptr),
+        GetModuleHandleA(nullptr),
         nullptr);
 }
 
@@ -674,8 +672,8 @@ struct SnapshotHandoffBenchTotals {
 class AnimationBenchmarkRenderWorker {
 public:
     explicit AnimationBenchmarkRenderWorker(HWND hwnd)
-        : hwnd_(hwnd), requestEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
-          responseEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {}
+        : hwnd_(hwnd), requestEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
+          responseEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
 
     ~AnimationBenchmarkRenderWorker() {
         Shutdown();

@@ -2,23 +2,22 @@
 
 #include <cstdio>
 
-#include "util/utf8.h"
+#include "util/text_encoding.h"
 
 namespace {
 
-constexpr wchar_t kReadBinaryMode[] = L"rb";   // _wfopen_s mode string follows the widened file path.
-constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened file path.
+constexpr char kReadBinaryMode[] = "rb";
+constexpr char kWriteBinaryMode[] = "wb";
 
 bool HasValidUtf8Encoding(const std::string& text) {
-    return text.empty() || !WideFromUtf8(text).empty();
+    return IsValidUtf8(text);
 }
 
 }  // namespace
 
-std::string ReadConfigFileUtf8(const FilePath& path) {
+std::string ReadConfigFile(const FilePath& path) {
     std::FILE* input = nullptr;
-    const std::wstring widePath = path.Wide();
-    if (_wfopen_s(&input, widePath.c_str(), kReadBinaryMode) != 0 || input == nullptr) {
+    if (fopen_s(&input, path.string().c_str(), kReadBinaryMode) != 0 || input == nullptr) {
         return {};
     }
 
@@ -48,14 +47,13 @@ std::string ReadConfigFileUtf8(const FilePath& path) {
     return text;
 }
 
-bool WriteConfigFileUtf8(const FilePath& path, const std::string& text) {
+bool WriteConfigFile(const FilePath& path, const std::string& text) {
     if (!HasValidUtf8Encoding(text)) {
         return false;
     }
 
     std::FILE* output = nullptr;
-    const std::wstring widePath = path.Wide();
-    if (_wfopen_s(&output, widePath.c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
+    if (fopen_s(&output, path.string().c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
         return false;
     }
 

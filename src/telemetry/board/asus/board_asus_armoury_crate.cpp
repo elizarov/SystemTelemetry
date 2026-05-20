@@ -25,7 +25,7 @@ constexpr std::uint32_t kAsusAtkCpuTemperature = 0x00120094;
 constexpr std::uint32_t kAsusAtkCpuFan = 0x00110013;
 constexpr std::uint32_t kAsusAtkGpuFan = 0x00110014;
 constexpr char kAsusGpuFanName[] = "GPU Fan";
-constexpr wchar_t kAsusAtkDevicePath[] = L"\\\\.\\ATKACPI";  // CreateFileW requires a UTF-16 device path.
+constexpr char kAsusAtkDevicePath[] = "\\\\.\\ATKACPI";
 
 struct AsusArmouryCrateSnapshot {
     bool success = false;
@@ -76,7 +76,7 @@ bool IsSaneCelsius(double value) {
 }
 
 UniqueHandle OpenAsusAtkDevice() {
-    return UniqueHandle(CreateFileW(kAsusAtkDevicePath,
+    return UniqueHandle(CreateFileA(kAsusAtkDevicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr,

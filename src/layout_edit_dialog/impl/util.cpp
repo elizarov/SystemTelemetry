@@ -1,10 +1,11 @@
 #include "layout_edit_dialog/impl/util.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <commctrl.h>
+#include <cstdlib>
 #include <cstring>
-#include <cwchar>
 
 #include "config/color_math.h"
 #include "config/metric_board_binding.h"
@@ -15,7 +16,6 @@
 #include "telemetry/metrics.h"
 #include "util/localization_catalog.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -24,28 +24,26 @@ constexpr double kLchChromaSliderScale = 1000.0;
 constexpr double kLchChromaSliderMax = 0.4;
 constexpr double kHsvUnitSliderScale = 1000.0;
 
-int CALLBACK CollectFontFamilyProc(const LOGFONTW* logFont, const TEXTMETRICW*, DWORD, LPARAM lParam) {
-    auto* families = reinterpret_cast<std::vector<std::wstring>*>(lParam);
-    if (families == nullptr || logFont == nullptr || logFont->lfFaceName[0] == wchar_t{} ||
-        logFont->lfFaceName[0] == static_cast<wchar_t>('@')) {
+int CALLBACK CollectFontFamilyProc(const LOGFONTA* logFont, const TEXTMETRICA*, DWORD, LPARAM lParam) {
+    auto* families = reinterpret_cast<std::vector<std::string>*>(lParam);
+    if (families == nullptr || logFont == nullptr || logFont->lfFaceName[0] == '\0' || logFont->lfFaceName[0] == '@') {
         return 1;
     }
     families->push_back(logFont->lfFaceName);
     return 1;
 }
 
-bool CaseInsensitiveEqual(const std::wstring& left, const std::wstring& right) {
-    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+bool CaseInsensitiveEqual(const std::string& left, const std::string& right) {
+    return CompareStringA(LOCALE_INVARIANT, NORM_IGNORECASE, left.c_str(), -1, right.c_str(), -1) == CSTR_EQUAL;
 }
 
-bool CaseInsensitiveLess(const std::wstring& left, const std::wstring& right) {
-    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_LESS_THAN;
+bool CaseInsensitiveLess(const std::string& left, const std::string& right) {
+    return CompareStringA(LOCALE_INVARIANT, NORM_IGNORECASE, left.c_str(), -1, right.c_str(), -1) == CSTR_LESS_THAN;
 }
 
-void SortUniqueFontFamilies(std::vector<std::wstring>& families) {
-    // Size: keep the only wide-string sort local to this Win32 font boundary so util/strings stays UTF-8-only.
+void SortUniqueFontFamilies(std::vector<std::string>& families) {
     for (size_t i = 1; i < families.size(); ++i) {
-        std::wstring family = std::move(families[i]);
+        std::string family = std::move(families[i]);
         size_t insert = i;
         while (insert > 0 && CaseInsensitiveLess(family, families[insert - 1])) {
             families[insert] = std::move(families[insert - 1]);
@@ -93,7 +91,7 @@ void SetDialogControlRoundedDecimal(HWND hwnd, int controlId, double value, int 
     if (!text.empty() && text.back() == '.') {
         text.pop_back();
     }
-    SetDialogControlTextUtf8(hwnd, controlId, text.empty() || text == "-0" ? "0" : text);
+    SetDialogControlText(hwnd, controlId, text.empty() || text == "-0" ? "0" : text);
 }
 
 void SetDialogControlRoundedInteger(HWND hwnd, int controlId, double value) {
@@ -115,26 +113,26 @@ HsvColor DisplayRoundedHsv(HsvColor hsv) {
 }
 
 void SetSliderRange(HWND hwnd, int sliderId, int minValue, int maxValue, int pageSize, int lineSize) {
-    SendDlgItemMessageW(hwnd, sliderId, TBM_SETRANGEMIN, TRUE, minValue);
-    SendDlgItemMessageW(hwnd, sliderId, TBM_SETRANGEMAX, TRUE, maxValue);
-    SendDlgItemMessageW(hwnd, sliderId, TBM_SETPAGESIZE, 0, pageSize);
-    SendDlgItemMessageW(hwnd, sliderId, TBM_SETLINESIZE, 0, lineSize);
+    SendDlgItemMessageA(hwnd, sliderId, TBM_SETRANGEMIN, TRUE, minValue);
+    SendDlgItemMessageA(hwnd, sliderId, TBM_SETRANGEMAX, TRUE, maxValue);
+    SendDlgItemMessageA(hwnd, sliderId, TBM_SETPAGESIZE, 0, pageSize);
+    SendDlgItemMessageA(hwnd, sliderId, TBM_SETLINESIZE, 0, lineSize);
 }
 
 void SetLchSliderPositions(HWND hwnd, OklchColor lch) {
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(lch.l * 1000.0)), 0, 1000));
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(lch.c * kLchChromaSliderScale)),
             0,
             static_cast<int>(std::lround(kLchChromaSliderMax * kLchChromaSliderScale))));
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
         TBM_SETPOS,
         TRUE,
@@ -142,17 +140,17 @@ void SetLchSliderPositions(HWND hwnd, OklchColor lch) {
 }
 
 void SetHsvSliderPositions(HWND hwnd, HsvColor hsv) {
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(hsv.h)), 0, 360));
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(hsv.s * kHsvUnitSliderScale)), 0, 1000));
-    SendDlgItemMessageW(hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
         TBM_SETPOS,
         TRUE,
@@ -209,40 +207,40 @@ bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) < kScaleEpsilon;
 }
 
-std::optional<double> TryParseDialogDouble(const wchar_t* text) {
-    if (text == nullptr || *text == wchar_t{}) {
+std::optional<double> TryParseDialogDouble(const char* text) {
+    if (text == nullptr || *text == '\0') {
         return std::nullopt;
     }
-    wchar_t normalized[128] = {};
+    char normalized[128] = {};
     size_t length = 0;
-    while (text[length] != wchar_t{} && length + 1 < ARRAYSIZE(normalized)) {
-        normalized[length] = text[length] == static_cast<wchar_t>(',') ? static_cast<wchar_t>('.') : text[length];
+    while (text[length] != '\0' && length + 1 < ARRAYSIZE(normalized)) {
+        normalized[length] = text[length] == ',' ? '.' : text[length];
         ++length;
     }
-    if (text[length] != wchar_t{}) {
+    if (text[length] != '\0') {
         return std::nullopt;
     }
-    wchar_t* end = nullptr;
-    const double value = std::wcstod(normalized, &end);
-    if (end == normalized || end == nullptr || *end != wchar_t{} || !std::isfinite(value)) {
+    char* end = nullptr;
+    const double value = std::strtod(normalized, &end);
+    if (end == normalized || end == nullptr || *end != '\0' || !std::isfinite(value)) {
         return std::nullopt;
     }
     return value;
 }
 
 std::optional<double> TryParseDialogControlDouble(HWND hwnd, int controlId) {
-    wchar_t buffer[128] = {};
-    GetDlgItemTextW(hwnd, controlId, buffer, ARRAYSIZE(buffer));
+    char buffer[128] = {};
+    GetDlgItemTextA(hwnd, controlId, buffer, ARRAYSIZE(buffer));
     return TryParseDialogDouble(buffer);
 }
 
-std::optional<int> TryParseDialogInteger(const wchar_t* text) {
-    if (text == nullptr || *text == wchar_t{}) {
+std::optional<int> TryParseDialogInteger(const char* text) {
+    if (text == nullptr || *text == '\0') {
         return std::nullopt;
     }
-    wchar_t* end = nullptr;
-    const long value = std::wcstol(text, &end, 10);
-    if (end == text || end == nullptr || *end != wchar_t{}) {
+    char* end = nullptr;
+    const long value = std::strtol(text, &end, 10);
+    if (end == text || end == nullptr || *end != '\0') {
         return std::nullopt;
     }
     return static_cast<int>(value);
@@ -252,64 +250,64 @@ std::string LayoutGuideChildName(const LayoutNodeConfig& node) {
     return node.name.empty() ? "unknown" : node.name;
 }
 
-std::string ReadDialogControlTextUtf8(HWND hwnd, int controlId) {
-    wchar_t buffer[256] = {};
-    GetDlgItemTextW(hwnd, controlId, buffer, ARRAYSIZE(buffer));
-    return Utf8FromWide(buffer);
+std::string ReadDialogControlText(HWND hwnd, int controlId) {
+    char buffer[256] = {};
+    GetDlgItemTextA(hwnd, controlId, buffer, ARRAYSIZE(buffer));
+    return buffer;
 }
 
-void SetDialogControlTextUtf8(HWND hwnd, int controlId, std::string_view text) {
-    const std::wstring wideText = WideFromUtf8(text);
-    SetDlgItemTextW(hwnd, controlId, wideText.c_str());
+void SetDialogControlText(HWND hwnd, int controlId, std::string_view text) {
+    const std::string textStorage(text);
+    SetDlgItemTextA(hwnd, controlId, textStorage.c_str());
 }
 
 void SetDialogControlInteger(HWND hwnd, int controlId, int value) {
-    SetDialogControlTextUtf8(hwnd, controlId, FormatText("%d", value));
+    SetDialogControlText(hwnd, controlId, FormatText("%d", value));
 }
 
 void SetDialogControlIntegerOrEmpty(HWND hwnd, int controlId, int value, bool hasValue) {
     if (hasValue) {
         SetDialogControlInteger(hwnd, controlId, value);
     } else {
-        SetDialogControlTextUtf8(hwnd, controlId, "");
+        SetDialogControlText(hwnd, controlId, "");
     }
 }
 
-void SetWindowTextUtf8(HWND hwnd, std::string_view text) {
-    const std::wstring wideText = WideFromUtf8(text);
-    SetWindowTextW(hwnd, wideText.c_str());
+void SetWindowTextValue(HWND hwnd, std::string_view text) {
+    const std::string textStorage(text);
+    SetWindowTextA(hwnd, textStorage.c_str());
 }
 
-LRESULT AddComboStringUtf8(HWND combo, std::string_view text) {
-    const std::wstring wideText = WideFromUtf8(text);
-    return SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(wideText.c_str()));
+LRESULT AddComboString(HWND combo, std::string_view text) {
+    const std::string textStorage(text);
+    return SendMessageA(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(textStorage.c_str()));
 }
 
 std::string FormatDialogColorHex(unsigned int color) {
     return FormatText("#%08X", color);
 }
 
-std::optional<unsigned int> TryParseDialogHexColor(const wchar_t* text) {
+std::optional<unsigned int> TryParseDialogHexColor(const char* text) {
     if (text == nullptr) {
         return std::nullopt;
     }
-    if (*text == static_cast<wchar_t>('#')) {
+    if (*text == '#') {
         ++text;
     }
-    if (wcslen(text) != 8) {
+    if (std::strlen(text) != 8) {
         return std::nullopt;
     }
 
     unsigned int color = 0;
     for (size_t i = 0; i < 8; ++i) {
-        const wchar_t ch = text[i];
+        const char ch = text[i];
         color <<= 4;
-        if (ch >= static_cast<wchar_t>('0') && ch <= static_cast<wchar_t>('9')) {
-            color |= static_cast<unsigned int>(ch - static_cast<wchar_t>('0'));
-        } else if (ch >= static_cast<wchar_t>('a') && ch <= static_cast<wchar_t>('f')) {
-            color |= static_cast<unsigned int>(10 + ch - static_cast<wchar_t>('a'));
-        } else if (ch >= static_cast<wchar_t>('A') && ch <= static_cast<wchar_t>('F')) {
-            color |= static_cast<unsigned int>(10 + ch - static_cast<wchar_t>('A'));
+        if (ch >= '0' && ch <= '9') {
+            color |= static_cast<unsigned int>(ch - '0');
+        } else if (ch >= 'a' && ch <= 'f') {
+            color |= static_cast<unsigned int>(10 + ch - 'a');
+        } else if (ch >= 'A' && ch <= 'F') {
+            color |= static_cast<unsigned int>(10 + ch - 'A');
         } else {
             return std::nullopt;
         }
@@ -364,11 +362,11 @@ void ConfigureColorViewTabs(HWND hwnd, ColorEditViewMode selectedMode) {
         return;
     }
     if (TabCtrl_GetItemCount(tab) == 0) {
-        TCITEMW item{};
+        TCITEMA item{};
         item.mask = TCIF_TEXT;
         const auto insertTab = [&](int index, std::string_view text) {
-            const std::wstring wideText = WideFromUtf8(text);
-            item.pszText = const_cast<wchar_t*>(wideText.c_str());
+            const std::string textStorage(text);
+            item.pszText = const_cast<char*>(textStorage.c_str());
             TabCtrl_InsertItem(tab, index, &item);
         };
         insertTab(0, "RGB");
@@ -386,11 +384,11 @@ void ConfigureColorViewTabs(HWND hwnd, ColorEditViewMode selectedMode) {
 
 void SetColorDialogChannel(HWND hwnd, const ColorDialogControls& channel, unsigned int value) {
     SetDialogControlInteger(hwnd, channel.editId, static_cast<int>(value));
-    SendDlgItemMessageW(hwnd, channel.sliderId, TBM_SETPOS, TRUE, value);
+    SendDlgItemMessageA(hwnd, channel.sliderId, TBM_SETPOS, TRUE, value);
 }
 
 void SetColorDialogHex(HWND hwnd, unsigned int color) {
-    SetDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, FormatDialogColorHex(color));
+    SetDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, FormatDialogColorHex(color));
 }
 
 void SetColorDialogLch(HWND hwnd, unsigned int color) {
@@ -467,14 +465,14 @@ void SyncColorLchSliderFromEdit(HWND hwnd, int editId) {
     }
     switch (editId) {
         case IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value * 1000.0)), 0, 1000));
             break;
         case IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
                 TBM_SETPOS,
                 TRUE,
@@ -483,7 +481,7 @@ void SyncColorLchSliderFromEdit(HWND hwnd, int editId) {
                     static_cast<int>(std::lround(kLchChromaSliderMax * kLchChromaSliderScale))));
             break;
         case IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
@@ -499,21 +497,21 @@ void SyncColorHsvSliderFromEdit(HWND hwnd, int editId) {
     }
     switch (editId) {
         case IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value)), 0, 360));
             break;
         case IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value * kHsvUnitSliderScale)), 0, 1000));
             break;
         case IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_EDIT:
-            SendDlgItemMessageW(hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
@@ -523,7 +521,7 @@ void SyncColorHsvSliderFromEdit(HWND hwnd, int editId) {
 }
 
 void SetColorLchEditFromSlider(HWND hwnd, int sliderId) {
-    const int position = static_cast<int>(SendDlgItemMessageW(hwnd, sliderId, TBM_GETPOS, 0, 0));
+    const int position = static_cast<int>(SendDlgItemMessageA(hwnd, sliderId, TBM_GETPOS, 0, 0));
     switch (sliderId) {
         case IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER:
             SetDialogControlRoundedDecimal(
@@ -540,7 +538,7 @@ void SetColorLchEditFromSlider(HWND hwnd, int sliderId) {
 }
 
 void SetColorHsvEditFromSlider(HWND hwnd, int sliderId) {
-    const int position = static_cast<int>(SendDlgItemMessageW(hwnd, sliderId, TBM_GETPOS, 0, 0));
+    const int position = static_cast<int>(SendDlgItemMessageA(hwnd, sliderId, TBM_GETPOS, 0, 0));
     switch (sliderId) {
         case IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER:
             SetDialogControlInteger(hwnd, IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT, position);
@@ -559,8 +557,8 @@ void SetColorHsvEditFromSlider(HWND hwnd, int sliderId) {
 }
 
 std::optional<unsigned int> ParseColorDialogChannel(HWND hwnd, int editId) {
-    wchar_t buffer[64] = {};
-    GetDlgItemTextW(hwnd, editId, buffer, ARRAYSIZE(buffer));
+    char buffer[64] = {};
+    GetDlgItemTextA(hwnd, editId, buffer, ARRAYSIZE(buffer));
     const auto value = TryParseDialogInteger(buffer);
     if (!value.has_value() || *value < 0 || *value > 255) {
         return std::nullopt;
@@ -597,16 +595,16 @@ const ColorDialogControls* FindColorDialogControlsBySliderId(int sliderId) {
     return nullptr;
 }
 
-std::vector<std::wstring> EnumerateInstalledFontFamilies(HWND hwnd) {
-    std::vector<std::wstring> families;
+std::vector<std::string> EnumerateInstalledFontFamilies(HWND hwnd) {
+    std::vector<std::string> families;
     HDC dc = GetDC(hwnd);
     if (dc == nullptr) {
         return families;
     }
 
-    LOGFONTW filter{};
+    LOGFONTA filter{};
     filter.lfCharSet = DEFAULT_CHARSET;
-    EnumFontFamiliesExW(dc, &filter, CollectFontFamilyProc, reinterpret_cast<LPARAM>(&families), 0);
+    EnumFontFamiliesExA(dc, &filter, CollectFontFamilyProc, reinterpret_cast<LPARAM>(&families), 0);
     ReleaseDC(hwnd, dc);
 
     SortUniqueFontFamilies(families);
@@ -619,22 +617,22 @@ void PopulateFontFaceComboBox(HWND hwnd, std::string_view selectedFace) {
         return;
     }
 
-    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
-    SendMessageW(combo, CB_SETMINVISIBLE, 10, 0);
+    SendMessageA(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageA(combo, CB_SETMINVISIBLE, 10, 0);
     const auto families = EnumerateInstalledFontFamilies(hwnd);
-    const std::wstring selectedFaceWide = WideFromUtf8(selectedFace);
+    const std::string selectedFaceText(selectedFace);
     int selectedIndex = CB_ERR;
     for (const auto& family : families) {
-        const LRESULT index = SendMessageW(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(family.c_str()));
-        if (index != CB_ERR && selectedIndex == CB_ERR && CaseInsensitiveEqual(family, selectedFaceWide)) {
+        const LRESULT index = AddComboString(combo, family);
+        if (index != CB_ERR && selectedIndex == CB_ERR && CaseInsensitiveEqual(family, selectedFaceText)) {
             selectedIndex = static_cast<int>(index);
         }
     }
 
     if (selectedIndex != CB_ERR) {
-        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+        SendMessageA(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
     } else {
-        SetWindowTextW(combo, selectedFaceWide.c_str());
+        SetWindowTextValue(combo, selectedFace);
     }
 }
 
@@ -645,17 +643,17 @@ std::string ReadFontDialogFaceText(HWND hwnd, UINT notificationCode) {
     }
 
     if (notificationCode == CBN_SELCHANGE) {
-        const LRESULT selection = SendMessageW(combo, CB_GETCURSEL, 0, 0);
+        const LRESULT selection = SendMessageA(combo, CB_GETCURSEL, 0, 0);
         if (selection != CB_ERR) {
-            wchar_t selectedFace[256] = {};
-            SendMessageW(combo, CB_GETLBTEXT, static_cast<WPARAM>(selection), reinterpret_cast<LPARAM>(selectedFace));
-            return Utf8FromWide(selectedFace);
+            char selectedFace[256] = {};
+            SendMessageA(combo, CB_GETLBTEXT, static_cast<WPARAM>(selection), reinterpret_cast<LPARAM>(selectedFace));
+            return selectedFace;
         }
     }
 
-    wchar_t faceBuffer[256] = {};
-    GetWindowTextW(combo, faceBuffer, ARRAYSIZE(faceBuffer));
-    return Utf8FromWide(faceBuffer);
+    char faceBuffer[256] = {};
+    GetWindowTextA(combo, faceBuffer, ARRAYSIZE(faceBuffer));
+    return faceBuffer;
 }
 
 void PopulateMetricBindingComboBox(
@@ -665,20 +663,20 @@ void PopulateMetricBindingComboBox(
         return;
     }
 
-    SendMessageW(combo, CB_RESETCONTENT, 0, 0);
-    SendMessageW(combo, CB_SETMINVISIBLE, 10, 0);
+    SendMessageA(combo, CB_RESETCONTENT, 0, 0);
+    SendMessageA(combo, CB_SETMINVISIBLE, 10, 0);
     int selectedIndex = CB_ERR;
     for (const auto& option : options) {
-        const LRESULT index = AddComboStringUtf8(combo, option);
+        const LRESULT index = AddComboString(combo, option);
         if (index != CB_ERR && selectedIndex == CB_ERR && option == selectedBinding) {
             selectedIndex = static_cast<int>(index);
         }
     }
 
     if (selectedIndex != CB_ERR) {
-        SendMessageW(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
+        SendMessageA(combo, CB_SETCURSEL, static_cast<WPARAM>(selectedIndex), 0);
     } else {
-        SetWindowTextUtf8(combo, selectedBinding);
+        SetWindowTextValue(combo, selectedBinding);
     }
 
     EnableWindow(combo, enableSelection ? TRUE : FALSE);

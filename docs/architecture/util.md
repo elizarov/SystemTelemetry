@@ -4,11 +4,11 @@
 
 ## Responsibilities
 
-- UTF-8 `FilePath` and filesystem helpers that widen only at Win32 filesystem calls.
-- Command-line text handling after one Win32-to-UTF-8 conversion at process startup.
+- UTF-8 `FilePath` and filesystem helpers that use Win32 A APIs by default and widen only for wide-native interfaces.
+- Command-line text handling after the `CommandLineToArgvW` wide-native parser boundary at process startup.
 - String trimming, splitting, case folding, and whitespace normalization.
 - Enum string conversion.
-- UTF-8 and UTF-16 boundary conversion helpers.
+- UTF-8 validation and narrow/wide boundary conversion helpers for APIs with no A-style text boundary.
 - Embedded resource loading and generated text-atlas resource string hash-id lookup.
 - Localization catalog access.
 - Numeric safety helpers, DPI scale conversion, and domain-neutral numeric text formatting.
@@ -25,4 +25,4 @@
 - Every non-util package may depend on `util` for domain-neutral helpers.
 - It does not depend on config, telemetry, renderer, widget, UI, diagnostics, or application-facing packages.
 - `strings.*` stays limited to domain-neutral string operations; config-language spelling, menu labels, telemetry labels, and UI copy live in the package that owns that contract.
-- Project filesystem operations use `src/util/file_path.*` helpers instead of `std::filesystem` so app-owned path data stays UTF-8 while filesystem calls still use the Win32 wide API.
+- Project filesystem operations use `src/util/file_path.*` helpers instead of `std::filesystem` so app-owned path data stays UTF-8 and filesystem calls use Win32 A APIs by default.

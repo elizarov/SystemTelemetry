@@ -73,12 +73,12 @@ std::string DecompressResourceData(std::string_view data) {
 }
 
 std::string LoadCompressedResourceData(int resourceId) {
-    HMODULE module = GetModuleHandleW(nullptr);
+    HMODULE module = GetModuleHandleA(nullptr);
     if (module == nullptr) {
         return {};
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), RT_RCDATA);
+    HRSRC resource = FindResourceA(module, MAKEINTRESOURCEA(resourceId), RT_RCDATA);
     if (resource == nullptr) {
         return {};
     }
@@ -141,7 +141,7 @@ const TextAtlas& GetTextAtlas() {
 
 }  // namespace
 
-std::string LoadUtf8ResourceData(TextResourceId resourceId) {
+std::string LoadTextResourceData(TextResourceId resourceId) {
     const size_t resourceIndex = static_cast<size_t>(resourceId);
     if (resourceIndex >= kTextResourceCount) {
         return {};

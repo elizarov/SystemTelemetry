@@ -5,13 +5,13 @@
 #include <cstdio>
 #include <utility>
 
+#include "util/text_encoding.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
-constexpr wchar_t kReadBinaryMode[] = L"rb";   // _wfopen_s mode string follows the widened file path.
-constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened file path.
+constexpr char kReadBinaryMode[] = "rb";
+constexpr char kWriteBinaryMode[] = "wb";
 
 bool IsSeparator(char ch) {
     return ch == '\\' || ch == '/';
@@ -47,16 +47,11 @@ std::string TrimTrailingSeparators(std::string path) {
 
 }  // namespace
 
-FilePath::FilePath(const wchar_t* path)
-    : path_(Utf8FromWide(path != nullptr ? std::wstring_view(path) : std::wstring_view())) {}
-
-FilePath::FilePath(const char* utf8Path) : path_(utf8Path != nullptr ? utf8Path : "") {}
-
-FilePath::FilePath(std::wstring path) : path_(Utf8FromWide(path)) {}
+FilePath::FilePath(const char* path) : path_(path != nullptr ? path : "") {}
 
 FilePath::FilePath(std::string path) : path_(std::move(path)) {}
 
-FilePath::FilePath(std::string_view utf8Path) : path_(utf8Path) {}
+FilePath::FilePath(std::string_view path) : path_(path) {}
 
 bool FilePath::Empty() const {
     return path_.empty();
@@ -102,8 +97,8 @@ FilePath FilePath::parent_path() const {
     return ParentPath();
 }
 
-std::wstring FilePath::Wide() const {
-    return WideFromUtf8(path_);
+std::wstring FilePath::WideForNativeApi() const {
+    return WideFromText(path_);
 }
 
 std::string FilePath::string() const {
@@ -136,12 +131,12 @@ FilePath operator/(const FilePath& base, const char* child) {
 }
 
 FilePath CurrentDirectoryPath() {
-    DWORD length = GetCurrentDirectoryW(0, nullptr);
+    DWORD length = GetCurrentDirectoryA(0, nullptr);
     if (length == 0) {
         return {};
     }
-    std::wstring path(length, wchar_t{});
-    const DWORD written = GetCurrentDirectoryW(length, path.data());
+    std::string path(length, '\0');
+    const DWORD written = GetCurrentDirectoryA(length, path.data());
     if (written == 0 || written >= length) {
         return {};
     }
@@ -150,12 +145,12 @@ FilePath CurrentDirectoryPath() {
 }
 
 FilePath TempDirectoryPath() {
-    DWORD length = GetTempPathW(0, nullptr);
+    DWORD length = GetTempPathA(0, nullptr);
     if (length == 0) {
         return {};
     }
-    std::wstring path(length, wchar_t{});
-    const DWORD written = GetTempPathW(length, path.data());
+    std::string path(length, '\0');
+    const DWORD written = GetTempPathA(length, path.data());
     if (written == 0 || written >= length) {
         return {};
     }
@@ -167,8 +162,7 @@ bool FileExists(const FilePath& path) {
     if (path.Empty()) {
         return false;
     }
-    const std::wstring widePath = path.Wide();
-    const DWORD attributes = GetFileAttributesW(widePath.c_str());
+    const DWORD attributes = GetFileAttributesA(path.string().c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
 }
 
@@ -176,8 +170,7 @@ bool RemoveFileIfExists(const FilePath& path) {
     if (path.Empty()) {
         return false;
     }
-    const std::wstring widePath = path.Wide();
-    if (DeleteFileW(widePath.c_str())) {
+    if (DeleteFileA(path.string().c_str())) {
         return true;
     }
     return GetLastError() == ERROR_FILE_NOT_FOUND || GetLastError() == ERROR_PATH_NOT_FOUND;
@@ -185,8 +178,7 @@ bool RemoveFileIfExists(const FilePath& path) {
 
 std::optional<std::string> ReadFileBinary(const FilePath& path) {
     FILE* file = nullptr;
-    const std::wstring widePath = path.Wide();
-    if (_wfopen_s(&file, widePath.c_str(), kReadBinaryMode) != 0 || file == nullptr) {
+    if (fopen_s(&file, path.string().c_str(), kReadBinaryMode) != 0 || file == nullptr) {
         return std::nullopt;
     }
     if (fseek(file, 0, SEEK_END) != 0) {
@@ -210,8 +202,7 @@ std::optional<std::string> ReadFileBinary(const FilePath& path) {
 
 bool WriteFileBinary(const FilePath& path, std::string_view text) {
     FILE* file = nullptr;
-    const std::wstring widePath = path.Wide();
-    if (_wfopen_s(&file, widePath.c_str(), kWriteBinaryMode) != 0 || file == nullptr) {
+    if (fopen_s(&file, path.string().c_str(), kWriteBinaryMode) != 0 || file == nullptr) {
         return false;
     }
     const bool ok = text.empty() || fwrite(text.data(), 1, text.size(), file) == text.size();

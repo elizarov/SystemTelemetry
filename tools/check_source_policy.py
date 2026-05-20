@@ -26,6 +26,20 @@ CONDITIONAL_COMPILATION_RE = re.compile(r"^\s*#\s*(?:if|ifdef|ifndef|elif|else|e
 CONST_WIDE_STRING_DECL_RE = re.compile(
     r"^\s*(?:(?:static|inline)\s+)*(?:constexpr|const)\b(?=[^=;\n]*\bwchar_t\b)[^=;\n]*=\s*$"
 )
+WIN32_W_CALL_RE = re.compile(r"\b([A-Za-z_][A-Za-z0-9_]*W)\s*\(")
+ALLOWED_W_API_CALLS_BY_FILE = {
+    ("src/util/command_line.cpp", "CommandLineToArgvW"),
+    ("src/util/command_line.cpp", "GetCommandLineW"),
+}
+OBSOLETE_UTF8_IDENTIFIER_RE = re.compile(
+    r"\b(?:"
+    r"AddComboStringUtf8|AppendMenuUtf8|CleanProcessDisplayNameUtf8|LoadUtf8ResourceData|"
+    r"ManagedStringFromUtf8|MessageBoxUtf8|ReadComboTextUtf8|ReadConfigFileUtf8|"
+    r"ReadDialogControlTextUtf8|SetDiagnosticsUtf8|SetDialogControlTextUtf8|"
+    r"SetWindowTextUtf8|Utf8FromAnsi|Utf8FromWide|WideFromUtf8|WriteConfigFileUtf8|"
+    r"kAppTitleUtf8"
+    r")\b"
+)
 
 
 @dataclass(frozen=True)
@@ -323,6 +337,34 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         ),
                     )
                 )
+            for match in WIN32_W_CALL_RE.finditer(line):
+                function_name = match.group(1)
+                if (file_rel, function_name) in ALLOWED_W_API_CALLS_BY_FILE:
+                    continue
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            f"{function_name} is not allowed in maintained source; CaseDash declares UTF-8 as "
+                            "the process code page and calls Win32 A APIs by default. Keep W calls only for "
+                            "documented wide-native APIs that have no A-style boundary. "
+                            f"See {GUARDRAILS_DOC}."
+                        ),
+                    )
+                )
+            if OBSOLETE_UTF8_IDENTIFIER_RE.search(line):
+                violations.append(
+                    Violation(
+                        relpath=file_rel,
+                        line=line_number,
+                        message=(
+                            "obsolete conversion-only Utf8 helper names are not allowed; UTF-8 is the app default, "
+                            "so call A APIs directly or use no-suffix app helpers. "
+                            f"See {GUARDRAILS_DOC}."
+                        ),
+                    )
+                )
         for line_number in find_undocumented_wide_literal_lines(text):
             violations.append(
                 Violation(
@@ -330,8 +372,8 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                     line=line_number,
                     message=(
                         'wide literals must stay narrow UTF-8 by default; only const wchar_t string constants '
-                        'initialized with L"..." and an end-of-line reason comment are allowed for fixed Win32 '
-                        "or managed interop boundary text. "
+                        'initialized with L"..." and an end-of-line reason comment are allowed for wide-native '
+                        "boundaries with no A-style API. "
                         f"See {GUARDRAILS_DOC}."
                     ),
                 )

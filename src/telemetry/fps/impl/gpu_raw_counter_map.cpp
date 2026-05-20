@@ -4,13 +4,13 @@
 
 namespace {
 
-std::size_t HashGpuEngineInstance(const wchar_t* value) {
+std::size_t HashGpuEngineInstance(const char* value) {
     std::size_t hash = 1469598103934665603ull;
     if (value == nullptr) {
         return hash;
     }
-    while (*value != wchar_t{}) {
-        hash ^= static_cast<std::size_t>(*value);
+    while (*value != '\0') {
+        hash ^= static_cast<std::size_t>(static_cast<unsigned char>(*value));
         hash *= 1099511628211ull;
         ++value;
     }
@@ -41,14 +41,14 @@ void GpuRawCounterMap::Reserve(std::size_t count) {
     }
 }
 
-void GpuRawCounterMap::Set(const wchar_t* instance, const PDH_RAW_COUNTER& raw) {
+void GpuRawCounterMap::Set(const char* instance, const PDH_RAW_COUNTER& raw) {
     if (entries_.empty() || (size_ + 1) * 2 > entries_.size()) {
         Reserve(entries_.empty() ? 16 : entries_.size());
     }
     Insert(instance, raw);
 }
 
-const PDH_RAW_COUNTER* GpuRawCounterMap::Find(const wchar_t* instance) const {
+const PDH_RAW_COUNTER* GpuRawCounterMap::Find(const char* instance) const {
     if (entries_.empty() || instance == nullptr) {
         return nullptr;
     }
@@ -72,13 +72,13 @@ void GpuRawCounterMap::Swap(GpuRawCounterMap& other) {
     std::swap(size_, other.size_);
 }
 
-void GpuRawCounterMap::Insert(const wchar_t* instance, const PDH_RAW_COUNTER& raw) {
+void GpuRawCounterMap::Insert(const char* instance, const PDH_RAW_COUNTER& raw) {
     const std::size_t mask = entries_.size() - 1;
     std::size_t slot = HashGpuEngineInstance(instance) & mask;
     for (;;) {
         Entry& entry = entries_[slot];
         if (!entry.occupied) {
-            entry.instance = instance != nullptr ? instance : std::wstring{};
+            entry.instance = instance != nullptr ? instance : std::string{};
             entry.raw = raw;
             entry.occupied = true;
             ++size_;

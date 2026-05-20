@@ -29,7 +29,7 @@ namespace {
 constexpr char kTelemetryDumpFilter[] = "Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0";
 constexpr char kPngFilter[] = "PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0";
 constexpr char kIniFilter[] = "INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0";
-constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened export path.
+constexpr char kWriteBinaryMode[] = "wb";
 
 template <size_t Size> constexpr std::string_view StringViewWithTerminator(const char (&text)[Size]) {
     return std::string_view(text, Size);
@@ -360,8 +360,7 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
         return;
     }
     std::FILE* output = nullptr;
-    const std::wstring widePath = path->Wide();
-    if (_wfopen_s(&output, widePath.c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
+    if (fopen_s(&output, path->string().c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
         const std::string pathText = path->string();
         shell.ShowError(FormatText("Failed to open dump file:\n%s", pathText.c_str()));
         return;

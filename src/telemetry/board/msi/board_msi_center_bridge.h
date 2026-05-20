@@ -23,7 +23,7 @@ public:
     MsiCenterRuntime(const MsiCenterRuntime&) = delete;
     MsiCenterRuntime& operator=(const MsiCenterRuntime&) = delete;
 
-    bool Capture(const wchar_t* msiCenterDirectory, MsiCenterCaptureSink& sink);
+    bool Capture(const char* msiCenterDirectory, MsiCenterCaptureSink& sink);
 
 private:
     struct Impl;

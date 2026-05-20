@@ -4,7 +4,7 @@
 #include "util/file_path.h"
 #include "util/resource_loader.h"
 
-std::string LoadUtf8ResourceData(TextResourceId resourceId) {
+std::string LoadTextResourceData(TextResourceId resourceId) {
     // Unit tests need RES_STR text without embedding the full app config/localization atlas.
     if (resourceId != TextResourceId::ResourceStringCatalog) {
         return {};

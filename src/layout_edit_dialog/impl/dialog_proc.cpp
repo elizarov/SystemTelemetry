@@ -28,11 +28,11 @@ bool IsDialogComboBoxControl(HWND hwnd, int controlId) {
         return false;
     }
 
-    wchar_t className[64] = {};
-    if (GetClassNameW(control, className, ARRAYSIZE(className)) == 0) {
+    char className[64] = {};
+    if (GetClassNameA(control, className, ARRAYSIZE(className)) == 0) {
         return false;
     }
-    return CompareStringOrdinal(className, -1, WC_COMBOBOXW, -1, TRUE) == CSTR_EQUAL;
+    return lstrcmpiA(className, WC_COMBOBOXA) == 0;
 }
 
 void RaiseComboDropList(HWND hwnd, int controlId) {
@@ -65,13 +65,13 @@ void ResizeComboDropList(HWND hwnd, int controlId, int maxVisibleItems = 10) {
         return;
     }
 
-    const LRESULT itemCount = SendMessageW(combo, CB_GETCOUNT, 0, 0);
+    const LRESULT itemCount = SendMessageA(combo, CB_GETCOUNT, 0, 0);
     if (itemCount == CB_ERR || itemCount <= 0) {
         return;
     }
 
-    const LRESULT listItemHeight = SendMessageW(combo, CB_GETITEMHEIGHT, 0, 0);
-    const LRESULT selectionItemHeight = SendMessageW(combo, CB_GETITEMHEIGHT, static_cast<WPARAM>(-1), 0);
+    const LRESULT listItemHeight = SendMessageA(combo, CB_GETITEMHEIGHT, 0, 0);
+    const LRESULT selectionItemHeight = SendMessageA(combo, CB_GETITEMHEIGHT, static_cast<WPARAM>(-1), 0);
     const int itemHeight =
         (std::max)(1, static_cast<int>(listItemHeight != CB_ERR ? listItemHeight : selectionItemHeight));
     const int visibleItems = (std::max)(1, (std::min)(static_cast<int>(itemCount), maxVisibleItems));
@@ -178,8 +178,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
     switch (message) {
         case WM_NOTIFY: {
             const auto* notify = reinterpret_cast<NMHDR*>(lParam);
-            if (notify != nullptr && notify->idFrom == IDC_LAYOUT_EDIT_TREE && notify->code == TVN_SELCHANGEDW) {
-                const auto* treeView = reinterpret_cast<NMTREEVIEWW*>(lParam);
+            if (notify != nullptr && notify->idFrom == IDC_LAYOUT_EDIT_TREE && notify->code == TVN_SELCHANGEDA) {
+                const auto* treeView = reinterpret_cast<NMTREEVIEWA*>(lParam);
                 HandleLayoutEditTreeSelection(state, hwnd, treeView->itemNew.hItem);
                 return handled(TRUE);
             }
@@ -226,7 +226,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FILTER_EDIT && HIWORD(wParam) == EN_CHANGE) {
-                state->currentFilter = ReadDialogControlTextUtf8(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT);
+                state->currentFilter = ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT);
                 RebuildLayoutEditTree(state, hwnd);
                 return handled(TRUE);
             }
@@ -289,8 +289,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
             }
             if (LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_HEX_EDIT && HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
-                    wchar_t buffer[256] = {};
-                    GetDlgItemTextW(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, buffer, ARRAYSIZE(buffer));
+                    char buffer[256] = {};
+                    GetDlgItemTextA(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, buffer, ARRAYSIZE(buffer));
                     if (const auto color = TryParseDialogHexColor(buffer); color.has_value()) {
                         state->updatingControls = true;
                         SetColorDialogChannel(hwnd, kColorDialogControls[0], (*color >> 24) & 0xFFu);
@@ -316,7 +316,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                     const auto value = ParseColorDialogChannel(hwnd, channel->editId);
                     if (value.has_value()) {
                         const auto color = ReadColorDialogValue(hwnd);
-                        SendDlgItemMessageW(hwnd, channel->sliderId, TBM_SETPOS, TRUE, *value);
+                        SendDlgItemMessageA(hwnd, channel->sliderId, TBM_SETPOS, TRUE, *value);
                         if (color.has_value()) {
                             state->updatingControls = true;
                             SetColorDialogHex(hwnd, *color);
@@ -408,7 +408,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         return handled(TRUE);
                     }
                     const unsigned int currentColor = ReadColorDialogValue(hwnd).value_or(0x000000FFu);
-                    CHOOSECOLORW chooseColor{};
+                    CHOOSECOLORA chooseColor{};
                     chooseColor.lStructSize = sizeof(chooseColor);
                     chooseColor.hwndOwner = hwnd;
                     chooseColor.rgbResult =
@@ -419,7 +419,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         BuildTraceNodeDetail(state->selectedNode,
                             " current=%s",
                             QuoteTraceText(FormatTraceColorHex(currentColor)).c_str()));
-                    if (ChooseColorW(&chooseColor) == TRUE) {
+                    if (ChooseColorA(&chooseColor) == TRUE) {
                         const unsigned int currentAlpha = ReadColorDialogValue(hwnd).value_or(currentColor) & 0xFFu;
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
                                                        (GetGValue(chooseColor.rgbResult) << 16) |
@@ -444,7 +444,7 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 if (const auto* channel = FindColorDialogControlsBySliderId(sliderId); channel != nullptr) {
                     if (!state->updatingControls) {
                         const int position =
-                            static_cast<int>(SendDlgItemMessageW(hwnd, channel->sliderId, TBM_GETPOS, 0, 0));
+                            static_cast<int>(SendDlgItemMessageA(hwnd, channel->sliderId, TBM_GETPOS, 0, 0));
                         state->updatingControls = true;
                         SetDialogControlInteger(hwnd, channel->editId, position);
                         if (const auto color = ReadColorDialogValue(hwnd); color.has_value()) {

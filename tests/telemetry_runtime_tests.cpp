@@ -72,7 +72,7 @@ protected:
     AppConfig config_{};
     Trace trace_;
     mutable LightweightMutex mutex_;
-    HANDLE callbackEvent_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    HANDLE callbackEvent_ = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     TelemetryUpdate latest_{};
     int callbackCount_ = 0;
 };

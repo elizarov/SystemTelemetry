@@ -9,4 +9,4 @@ enum class TextResourceId {
     Count,
 };
 
-std::string LoadUtf8ResourceData(TextResourceId resourceId);
+std::string LoadTextResourceData(TextResourceId resourceId);

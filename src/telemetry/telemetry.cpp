@@ -56,7 +56,7 @@ public:
         if (!collector_->Initialize(settings, errorText)) {
             return false;
         }
-        wakeEvent_ = CreateEventW(nullptr, FALSE, FALSE, nullptr);
+        wakeEvent_ = CreateEventA(nullptr, FALSE, FALSE, nullptr);
         if (wakeEvent_ == nullptr) {
             if (errorText != nullptr) {
                 *errorText = "Failed to create telemetry wake event.";
