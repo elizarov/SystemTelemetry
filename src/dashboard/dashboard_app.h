@@ -132,6 +132,7 @@ private:
     void SyncNativeTitlebarControls();
     void UpdateNativeTitlebarControls();
     void ShowNativeTitlebarControls(bool show);
+    int NativeTitlebarComboClosedHeight(HWND combo) const;
     int NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const;
     void PositionNativeTitlebarCombo(HWND combo, const RECT& closedRect);
     RECT NativeTitlebarLayoutComboRect() const;
@@ -220,6 +221,7 @@ private:
     bool nativeTitlebarVisible_ = false;
     bool nativeTitlebarProbeVisible_ = false;
     bool nativeTitlebarProbeRectValid_ = false;
+    bool nativeTitlebarHoverInside_ = false;
     bool nativeTitlebarHoverTimerActive_ = false;
     bool nativeTitlebarControlsVisible_ = false;
     bool nativeTitlebarComboDropdownOpen_ = false;

@@ -87,7 +87,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 ## Hover Titlebar
 
 - Hovering the dashboard or the virtual titlebar band directly above it shows a Windows titlebar strip titled `CaseDash` while keeping the rendered dashboard content in the same screen rectangle.
-- The visible titlebar strip uses the dashboard width and stays hidden when its native frame would extend outside the current monitor, including fitted full-monitor dashboard placement.
+- The visible titlebar strip uses the dashboard width and stays hidden when its native frame would extend above the monitor or past the monitor sides, including fitted full-monitor dashboard placement. Bottom-frame overflow from a dashboard placement that is taller than the monitor does not by itself suppress the titlebar.
 - Leaving the dashboard, titlebar, or virtual titlebar band hides the strip unless a titlebar control dropdown, titlebar menu, close action, or titlebar move interaction is in progress.
 - Right-aligned titlebar controls appear left to right as a layout dropdown, a theme dropdown, a display setup button, and a close button.
 - The layout dropdown is a native Windows dropdown, shows layout names only, reflects the active layout, and applies a new layout through the same behavior as the `Layout` submenu.

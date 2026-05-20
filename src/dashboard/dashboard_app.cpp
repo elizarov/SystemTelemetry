@@ -702,6 +702,7 @@ void DashboardApp::DestroyNativeTitlebarProbe() {
         DestroyWindow(titlebarHoverProbeHwnd_);
         titlebarHoverProbeHwnd_ = nullptr;
     }
+    nativeTitlebarHoverInside_ = false;
     nativeTitlebarProbeVisible_ = false;
     nativeTitlebarProbeRectValid_ = false;
 }
@@ -715,6 +716,7 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         if (nativeTitlebarProbeVisible_) {
             ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
         }
+        nativeTitlebarHoverInside_ = false;
         nativeTitlebarProbeVisible_ = false;
         nativeTitlebarProbeRectValid_ = false;
         ShowNativeTitlebarControls(false);
@@ -935,6 +937,19 @@ void DashboardApp::ShowNativeTitlebarControls(bool show) {
     }
 }
 
+int DashboardApp::NativeTitlebarComboClosedHeight(HWND combo) const {
+    const int fallbackHeight = ScaleLogicalToPhysical(kTitlebarComboHeightLogical, CurrentWindowDpi());
+    if (combo == nullptr) {
+        return fallbackHeight;
+    }
+
+    const LRESULT selectionHeight = SendMessageA(combo, CB_GETITEMHEIGHT, static_cast<WPARAM>(-1), 0);
+    if (selectionHeight == CB_ERR || selectionHeight <= 0) {
+        return fallbackHeight;
+    }
+    return static_cast<int>(selectionHeight);
+}
+
 int DashboardApp::NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const {
     const int closedHeight = RectHeight(closedRect);
     if (combo == nullptr || closedHeight <= 0) {
@@ -1008,8 +1023,7 @@ RECT DashboardApp::NativeTitlebarLayoutComboRect() const {
         return {};
     }
     const int width = std::min(desiredWidth, availableWidth);
-    const int height =
-        std::min(RectHeight(clientRect), ScaleLogicalToPhysical(kTitlebarComboHeightLogical, CurrentWindowDpi()));
+    const int height = std::min(RectHeight(clientRect), NativeTitlebarComboClosedHeight(titlebarLayoutComboHwnd_));
     const int top = clientRect.top + std::max(0, (RectHeight(clientRect) - height) / 2);
     return RECT{right - width, top, right, top + height};
 }
@@ -1032,8 +1046,7 @@ RECT DashboardApp::NativeTitlebarThemeComboRect() const {
         return {};
     }
     const int width = std::min(desiredWidth, availableWidth);
-    const int height =
-        std::min(RectHeight(clientRect), ScaleLogicalToPhysical(kTitlebarComboHeightLogical, CurrentWindowDpi()));
+    const int height = std::min(RectHeight(clientRect), NativeTitlebarComboClosedHeight(titlebarThemeComboHwnd_));
     const int top = clientRect.top + std::max(0, (RectHeight(clientRect) - height) / 2);
     return RECT{right - width, top, right, top + height};
 }
@@ -1324,6 +1337,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     const DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(clientRect);
     const bool cursorInClient = PtInRect(&clientRect, cursor) != FALSE;
     const bool cursorInTitlebarBand = geometry.canShow && PtInRect(&geometry.virtualHoverRect, cursor) != FALSE;
+    const bool cursorInsideHoverArea = cursorInClient || cursorInTitlebarBand;
     if (nativeTitlebarComboDropdownOpen_) {
         StartNativeTitlebarHoverTimer();
         return;
@@ -1333,14 +1347,22 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
         StartNativeTitlebarHoverTimer();
         return;
     }
-    if (cursorInClient || cursorInTitlebarBand) {
-        if (!nativeTitlebarVisible_ && geometry.canShow) {
+
+    if (cursorInsideHoverArea) {
+        const bool enteredHoverArea = !nativeTitlebarHoverInside_;
+        nativeTitlebarHoverInside_ = true;
+
+        // The probe window and child controls are expensive visual state; keep them stable while the pointer stays
+        // inside the combined dashboard/titlebar area.
+        if (enteredHoverArea && !nativeTitlebarVisible_ && geometry.canShow) {
             ShowNativeTitlebar(geometry);
         } else if (nativeTitlebarVisible_ && !geometry.canShow) {
             HideNativeTitlebar();
-        } else {
+            StopNativeTitlebarHoverTimer();
+        } else if (enteredHoverArea && geometry.canShow) {
             UpdateNativeTitlebarProbe();
         }
+
         if (nativeTitlebarVisible_) {
             UpdateNativeTitlebarButtonHover(cursor);
             StartNativeTitlebarHoverTimer();
@@ -1348,7 +1370,10 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
         return;
     }
 
-    HideNativeTitlebar();
+    if (nativeTitlebarHoverInside_ || nativeTitlebarVisible_) {
+        nativeTitlebarHoverInside_ = false;
+        HideNativeTitlebar();
+    }
     StopNativeTitlebarHoverTimer();
 }
 
@@ -2097,9 +2122,6 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
                 return 0;
             }
             UpdateNativeTitlebarHoverFromCursor();
-            if (nativeTitlebarVisible_) {
-                UpdateNativeTitlebarButtonHover(screenPoint);
-            }
             return 0;
         }
         case WM_LBUTTONDOWN: {

@@ -16,9 +16,8 @@ bool IsRectUsable(const RECT& rect) {
     return RectWidth(rect) > 0 && RectHeight(rect) > 0;
 }
 
-bool RectContainsRect(const RECT& outer, const RECT& inner) {
-    return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right &&
-           inner.bottom <= outer.bottom;
+bool TitlebarHorizontalAndTopEdgesFitMonitor(const RECT& monitor, const RECT& window) {
+    return window.left >= monitor.left && window.top >= monitor.top && window.right <= monitor.right;
 }
 
 bool RectsMatch(const RECT& left, const RECT& right) {
@@ -54,7 +53,7 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
     geometry.virtualHoverRect =
         RECT{dashboardClientRect.left, geometry.windowRect.top, dashboardClientRect.right, dashboardClientRect.top};
     geometry.canShow = IsRectUsable(geometry.windowRect) && IsRectUsable(geometry.virtualHoverRect) &&
-                       RectContainsRect(monitorRect, geometry.windowRect);
+                       TitlebarHorizontalAndTopEdgesFitMonitor(monitorRect, geometry.windowRect);
     if (!geometry.canShow) {
         geometry.windowRect = {};
         geometry.virtualHoverRect = {};
