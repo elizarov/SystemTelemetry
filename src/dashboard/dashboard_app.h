@@ -8,6 +8,7 @@
 #include <shellapi.h>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
@@ -56,6 +57,12 @@ public:
 
 private:
     friend class DashboardShellUi;
+
+    enum class NativeTitlebarButton {
+        None,
+        Display,
+        Close,
+    };
 
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -120,12 +127,31 @@ private:
     void DestroyNativeTitlebarProbe();
     void ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry);
     void HideNativeTitlebar();
-    RECT NativeTitlebarCloseButtonRect() const;
-    bool HitTestNativeTitlebarCloseButton(POINT clientPoint) const;
+    bool CreateNativeTitlebarControls();
+    void DestroyNativeTitlebarControls();
+    void SyncNativeTitlebarControls();
+    void UpdateNativeTitlebarControls();
+    void ShowNativeTitlebarControls(bool show);
+    int NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const;
+    void PositionNativeTitlebarCombo(HWND combo, const RECT& closedRect);
+    RECT NativeTitlebarLayoutComboRect() const;
+    RECT NativeTitlebarThemeComboRect() const;
+    RECT NativeTitlebarButtonRect(NativeTitlebarButton button) const;
+    void PopulateNativeTitlebarCombo(HWND combo,
+        const std::vector<std::string>& values,
+        std::string_view selected,
+        std::vector<std::string>& cache,
+        std::string& selectedCache);
+    std::vector<std::string> NativeTitlebarLayoutNames() const;
+    std::vector<std::string> NativeTitlebarThemeNames() const;
+    std::optional<size_t> NativeTitlebarComboSelectionIndex(HWND combo) const;
+    NativeTitlebarButton HitTestNativeTitlebarButton(POINT clientPoint) const;
     void PaintNativeTitlebar(HDC hdc) const;
-    void SetNativeTitlebarCloseButtonState(bool hovered, bool pressed);
-    void ResetNativeTitlebarCloseButtonState();
-    void UpdateNativeTitlebarCloseButtonHover(POINT screenPoint);
+    void PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const;
+    void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
+    void ResetNativeTitlebarButtonState();
+    void UpdateNativeTitlebarButtonHover(POINT screenPoint);
+    void InvokeNativeTitlebarButton(NativeTitlebarButton button);
     void StartNativeTitlebarHoverTimer();
     void StopNativeTitlebarHoverTimer();
     void StartMoveMode(bool hasCursorAnchorClientPoint,
@@ -188,14 +214,22 @@ private:
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     bool stopMoveModeWhenLeftButtonReleased_ = false;
     HWND titlebarHoverProbeHwnd_ = nullptr;
+    HWND titlebarLayoutComboHwnd_ = nullptr;
+    HWND titlebarThemeComboHwnd_ = nullptr;
     RECT nativeTitlebarProbeRect_{};
     bool nativeTitlebarVisible_ = false;
     bool nativeTitlebarProbeVisible_ = false;
     bool nativeTitlebarProbeRectValid_ = false;
     bool nativeTitlebarHoverTimerActive_ = false;
+    bool nativeTitlebarControlsVisible_ = false;
+    bool nativeTitlebarComboDropdownOpen_ = false;
     BYTE nativeTitlebarProbeAlpha_ = 0;
-    bool nativeTitlebarCloseHovered_ = false;
-    bool nativeTitlebarClosePressed_ = false;
+    NativeTitlebarButton nativeTitlebarHoveredButton_ = NativeTitlebarButton::None;
+    NativeTitlebarButton nativeTitlebarPressedButton_ = NativeTitlebarButton::None;
+    std::vector<std::string> nativeTitlebarLayoutItems_;
+    std::vector<std::string> nativeTitlebarThemeItems_;
+    std::string nativeTitlebarSelectedLayout_;
+    std::string nativeTitlebarSelectedTheme_;
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;

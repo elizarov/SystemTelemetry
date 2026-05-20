@@ -66,8 +66,6 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The tray icon exposes the same action set as the dashboard menu.
 - `About CaseDash` shows the current themed app icon in a square slot, compiled version, build kind, and commit when available.
 - The dashboard uses normal window Z-order behavior; `Bring to Front` raises it when needed.
-- Hovering the dashboard or the virtual titlebar band directly above it shows a Windows titlebar titled `CaseDash` with a small custom gray `X` close button while keeping the rendered dashboard content in the same screen rectangle. The visible titlebar strip uses the dashboard width. The titlebar stays hidden when its native frame would extend outside the current monitor, including fitted full-monitor dashboard placement.
-- Dragging the hover titlebar starts dashboard move mode with the usual monitor, scale, and coordinate overlay, and the overlay prompts `Release to place` because releasing the pointer completes placement. Other move-mode entry points prompt `Left-click to place`. The titlebar close button exits through the same save-or-discard prompt used by `Exit` when layout-edit changes are unsaved.
 - The installer completion launch starts the dashboard with the same front-and-focus behavior as `Bring to Front`.
 - Canceling the MSI setup from a setup wizard page and confirming exit closes the installer immediately.
 - The MSI setup UI uses CaseDash-branded dialog and banner artwork. The welcome dialog bitmap uses the WiX dialog bitmap size and background, places the generated dark_cyan app icon and black `CaseDash` wordmark on the left side, and leaves the right-side WiX text area unobscured. The banner bitmap uses the WiX banner bitmap size, keeps a uniform pale background above a blue underline, and places a separately generated dark_cyan app icon at native size in the right-hand area.
@@ -85,6 +83,18 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.
 - The `Storage Drives` submenu lists runtime drive candidates, keeps checkbox state for the current selection, and reapplies rendering and telemetry immediately when the selection changes.
 - The `Start with Windows` command installs machine-wide logon startup for the dashboard UI through `HKLM\Software\Microsoft\Windows\CurrentVersion\Run` and installs and starts the machine-wide `CashDashService` service used for privileged collection. The command is checked only when the Run entry targets the current executable, the service binary path targets the current executable, and the service is running. Disabling auto-start removes the Run entry, stops and deletes the service, and treats an already-absent or SCM-pending-delete service as cleaned up. Enabling or disabling auto-start uses the elevated helper path when administrator rights are required, and failed enable attempts roll back partial service or Run registration.
+
+## Hover Titlebar
+
+- Hovering the dashboard or the virtual titlebar band directly above it shows a Windows titlebar strip titled `CaseDash` while keeping the rendered dashboard content in the same screen rectangle.
+- The visible titlebar strip uses the dashboard width and stays hidden when its native frame would extend outside the current monitor, including fitted full-monitor dashboard placement.
+- Leaving the dashboard, titlebar, or virtual titlebar band hides the strip unless a titlebar control dropdown, titlebar menu, close action, or titlebar move interaction is in progress.
+- Right-aligned titlebar controls appear left to right as a layout dropdown, a theme dropdown, a display setup button, and a close button.
+- The layout dropdown is a native Windows dropdown, shows layout names only, reflects the active layout, and applies a new layout through the same behavior as the `Layout` submenu.
+- The theme dropdown is a native Windows dropdown, shows theme names with spaces such as `dark cyan`, reflects the active theme, and applies a new theme through the same behavior as the `Theme` submenu.
+- The display setup button is a custom gray titlebar button with a minimal monitor glyph, shares hover and pressed feedback with the close button, and opens the same target-display entries as `Display` > `Configure Display`.
+- The close button is a custom gray `X` button and exits through the same save-or-discard prompt used by `Exit` when layout-edit changes are unsaved.
+- Dragging empty titlebar space starts dashboard move mode with the usual monitor, scale, and coordinate overlay, and the overlay prompts `Release to place` because releasing the pointer completes placement. Other move-mode entry points prompt `Left-click to place`.
 
 ## Telemetry And Content Behavior
 

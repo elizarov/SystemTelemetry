@@ -566,6 +566,51 @@ bool DashboardShellUi::HandleConfigureDisplay(const DisplayMenuOption& option) {
     return true;
 }
 
+void DashboardShellUi::ApplyTitlebarLayoutSelection(size_t index) {
+    if (index >= app_.controller_.State().config.layout.layouts.size() ||
+        (kCommandLayoutBase + index) > kCommandLayoutMax) {
+        return;
+    }
+    ExecuteCommand(kCommandLayoutBase + static_cast<UINT>(index), nullptr);
+}
+
+void DashboardShellUi::ApplyTitlebarThemeSelection(size_t index) {
+    if (index >= app_.controller_.State().config.layout.themes.size() ||
+        (kCommandThemeBase + index) > kCommandThemeMax) {
+        return;
+    }
+    ExecuteCommand(kCommandThemeBase + static_cast<UINT>(index), nullptr);
+}
+
+void DashboardShellUi::ShowTitlebarConfigureDisplayMenu(POINT screenPoint) {
+    app_.HideLayoutEditTooltip();
+    DashboardShellUiModalScope scopedModalUi(*this);
+    HMENU menu = CreatePopupMenu();
+    if (menu == nullptr) {
+        return;
+    }
+
+    DisplayMenuOption configDisplayOptions[kConfigureDisplayMenuCapacity];
+    const size_t configDisplayOptionCount =
+        BuildConfigureDisplayMenu(menu, configDisplayOptions, kConfigureDisplayMenuCapacity);
+    SetForegroundWindow(app_.hwnd_);
+    const UINT selected = TrackPopupMenu(menu,
+        TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
+        screenPoint.x,
+        screenPoint.y,
+        0,
+        app_.hwnd_,
+        nullptr);
+    DestroyMenu(menu);
+
+    if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
+        const size_t index = selected - kCommandConfigureDisplayBase;
+        if (index < configDisplayOptionCount) {
+            HandleConfigureDisplay(configDisplayOptions[index]);
+        }
+    }
+}
+
 void DashboardShellUi::HandleExitRequest() {
     if (app_.controller_.State().isEditingLayout && app_.controller_.HasUnsavedLayoutEditChanges()) {
         const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::ExitApplication);
@@ -894,6 +939,24 @@ UINT DashboardShellUi::ResolveDefaultCommand(
     return layoutEditTarget != nullptr ? kCommandEditLayoutTarget : kCommandMove;
 }
 
+size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption* options, size_t capacity) const {
+    const DashboardSessionState& state = app_.controller_.State();
+    const size_t optionCount = EnumerateDisplayMenuOptions(state.config, options, capacity);
+    if (optionCount == 0) {
+        AppendMenuText(menu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
+        return 0;
+    }
+
+    for (size_t i = 0; i < optionCount; ++i) {
+        const DisplayMenuOption& option = options[i];
+        const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
+        const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
+                           (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
+        AppendMenuText(menu, flags, commandId, option.displayName);
+    }
+    return optionCount;
+}
+
 void DashboardShellUi::ExecuteCommand(
     UINT selected, const LayoutEditController::TooltipTarget* layoutEditTarget, const POINT* cursorAnchorClientPoint) {
     DashboardSessionState& state = app_.controller_.State();
@@ -1170,19 +1233,7 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuText(scaleMenu, MF_STRING, kCommandCustomScale, "Custom...");
     DisplayMenuOption configDisplayOptions[kConfigureDisplayMenuCapacity];
     const size_t configDisplayOptionCount =
-        EnumerateDisplayMenuOptions(state.config, configDisplayOptions, kConfigureDisplayMenuCapacity);
-    if (configDisplayOptionCount == 0) {
-        AppendMenuText(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
-    } else {
-        for (size_t i = 0; i < configDisplayOptionCount; ++i) {
-            const DisplayMenuOption& option = configDisplayOptions[i];
-            const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
-            const std::string& label = option.displayName;
-            const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
-                               (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuText(configureDisplayMenu, flags, commandId, label);
-        }
-    }
+        BuildConfigureDisplayMenu(configureDisplayMenu, configDisplayOptions, kConfigureDisplayMenuCapacity);
     AppendMenuText(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
     AppendMenuText(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
     AppendMenuText(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");

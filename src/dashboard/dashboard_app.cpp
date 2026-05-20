@@ -40,11 +40,20 @@ constexpr DWORD kDashboardVisibleTitlebarStyle = WS_POPUP | WS_CAPTION | WS_SYSM
 constexpr DWORD kDashboardTitlebarStyleMask = WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX;
 constexpr BYTE kTitlebarProbeAlpha = 1;
 constexpr BYTE kTitlebarVisibleAlpha = 255;
+constexpr int kTitlebarLayoutComboId = 4201;
+constexpr int kTitlebarThemeComboId = 4202;
+constexpr int kTitlebarHorizontalPaddingLogical = 12;
+constexpr int kTitlebarControlGapLogical = 6;
+constexpr int kTitlebarLayoutComboWidthLogical = 78;
+constexpr int kTitlebarThemeComboWidthLogical = 112;
+constexpr int kTitlebarComboHeightLogical = 22;
+constexpr int kTitlebarComboVisibleRows = 8;
+constexpr int kTitlebarComboDropPaddingLogical = 6;
 constexpr COLORREF kTitlebarBackgroundColor = RGB(238, 238, 238);
 constexpr COLORREF kTitlebarTextColor = RGB(32, 32, 32);
-constexpr COLORREF kTitlebarCloseHoverColor = RGB(224, 224, 224);
-constexpr COLORREF kTitlebarClosePressedColor = RGB(204, 204, 204);
-constexpr COLORREF kTitlebarCloseGlyphColor = RGB(38, 38, 38);
+constexpr COLORREF kTitlebarButtonHoverColor = RGB(224, 224, 224);
+constexpr COLORREF kTitlebarButtonPressedColor = RGB(204, 204, 204);
+constexpr COLORREF kTitlebarButtonGlyphColor = RGB(38, 38, 38);
 
 using AdjustWindowRectExForDpiFn = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
 
@@ -66,6 +75,12 @@ bool IsRectUsable(const RECT& rect) {
 
 bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+}
+
+std::string TitlebarThemeDisplayName(std::string_view name) {
+    std::string result{name};
+    std::replace(result.begin(), result.end(), '_', ' ');
+    return result;
 }
 
 bool AdjustDashboardWindowRectForDpi(RECT& rect, DWORD style, DWORD exStyle, UINT dpi) {
@@ -659,7 +674,7 @@ bool DashboardApp::CreateNativeTitlebarProbe() {
     titlebarHoverProbeHwnd_ = CreateWindowExA(WS_EX_TOOLWINDOW | WS_EX_NOACTIVATE | WS_EX_LAYERED,
         kTitlebarProbeWindowClassName,
         "",
-        WS_POPUP,
+        WS_POPUP | WS_CLIPCHILDREN,
         0,
         0,
         0,
@@ -673,11 +688,16 @@ bool DashboardApp::CreateNativeTitlebarProbe() {
     }
     SetLayeredWindowAttributes(titlebarHoverProbeHwnd_, 0, kTitlebarProbeAlpha, LWA_ALPHA);
     nativeTitlebarProbeAlpha_ = kTitlebarProbeAlpha;
+    if (!CreateNativeTitlebarControls()) {
+        DestroyNativeTitlebarProbe();
+        return false;
+    }
     UpdateNativeTitlebarProbe();
     return true;
 }
 
 void DashboardApp::DestroyNativeTitlebarProbe() {
+    DestroyNativeTitlebarControls();
     if (titlebarHoverProbeHwnd_ != nullptr) {
         DestroyWindow(titlebarHoverProbeHwnd_);
         titlebarHoverProbeHwnd_ = nullptr;
@@ -697,7 +717,8 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         }
         nativeTitlebarProbeVisible_ = false;
         nativeTitlebarProbeRectValid_ = false;
-        ResetNativeTitlebarCloseButtonState();
+        ShowNativeTitlebarControls(false);
+        ResetNativeTitlebarButtonState();
         return;
     }
 
@@ -708,7 +729,8 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         }
         nativeTitlebarProbeVisible_ = false;
         nativeTitlebarProbeRectValid_ = false;
-        ResetNativeTitlebarCloseButtonState();
+        ShowNativeTitlebarControls(false);
+        ResetNativeTitlebarButtonState();
         return;
     }
 
@@ -744,11 +766,13 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
     }
     nativeTitlebarProbeVisible_ = true;
     if (nativeTitlebarVisible_) {
+        UpdateNativeTitlebarControls();
         if (!wasVisible || rectChanged || alphaChanged) {
             InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
         }
     } else {
-        ResetNativeTitlebarCloseButtonState();
+        ShowNativeTitlebarControls(false);
+        ResetNativeTitlebarButtonState();
     }
 }
 
@@ -792,7 +816,8 @@ void DashboardApp::HideNativeTitlebar() {
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardHiddenWindowStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = false;
-    ResetNativeTitlebarCloseButtonState();
+    ShowNativeTitlebarControls(false);
+    ResetNativeTitlebarButtonState();
     SetWindowPos(hwnd_,
         nullptr,
         clientRect.left,
@@ -804,7 +829,216 @@ void DashboardApp::HideNativeTitlebar() {
     UpdateNativeTitlebarProbe();
 }
 
-RECT DashboardApp::NativeTitlebarCloseButtonRect() const {
+bool DashboardApp::CreateNativeTitlebarControls() {
+    if (titlebarHoverProbeHwnd_ == nullptr) {
+        return false;
+    }
+    if (titlebarLayoutComboHwnd_ != nullptr && titlebarThemeComboHwnd_ != nullptr) {
+        return true;
+    }
+
+    auto createCombo = [&](int id) -> HWND {
+        HWND combo = CreateWindowExA(0,
+            WC_COMBOBOXA,
+            "",
+            WS_CHILD | WS_CLIPSIBLINGS | CBS_DROPDOWNLIST | CBS_HASSTRINGS | WS_VSCROLL,
+            0,
+            0,
+            0,
+            0,
+            titlebarHoverProbeHwnd_,
+            reinterpret_cast<HMENU>(static_cast<INT_PTR>(id)),
+            instance_,
+            nullptr);
+        if (combo != nullptr) {
+            SendMessageA(combo, WM_SETFONT, reinterpret_cast<WPARAM>(GetStockObject(DEFAULT_GUI_FONT)), TRUE);
+            SendMessageA(combo, CB_SETMINVISIBLE, 8, 0);
+        }
+        return combo;
+    };
+
+    titlebarLayoutComboHwnd_ = createCombo(kTitlebarLayoutComboId);
+    titlebarThemeComboHwnd_ = createCombo(kTitlebarThemeComboId);
+    if (titlebarLayoutComboHwnd_ == nullptr || titlebarThemeComboHwnd_ == nullptr) {
+        DestroyNativeTitlebarControls();
+        return false;
+    }
+
+    SyncNativeTitlebarControls();
+    UpdateNativeTitlebarControls();
+    return true;
+}
+
+void DashboardApp::DestroyNativeTitlebarControls() {
+    nativeTitlebarComboDropdownOpen_ = false;
+    nativeTitlebarControlsVisible_ = false;
+    if (titlebarLayoutComboHwnd_ != nullptr) {
+        DestroyWindow(titlebarLayoutComboHwnd_);
+        titlebarLayoutComboHwnd_ = nullptr;
+    }
+    if (titlebarThemeComboHwnd_ != nullptr) {
+        DestroyWindow(titlebarThemeComboHwnd_);
+        titlebarThemeComboHwnd_ = nullptr;
+    }
+    nativeTitlebarLayoutItems_.clear();
+    nativeTitlebarThemeItems_.clear();
+    nativeTitlebarSelectedLayout_.clear();
+    nativeTitlebarSelectedTheme_.clear();
+}
+
+void DashboardApp::SyncNativeTitlebarControls() {
+    if (titlebarLayoutComboHwnd_ == nullptr || titlebarThemeComboHwnd_ == nullptr) {
+        return;
+    }
+
+    const DashboardSessionState& state = controller_.State();
+    PopulateNativeTitlebarCombo(titlebarLayoutComboHwnd_,
+        NativeTitlebarLayoutNames(),
+        state.config.display.layout,
+        nativeTitlebarLayoutItems_,
+        nativeTitlebarSelectedLayout_);
+    PopulateNativeTitlebarCombo(titlebarThemeComboHwnd_,
+        NativeTitlebarThemeNames(),
+        TitlebarThemeDisplayName(state.config.display.theme),
+        nativeTitlebarThemeItems_,
+        nativeTitlebarSelectedTheme_);
+}
+
+void DashboardApp::UpdateNativeTitlebarControls() {
+    if (!nativeTitlebarVisible_ || titlebarHoverProbeHwnd_ == nullptr || titlebarLayoutComboHwnd_ == nullptr ||
+        titlebarThemeComboHwnd_ == nullptr) {
+        ShowNativeTitlebarControls(false);
+        return;
+    }
+
+    SyncNativeTitlebarControls();
+    nativeTitlebarControlsVisible_ = true;
+    if (nativeTitlebarComboDropdownOpen_) {
+        return;
+    }
+
+    PositionNativeTitlebarCombo(titlebarLayoutComboHwnd_, NativeTitlebarLayoutComboRect());
+    PositionNativeTitlebarCombo(titlebarThemeComboHwnd_, NativeTitlebarThemeComboRect());
+}
+
+void DashboardApp::ShowNativeTitlebarControls(bool show) {
+    nativeTitlebarControlsVisible_ = show;
+    if (show) {
+        return;
+    }
+    nativeTitlebarComboDropdownOpen_ = false;
+    if (titlebarLayoutComboHwnd_ != nullptr && IsWindowVisible(titlebarLayoutComboHwnd_)) {
+        ShowWindow(titlebarLayoutComboHwnd_, SW_HIDE);
+    }
+    if (titlebarThemeComboHwnd_ != nullptr && IsWindowVisible(titlebarThemeComboHwnd_)) {
+        ShowWindow(titlebarThemeComboHwnd_, SW_HIDE);
+    }
+}
+
+int DashboardApp::NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const {
+    const int closedHeight = RectHeight(closedRect);
+    if (combo == nullptr || closedHeight <= 0) {
+        return closedHeight;
+    }
+
+    LRESULT itemHeight = SendMessageA(combo, CB_GETITEMHEIGHT, 0, 0);
+    if (itemHeight == CB_ERR || itemHeight <= 0) {
+        itemHeight = closedHeight;
+    }
+
+    const LRESULT itemCountResult = SendMessageA(combo, CB_GETCOUNT, 0, 0);
+    const int itemCount = itemCountResult == CB_ERR ? 1 : static_cast<int>(itemCountResult);
+    const int visibleRows = std::clamp(itemCount, 1, kTitlebarComboVisibleRows);
+    return closedHeight + static_cast<int>(itemHeight) * visibleRows +
+           ScaleLogicalToPhysical(kTitlebarComboDropPaddingLogical, CurrentWindowDpi());
+}
+
+void DashboardApp::PositionNativeTitlebarCombo(HWND combo, const RECT& closedRect) {
+    if (combo == nullptr) {
+        return;
+    }
+
+    if (!IsRectUsable(closedRect)) {
+        if (IsWindowVisible(combo)) {
+            ShowWindow(combo, SW_HIDE);
+        }
+        return;
+    }
+
+    RECT targetRect = closedRect;
+    targetRect.bottom = targetRect.top + NativeTitlebarComboWindowHeight(combo, closedRect);
+    RECT currentRect{};
+    bool rectMatches = false;
+    if (GetWindowRect(combo, &currentRect)) {
+        MapWindowPoints(HWND_DESKTOP, titlebarHoverProbeHwnd_, reinterpret_cast<POINT*>(&currentRect), 2);
+        rectMatches = TitlebarRectsEqual(currentRect, targetRect);
+    }
+    if (!rectMatches) {
+        SetWindowPos(combo,
+            nullptr,
+            targetRect.left,
+            targetRect.top,
+            RectWidth(targetRect),
+            RectHeight(targetRect),
+            SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+    }
+    if (!IsWindowVisible(combo)) {
+        ShowWindow(combo, SW_SHOWNOACTIVATE);
+    }
+}
+
+RECT DashboardApp::NativeTitlebarLayoutComboRect() const {
+    if (titlebarHoverProbeHwnd_ == nullptr) {
+        return {};
+    }
+
+    RECT clientRect{};
+    GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
+    const RECT themeRect = NativeTitlebarThemeComboRect();
+    const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
+    const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
+    const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
+    const int right = IsRectUsable(themeRect)     ? themeRect.left - gap
+                      : IsRectUsable(displayRect) ? displayRect.left - gap
+                                                  : closeRect.left - gap;
+    const int minWidth = ScaleLogicalToPhysical(58, CurrentWindowDpi());
+    const int desiredWidth = ScaleLogicalToPhysical(kTitlebarLayoutComboWidthLogical, CurrentWindowDpi());
+    const int availableWidth = right - clientRect.left;
+    if (availableWidth < minWidth || RectHeight(clientRect) <= 0) {
+        return {};
+    }
+    const int width = std::min(desiredWidth, availableWidth);
+    const int height =
+        std::min(RectHeight(clientRect), ScaleLogicalToPhysical(kTitlebarComboHeightLogical, CurrentWindowDpi()));
+    const int top = clientRect.top + std::max(0, (RectHeight(clientRect) - height) / 2);
+    return RECT{right - width, top, right, top + height};
+}
+
+RECT DashboardApp::NativeTitlebarThemeComboRect() const {
+    if (titlebarHoverProbeHwnd_ == nullptr) {
+        return {};
+    }
+
+    RECT clientRect{};
+    GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
+    const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
+    const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
+    const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
+    const int right = IsRectUsable(displayRect) ? displayRect.left - gap : closeRect.left - gap;
+    const int minWidth = ScaleLogicalToPhysical(76, CurrentWindowDpi());
+    const int desiredWidth = ScaleLogicalToPhysical(kTitlebarThemeComboWidthLogical, CurrentWindowDpi());
+    const int availableWidth = right - clientRect.left;
+    if (availableWidth < minWidth || RectHeight(clientRect) <= 0) {
+        return {};
+    }
+    const int width = std::min(desiredWidth, availableWidth);
+    const int height =
+        std::min(RectHeight(clientRect), ScaleLogicalToPhysical(kTitlebarComboHeightLogical, CurrentWindowDpi()));
+    const int top = clientRect.top + std::max(0, (RectHeight(clientRect) - height) / 2);
+    return RECT{right - width, top, right, top + height};
+}
+
+RECT DashboardApp::NativeTitlebarButtonRect(NativeTitlebarButton button) const {
     RECT rect{};
     if (titlebarHoverProbeHwnd_ == nullptr) {
         return rect;
@@ -817,14 +1051,99 @@ RECT DashboardApp::NativeTitlebarCloseButtonRect() const {
     }
 
     const int minimumButtonWidth = ScaleLogicalToPhysical(36, CurrentWindowDpi());
-    const int buttonWidth = std::min(width, std::max(height, minimumButtonWidth));
-    rect.left = rect.right - buttonWidth;
-    return rect;
+    const int closeButtonWidth = std::min(width, std::max(height, minimumButtonWidth));
+    if (button == NativeTitlebarButton::Close) {
+        rect.left = rect.right - closeButtonWidth;
+        return rect;
+    }
+
+    if (button == NativeTitlebarButton::Display) {
+        const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
+        const int right = rect.right - closeButtonWidth - gap;
+        const int availableWidth = right - rect.left;
+        if (availableWidth < closeButtonWidth) {
+            return {};
+        }
+        return RECT{right - closeButtonWidth, rect.top, right, rect.bottom};
+    }
+
+    return {};
 }
 
-bool DashboardApp::HitTestNativeTitlebarCloseButton(POINT clientPoint) const {
-    const RECT closeRect = NativeTitlebarCloseButtonRect();
-    return PtInRect(&closeRect, clientPoint) != FALSE;
+void DashboardApp::PopulateNativeTitlebarCombo(HWND combo,
+    const std::vector<std::string>& values,
+    std::string_view selected,
+    std::vector<std::string>& cache,
+    std::string& selectedCache) {
+    if (combo == nullptr) {
+        return;
+    }
+
+    if (cache != values) {
+        SendMessageA(combo, CB_RESETCONTENT, 0, 0);
+        for (const std::string& value : values) {
+            SendMessageA(combo, CB_ADDSTRING, 0, reinterpret_cast<LPARAM>(value.c_str()));
+        }
+        cache = values;
+        selectedCache.clear();
+    }
+
+    if (selectedCache != selected) {
+        int selectedIndex = -1;
+        for (size_t i = 0; i < values.size(); ++i) {
+            if (values[i] == selected) {
+                selectedIndex = static_cast<int>(i);
+                break;
+            }
+        }
+        SendMessageA(combo, CB_SETCURSEL, selectedIndex >= 0 ? selectedIndex : -1, 0);
+        selectedCache = std::string(selected);
+    }
+}
+
+std::vector<std::string> DashboardApp::NativeTitlebarLayoutNames() const {
+    std::vector<std::string> names;
+    const auto& layouts = controller_.State().config.layout.layouts;
+    names.reserve(layouts.size());
+    for (const LayoutSectionConfig& layout : layouts) {
+        names.push_back(layout.name);
+    }
+    return names;
+}
+
+std::vector<std::string> DashboardApp::NativeTitlebarThemeNames() const {
+    std::vector<std::string> names;
+    const auto& themes = controller_.State().config.layout.themes;
+    names.reserve(themes.size());
+    for (const ThemeConfig& theme : themes) {
+        names.push_back(TitlebarThemeDisplayName(theme.name));
+    }
+    return names;
+}
+
+std::optional<size_t> DashboardApp::NativeTitlebarComboSelectionIndex(HWND combo) const {
+    if (combo == nullptr) {
+        return std::nullopt;
+    }
+    const LRESULT selection = SendMessageA(combo, CB_GETCURSEL, 0, 0);
+    if (selection == CB_ERR || selection < 0) {
+        return std::nullopt;
+    }
+    return static_cast<size_t>(selection);
+}
+
+DashboardApp::NativeTitlebarButton DashboardApp::HitTestNativeTitlebarButton(POINT clientPoint) const {
+    const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
+    if (IsRectUsable(closeRect) && PtInRect(&closeRect, clientPoint) != FALSE) {
+        return NativeTitlebarButton::Close;
+    }
+
+    const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
+    if (IsRectUsable(displayRect) && PtInRect(&displayRect, clientPoint) != FALSE) {
+        return NativeTitlebarButton::Display;
+    }
+
+    return NativeTitlebarButton::None;
 }
 
 void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
@@ -839,17 +1158,25 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
     }
 
     FillRectWithColor(hdc, clientRect, kTitlebarBackgroundColor);
+    PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Display);
+    PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Close);
 
-    const RECT closeRect = NativeTitlebarCloseButtonRect();
-    const bool closePressed = nativeTitlebarClosePressed_ && nativeTitlebarCloseHovered_;
-    if (closePressed) {
-        FillRectWithColor(hdc, closeRect, kTitlebarClosePressedColor);
-    } else if (nativeTitlebarCloseHovered_) {
-        FillRectWithColor(hdc, closeRect, kTitlebarCloseHoverColor);
+    const int padding = ScaleLogicalToPhysical(kTitlebarHorizontalPaddingLogical, CurrentWindowDpi());
+    const RECT layoutRect = NativeTitlebarLayoutComboRect();
+    const RECT themeRect = NativeTitlebarThemeComboRect();
+    const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
+    const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
+    LONG controlsLeft = closeRect.left;
+    if (IsRectUsable(displayRect)) {
+        controlsLeft = std::min(controlsLeft, displayRect.left);
     }
-
-    const int padding = ScaleLogicalToPhysical(12, CurrentWindowDpi());
-    RECT textRect{clientRect.left + padding, clientRect.top, closeRect.left - padding, clientRect.bottom};
+    if (IsRectUsable(themeRect)) {
+        controlsLeft = std::min(controlsLeft, themeRect.left);
+    }
+    if (IsRectUsable(layoutRect)) {
+        controlsLeft = std::min(controlsLeft, layoutRect.left);
+    }
+    RECT textRect{clientRect.left + padding, clientRect.top, controlsLeft - padding, clientRect.bottom};
     if (textRect.right > textRect.left) {
         HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
         const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
@@ -861,47 +1188,124 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
             SelectObject(hdc, oldFont);
         }
     }
-
-    const int glyphSize = std::max(8, ScaleLogicalToPhysical(10, CurrentWindowDpi()));
-    const int halfGlyph = glyphSize / 2;
-    const int centerX = (closeRect.left + closeRect.right) / 2;
-    const int centerY = (closeRect.top + closeRect.bottom) / 2;
-    HPEN pen =
-        CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), kTitlebarCloseGlyphColor);
-    HGDIOBJ oldPen = SelectObject(hdc, pen);
-    MoveToEx(hdc, centerX - halfGlyph, centerY - halfGlyph, nullptr);
-    LineTo(hdc, centerX + halfGlyph + 1, centerY + halfGlyph + 1);
-    MoveToEx(hdc, centerX + halfGlyph, centerY - halfGlyph, nullptr);
-    LineTo(hdc, centerX - halfGlyph - 1, centerY + halfGlyph + 1);
-    if (oldPen != nullptr) {
-        SelectObject(hdc, oldPen);
-    }
-    DeleteObject(pen);
 }
 
-void DashboardApp::SetNativeTitlebarCloseButtonState(bool hovered, bool pressed) {
-    if (nativeTitlebarCloseHovered_ == hovered && nativeTitlebarClosePressed_ == pressed) {
+void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const {
+    const RECT buttonRect = NativeTitlebarButtonRect(button);
+    if (button == NativeTitlebarButton::None || !IsRectUsable(buttonRect)) {
         return;
     }
-    nativeTitlebarCloseHovered_ = hovered;
-    nativeTitlebarClosePressed_ = pressed;
+
+    const bool hovered = nativeTitlebarHoveredButton_ == button;
+    const bool pressed = nativeTitlebarPressedButton_ == button && hovered;
+    if (pressed) {
+        FillRectWithColor(hdc, buttonRect, kTitlebarButtonPressedColor);
+    } else if (hovered) {
+        FillRectWithColor(hdc, buttonRect, kTitlebarButtonHoverColor);
+    }
+
+    HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
+    const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
+    const COLORREF oldTextColor = SetTextColor(hdc, kTitlebarButtonGlyphColor);
+
+    if (button == NativeTitlebarButton::Display) {
+        const int screenWidth = std::max(14, ScaleLogicalToPhysical(16, CurrentWindowDpi()));
+        const int screenHeight = std::max(9, ScaleLogicalToPhysical(10, CurrentWindowDpi()));
+        const int centerX = (buttonRect.left + buttonRect.right) / 2;
+        const int centerY = (buttonRect.top + buttonRect.bottom) / 2;
+        RECT screenRect{centerX - screenWidth / 2,
+            centerY - screenHeight / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi()),
+            centerX + (screenWidth + 1) / 2,
+            centerY + (screenHeight + 1) / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi())};
+        HPEN pen =
+            CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), kTitlebarButtonGlyphColor);
+        HGDIOBJ oldPen = SelectObject(hdc, pen);
+        HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
+        Rectangle(hdc, screenRect.left, screenRect.top, screenRect.right, screenRect.bottom);
+        MoveToEx(hdc, centerX, screenRect.bottom, nullptr);
+        LineTo(hdc, centerX, screenRect.bottom + ScaleLogicalToPhysical(3, CurrentWindowDpi()));
+        MoveToEx(hdc,
+            centerX - ScaleLogicalToPhysical(4, CurrentWindowDpi()),
+            screenRect.bottom + ScaleLogicalToPhysical(3, CurrentWindowDpi()),
+            nullptr);
+        LineTo(hdc,
+            centerX + ScaleLogicalToPhysical(4, CurrentWindowDpi()) + 1,
+            screenRect.bottom + ScaleLogicalToPhysical(3, CurrentWindowDpi()));
+        if (oldBrush != nullptr) {
+            SelectObject(hdc, oldBrush);
+        }
+        if (oldPen != nullptr) {
+            SelectObject(hdc, oldPen);
+        }
+        DeleteObject(pen);
+    } else if (button == NativeTitlebarButton::Close) {
+        const int glyphSize = std::max(8, ScaleLogicalToPhysical(10, CurrentWindowDpi()));
+        const int halfGlyph = glyphSize / 2;
+        const int centerX = (buttonRect.left + buttonRect.right) / 2;
+        const int centerY = (buttonRect.top + buttonRect.bottom) / 2;
+        HPEN pen =
+            CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), kTitlebarButtonGlyphColor);
+        HGDIOBJ oldPen = SelectObject(hdc, pen);
+        MoveToEx(hdc, centerX - halfGlyph, centerY - halfGlyph, nullptr);
+        LineTo(hdc, centerX + halfGlyph + 1, centerY + halfGlyph + 1);
+        MoveToEx(hdc, centerX + halfGlyph, centerY - halfGlyph, nullptr);
+        LineTo(hdc, centerX - halfGlyph - 1, centerY + halfGlyph + 1);
+        if (oldPen != nullptr) {
+            SelectObject(hdc, oldPen);
+        }
+        DeleteObject(pen);
+    }
+
+    SetTextColor(hdc, oldTextColor);
+    SetBkMode(hdc, oldBkMode);
+    if (oldFont != nullptr) {
+        SelectObject(hdc, oldFont);
+    }
+}
+
+void DashboardApp::SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed) {
+    if (nativeTitlebarHoveredButton_ == hovered && nativeTitlebarPressedButton_ == pressed) {
+        return;
+    }
+    nativeTitlebarHoveredButton_ = hovered;
+    nativeTitlebarPressedButton_ = pressed;
     if (titlebarHoverProbeHwnd_ != nullptr && nativeTitlebarVisible_) {
         InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
     }
 }
 
-void DashboardApp::ResetNativeTitlebarCloseButtonState() {
-    SetNativeTitlebarCloseButtonState(false, false);
+void DashboardApp::ResetNativeTitlebarButtonState() {
+    SetNativeTitlebarButtonState(NativeTitlebarButton::None, NativeTitlebarButton::None);
 }
 
-void DashboardApp::UpdateNativeTitlebarCloseButtonHover(POINT screenPoint) {
+void DashboardApp::UpdateNativeTitlebarButtonHover(POINT screenPoint) {
     if (!nativeTitlebarVisible_ || titlebarHoverProbeHwnd_ == nullptr) {
-        ResetNativeTitlebarCloseButtonState();
+        ResetNativeTitlebarButtonState();
         return;
     }
     POINT clientPoint = screenPoint;
     ScreenToClient(titlebarHoverProbeHwnd_, &clientPoint);
-    SetNativeTitlebarCloseButtonState(HitTestNativeTitlebarCloseButton(clientPoint), nativeTitlebarClosePressed_);
+    SetNativeTitlebarButtonState(HitTestNativeTitlebarButton(clientPoint), nativeTitlebarPressedButton_);
+}
+
+void DashboardApp::InvokeNativeTitlebarButton(NativeTitlebarButton button) {
+    if (button == NativeTitlebarButton::Close) {
+        if (hwnd_ != nullptr) {
+            PostMessageA(hwnd_, WM_CLOSE, 0, 0);
+        }
+        return;
+    }
+
+    if (button == NativeTitlebarButton::Display && shellUi_ != nullptr && titlebarHoverProbeHwnd_ != nullptr) {
+        const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
+        if (!IsRectUsable(displayRect)) {
+            return;
+        }
+        POINT menuPoint{displayRect.left, displayRect.bottom};
+        ClientToScreen(titlebarHoverProbeHwnd_, &menuPoint);
+        shellUi_->ShowTitlebarConfigureDisplayMenu(menuPoint);
+        UpdateNativeTitlebarHoverFromCursor();
+    }
 }
 
 void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
@@ -920,8 +1324,12 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     const DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(clientRect);
     const bool cursorInClient = PtInRect(&clientRect, cursor) != FALSE;
     const bool cursorInTitlebarBand = geometry.canShow && PtInRect(&geometry.virtualHoverRect, cursor) != FALSE;
-    if (nativeTitlebarClosePressed_) {
-        UpdateNativeTitlebarCloseButtonHover(cursor);
+    if (nativeTitlebarComboDropdownOpen_) {
+        StartNativeTitlebarHoverTimer();
+        return;
+    }
+    if (nativeTitlebarPressedButton_ != NativeTitlebarButton::None) {
+        UpdateNativeTitlebarButtonHover(cursor);
         StartNativeTitlebarHoverTimer();
         return;
     }
@@ -934,7 +1342,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
             UpdateNativeTitlebarProbe();
         }
         if (nativeTitlebarVisible_) {
-            UpdateNativeTitlebarCloseButtonHover(cursor);
+            UpdateNativeTitlebarButtonHover(cursor);
             StartNativeTitlebarHoverTimer();
         }
         return;
@@ -1649,6 +2057,39 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
         }
         case WM_MOUSEACTIVATE:
             return MA_NOACTIVATE;
+        case WM_COMMAND: {
+            const HWND commandHwnd = reinterpret_cast<HWND>(lParam);
+            const int notification = HIWORD(wParam);
+            if (commandHwnd == titlebarLayoutComboHwnd_ || commandHwnd == titlebarThemeComboHwnd_) {
+                if (notification == CBN_DROPDOWN) {
+                    nativeTitlebarComboDropdownOpen_ = true;
+                    StartNativeTitlebarHoverTimer();
+                    return 0;
+                }
+                if (notification == CBN_CLOSEUP) {
+                    nativeTitlebarComboDropdownOpen_ = false;
+                    UpdateNativeTitlebarHoverFromCursor();
+                    return 0;
+                }
+                if (notification == CBN_SELCHANGE && shellUi_ != nullptr) {
+                    const std::optional<size_t> selectedIndex = NativeTitlebarComboSelectionIndex(commandHwnd);
+                    if (selectedIndex.has_value()) {
+                        if (commandHwnd == titlebarLayoutComboHwnd_) {
+                            shellUi_->ApplyTitlebarLayoutSelection(*selectedIndex);
+                        } else {
+                            shellUi_->ApplyTitlebarThemeSelection(*selectedIndex);
+                        }
+                        SyncNativeTitlebarControls();
+                        UpdateNativeTitlebarControls();
+                        if (titlebarHoverProbeHwnd_ != nullptr) {
+                            InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
+                        }
+                    }
+                    return 0;
+                }
+            }
+            break;
+        }
         case WM_MOUSEMOVE: {
             POINT screenPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
             ClientToScreen(hwnd, &screenPoint);
@@ -1657,7 +2098,7 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
             }
             UpdateNativeTitlebarHoverFromCursor();
             if (nativeTitlebarVisible_) {
-                UpdateNativeTitlebarCloseButtonHover(screenPoint);
+                UpdateNativeTitlebarButtonHover(screenPoint);
             }
             return 0;
         }
@@ -1670,8 +2111,9 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
             UpdateNativeTitlebarHoverFromCursor();
             if (nativeTitlebarVisible_) {
                 const POINT probeClientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-                if (HitTestNativeTitlebarCloseButton(probeClientPoint)) {
-                    SetNativeTitlebarCloseButtonState(true, true);
+                const NativeTitlebarButton button = HitTestNativeTitlebarButton(probeClientPoint);
+                if (button != NativeTitlebarButton::None) {
+                    SetNativeTitlebarButtonState(button, button);
                     SetCapture(hwnd);
                     return 0;
                 }
@@ -1680,22 +2122,23 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
             return 0;
         }
         case WM_LBUTTONUP:
-            if (nativeTitlebarClosePressed_) {
+            if (nativeTitlebarPressedButton_ != NativeTitlebarButton::None) {
                 const POINT probeClientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-                const bool closeClicked = HitTestNativeTitlebarCloseButton(probeClientPoint);
-                ResetNativeTitlebarCloseButtonState();
+                const NativeTitlebarButton pressedButton = nativeTitlebarPressedButton_;
+                const bool clicked = HitTestNativeTitlebarButton(probeClientPoint) == pressedButton;
+                ResetNativeTitlebarButtonState();
                 if (GetCapture() == hwnd) {
                     ReleaseCapture();
                 }
-                if (closeClicked && hwnd_ != nullptr) {
-                    PostMessageA(hwnd_, WM_CLOSE, 0, 0);
+                if (clicked) {
+                    InvokeNativeTitlebarButton(pressedButton);
                 }
                 return 0;
             }
             break;
         case WM_CAPTURECHANGED:
-            if (nativeTitlebarClosePressed_) {
-                ResetNativeTitlebarCloseButtonState();
+            if (nativeTitlebarPressedButton_ != NativeTitlebarButton::None) {
+                ResetNativeTitlebarButtonState();
             }
             break;
         case WM_SETCURSOR:
