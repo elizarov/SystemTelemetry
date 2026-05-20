@@ -38,11 +38,10 @@ DashboardTitlebarFrameMargins DashboardTitlebarFrameMarginsFromAdjustedRect(
         NonNegativeMargin(adjustedRect.bottom - clientHeight)};
 }
 
-DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
-    const RECT& dashboardClientRect, const RECT& monitorRect, DashboardTitlebarFrameMargins margins) {
+DashboardTitlebarGeometry ResolveDashboardTitlebarFrameGeometry(
+    const RECT& dashboardClientRect, DashboardTitlebarFrameMargins margins) {
     DashboardTitlebarGeometry geometry;
-    if (!IsRectUsable(dashboardClientRect) || !IsRectUsable(monitorRect) || margins.top <= 0 ||
-        RectsMatch(dashboardClientRect, monitorRect)) {
+    if (!IsRectUsable(dashboardClientRect) || margins.top <= 0) {
         return geometry;
     }
 
@@ -52,6 +51,21 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
         dashboardClientRect.bottom + margins.bottom};
     geometry.virtualHoverRect =
         RECT{dashboardClientRect.left, geometry.windowRect.top, dashboardClientRect.right, dashboardClientRect.top};
+    geometry.canShow = IsRectUsable(geometry.windowRect) && IsRectUsable(geometry.virtualHoverRect);
+    if (!geometry.canShow) {
+        geometry.windowRect = {};
+        geometry.virtualHoverRect = {};
+    }
+    return geometry;
+}
+
+DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
+    const RECT& dashboardClientRect, const RECT& monitorRect, DashboardTitlebarFrameMargins margins) {
+    if (!IsRectUsable(monitorRect) || RectsMatch(dashboardClientRect, monitorRect)) {
+        return {};
+    }
+
+    DashboardTitlebarGeometry geometry = ResolveDashboardTitlebarFrameGeometry(dashboardClientRect, margins);
     geometry.canShow = IsRectUsable(geometry.windowRect) && IsRectUsable(geometry.virtualHoverRect) &&
                        TitlebarHorizontalAndTopEdgesFitMonitor(monitorRect, geometry.windowRect);
     if (!geometry.canShow) {

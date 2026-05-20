@@ -17,5 +17,7 @@ struct DashboardTitlebarGeometry {
 
 DashboardTitlebarFrameMargins DashboardTitlebarFrameMarginsFromAdjustedRect(
     const RECT& adjustedRect, int clientWidth, int clientHeight);
+DashboardTitlebarGeometry ResolveDashboardTitlebarFrameGeometry(
+    const RECT& dashboardClientRect, DashboardTitlebarFrameMargins margins);
 DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
     const RECT& dashboardClientRect, const RECT& monitorRect, DashboardTitlebarFrameMargins margins);

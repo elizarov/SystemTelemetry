@@ -163,7 +163,8 @@ private:
     void StartMoveMode(bool hasCursorAnchorClientPoint,
         POINT cursorAnchorClientPoint,
         bool clampCursorAnchorClientPoint,
-        bool placeOnRelease);
+        bool placeOnRelease,
+        bool keepNativeTitlebarDuringMove);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
@@ -219,6 +220,7 @@ private:
     bool clampMoveCursorAnchorClientPoint_ = true;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     bool stopMoveModeWhenLeftButtonReleased_ = false;
+    bool nativeTitlebarDragMoveActive_ = false;
     HWND titlebarHoverProbeHwnd_ = nullptr;
     HWND titlebarLayoutComboHwnd_ = nullptr;
     HWND titlebarThemeComboHwnd_ = nullptr;

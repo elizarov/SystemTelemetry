@@ -765,7 +765,14 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         return;
     }
 
-    const DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(DashboardClientScreenRect());
+    const RECT dashboardClientRect = DashboardClientScreenRect();
+    DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(dashboardClientRect);
+    if (!geometry.canShow && nativeTitlebarDragMoveActive_ && controller_.State().isMoving && nativeTitlebarVisible_) {
+        // Preserve the custom strip during an active titlebar drag even after hover eligibility no longer fits.
+        const DashboardTitlebarFrameMargins margins =
+            ComputeNativeTitlebarFrameMargins(RectWidth(dashboardClientRect), RectHeight(dashboardClientRect));
+        geometry = ResolveDashboardTitlebarFrameGeometry(dashboardClientRect, margins);
+    }
     if (!geometry.canShow) {
         if (nativeTitlebarProbeVisible_) {
             ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
@@ -1590,17 +1597,18 @@ void DashboardApp::RemoveTrayIcon() {
 }
 
 void DashboardApp::StartMoveMode() {
-    StartMoveMode(false, POINT{}, true, false);
+    StartMoveMode(false, POINT{}, true, false, false);
 }
 
 void DashboardApp::StartMoveModeAt(POINT cursorAnchorClientPoint) {
-    StartMoveMode(true, cursorAnchorClientPoint, true, false);
+    StartMoveMode(true, cursorAnchorClientPoint, true, false, false);
 }
 
 void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
     POINT cursorAnchorClientPoint,
     bool clampCursorAnchorClientPoint,
-    bool placeOnRelease) {
+    bool placeOnRelease,
+    bool keepNativeTitlebarDuringMove) {
     if (controller_.State().isEditingLayout) {
         layoutEditController_.CancelInteraction();
     }
@@ -1610,9 +1618,14 @@ void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
     clampMoveCursorAnchorClientPoint_ = clampCursorAnchorClientPoint;
     suppressMoveStopOnNextLeftButtonUp_ = false;
     stopMoveModeWhenLeftButtonReleased_ = placeOnRelease;
+    nativeTitlebarDragMoveActive_ = keepNativeTitlebarDuringMove && nativeTitlebarVisible_;
     controller_.State().isMoving = true;
     StopNativeTitlebarHoverTimer();
-    UpdateNativeTitlebarProbe();
+    if (nativeTitlebarDragMoveActive_) {
+        UpdateNativeTitlebarProbe();
+    } else {
+        HideNativeTitlebar();
+    }
     SetTimer(hwnd_, kMoveTimerId, kMoveTimerMs, nullptr);
     UpdateMoveTracking();
     SyncDashboardMoveOverlayState();
@@ -1622,7 +1635,7 @@ void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
 void DashboardApp::StartMoveModeFromNativeTitlebar(POINT screenPoint) {
     POINT clientPoint = screenPoint;
     ScreenToClient(hwnd_, &clientPoint);
-    StartMoveMode(true, clientPoint, false, true);
+    StartMoveMode(true, clientPoint, false, true, true);
 }
 
 void DashboardApp::StopMoveMode() {
@@ -1633,6 +1646,7 @@ void DashboardApp::StopMoveMode() {
     clampMoveCursorAnchorClientPoint_ = true;
     suppressMoveStopOnNextLeftButtonUp_ = false;
     stopMoveModeWhenLeftButtonReleased_ = false;
+    nativeTitlebarDragMoveActive_ = false;
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     HideLayoutEditTooltip();

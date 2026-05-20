@@ -96,7 +96,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The theme dropdown is a native Windows dropdown, shows theme names with spaces such as `dark cyan`, reflects the active theme, and applies a new theme through the same behavior as the `Theme` submenu.
 - The display setup button is a custom gray titlebar button with a minimal monitor glyph, shares hover and pressed feedback with the close button, and opens the same target-display entries as `Display` > `Configure Display`.
 - The close button is a custom `X` button, uses the native Windows close-button hover or pressed background when available, and exits through the same save-or-discard prompt used by `Exit` when layout-edit changes are unsaved.
-- Dragging empty titlebar space starts dashboard move mode with the usual monitor, scale, and coordinate overlay, and the overlay prompts `Release to place` because releasing the pointer completes placement. Other move-mode entry points prompt `Left-click to place`.
+- Dragging empty titlebar space starts dashboard move mode with the usual monitor, scale, and coordinate overlay, and the overlay prompts `Release to place` because releasing the pointer completes placement. A titlebar-initiated drag keeps the custom titlebar visible until the pointer is released, even if the titlebar moves partly beyond the monitor edge; after release, normal monitor-fit suppression applies again. Other move-mode entry points hide the titlebar while moving and prompt `Left-click to place`.
 
 ## Telemetry And Content Behavior
 
