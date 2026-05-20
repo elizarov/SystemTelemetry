@@ -484,22 +484,7 @@ def print_large_source_files(records: tuple[SourceRecord, ...]) -> None:
         print(f"  {relpath(source_file.path)}: {source_dependency_graph.format_loc_count(source_file.loc)} LOC")
 
 
-def print_module_loc_summary(modules: dict[str, source_dependency_graph.Module]) -> None:
-    print("LOC totals by src module:")
-    for module_name, module in sorted(modules.items()):
-        if module_name == source_dependency_graph.EXTERNAL_D2D_MODULE:
-            continue
-        print(
-            f"  {source_dependency_graph.display_name(module.name)}: "
-            f"{source_dependency_graph.format_loc_count(module.total_loc)} total "
-            f"(.h {source_dependency_graph.format_loc_count(module.header_loc)} in {module.header_files} file(s), "
-            f".cpp {source_dependency_graph.format_loc_count(module.cpp_loc)} in {module.cpp_files} file(s))"
-        )
-
-
 def print_verbose_source_metrics(data: SourceDependencyData) -> None:
-    print_module_loc_summary(data.modules)
-    print()
     print_large_source_files(data.records)
     print()
     source_dependency_graph.print_package_dependency_components(data.modules, data.edges)
@@ -771,7 +756,7 @@ def parse_args() -> argparse.Namespace:
         "-v",
         "--verbose",
         action="store_true",
-        help="Print source module LOC totals, large source files, and topological dependency details.",
+        help="Print source files over 1,000 LOC and topological dependency details.",
     )
     return parser.parse_args()
 
