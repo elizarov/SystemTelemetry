@@ -18,9 +18,14 @@ struct DashboardTitlebarChromeResult {
     HRESULT darkMode = S_OK;
 };
 
+struct DashboardCloseButtonColors {
+    COLORREF background = RGB(232, 17, 35);
+    COLORREF glyph = RGB(255, 255, 255);
+};
+
 DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND hwnd);
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF background, COLORREF text);
 int ResolveDashboardTitlebarCornerRadius(UINT dpi);
-bool PaintDashboardNativeCloseButtonBackground(HWND hwnd, HDC hdc, const RECT& rect, bool pressed);
+DashboardCloseButtonColors ResolveDashboardCloseButtonColors(HWND hwnd, bool pressed);
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible);
 bool DashboardTitlebarChromeSucceeded(const DashboardTitlebarChromeResult& result);

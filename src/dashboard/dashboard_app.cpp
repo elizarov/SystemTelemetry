@@ -49,9 +49,6 @@ constexpr int kTitlebarThemeComboWidthLogical = 112;
 constexpr int kTitlebarComboHeightLogical = 22;
 constexpr int kTitlebarComboVisibleRows = 8;
 constexpr int kTitlebarComboDropPaddingLogical = 6;
-constexpr COLORREF kTitlebarCloseButtonFallbackHoverColor = RGB(232, 17, 35);
-constexpr COLORREF kTitlebarCloseButtonFallbackPressedColor = RGB(196, 43, 28);
-constexpr COLORREF kTitlebarCloseButtonFallbackGlyphColor = RGB(255, 255, 255);
 
 using AdjustWindowRectExForDpiFn = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
 
@@ -77,6 +74,10 @@ bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
 
 int NativeTitlebarGlyphSize(UINT dpi) {
     return std::max(8, ScaleLogicalToPhysical(10, dpi));
+}
+
+int NativeTitlebarAppIconSize(UINT dpi) {
+    return std::max(16, ScaleLogicalToPhysical(16, dpi));
 }
 
 std::string TitlebarThemeDisplayName(std::string_view name) {
@@ -1273,31 +1274,24 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
 
     const bool hovered = nativeTitlebarHoveredButton_ == button;
     const bool pressed = nativeTitlebarPressedButton_ == button && hovered;
-    const bool nativeCloseButtonDrawn =
-        button == NativeTitlebarButton::Close && (hovered || pressed) &&
-        PaintDashboardNativeCloseButtonBackground(titlebarHoverProbeHwnd_, hdc, buttonRect, pressed);
-    if (!nativeCloseButtonDrawn && button == NativeTitlebarButton::Close && pressed) {
-        FillRectWithColor(hdc, buttonRect, kTitlebarCloseButtonFallbackPressedColor);
-    } else if (!nativeCloseButtonDrawn && button == NativeTitlebarButton::Close && hovered) {
-        FillRectWithColor(hdc, buttonRect, kTitlebarCloseButtonFallbackHoverColor);
+    const bool closeButtonActive = button == NativeTitlebarButton::Close && (hovered || pressed);
+    DashboardCloseButtonColors closeButtonColors{};
+    if (closeButtonActive) {
+        closeButtonColors = ResolveDashboardCloseButtonColors(titlebarHoverProbeHwnd_, pressed);
+        FillRectWithColor(hdc, buttonRect, closeButtonColors.background);
     } else if (pressed) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonPressed);
     } else if (hovered) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonHover);
     }
-    if (nativeCloseButtonDrawn) {
-        return;
-    }
 
     HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
     const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-    const COLORREF glyphColor = button == NativeTitlebarButton::Close && (hovered || pressed)
-                                    ? kTitlebarCloseButtonFallbackGlyphColor
-                                    : nativeTitlebarPalette_.buttonGlyph;
+    const COLORREF glyphColor = closeButtonActive ? closeButtonColors.glyph : nativeTitlebarPalette_.buttonGlyph;
     const COLORREF oldTextColor = SetTextColor(hdc, glyphColor);
 
     if (button == NativeTitlebarButton::AppMenu) {
-        const int iconSize = NativeTitlebarGlyphSize(CurrentWindowDpi());
+        const int iconSize = NativeTitlebarAppIconSize(CurrentWindowDpi());
         const int iconLeft = (buttonRect.left + buttonRect.right - iconSize) / 2;
         const int iconTop = (buttonRect.top + buttonRect.bottom - iconSize) / 2;
         HICON icon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconA(nullptr, IDI_APPLICATION);

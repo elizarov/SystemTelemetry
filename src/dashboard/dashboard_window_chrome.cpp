@@ -20,6 +20,9 @@ constexpr UINT kDefaultDpi = 96;
 constexpr UINT kMaxReasonableDpi = 960;
 constexpr COLORREF kDwmColorDefault = 0xFFFFFFFF;
 constexpr wchar_t kWindowThemeClassName[] = L"WINDOW";  // UxTheme exposes only UTF-16 class names.
+constexpr COLORREF kDefaultCloseButtonHoverColor = RGB(232, 17, 35);
+constexpr COLORREF kDefaultCloseButtonPressedColor = RGB(196, 43, 28);
+constexpr COLORREF kDefaultCloseButtonGlyphColor = RGB(255, 255, 255);
 
 int ColorChannel(COLORREF color, int shift) {
     return static_cast<int>((color >> shift) & 0xFF);
@@ -55,6 +58,13 @@ bool HighContrastEnabled() {
            (highContrast.dwFlags & HCF_HIGHCONTRASTON) != 0;
 }
 
+bool LooksLikeCloseActionColor(COLORREF color) {
+    const int red = ColorChannel(color, 0);
+    const int green = ColorChannel(color, 8);
+    const int blue = ColorChannel(color, 16);
+    return red >= 160 && green <= 140 && blue <= 160 && red >= green + 40;
+}
+
 template <typename Value> HRESULT SetDwmAttribute(HWND hwnd, DWORD attribute, const Value& value) {
     return DwmSetWindowAttribute(hwnd, attribute, &value, sizeof(value));
 }
@@ -88,16 +98,26 @@ int ResolveDashboardTitlebarCornerRadius(UINT dpi) {
     return std::max(1, MulDiv(kNativeTitlebarCornerRadiusLogical, static_cast<int>(effectiveDpi), kDefaultDpi));
 }
 
-bool PaintDashboardNativeCloseButtonBackground(HWND hwnd, HDC hdc, const RECT& rect, bool pressed) {
-    HTHEME theme = OpenThemeData(hwnd, kWindowThemeClassName);
-    if (theme == nullptr) {
-        return false;
+DashboardCloseButtonColors ResolveDashboardCloseButtonColors(HWND hwnd, bool pressed) {
+    DashboardCloseButtonColors colors{
+        pressed ? kDefaultCloseButtonPressedColor : kDefaultCloseButtonHoverColor, kDefaultCloseButtonGlyphColor};
+    if (HighContrastEnabled()) {
+        return DashboardCloseButtonColors{GetSysColor(COLOR_HIGHLIGHT), GetSysColor(COLOR_HIGHLIGHTTEXT)};
     }
 
-    const HRESULT result =
-        DrawThemeBackground(theme, hdc, WP_CLOSEBUTTON, pressed ? CBS_PUSHED : CBS_HOT, &rect, nullptr);
+    HTHEME theme = OpenThemeData(hwnd, kWindowThemeClassName);
+    if (theme == nullptr) {
+        return colors;
+    }
+
+    COLORREF themeBackground{};
+    const int state = pressed ? CBS_PUSHED : CBS_HOT;
+    if (SUCCEEDED(GetThemeColor(theme, WP_CLOSEBUTTON, state, TMT_FILLCOLOR, &themeBackground)) &&
+        LooksLikeCloseActionColor(themeBackground)) {
+        colors.background = themeBackground;
+    }
     CloseThemeData(theme);
-    return SUCCEEDED(result);
+    return colors;
 }
 
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible) {
