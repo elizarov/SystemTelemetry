@@ -7,7 +7,6 @@ if "%root_arg:~-1%"=="\" set "root_arg=%root_arg:~0,-1%"
 pushd "%root%" >nul || exit /b 1
 
 set "failed=0"
-echo Running combined lint checks...
 python tools\lint_check.py --check --skip-svg
 if errorlevel 1 set "failed=1"
 
@@ -24,7 +23,6 @@ if /I "%~1"=="includes" (
 )
 
 if "%failed%"=="0" (
-    echo Lint passed.
     popd >nul
     exit /b 0
 )

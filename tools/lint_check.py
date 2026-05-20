@@ -488,6 +488,35 @@ def print_large_source_files(records: tuple[SourceRecord, ...]) -> None:
         print(f"  {relpath(source_file.path)}: {source_dependency_graph.format_loc_count(source_file.loc)} LOC")
 
 
+def print_module_loc_summary(modules: dict[str, source_dependency_graph.Module]) -> None:
+    print("LOC totals by src module:")
+    for module_name, module in sorted(modules.items()):
+        if module_name == source_dependency_graph.EXTERNAL_D2D_MODULE:
+            continue
+        print(
+            f"  {source_dependency_graph.display_name(module.name)}: "
+            f"{source_dependency_graph.format_loc_count(module.total_loc)} total "
+            f"(.h {source_dependency_graph.format_loc_count(module.header_loc)} in {module.header_files} file(s), "
+            f".cpp {source_dependency_graph.format_loc_count(module.cpp_loc)} in {module.cpp_files} file(s))"
+        )
+
+
+def print_verbose_source_metrics(data: SourceDependencyData) -> None:
+    print_module_loc_summary(data.modules)
+    print()
+    print_large_source_files(data.records)
+    print()
+    source_dependency_graph.print_package_dependency_components(data.modules, data.edges)
+
+
+def print_scanned_loc_summary(records: tuple[SourceRecord, ...]) -> None:
+    total_loc = sum(record.line_count for record in records)
+    print(
+        f"Scanned {source_dependency_graph.format_loc_count(total_loc)} LOC "
+        f"across {len(records)} lint input file(s)."
+    )
+
+
 def write_source_dependency_outputs(
     data: SourceDependencyData,
     dot_output: Path,
@@ -658,68 +687,50 @@ def collect_source_policy_violations(
     return violations, len(policy_records)
 
 
-def print_architecture_report(violations: list[check_architecture.Violation], header_count: int, cpp_count: int) -> None:
+def print_architecture_report(violations: list[check_architecture.Violation]) -> bool:
+    if not violations:
+        return False
     print("Architecture check:")
-    if violations:
-        for violation in violations:
-            print(f"{violation.relpath}:{violation.line}: {violation.kind}: {violation.message}")
-        print(f"Architecture check failed with {len(violations)} violation(s).")
-        return
-    print(f"Architecture check passed for {header_count} headers and {cpp_count} implementation files.")
+    for violation in violations:
+        print(f"{violation.relpath}:{violation.line}: {violation.kind}: {violation.message}")
+    print(f"Architecture check failed with {len(violations)} violation(s).")
+    return True
 
 
 def print_source_dependency_report(
-    data: SourceDependencyData,
-    dot_output: Path,
-    graphml_output: Path,
-    svg_output: Path,
-    skip_svg: bool,
     output_error: str | None,
     violations: list[source_dependency_graph.Violation],
     checked: bool,
-) -> None:
+) -> bool:
+    if not output_error and (not checked or not violations):
+        return False
     print("Source dependency check:")
     if output_error:
         print(f"Source dependency graph write failed: {output_error}")
-    else:
-        public_edges = sum(1 for kind in data.edges.values() if kind == "public")
-        private_edges = sum(1 for kind in data.edges.values() if kind == "private")
-        written_outputs = f"{dot_output} and {graphml_output}"
-        if not skip_svg:
-            written_outputs += f", and {svg_output}"
-        print(
-            f"Wrote {written_outputs} with {len(data.modules)} modules, {public_edges} public dependencies, "
-            f"and {private_edges} private dependencies."
-        )
-    source_dependency_graph.print_package_loc_summary(data.modules)
-    source_dependency_graph.print_package_dependency_components(data.modules, data.edges)
-    print_large_source_files(data.records)
-    if checked:
-        if violations:
-            source_dependency_graph.print_violations(violations)
-            print(f"Source dependency check failed with {len(violations)} violation(s).")
-            return
-        print("Source dependency check passed.")
+    if checked and violations:
+        source_dependency_graph.print_violations(violations)
+        print(f"Source dependency check failed with {len(violations)} violation(s).")
+    return True
 
 
-def print_include_style_report(violations: list[check_includes.Violation], file_count: int) -> None:
+def print_include_style_report(violations: list[check_includes.Violation]) -> bool:
+    if not violations:
+        return False
     print("Include style check:")
-    if violations:
-        for violation in violations:
-            print(f"{violation.relpath}:{violation.line}: include-style: {violation.message}")
-        print(f"Include style check failed with {len(violations)} violation(s).")
-        return
-    print(f"Include style check passed for {file_count} tracked source, test, and resource files.")
+    for violation in violations:
+        print(f"{violation.relpath}:{violation.line}: include-style: {violation.message}")
+    print(f"Include style check failed with {len(violations)} violation(s).")
+    return True
 
 
-def print_source_policy_report(violations: list[check_source_policy.Violation], file_count: int) -> None:
+def print_source_policy_report(violations: list[check_source_policy.Violation]) -> bool:
+    if not violations:
+        return False
     print("Source policy check:")
-    if violations:
-        for violation in violations:
-            print(f"{violation.relpath}:{violation.line}: source-policy: {violation.message}")
-        print(f"Source policy check failed with {len(violations)} violation(s).")
-        return
-    print(f"Source policy check passed for {file_count} tracked source and test files.")
+    for violation in violations:
+        print(f"{violation.relpath}:{violation.line}: source-policy: {violation.message}")
+    print(f"Source policy check failed with {len(violations)} violation(s).")
+    return True
 
 
 def parse_args() -> argparse.Namespace:
@@ -760,6 +771,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Do not print per-file scan progress.",
     )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Print source module LOC totals, large source files, and topological dependency details.",
+    )
     return parser.parse_args()
 
 
@@ -770,7 +787,7 @@ def main() -> int:
 
     records = scan_lint_inputs(discover_lint_inputs(), show_progress=not args.no_progress)
 
-    architecture_violations, header_count, cpp_count = collect_architecture_violations(records)
+    architecture_violations, _header_count, _cpp_count = collect_architecture_violations(records)
     source_dependency_data = collect_source_dependency_data(records)
     source_dependency_output_error = write_source_dependency_outputs(
         source_dependency_data,
@@ -782,25 +799,30 @@ def main() -> int:
     source_dependency_violations = (
         source_dependency_graph.check_graph_rules(source_dependency_data.edges) if args.check else []
     )
-    include_style_violations, include_style_file_count = collect_include_style_violations(records)
-    source_policy_violations, source_policy_file_count = collect_source_policy_violations(records)
+    include_style_violations, _include_style_file_count = collect_include_style_violations(records)
+    source_policy_violations, _source_policy_file_count = collect_source_policy_violations(records)
 
-    print_architecture_report(architecture_violations, header_count, cpp_count)
-    print()
-    print_source_dependency_report(
-        source_dependency_data,
-        args.output,
-        graphml_output,
-        svg_output,
-        args.skip_svg,
-        source_dependency_output_error,
-        source_dependency_violations,
-        args.check,
+    printed_report = False
+    report_printers = (
+        (bool(architecture_violations), lambda: print_architecture_report(architecture_violations)),
+        (
+            bool(source_dependency_output_error) or (args.check and bool(source_dependency_violations)),
+            lambda: print_source_dependency_report(
+                source_dependency_output_error,
+                source_dependency_violations,
+                args.check,
+            ),
+        ),
+        (bool(include_style_violations), lambda: print_include_style_report(include_style_violations)),
+        (bool(source_policy_violations), lambda: print_source_policy_report(source_policy_violations)),
     )
-    print()
-    print_include_style_report(include_style_violations, include_style_file_count)
-    print()
-    print_source_policy_report(source_policy_violations, source_policy_file_count)
+    for should_print, print_report in report_printers:
+        if not should_print:
+            continue
+        if printed_report:
+            print()
+        print_report()
+        printed_report = True
 
     if (
         architecture_violations
@@ -809,12 +831,15 @@ def main() -> int:
         or include_style_violations
         or source_policy_violations
     ):
-        print()
+        if printed_report:
+            print()
         print("Combined lint check failed.")
         return 1
 
-    print()
-    print("Combined lint check passed.")
+    print_scanned_loc_summary(records)
+    if args.verbose:
+        print()
+        print_verbose_source_metrics(source_dependency_data)
     return 0
 
 
