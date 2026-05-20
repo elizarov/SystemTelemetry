@@ -7,19 +7,54 @@ if "%root_arg:~-1%"=="\" set "root_arg=%root_arg:~0,-1%"
 pushd "%root%" >nul || exit /b 1
 
 set "failed=0"
-python tools\lint_check.py --check --skip-svg
+set "lint_check_args=--check --skip-svg"
+set "include_lint=0"
+set "include_scope=all"
+
+:parse_lint_args
+if "%~1"=="" goto lint_args_done
+if /I "%~1"=="-v" (
+    set "lint_check_args=!lint_check_args! --verbose"
+    shift
+    goto parse_lint_args
+)
+if /I "%~1"=="--verbose" (
+    set "lint_check_args=!lint_check_args! --verbose"
+    shift
+    goto parse_lint_args
+)
+if /I "%~1"=="includes" (
+    if "!include_lint!"=="1" goto :usage
+    set "include_lint=1"
+    shift
+    goto parse_lint_args
+)
+if /I "%~1"=="changed" (
+    if not "!include_lint!"=="1" goto :usage
+    if /I "!include_scope!"=="changed" goto :usage
+    set "include_scope=changed"
+    shift
+    goto parse_lint_args
+)
+goto :usage
+
+:lint_args_done
+
+python tools\lint_check.py !lint_check_args!
 if errorlevel 1 set "failed=1"
 
-if /I "%~1"=="includes" (
-    call :run_include_lint %~2 %~3
+if "!include_lint!"=="1" (
+    if /I "!include_scope!"=="changed" (
+        call :run_include_lint changed
+    ) else (
+        call :run_include_lint
+    )
     set "include_lint_result=!errorlevel!"
     if "!include_lint_result!"=="2" (
         popd >nul
         exit /b 2
     )
     if not "!include_lint_result!"=="0" set "failed=1"
-) else if not "%~1"=="" (
-    goto :usage
 )
 
 if "%failed%"=="0" (
@@ -53,8 +88,8 @@ exit /b !errorlevel!
 
 :usage
 echo Usage:
-echo   lint
-echo   lint includes
-echo   lint includes changed
+echo   lint [-v^|--verbose]
+echo   lint [-v^|--verbose] includes
+echo   lint [-v^|--verbose] includes changed
 popd >nul
 exit /b 2
