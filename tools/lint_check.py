@@ -196,22 +196,18 @@ def scan_lint_inputs(entries: list[FileEntry], show_progress: bool) -> tuple[Sou
     total = len(entries)
     use_single_line_progress = show_progress and sys.stdout.isatty()
     previous_progress_length = 0
-    if show_progress:
-        print(f"Scanning {total} lint input file(s)...")
     for index, entry in enumerate(entries, start=1):
-        if show_progress:
+        if use_single_line_progress:
             relative = relpath(entry.path)
-            if use_single_line_progress:
-                progress = truncate_progress_line(f"[{index}/{total}] lint-check ", relative)
-                padding = " " * max(0, previous_progress_length - len(progress))
-                sys.stdout.write(f"\r{progress}{padding}")
-                sys.stdout.flush()
-                previous_progress_length = len(progress)
-            else:
-                print(f"[{index}/{total}] lint-check {relative}", flush=True)
+            progress = truncate_progress_line(f"[{index}/{total}] lint-check ", relative)
+            padding = " " * max(0, previous_progress_length - len(progress))
+            sys.stdout.write(f"\r{progress}{padding}")
+            sys.stdout.flush()
+            previous_progress_length = len(progress)
         records.append(scan_file(entry))
-    if show_progress:
-        print()
+    if use_single_line_progress:
+        sys.stdout.write(f"\r{' ' * previous_progress_length}\r")
+        sys.stdout.flush()
     return tuple(records)
 
 
