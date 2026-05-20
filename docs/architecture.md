@@ -25,7 +25,7 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, profiling, generated asset, and source dependency graph helper scripts.
+- `tools/` contains shared formatting, lint, profiling, generated asset, and source dependency graph helper scripts. `tools/lint_check.py` is the combined source scanner behind the maintained lint entrypoint.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
 - `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, package, release, and website deployment automation.
@@ -39,7 +39,7 @@ Other top-level areas:
 - Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
 - Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
 - Maintained source and tests do not use conditional-compilation guards. Code must always compile for every native target; target-specific benchmark or diagnostics helpers stay ordinary functions and rely on the linker to remove unused code from targets that do not reference them.
-- `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, source-policy bans, and the renderer-only Direct2D boundary before reporting success.
+- `lint.cmd` runs the combined lint scanner and enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, source-policy bans, and the renderer-only Direct2D boundary before reporting success.
 
 ## Package Dependency Rules
 

@@ -7,20 +7,8 @@ if "%root_arg:~-1%"=="\" set "root_arg=%root_arg:~0,-1%"
 pushd "%root%" >nul || exit /b 1
 
 set "failed=0"
-echo Running architecture checks...
-python tools\check_architecture.py
-if errorlevel 1 set "failed=1"
-
-echo Running source dependency checks...
-python tools\source_dependency_graph.py --check --skip-svg
-if errorlevel 1 set "failed=1"
-
-echo Running include style checks...
-python tools\check_includes.py
-if errorlevel 1 set "failed=1"
-
-echo Running source policy checks...
-python tools\check_source_policy.py
+echo Running combined lint checks...
+python tools\lint_check.py --check --skip-svg
 if errorlevel 1 set "failed=1"
 
 if /I "%~1"=="includes" (
