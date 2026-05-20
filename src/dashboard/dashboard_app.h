@@ -13,6 +13,7 @@
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
 #include "dashboard/dashboard_titlebar.h"
+#include "dashboard/dashboard_window_chrome.h"
 #include "display/constants.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
@@ -149,6 +150,7 @@ private:
     NativeTitlebarButton HitTestNativeTitlebarButton(POINT clientPoint) const;
     void PaintNativeTitlebar(HDC hdc) const;
     void PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const;
+    void RefreshNativeTitlebarChrome();
     void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
     void ResetNativeTitlebarButtonState();
     void UpdateNativeTitlebarButtonHover(POINT screenPoint);
@@ -232,6 +234,7 @@ private:
     std::vector<std::string> nativeTitlebarThemeItems_;
     std::string nativeTitlebarSelectedLayout_;
     std::string nativeTitlebarSelectedTheme_;
+    DashboardTitlebarPalette nativeTitlebarPalette_{};
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;

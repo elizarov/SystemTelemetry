@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "dashboard/dashboard_titlebar.h"
+#include "dashboard/dashboard_window_chrome.h"
 
 namespace {
 
@@ -81,4 +82,37 @@ TEST(DashboardTitlebarGeometry, PreservesClientRectThroughAdjustedMargins) {
         geometry.windowRect.right - margins.right,
         geometry.windowRect.bottom - margins.bottom};
     ExpectRect(reconstructedClient, 100, 100, 500, 300);
+}
+
+TEST(DashboardTitlebarPalette, DerivesButtonColorsFromBaseColors) {
+    const DashboardTitlebarPalette palette =
+        ResolveDashboardTitlebarPaletteFromBaseColors(RGB(240, 240, 240), RGB(40, 40, 40));
+
+    EXPECT_EQ(palette.background, RGB(240, 240, 240));
+    EXPECT_EQ(palette.text, RGB(40, 40, 40));
+    EXPECT_EQ(palette.buttonGlyph, RGB(40, 40, 40));
+    EXPECT_EQ(palette.buttonHover, RGB(216, 216, 216));
+    EXPECT_EQ(palette.buttonPressed, RGB(196, 196, 196));
+}
+
+TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
+    const DashboardTitlebarPalette palette =
+        ResolveDashboardTitlebarPaletteFromBaseColors(RGB(32, 32, 32), RGB(255, 255, 255));
+
+    EXPECT_EQ(palette.background, RGB(32, 32, 32));
+    EXPECT_EQ(palette.text, RGB(255, 255, 255));
+    EXPECT_EQ(palette.buttonGlyph, RGB(255, 255, 255));
+    EXPECT_EQ(palette.buttonHover, RGB(58, 58, 58));
+    EXPECT_EQ(palette.buttonPressed, RGB(81, 81, 81));
+}
+
+TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
+    const DashboardTitlebarChromeResult result = ApplyDashboardTitlebarChrome(nullptr, true);
+
+    EXPECT_FALSE(DashboardTitlebarChromeSucceeded(result));
+    EXPECT_EQ(result.cornerPreference, E_HANDLE);
+    EXPECT_EQ(result.borderColor, E_HANDLE);
+    EXPECT_EQ(result.captionColor, E_HANDLE);
+    EXPECT_EQ(result.textColor, E_HANDLE);
+    EXPECT_EQ(result.darkMode, E_HANDLE);
 }

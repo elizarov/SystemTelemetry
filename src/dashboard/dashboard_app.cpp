@@ -49,11 +49,6 @@ constexpr int kTitlebarThemeComboWidthLogical = 112;
 constexpr int kTitlebarComboHeightLogical = 22;
 constexpr int kTitlebarComboVisibleRows = 8;
 constexpr int kTitlebarComboDropPaddingLogical = 6;
-constexpr COLORREF kTitlebarBackgroundColor = RGB(238, 238, 238);
-constexpr COLORREF kTitlebarTextColor = RGB(32, 32, 32);
-constexpr COLORREF kTitlebarButtonHoverColor = RGB(224, 224, 224);
-constexpr COLORREF kTitlebarButtonPressedColor = RGB(204, 204, 204);
-constexpr COLORREF kTitlebarButtonGlyphColor = RGB(38, 38, 38);
 
 using AdjustWindowRectExForDpiFn = BOOL(WINAPI*)(LPRECT, DWORD, BOOL, DWORD, UINT);
 
@@ -788,6 +783,7 @@ void DashboardApp::ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry)
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardVisibleTitlebarStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = true;
+    RefreshNativeTitlebarChrome();
     if (nativeTitlebarProbeVisible_) {
         ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
         nativeTitlebarProbeVisible_ = false;
@@ -818,6 +814,7 @@ void DashboardApp::HideNativeTitlebar() {
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardHiddenWindowStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = false;
+    RefreshNativeTitlebarChrome();
     ShowNativeTitlebarControls(false);
     ResetNativeTitlebarButtonState();
     SetWindowPos(hwnd_,
@@ -1170,7 +1167,7 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
         return;
     }
 
-    FillRectWithColor(hdc, clientRect, kTitlebarBackgroundColor);
+    FillRectWithColor(hdc, clientRect, nativeTitlebarPalette_.background);
     PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Display);
     PaintNativeTitlebarButton(hdc, NativeTitlebarButton::Close);
 
@@ -1193,7 +1190,7 @@ void DashboardApp::PaintNativeTitlebar(HDC hdc) const {
     if (textRect.right > textRect.left) {
         HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
         const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-        const COLORREF oldTextColor = SetTextColor(hdc, kTitlebarTextColor);
+        const COLORREF oldTextColor = SetTextColor(hdc, nativeTitlebarPalette_.text);
         DrawTextA(hdc, kAppTitle, -1, &textRect, DT_SINGLELINE | DT_VCENTER | DT_LEFT | DT_END_ELLIPSIS | DT_NOPREFIX);
         SetTextColor(hdc, oldTextColor);
         SetBkMode(hdc, oldBkMode);
@@ -1212,14 +1209,14 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
     const bool hovered = nativeTitlebarHoveredButton_ == button;
     const bool pressed = nativeTitlebarPressedButton_ == button && hovered;
     if (pressed) {
-        FillRectWithColor(hdc, buttonRect, kTitlebarButtonPressedColor);
+        FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonPressed);
     } else if (hovered) {
-        FillRectWithColor(hdc, buttonRect, kTitlebarButtonHoverColor);
+        FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonHover);
     }
 
     HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
     const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-    const COLORREF oldTextColor = SetTextColor(hdc, kTitlebarButtonGlyphColor);
+    const COLORREF oldTextColor = SetTextColor(hdc, nativeTitlebarPalette_.buttonGlyph);
 
     if (button == NativeTitlebarButton::Display) {
         const int screenWidth = std::max(14, ScaleLogicalToPhysical(16, CurrentWindowDpi()));
@@ -1230,8 +1227,8 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
             centerY - screenHeight / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi()),
             centerX + (screenWidth + 1) / 2,
             centerY + (screenHeight + 1) / 2 - ScaleLogicalToPhysical(1, CurrentWindowDpi())};
-        HPEN pen =
-            CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), kTitlebarButtonGlyphColor);
+        HPEN pen = CreatePen(
+            PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), nativeTitlebarPalette_.buttonGlyph);
         HGDIOBJ oldPen = SelectObject(hdc, pen);
         HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
         Rectangle(hdc, screenRect.left, screenRect.top, screenRect.right, screenRect.bottom);
@@ -1256,8 +1253,8 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
         const int halfGlyph = glyphSize / 2;
         const int centerX = (buttonRect.left + buttonRect.right) / 2;
         const int centerY = (buttonRect.top + buttonRect.bottom) / 2;
-        HPEN pen =
-            CreatePen(PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), kTitlebarButtonGlyphColor);
+        HPEN pen = CreatePen(
+            PS_SOLID, std::max(1, ScaleLogicalToPhysical(1, CurrentWindowDpi())), nativeTitlebarPalette_.buttonGlyph);
         HGDIOBJ oldPen = SelectObject(hdc, pen);
         MoveToEx(hdc, centerX - halfGlyph, centerY - halfGlyph, nullptr);
         LineTo(hdc, centerX + halfGlyph + 1, centerY + halfGlyph + 1);
@@ -1273,6 +1270,28 @@ void DashboardApp::PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton butto
     SetBkMode(hdc, oldBkMode);
     if (oldFont != nullptr) {
         SelectObject(hdc, oldFont);
+    }
+}
+
+void DashboardApp::RefreshNativeTitlebarChrome() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    nativeTitlebarPalette_ = ResolveDashboardTitlebarPalette(hwnd_);
+    const DashboardTitlebarChromeResult chromeResult = ApplyDashboardTitlebarChrome(hwnd_, nativeTitlebarVisible_);
+    if (!DashboardTitlebarChromeSucceeded(chromeResult) && trace_.Enabled(TracePrefix::Diagnostics)) {
+        trace_.WriteFmt(TracePrefix::Diagnostics,
+            "titlebar_chrome corner=0x%08lx border=0x%08lx caption=0x%08lx text=0x%08lx dark=0x%08lx visible=%d",
+            static_cast<unsigned long>(chromeResult.cornerPreference),
+            static_cast<unsigned long>(chromeResult.borderColor),
+            static_cast<unsigned long>(chromeResult.captionColor),
+            static_cast<unsigned long>(chromeResult.textColor),
+            static_cast<unsigned long>(chromeResult.darkMode),
+            nativeTitlebarVisible_ ? 1 : 0);
+    }
+    if (nativeTitlebarVisible_ && titlebarHoverProbeHwnd_ != nullptr) {
+        InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
     }
 }
 
@@ -2190,6 +2209,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
     switch (message) {
         case WM_CREATE:
             currentDpi_ = CurrentWindowDpi();
+            RefreshNativeTitlebarChrome();
             UpdateRendererScale(ResolveCurrentDisplayScale(currentDpi_));
             if (!InitializeFonts()) {
                 return -1;
@@ -2244,6 +2264,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             return 0;
         }
         case WM_ACTIVATE:
+            RefreshNativeTitlebarChrome();
             if (shellUi_ != nullptr) {
                 TraceLayoutEditUiEventFmt(
                     TracePrefix::LayoutEditUi, "wm_activate", "active_state=\"%d\"", static_cast<int>(LOWORD(wParam)));
@@ -2510,6 +2531,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (!ApplyWindowDpi(HIWORD(wParam), reinterpret_cast<const RECT*>(lParam))) {
                 return -1;
             }
+            RefreshNativeTitlebarChrome();
             if (layoutEditTooltipHwnd_ != nullptr) {
                 SendMessageA(
                     layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
@@ -2528,8 +2550,16 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 return -1;
             }
             return 0;
+        case WM_THEMECHANGED:
+        case WM_DWMCOLORIZATIONCOLORCHANGED:
+            RefreshNativeTitlebarChrome();
+            if (nativeTitlebarVisible_) {
+                UpdateNativeTitlebarControls();
+            }
+            return 0;
         case WM_DEVICECHANGE:
         case WM_SETTINGCHANGE:
+            RefreshNativeTitlebarChrome();
             if (!HandleRenderEnvironmentChange(message == WM_DEVICECHANGE ? "device_change" : "setting_change")) {
                 return -1;
             }

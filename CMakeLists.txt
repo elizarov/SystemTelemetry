@@ -183,6 +183,7 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_menu_format.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
@@ -543,6 +544,7 @@ target_link_options(CaseDash PRIVATE
 
 target_link_libraries(CaseDash PRIVATE
     user32
+    dwmapi
     gdi32
     d3d11
     d2d1
@@ -653,6 +655,7 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
@@ -752,7 +755,9 @@ target_link_options(CaseDashTests PRIVATE
 target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
+    dwmapi
     gdi32
+    advapi32
     d3d11
     d2d1
     dwrite
