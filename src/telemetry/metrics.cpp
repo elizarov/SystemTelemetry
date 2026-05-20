@@ -6,6 +6,7 @@
 #include <string_view>
 #include <utility>
 
+#include "config/config_telemetry.h"
 #include "telemetry/timing.h"
 #include "util/numeric_safety.h"
 #include "util/text_format.h"

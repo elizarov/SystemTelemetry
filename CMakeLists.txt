@@ -113,9 +113,44 @@ add_custom_target(CaseDashGeneratedResources DEPENDS
     "${CASEDASH_RESOURCE_STRING_HEADER}"
 )
 
+set(CASEDASH_CONFIG_META_DIR "${CASEDASH_GENERATED_DIR}/config")
+set(CASEDASH_CONFIG_META_CPP "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.cpp")
+set(CASEDASH_CONFIG_META_JSON "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.json")
+set(CASEDASH_LAYOUT_EDIT_META_CPP "${CASEDASH_GENERATED_DIR}/layout_model/layout_edit_parameter_metadata.generated.cpp")
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_CONFIG_META_CPP}"
+        "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+        "${CASEDASH_CONFIG_META_JSON}"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
+        --descriptor "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        --primitives "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
+        --layout-edit-parameters "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
+        --resource-config "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        --output-cpp "${CASEDASH_CONFIG_META_CPP}"
+        --output-layout-edit-cpp "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+        --output-json "${CASEDASH_CONFIG_META_JSON}"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
+        "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
+        "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+    VERBATIM
+)
+add_custom_target(CaseDashGeneratedConfigMeta DEPENDS
+    "${CASEDASH_CONFIG_META_CPP}"
+    "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+    "${CASEDASH_CONFIG_META_JSON}"
+)
+
 add_executable(CaseDash WIN32
     resources/CaseDash.rc
     ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_VERSION_RC}
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
@@ -175,7 +210,8 @@ add_executable(CaseDash WIN32
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -276,7 +312,8 @@ set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION
 )
 
 set(casedash_release_speed_sources
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/config_resolution.cpp
     src/config/metric_catalog.cpp
     src/dashboard/dashboard_app.cpp
@@ -467,7 +504,7 @@ target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDash CaseDashGeneratedResources)
+add_dependencies(CaseDash CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 
 target_compile_definitions(CaseDash PRIVATE
     UNICODE
@@ -555,6 +592,8 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(CaseDashTests
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     tests/app_icon_renderer_tests.cpp
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
@@ -574,6 +613,7 @@ add_executable(CaseDashTests
     tests/layout_edit_tooltip_tests.cpp
     tests/layout_guide_sheet_planner_tests.cpp
     tests/localization_catalog_tests.cpp
+    tests/config_meta_tests.cpp
     tests/config_parser_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
@@ -585,7 +625,8 @@ add_executable(CaseDashTests
     tests/animation_timeline_tests.cpp
     tests/throughput_chart_widget_tests.cpp
     tests/render_thread_tests.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -686,7 +727,7 @@ target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/resources"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDashTests CaseDashGeneratedResources)
+add_dependencies(CaseDashTests CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashTests PRIVATE
     UNICODE
     _UNICODE
@@ -736,6 +777,8 @@ add_test(NAME CaseDashTests COMMAND CaseDashTests)
 add_executable(CaseDashBenchmarks
     resources/CaseDash.rc
     ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_BENCHMARKS_VERSION_RC}
     tests/benchmarks.cpp
     src/util/strings.cpp
@@ -743,7 +786,8 @@ add_executable(CaseDashBenchmarks
     src/util/text_format.cpp
     src/util/win32_format.cpp
     src/util/scale.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -878,7 +922,7 @@ target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources)
+add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashBenchmarks PRIVATE
     UNICODE
     _UNICODE

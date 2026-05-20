@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 
 namespace {
 
@@ -23,7 +24,7 @@ LayoutSectionConfig MakeNamedLayout(const std::string& name, int width, int heig
     layout.name = name;
     layout.window.width = width;
     layout.window.height = height;
-    layout.cardsLayout.name = rootName;
+    layout.cards.name = rootName;
     return layout;
 }
 
@@ -98,14 +99,14 @@ TEST(ConfigResolution, SelectsRequestedLayoutAndFallsBackToFirstLayout) {
     EXPECT_EQ(config.display.layout, "secondary");
     EXPECT_EQ(config.layout.structure.window.width, 1024);
     EXPECT_EQ(config.layout.structure.window.height, 600);
-    EXPECT_EQ(config.layout.structure.cardsLayout.name, "columns");
+    EXPECT_EQ(config.layout.structure.cards.name, "columns");
 
     config.display.layout.clear();
     ASSERT_TRUE(SelectResolvedLayout(config, "missing"));
     EXPECT_EQ(config.display.layout, "primary");
     EXPECT_EQ(config.layout.structure.window.width, 800);
     EXPECT_EQ(config.layout.structure.window.height, 480);
-    EXPECT_EQ(config.layout.structure.cardsLayout.name, "rows");
+    EXPECT_EQ(config.layout.structure.cards.name, "rows");
 }
 
 TEST(ConfigResolution, ExtractTelemetrySettingsIncludesOnlyBoardAndSelectionInputs) {

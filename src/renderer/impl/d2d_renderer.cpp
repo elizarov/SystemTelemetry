@@ -264,7 +264,7 @@ int GetPanelIconAtlasSlot(std::string_view iconName) {
     return -1;
 }
 
-UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style) {
+UiFontConfig FontConfigForStyle(const FontsConfig& fonts, TextStyleId style) {
     switch (style) {
         case TextStyleId::Title:
             return fonts.title;

@@ -144,8 +144,8 @@ TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForCardLayout) {
 TEST(LayoutEditTooltip, BuildsMetricListOrderTooltipLineForDashboardLayout) {
     AppConfig config;
     config.display.layout = "main";
-    config.layout.structure.cardsLayout.name = "metric_list";
-    config.layout.structure.cardsLayout.parameter = "network.upload,network.download";
+    config.layout.structure.cards.name = "metric_list";
+    config.layout.structure.cards.parameter = "network.upload,network.download";
 
     const auto line = BuildMetricListOrderTooltipLine(
         config, LayoutNodeFieldEditKey{"", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 0);
@@ -188,9 +188,9 @@ TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
 TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) {
     AppConfig config;
     config.display.layout = "main";
-    config.layout.structure.cardsLayout.name = "columns";
-    config.layout.structure.cardsLayout.children.push_back(LayoutNodeConfig{.name = "cpu"});
-    config.layout.structure.cardsLayout.children.push_back(LayoutNodeConfig{.name = "gpu"});
+    config.layout.structure.cards.name = "columns";
+    config.layout.structure.cards.children.push_back(LayoutNodeConfig{.name = "cpu"});
+    config.layout.structure.cards.children.push_back(LayoutNodeConfig{.name = "gpu"});
 
     const auto line = BuildContainerChildOrderTooltipLine(config, LayoutContainerChildOrderEditKey{"", {}});
 
@@ -198,7 +198,7 @@ TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) 
     EXPECT_EQ(*line, "[layout.main] cards = columns(cpu, gpu)");
 }
 
-TEST(LayoutEditParameter, UsesReflectedFieldMetadataNames) {
+TEST(LayoutEditParameter, UsesGeneratedFieldMetadataNames) {
     const auto& gaugeField = GetLayoutEditConfigFieldMetadata(LayoutEditParameter::GaugeSegmentCount);
     EXPECT_STREQ(gaugeField.sectionName, "gauge");
     EXPECT_STREQ(gaugeField.parameterName, "segment_count");

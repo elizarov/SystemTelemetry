@@ -1,6 +1,6 @@
 #include "dashboard_renderer/impl/metric_lookup_cache.h"
 
-#include "config/config.h"
+#include "config/config_telemetry.h"
 #include "telemetry/metrics.h"
 #include "util/strings.h"
 

@@ -1,6 +1,7 @@
 #include "layout_edit/layout_edit_tree.h"
 
 #include "config/config_parser.h"
+#include "config/config_telemetry.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
@@ -245,7 +246,7 @@ void CollectReachableCardLayoutCards(const LayoutConfig& layout,
 std::vector<std::string> CollectReachableCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
     std::vector<std::string> recursionStack;
-    CollectReachableDashboardCards(config.layout, config.layout.structure.cardsLayout, orderedCards, recursionStack);
+    CollectReachableDashboardCards(config.layout, config.layout.structure.cards, orderedCards, recursionStack);
     return orderedCards;
 }
 
@@ -263,7 +264,7 @@ void CollectTopLevelCardsFromNode(const LayoutNodeConfig& node, std::vector<std:
 
 std::vector<std::string> CollectTopLevelCards(const AppConfig& config) {
     std::vector<std::string> orderedCards;
-    CollectTopLevelCardsFromNode(config.layout.structure.cardsLayout, orderedCards);
+    CollectTopLevelCardsFromNode(config.layout.structure.cards, orderedCards);
     return orderedCards;
 }
 
@@ -506,12 +507,8 @@ bool BuildActiveLayoutSectionNode(const AppConfig& config, LayoutEditTreeNode& s
     sectionNode.initiallyExpanded = true;
     sectionNode.selectionHighlight.emplace(LayoutEditSelectionHighlightSpecial::DashboardBounds);
     LayoutEditTreeNode groupNode;
-    if (BuildStructureGroup(sectionNode.label,
-            "cards",
-            "",
-            sectionNode.selectionHighlight,
-            config.layout.structure.cardsLayout,
-            groupNode)) {
+    if (BuildStructureGroup(
+            sectionNode.label, "cards", "", sectionNode.selectionHighlight, config.layout.structure.cards, groupNode)) {
         sectionNode.children.push_back(std::move(groupNode));
     }
     return true;

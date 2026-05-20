@@ -442,19 +442,19 @@ TEST(LayoutEditDialog, HasDescriptorHandlersForNodeFieldEditors) {
 TEST(LayoutEditService, AppliesNodeFieldPreviewToDashboardAndActiveNamedLayout) {
     AppConfig config;
     config.display.layout = "main";
-    config.layout.structure.cardsLayout.name = "rows";
-    config.layout.structure.cardsLayout.children.push_back(MakeNode("metric_list", "cpu.load"));
+    config.layout.structure.cards.name = "rows";
+    config.layout.structure.cards.children.push_back(MakeNode("metric_list", "cpu.load"));
     LayoutSectionConfig named;
     named.name = "main";
-    named.cardsLayout.name = "rows";
-    named.cardsLayout.children.push_back(MakeNode("metric_list", "cpu.load"));
+    named.cards.name = "rows";
+    named.cards.children.push_back(MakeNode("metric_list", "cpu.load"));
     config.layout.layouts.push_back(named);
 
     const LayoutEditFocusKey key = LayoutNodeFieldEditKey{"", {0}, WidgetClass::MetricList, LayoutNodeField::Parameter};
 
     ASSERT_TRUE(ApplyLayoutEditValue(config, key, LayoutEditValue{std::vector<std::string>{"cpu.ram", "gpu.vram"}}));
-    EXPECT_EQ(config.layout.structure.cardsLayout.children[0].parameter, "cpu.ram,gpu.vram");
-    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[0].parameter, "cpu.ram,gpu.vram");
+    EXPECT_EQ(config.layout.structure.cards.children[0].parameter, "cpu.ram,gpu.vram");
+    EXPECT_EQ(config.layout.layouts[0].cards.children[0].parameter, "cpu.ram,gpu.vram");
 }
 
 TEST(LayoutEditService, AppliesNodeFieldPreviewToCardLayout) {

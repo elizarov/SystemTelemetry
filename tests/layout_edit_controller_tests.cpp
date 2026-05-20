@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "config/config.h"
 #include "layout_edit/layout_edit_controller.h"
 
 namespace {
@@ -15,8 +16,8 @@ struct ContainerOrderCall {
 class TestLayoutEditHost : public LayoutEditHost {
 public:
     TestLayoutEditHost() {
-        config_.layout.structure.cardsLayout.name = "rows";
-        config_.layout.structure.cardsLayout.children = {LayoutNodeConfig{.name = "card", .cardReference = true},
+        config_.layout.structure.cards.name = "rows";
+        config_.layout.structure.cards.children = {LayoutNodeConfig{.name = "card", .cardReference = true},
             LayoutNodeConfig{.name = "card", .cardReference = true}};
     }
 

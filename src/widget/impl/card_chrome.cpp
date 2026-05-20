@@ -36,7 +36,7 @@ void CardChromeWidget::ResolveLayoutState(const WidgetHost& renderer, const Rend
 void CardChromeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource&) const {
     const int radius = (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardRadius));
     const float borderWidth = static_cast<float>(
-        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth)));
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorder)));
 
     renderer.Renderer().FillSolidRoundedRect(widget.rect, radius, RenderColorId::PanelFill);
     renderer.Renderer().DrawSolidRoundedRect(
@@ -144,7 +144,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         .targetOutline = LayoutEditTargetOutline::Hidden});
 
     const int borderScaled =
-        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorderWidth));
+        (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.cardStyle.cardBorder));
     const int borderAnchorPadding = (std::max)(1, renderer.Renderer().ScaleLogical(1));
     const int borderCenterX = widget.rect.left + (std::max)(0, (widget.rect.right - widget.rect.left) / 2);
     const int borderCenterY = widget.rect.top;
@@ -152,7 +152,7 @@ void CardChromeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayo
         .key = LayoutEditAnchorKey{cardIdentity, WidgetHost::LayoutEditParameter::CardBorder, 0},
         .anchorRect = MakeCircleAnchorRect(borderCenterX, borderCenterY, borderScaled, borderAnchorPadding),
         .shape = AnchorShape::Circle,
-        .value = renderer.Config().layout.cardStyle.cardBorderWidth,
+        .value = renderer.Config().layout.cardStyle.cardBorder,
         .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{borderCenterX, borderCenterY}, 2.0),
         .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
         .targetOutline = LayoutEditTargetOutline::Hidden});

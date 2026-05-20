@@ -1047,7 +1047,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         renderer.WindowHeight() - renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin)};
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
 
-    if (renderer.config_.layout.structure.cardsLayout.name.empty()) {
+    if (renderer.config_.layout.structure.cards.name.empty()) {
         renderer.lastError_ = "layout_missing_cards_root";
         return false;
     }
@@ -1060,7 +1060,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             dashboardRect.top,
             dashboardRect.right,
             dashboardRect.bottom,
-            renderer.config_.layout.structure.cardsLayout.name.c_str());
+            renderer.config_.layout.structure.cards.name.c_str());
     }
 
     if (includeWidgetState && !renderer.layoutGuideDragActive_) {
@@ -1215,11 +1215,11 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
 
     std::vector<LayoutEditOverlayOwner> overlayOwners;
     resolveDashboardNode(
-        resolveDashboardNode, renderer.config_.layout.structure.cardsLayout, dashboardRect, {}, overlayOwners);
+        resolveDashboardNode, renderer.config_.layout.structure.cards, dashboardRect, {}, overlayOwners);
 
     if (resolvedLayout_.cards.empty()) {
         renderer.lastError_ = FormatText(
-            "layout_resolve_failed cards=0 root=\"%s\"", renderer.config_.layout.structure.cardsLayout.name.c_str());
+            "layout_resolve_failed cards=0 root=\"%s\"", renderer.config_.layout.structure.cards.name.c_str());
         return false;
     }
 

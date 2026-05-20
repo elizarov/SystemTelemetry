@@ -1,167 +1,157 @@
 #include "config/config_writer.h"
 
-#include <type_traits>
-
 #include "config/config_file_io.h"
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
+#include "config/config_telemetry.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 
 namespace {
 
-template <typename Codec, typename Owner> struct CustomSectionHandler {
-    template <typename UpdateKeyFn> static void Save(const Owner&, UpdateKeyFn&&) {}
+std::string RuntimeSectionName(const RuntimeConfigSectionDescriptor& section) {
+    return FormatText("[%.*s]", static_cast<int>(section.nameLength), section.name);
+}
 
-    template <typename UpdateKeyFn> static void SaveDifferences(const Owner&, const Owner*, UpdateKeyFn&&) {}
-};
+std::string RuntimeDynamicSectionName(const RuntimeConfigSectionDescriptor& section, std::string_view suffix) {
+    return FormatText("[%.*s%.*s]",
+        static_cast<int>(section.nameLength),
+        section.name,
+        static_cast<int>(suffix.size()),
+        suffix.data());
+}
 
-template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardConfig> {
-    template <typename UpdateKeyFn> static void Save(const BoardConfig& board, UpdateKeyFn&& updateKey) {
-        for (const std::string& logicalName : board.requestedTemperatureNames) {
-            const auto it = board.temperatureSensorNames.find(logicalName);
-            const std::string sensorName =
-                it != board.temperatureSensorNames.end() && !it->second.empty() ? it->second : logicalName;
-            updateKey("[board]", FormatText("board.temp.%s", logicalName.c_str()), sensorName);
+template <typename UpdateKeyFn>
+void SaveBoardSectionDifferences(
+    const BoardConfig& board, const BoardConfig* compareBoard, const std::string& sectionName, UpdateKeyFn& updateKey) {
+    const auto saveBoardKey =
+        [&](const std::string& key, const std::string& currentValue, const std::string& compareValue) {
+            if (compareBoard == nullptr || currentValue != compareValue) {
+                updateKey(sectionName, key, currentValue);
+            }
+        };
+
+    for (const std::string& logicalName : board.requestedTemperatureNames) {
+        const auto currentIt = board.temperatureSensorNames.find(logicalName);
+        const std::string currentValue = currentIt != board.temperatureSensorNames.end() && !currentIt->second.empty()
+                                             ? currentIt->second
+                                             : logicalName;
+
+        std::string compareValue = logicalName;
+        if (compareBoard != nullptr) {
+            const auto compareIt = compareBoard->temperatureSensorNames.find(logicalName);
+            if (compareIt != compareBoard->temperatureSensorNames.end() && !compareIt->second.empty()) {
+                compareValue = compareIt->second;
+            }
         }
-        for (const std::string& logicalName : board.requestedFanNames) {
-            const auto it = board.fanSensorNames.find(logicalName);
-            const std::string sensorName =
-                it != board.fanSensorNames.end() && !it->second.empty() ? it->second : logicalName;
-            updateKey("[board]", FormatText("board.fan.%s", logicalName.c_str()), sensorName);
-        }
+        saveBoardKey(FormatText("board.temp.%s", logicalName.c_str()), currentValue, compareValue);
     }
 
-    template <typename UpdateKeyFn>
-    static void SaveDifferences(const BoardConfig& board, const BoardConfig* compareBoard, UpdateKeyFn&& updateKey) {
-        const auto saveBoardKey =
-            [&](const std::string& key, const std::string& currentValue, const std::string& compareValue) {
-                if (compareBoard == nullptr || currentValue != compareValue) {
-                    updateKey("[board]", key, currentValue);
-                }
-            };
+    for (const std::string& logicalName : board.requestedFanNames) {
+        const auto currentIt = board.fanSensorNames.find(logicalName);
+        const std::string currentValue =
+            currentIt != board.fanSensorNames.end() && !currentIt->second.empty() ? currentIt->second : logicalName;
 
-        for (const std::string& logicalName : board.requestedTemperatureNames) {
-            const auto currentIt = board.temperatureSensorNames.find(logicalName);
-            const std::string currentValue =
-                currentIt != board.temperatureSensorNames.end() && !currentIt->second.empty() ? currentIt->second
-                                                                                              : logicalName;
-
-            std::string compareValue = logicalName;
-            if (compareBoard != nullptr) {
-                const auto compareIt = compareBoard->temperatureSensorNames.find(logicalName);
-                if (compareIt != compareBoard->temperatureSensorNames.end() && !compareIt->second.empty()) {
-                    compareValue = compareIt->second;
-                }
-            }
-            saveBoardKey(FormatText("board.temp.%s", logicalName.c_str()), currentValue, compareValue);
-        }
-
-        for (const std::string& logicalName : board.requestedFanNames) {
-            const auto currentIt = board.fanSensorNames.find(logicalName);
-            const std::string currentValue =
-                currentIt != board.fanSensorNames.end() && !currentIt->second.empty() ? currentIt->second : logicalName;
-
-            std::string compareValue = logicalName;
-            if (compareBoard != nullptr) {
-                const auto compareIt = compareBoard->fanSensorNames.find(logicalName);
-                if (compareIt != compareBoard->fanSensorNames.end() && !compareIt->second.empty()) {
-                    compareValue = compareIt->second;
-                }
-            }
-            saveBoardKey(FormatText("board.fan.%s", logicalName.c_str()), currentValue, compareValue);
-        }
-    }
-};
-
-template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
-    template <typename UpdateKeyFn> static void Save(const MetricsSectionConfig& metrics, UpdateKeyFn&& updateKey) {
-        for (const auto& definition : metrics.definitions) {
-            if (definition.id.empty() || IsRuntimePlaceholderMetricId(definition.id)) {
-                continue;
-            }
-            updateKey("[metrics]", definition.id, FormatMetricDefinitionValue(definition));
-        }
-    }
-
-    template <typename UpdateKeyFn>
-    static void SaveDifferences(
-        const MetricsSectionConfig& metrics, const MetricsSectionConfig* compareMetrics, UpdateKeyFn&& updateKey) {
-        for (const auto& definition : metrics.definitions) {
-            if (definition.id.empty() || IsRuntimePlaceholderMetricId(definition.id)) {
-                continue;
-            }
-            const MetricDefinitionConfig* compareDefinition =
-                compareMetrics != nullptr ? FindMetricDefinition(*compareMetrics, definition.id) : nullptr;
-            const std::string currentValue = FormatMetricDefinitionValue(definition);
-            const std::string compareValue =
-                compareDefinition != nullptr ? FormatMetricDefinitionValue(*compareDefinition) : std::string{};
-            if (compareDefinition == nullptr || currentValue != compareValue) {
-                updateKey("[metrics]", definition.id, currentValue);
+        std::string compareValue = logicalName;
+        if (compareBoard != nullptr) {
+            const auto compareIt = compareBoard->fanSensorNames.find(logicalName);
+            if (compareIt != compareBoard->fanSensorNames.end() && !compareIt->second.empty()) {
+                compareValue = compareIt->second;
             }
         }
-    }
-};
-
-template <typename Section, typename CompareOwner, typename UpdateKeyFn>
-void SaveStructuredSectionDifferences(
-    const typename Section::owner_type& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
-    if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
-        const std::string sectionName =
-            FormatText("[%.*s]", static_cast<int>(Section::name.view().size()), Section::name.view().data());
-        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-            if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
-                updateKey(
-                    sectionName, std::string(field.key, field.keyLength), EncodeRuntimeConfigField(field, &owner));
-            }
-        }
-    } else {
-        CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::SaveDifferences(
-            owner, compareOwner, std::forward<UpdateKeyFn>(updateKey));
+        saveBoardKey(FormatText("board.fan.%s", logicalName.c_str()), currentValue, compareValue);
     }
 }
 
-template <typename Section, typename CompareOwner, typename UpdateKeyFn>
-void SaveDynamicStructuredSectionDifferences(const typename Section::owner_type& owner,
-    std::string_view suffix,
-    const CompareOwner* compareOwner,
-    UpdateKeyFn&& updateKey) {
-    const std::string sectionName = Section::FormatName(suffix);
-    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
-        if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, &owner, compareOwner)) {
-            updateKey(sectionName, std::string(field.key, field.keyLength), EncodeRuntimeConfigField(field, &owner));
+template <typename UpdateKeyFn>
+void SaveMetricsSectionDifferences(const MetricsSectionConfig& metrics,
+    const MetricsSectionConfig* compareMetrics,
+    const std::string& sectionName,
+    UpdateKeyFn& updateKey) {
+    for (const auto& definition : metrics.definitions) {
+        if (definition.id.empty() || IsRuntimePlaceholderMetricId(definition.id)) {
+            continue;
+        }
+        const MetricDefinitionConfig* compareDefinition =
+            compareMetrics != nullptr ? FindMetricDefinition(*compareMetrics, definition.id) : nullptr;
+        const std::string currentValue = FormatMetricDefinitionValue(definition);
+        const std::string compareValue =
+            compareDefinition != nullptr ? FormatMetricDefinitionValue(*compareDefinition) : std::string{};
+        if (compareDefinition == nullptr || currentValue != compareValue) {
+            updateKey(sectionName, definition.id, currentValue);
         }
     }
 }
 
-template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
-    BindingList::ForEach([&](auto binding) { fn(std::remove_cvref_t<decltype(binding)>{}, owner); });
+template <typename UpdateKeyFn>
+void SaveStructuredSectionDifferences(const RuntimeConfigSectionDescriptor& section,
+    const void* owner,
+    const void* compareOwner,
+    const std::string& sectionName,
+    UpdateKeyFn& updateKey) {
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFields(section)) {
+        if (compareOwner == nullptr || !RuntimeConfigFieldEquals(field, owner, compareOwner)) {
+            updateKey(sectionName, std::string(field.key, field.keyLength), EncodeRuntimeConfigField(field, owner));
+        }
+    }
 }
 
-template <typename BindingList, typename Owner, typename CompareOwner, typename UpdateKeyFn>
-void SaveKnownSectionDifferences(const Owner& owner, const CompareOwner* compareOwner, UpdateKeyFn&& updateKey) {
-    ForEachKnownBinding<BindingList>(owner, [&](auto binding, const auto& currentOwner) {
-        using Binding = decltype(binding);
-        if constexpr (Binding::is_recursive) {
-            const typename Binding::nested_owner_type* compareNestedOwner =
-                compareOwner != nullptr ? &Binding::Get(*compareOwner) : nullptr;
-            SaveKnownSectionDifferences<typename Binding::nested_owner_type::BindingList>(
-                Binding::Get(currentOwner), compareNestedOwner, updateKey);
-        } else if constexpr (Binding::is_dynamic) {
-            using Section = typename Binding::section_type;
-            for (const auto& item : Binding::Get(currentOwner)) {
-                const typename Binding::item_type* compareItem =
-                    compareOwner != nullptr ? Binding::Find(*compareOwner, Binding::Key(item)) : nullptr;
-                SaveDynamicStructuredSectionDifferences<Section>(item, Binding::Key(item), compareItem, updateKey);
-            }
+template <typename UpdateKeyFn>
+void SaveSectionDifferences(const RuntimeConfigSectionDescriptor& section,
+    const void* owner,
+    const void* compareOwner,
+    const std::string& sectionName,
+    UpdateKeyFn& updateKey) {
+    switch (section.codec) {
+        case RuntimeConfigSectionCodec::Structured:
+            SaveStructuredSectionDifferences(section, owner, compareOwner, sectionName, updateKey);
+            break;
+        case RuntimeConfigSectionCodec::Board:
+            SaveBoardSectionDifferences(*reinterpret_cast<const BoardConfig*>(owner),
+                reinterpret_cast<const BoardConfig*>(compareOwner),
+                sectionName,
+                updateKey);
+            break;
+        case RuntimeConfigSectionCodec::Metrics:
+            SaveMetricsSectionDifferences(*reinterpret_cast<const MetricsSectionConfig*>(owner),
+                reinterpret_cast<const MetricsSectionConfig*>(compareOwner),
+                sectionName,
+                updateKey);
+            break;
+    }
+}
+
+template <typename UpdateKeyFn> struct DynamicSectionSaveContext {
+    const RuntimeConfigSectionDescriptor* section = nullptr;
+    const AppConfig* compareConfig = nullptr;
+    UpdateKeyFn* updateKey = nullptr;
+};
+
+template <typename UpdateKeyFn> void SaveDynamicSectionItem(void* context, std::string_view suffix, const void* item) {
+    auto& saveContext = *reinterpret_cast<DynamicSectionSaveContext<UpdateKeyFn>*>(context);
+    const void* compareItem = saveContext.compareConfig != nullptr
+                                  ? saveContext.section->dynamic.find(*saveContext.compareConfig, suffix)
+                                  : nullptr;
+    SaveSectionDifferences(*saveContext.section,
+        item,
+        compareItem,
+        RuntimeDynamicSectionName(*saveContext.section, suffix),
+        *saveContext.updateKey);
+}
+
+template <typename UpdateKeyFn>
+void SaveKnownSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn& updateKey) {
+    for (const RuntimeConfigSectionDescriptor& section : RuntimeConfigSectionDescriptors()) {
+        if (section.kind == RuntimeConfigSectionKind::Dynamic) {
+            DynamicSectionSaveContext<UpdateKeyFn> context{&section, compareConfig, &updateKey};
+            section.dynamic.forEach(config, &context, SaveDynamicSectionItem<UpdateKeyFn>);
         } else {
-            using CurrentSection = typename Binding::section_type;
-            using CurrentOwner = typename CurrentSection::owner_type;
-            const CurrentOwner* compareSectionOwner = compareOwner != nullptr ? &Binding::Get(*compareOwner) : nullptr;
-            SaveStructuredSectionDifferences<CurrentSection>(
-                Binding::Get(currentOwner), compareSectionOwner, updateKey);
+            const void* owner = reinterpret_cast<const char*>(&config) + section.rootOffset;
+            const void* compareOwner =
+                compareConfig != nullptr ? reinterpret_cast<const char*>(compareConfig) + section.rootOffset : nullptr;
+            SaveSectionDifferences(section, owner, compareOwner, RuntimeSectionName(section), updateKey);
         }
-    });
+    }
 }
 
 void ReplaceOrAppendKey(std::vector<std::string>& lines,
@@ -232,8 +222,8 @@ void RemoveLeadingEmptyLines(std::vector<std::string>& lines) {
 
 template <typename UpdateKeyFn>
 void SaveKnownStructuredSectionDifferences(
-    const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn&& updateKey) {
-    SaveKnownSectionDifferences<AppConfig::BindingList>(config, compareConfig, updateKey);
+    const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn& updateKey) {
+    SaveKnownSectionDifferences(config, compareConfig, updateKey);
 }
 
 }  // namespace
@@ -344,7 +334,7 @@ std::string BuildSavedConfigText(
 }
 
 bool LayoutConfigHasDifferences(const LayoutConfig& config, const LayoutConfig& compareConfig) {
-    if (config.structure != compareConfig.structure || config.cardsLayout != compareConfig.cardsLayout) {
+    if (config.structure != compareConfig.structure) {
         return true;
     }
     AppConfig current;

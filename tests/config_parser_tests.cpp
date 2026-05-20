@@ -4,6 +4,7 @@
 #include "config/color_expression.h"
 #include "config/color_math.h"
 #include "config/config_parser.h"
+#include "config/config_telemetry.h"
 #include "telemetry/metrics.h"
 
 namespace {
@@ -248,7 +249,7 @@ TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
     RemoveFileIfExists(path);
 }
 
-TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
+TEST(ConfigParser, ParsesNamedLayoutSectionsThroughGeneratedSectionTable) {
     const FilePath path = WriteTestConfig("[display]\n"
                                           "layout = portrait\n"
                                           "\n"
@@ -264,15 +265,15 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughReflectedDynamicBindings) {
     EXPECT_EQ(config.layout.layouts[0].description, "Portrait Mode");
     EXPECT_EQ(config.layout.layouts[0].window.width, 480);
     EXPECT_EQ(config.layout.layouts[0].window.height, 800);
-    EXPECT_EQ(config.layout.layouts[0].cardsLayout.name, "columns");
-    ASSERT_EQ(config.layout.layouts[0].cardsLayout.children.size(), 2u);
-    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[0].name, "cpu");
-    EXPECT_EQ(config.layout.layouts[0].cardsLayout.children[1].name, "gpu");
+    EXPECT_EQ(config.layout.layouts[0].cards.name, "columns");
+    ASSERT_EQ(config.layout.layouts[0].cards.children.size(), 2u);
+    EXPECT_EQ(config.layout.layouts[0].cards.children[0].name, "cpu");
+    EXPECT_EQ(config.layout.layouts[0].cards.children[1].name, "gpu");
 
     RemoveFileIfExists(path);
 }
 
-TEST(ConfigParser, ParsesNamedThemeSectionsThroughReflectedDynamicBindings) {
+TEST(ConfigParser, ParsesNamedThemeSectionsThroughGeneratedSectionTable) {
     const FilePath path = WriteTestConfig("[display]\n"
                                           "theme = dusk\n"
                                           "\n"

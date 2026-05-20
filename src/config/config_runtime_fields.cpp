@@ -1,13 +1,11 @@
 #include "config/config_runtime_fields.h"
 
 #include <algorithm>
-#include <array>
 #include <cctype>
 #include <cerrno>
 #include <climits>
 #include <cstddef>
 #include <cstdlib>
-#include <type_traits>
 
 #include "config/color_format.h"
 #include "config/config_parser.h"
@@ -107,65 +105,6 @@ std::string FormatLogicalSize(const LogicalSizeConfig& size) {
 std::string FormatFontSpec(const UiFontConfig& font) {
     return FormatText("%s,%d,%d", font.face.c_str(), font.size, font.weight);
 }
-
-template <typename Value> consteval RuntimeConfigFieldValueKind RuntimeFieldValueKindFor() {
-    if constexpr (std::is_same_v<Value, int>) {
-        return RuntimeConfigFieldValueKind::Int;
-    } else if constexpr (std::is_same_v<Value, double>) {
-        return RuntimeConfigFieldValueKind::Double;
-    } else if constexpr (std::is_same_v<Value, std::string>) {
-        return RuntimeConfigFieldValueKind::String;
-    } else if constexpr (std::is_same_v<Value, std::vector<std::string>>) {
-        return RuntimeConfigFieldValueKind::StringList;
-    } else if constexpr (std::is_same_v<Value, LogicalPointConfig>) {
-        return RuntimeConfigFieldValueKind::LogicalPoint;
-    } else if constexpr (std::is_same_v<Value, LogicalSizeConfig>) {
-        return RuntimeConfigFieldValueKind::LogicalSize;
-    } else if constexpr (std::is_same_v<Value, ColorConfig>) {
-        return RuntimeConfigFieldValueKind::HexColor;
-    } else if constexpr (std::is_same_v<Value, UiFontConfig>) {
-        return RuntimeConfigFieldValueKind::FontSpec;
-    } else if constexpr (std::is_same_v<Value, LayoutNodeConfig>) {
-        return RuntimeConfigFieldValueKind::LayoutExpression;
-    }
-}
-
-template <typename Policy> consteval RuntimeConfigFieldPolicy RuntimeFieldPolicyFor() {
-    if constexpr (std::is_same_v<Policy, configschema::PositiveIntPolicy>) {
-        return RuntimeConfigFieldPolicy::PositiveInt;
-    } else if constexpr (std::is_same_v<Policy, configschema::NonNegativeIntPolicy>) {
-        return RuntimeConfigFieldPolicy::NonNegativeInt;
-    } else if constexpr (std::is_same_v<Policy, configschema::FontSizePolicy>) {
-        return RuntimeConfigFieldPolicy::FontSize;
-    } else if constexpr (std::is_same_v<Policy, configschema::DegreesPolicy>) {
-        return RuntimeConfigFieldPolicy::Degrees;
-    } else {
-        return RuntimeConfigFieldPolicy::None;
-    }
-}
-
-template <typename Field> consteval std::uint32_t RuntimeFieldOffset() {
-    return static_cast<std::uint32_t>(configschema::ReflectedFieldOffset<Field>());
-}
-
-template <typename Field> consteval RuntimeConfigFieldDescriptor MakeRuntimeFieldDescriptor() {
-    using Policy = typename Field::layout_edit_traits_type::policy_tag;
-    static_assert(Field::key.view().size() <= UCHAR_MAX, "Runtime config field keys must fit descriptor byte length.");
-    return RuntimeConfigFieldDescriptor{Field::key.value,
-        RuntimeFieldOffset<Field>(),
-        static_cast<std::uint8_t>(Field::key.view().size()),
-        RuntimeFieldValueKindFor<typename Field::field_type>(),
-        RuntimeFieldPolicyFor<Policy>()};
-}
-
-template <typename... Field> consteval auto MakeRuntimeFieldDescriptors(std::tuple<Field...>) {
-    return std::array<RuntimeConfigFieldDescriptor, sizeof...(Field)>{MakeRuntimeFieldDescriptor<Field>()...};
-}
-
-template <typename Section> struct RuntimeConfigFieldDescriptorTable {
-    using Fields = decltype(MakeRuntimeFieldDescriptors(typename Section::fields_type{}));
-    static constexpr Fields fields = MakeRuntimeFieldDescriptors(typename Section::fields_type{});
-};
 
 char* FieldAddress(void* owner, const RuntimeConfigFieldDescriptor& field) {
     return static_cast<char*>(owner) + field.offset;
@@ -304,6 +243,39 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
     return false;
 }
 
+std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFields(const RuntimeConfigSectionDescriptor& section) {
+    return std::span<const RuntimeConfigFieldDescriptor>(section.fields, section.fieldCount);
+}
+
+const RuntimeConfigSectionDescriptor* FindRuntimeConfigSectionByName(std::string_view sectionName) {
+    for (const RuntimeConfigSectionDescriptor& section : RuntimeConfigSectionDescriptors()) {
+        if (section.kind != RuntimeConfigSectionKind::Dynamic &&
+            std::string_view(section.name, section.nameLength) == sectionName) {
+            return &section;
+        }
+    }
+    return nullptr;
+}
+
+const RuntimeConfigSectionDescriptor* FindRuntimeConfigDynamicSection(std::string_view sectionName) {
+    for (const RuntimeConfigSectionDescriptor& section : RuntimeConfigSectionDescriptors()) {
+        if (section.kind == RuntimeConfigSectionKind::Dynamic) {
+            const std::string_view prefix(section.name, section.nameLength);
+            if (sectionName.rfind(prefix, 0) == 0) {
+                return &section;
+            }
+        }
+    }
+    return nullptr;
+}
+
+const RuntimeConfigSectionDescriptor* FindRuntimeConfigSection(std::string_view sectionName) {
+    if (const RuntimeConfigSectionDescriptor* section = FindRuntimeConfigSectionByName(sectionName)) {
+        return section;
+    }
+    return FindRuntimeConfigDynamicSection(sectionName);
+}
+
 std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     std::string text = node.name;
     if (node.weight != 1) {
@@ -323,12 +295,3 @@ std::string FormatLayoutExpression(const LayoutNodeConfig& node) {
     }
     return text;
 }
-
-#define CASEDASH_DEFINE_RUNTIME_FIELDS(section_type)                                                                   \
-    template <> std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFieldDescriptors<section_type>() {          \
-        return RuntimeConfigFieldDescriptorTable<section_type>::fields;                                                \
-    }
-
-CASEDASH_CONFIG_FIELD_SECTIONS(CASEDASH_DEFINE_RUNTIME_FIELDS)
-
-#undef CASEDASH_DEFINE_RUNTIME_FIELDS

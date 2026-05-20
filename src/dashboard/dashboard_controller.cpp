@@ -7,6 +7,7 @@
 #include "config/color_resolver.h"
 #include "config/config_io.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 #include "config/config_writer.h"
 #include "dashboard/autostart.h"
 #include "diagnostics/constants.h"
@@ -113,7 +114,7 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
 
-void AssignCommonFontFamily(UiFontSetConfig& fonts, const std::string& family) {
+void AssignCommonFontFamily(FontsConfig& fonts, const std::string& family) {
     fonts.title.face = family;
     fonts.big.face = family;
     fonts.value.face = family;
@@ -723,7 +724,7 @@ bool DashboardController::ApplyLayoutEditFontFamily(DashboardShellHost& shell, c
     return FinishConfigMutation(shell, false);
 }
 
-bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const UiFontSetConfig& fonts) {
+bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const FontsConfig& fonts) {
     state_.config.layout.fonts = fonts;
     return FinishConfigMutation(shell, false);
 }

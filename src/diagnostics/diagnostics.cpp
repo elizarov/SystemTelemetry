@@ -15,6 +15,7 @@
 #include "config/config_io.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 #include "config/config_writer.h"
 #include "diagnostics/app_icon_export.h"
 #include "diagnostics/constants.h"

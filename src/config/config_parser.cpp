@@ -5,12 +5,12 @@
 #include <cstdlib>
 #include <set>
 #include <string_view>
-#include <type_traits>
 
 #include "config/color_resolver.h"
 #include "config/config_file_io.h"
 #include "config/config_resolution.h"
 #include "config/config_runtime_fields.h"
+#include "config/config_telemetry.h"
 #include "config/widget_class.h"
 #include "util/resource_loader.h"
 #include "util/strings.h"
@@ -53,71 +53,58 @@ bool ParseMetricDefinition(
     return true;
 }
 
-template <typename Section>
+bool ApplyBoardSectionValue(BoardConfig& board, const std::string& key, const std::string& value);
+bool ApplyMetricsSectionValue(
+    MetricsSectionConfig& metrics, const std::string& key, const std::string& value, const ConfigParseContext& context);
+
 bool ApplyStructuredSectionFields(
-    typename Section::owner_type& owner, const std::string& key, const std::string& value) {
-    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<Section>()) {
+    const RuntimeConfigSectionDescriptor& section, void* owner, const std::string& key, const std::string& value) {
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFields(section)) {
         if (key == std::string_view(field.key, field.keyLength)) {
-            DecodeRuntimeConfigField(field, &owner, value);
+            DecodeRuntimeConfigField(field, owner, value);
             return true;
         }
     }
     return false;
 }
 
-template <typename Codec, typename Owner> struct CustomSectionHandler {
-    static bool Apply(Owner&, const std::string&, const std::string&, const ConfigParseContext&) {
-        return false;
-    }
-};
-
-template <typename Section>
-bool ApplySectionValue(typename Section::owner_type& owner,
+bool ApplySectionValue(const RuntimeConfigSectionDescriptor& section,
+    void* owner,
     const std::string& key,
     const std::string& value,
     const ConfigParseContext& context) {
-    if constexpr (std::is_same_v<typename Section::codec_type, configschema::StructuredSectionCodec>) {
-        return ApplyStructuredSectionFields<Section>(owner, key, value);
-    } else {
-        return CustomSectionHandler<typename Section::codec_type, typename Section::owner_type>::Apply(
-            owner, key, value, context);
+    switch (section.codec) {
+        case RuntimeConfigSectionCodec::Structured:
+            return ApplyStructuredSectionFields(section, owner, key, value);
+        case RuntimeConfigSectionCodec::Board:
+            return ApplyBoardSectionValue(*reinterpret_cast<BoardConfig*>(owner), key, value);
+        case RuntimeConfigSectionCodec::Metrics:
+            return ApplyMetricsSectionValue(*reinterpret_cast<MetricsSectionConfig*>(owner), key, value, context);
     }
+    return false;
 }
 
-template <typename BindingList, typename Owner, typename Fn> void ForEachKnownBinding(Owner&& owner, Fn&& fn) {
-    BindingList::ForEach([&](auto binding) { fn(std::remove_cvref_t<decltype(binding)>{}, owner); });
-}
-
-template <typename BindingList, typename Owner>
-bool DispatchKnownBindingSection(Owner& owner,
+bool DispatchRuntimeConfigSection(AppConfig& config,
     const std::string& section,
     const std::string& key,
     const std::string& value,
     const ConfigParseContext& context) {
-    bool handled = false;
-    ForEachKnownBinding<BindingList>(owner, [&](auto binding, auto& currentOwner) {
-        using Binding = decltype(binding);
-        if (!handled) {
-            if constexpr (Binding::is_recursive) {
-                handled = DispatchKnownBindingSection<typename Binding::nested_owner_type::BindingList>(
-                    Binding::Get(currentOwner), section, key, value, context);
-            } else if constexpr (Binding::is_dynamic) {
-                using Section = typename Binding::section_type;
-                if (Section::Matches(section)) {
-                    typename Section::owner_type& item = Binding::Ensure(currentOwner, Section::Suffix(section));
-                    ApplySectionValue<Section>(item, key, value, context);
-                    handled = true;
-                }
-            } else {
-                using Section = typename Binding::section_type;
-                if (section == Section::name.view()) {
-                    ApplySectionValue<Section>(Binding::Get(currentOwner), key, value, context);
-                    handled = true;
-                }
-            }
-        }
-    });
-    return handled;
+    const RuntimeConfigSectionDescriptor* descriptor = FindRuntimeConfigSection(section);
+    if (descriptor == nullptr) {
+        return false;
+    }
+
+    void* owner = nullptr;
+    if (descriptor->kind == RuntimeConfigSectionKind::Dynamic) {
+        const std::string_view prefix(descriptor->name, descriptor->nameLength);
+        owner = descriptor->dynamic.ensure(config, std::string_view(section).substr(prefix.size()));
+    } else {
+        owner = reinterpret_cast<char*>(&config) + descriptor->rootOffset;
+    }
+    if (owner == nullptr) {
+        return false;
+    }
+    return ApplySectionValue(*descriptor, owner, key, value, context);
 }
 
 class LayoutExpressionParser {
@@ -305,49 +292,45 @@ void MarkCardLayoutReferences(LayoutConfig& layout) {
     }
 }
 
-template <> struct CustomSectionHandler<configschema::BoardSectionCodec, BoardConfig> {
-    static bool Apply(BoardConfig& board, const std::string& key, const std::string& value, const ConfigParseContext&) {
-        if (key.rfind("board.temp.", 0) == 0) {
-            board.temperatureSensorNames[key.substr(std::string("board.temp.").size())] = value;
-            return true;
-        }
-        if (key.rfind("board.fan.", 0) == 0) {
-            board.fanSensorNames[key.substr(std::string("board.fan.").size())] = value;
-            return true;
-        }
-        return false;
-    }
-};
-
-template <> struct CustomSectionHandler<configschema::MetricsSectionCodec, MetricsSectionConfig> {
-    static bool Apply(MetricsSectionConfig& metrics,
-        const std::string& key,
-        const std::string& value,
-        const ConfigParseContext& context) {
-        if (key.empty()) {
-            return false;
-        }
-        if (IsRuntimePlaceholderMetricId(key)) {
-            return true;
-        }
-
-        MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
-        MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};
-        candidate.id = key;
-        if (const auto style = context.metricCatalog.FindMetricDisplayStyle(key); style.has_value()) {
-            candidate.style = *style;
-        }
-        if (!ParseMetricDefinition(value, candidate, context)) {
-            return false;
-        }
-        if (definition != nullptr) {
-            *definition = std::move(candidate);
-        } else {
-            metrics.definitions.push_back(std::move(candidate));
-        }
+bool ApplyBoardSectionValue(BoardConfig& board, const std::string& key, const std::string& value) {
+    if (key.rfind("board.temp.", 0) == 0) {
+        board.temperatureSensorNames[key.substr(std::string("board.temp.").size())] = value;
         return true;
     }
-};
+    if (key.rfind("board.fan.", 0) == 0) {
+        board.fanSensorNames[key.substr(std::string("board.fan.").size())] = value;
+        return true;
+    }
+    return false;
+}
+
+bool ApplyMetricsSectionValue(MetricsSectionConfig& metrics,
+    const std::string& key,
+    const std::string& value,
+    const ConfigParseContext& context) {
+    if (key.empty()) {
+        return false;
+    }
+    if (IsRuntimePlaceholderMetricId(key)) {
+        return true;
+    }
+
+    MetricDefinitionConfig* definition = FindMetricDefinition(metrics, key);
+    MetricDefinitionConfig candidate = definition != nullptr ? *definition : MetricDefinitionConfig{};
+    candidate.id = key;
+    if (const auto style = context.metricCatalog.FindMetricDisplayStyle(key); style.has_value()) {
+        candidate.style = *style;
+    }
+    if (!ParseMetricDefinition(value, candidate, context)) {
+        return false;
+    }
+    if (definition != nullptr) {
+        *definition = std::move(candidate);
+    } else {
+        metrics.definitions.push_back(std::move(candidate));
+    }
+    return true;
+}
 
 void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigParseContext& context) {
     std::string section;
@@ -389,7 +372,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        DispatchKnownBindingSection<AppConfig::BindingList>(config, section, key, value, context);
+        DispatchRuntimeConfigSection(config, section, key, value, context);
         if (lineEnd == text.size()) {
             break;
         }

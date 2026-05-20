@@ -8,6 +8,7 @@
 
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"

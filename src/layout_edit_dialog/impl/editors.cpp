@@ -5,6 +5,7 @@
 #include <cmath>
 
 #include "config/color_expression.h"
+#include "config/config_telemetry.h"
 #include "config/metric_board_binding.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
@@ -420,7 +421,7 @@ void PopulateDateTimeFormatCombo(HWND hwnd, const LayoutNodeFieldEditKey& key, s
     SendMessageW(combo, CB_SETMINVISIBLE, 8, 0);
 }
 
-std::array<const UiFontConfig*, 9> FontSetValues(const UiFontSetConfig& fonts) {
+std::array<const UiFontConfig*, 9> FontSetValues(const FontsConfig& fonts) {
     return {
         &fonts.title,
         &fonts.big,
@@ -434,7 +435,7 @@ std::array<const UiFontConfig*, 9> FontSetValues(const UiFontSetConfig& fonts) {
     };
 }
 
-std::string CommonFontFamilyText(const UiFontSetConfig& fonts) {
+std::string CommonFontFamilyText(const FontsConfig& fonts) {
     const auto fontValues = FontSetValues(fonts);
     if (fontValues.empty() || fontValues.front() == nullptr) {
         return {};

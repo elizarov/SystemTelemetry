@@ -2,10 +2,11 @@
 
 #include <windows.h>
 
-#include "config/config.h"
 #include "telemetry/telemetry.h"
 #include "util/file_path.h"
 #include "util/trace.h"
+
+struct AppConfig;
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace);
 bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, double targetScale, Trace& trace, HWND owner);

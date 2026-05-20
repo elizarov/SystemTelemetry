@@ -5,9 +5,10 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config.h"
 #include "config/config_schema.h"
 #include "widget/layout_edit_types.h"
+
+struct AppConfig;
 
 enum class LayoutEditTreeNodeKind {
     Section,

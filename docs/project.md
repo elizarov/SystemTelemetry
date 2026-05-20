@@ -101,6 +101,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
 - GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_TIDY_TIMEOUT_SECONDS` and `CASEDASH_TIDY_MAX_PARALLEL` for clang-tidy-backed include checks.
 - `for /f` commands invoke `vswhere.exe` through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
-- Config-schema reflection descriptors stay type-derived and default-initialized because the GitHub Visual Studio runner can lag the local MSVC toolset.
+- Config metadata is generated into table descriptors from `src/config/config.h` and custom-section annotations in `src/config/config_primitives.h`; keep parser, writer, color, and layout-edit metadata consumers on the non-template runtime table APIs.
+- Font config keeps the C++ member `smallText` and maps it to the persisted `small` key with `config_meta: rename=small`, so Win32 RPC `small` macro handling stays outside the config schema.
 - The repo uses CRLF text checkouts; `.githooks/pre-commit` stays a minimal CRLF-tolerant shell launcher, and multi-line hook logic lives in PowerShell.
 - The installer completion launch stays directory-sourced instead of `FileRef`-sourced so the Finish button does not depend on File table action state and surface MSI error 2753.

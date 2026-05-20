@@ -1,10 +1,10 @@
 #include <gtest/gtest.h>
 #include <string>
-#include <tuple>
-#include <type_traits>
 #include <vector>
 
 #include "config/config_parser.h"
+#include "config/config_runtime_fields.h"
+#include "config/config_telemetry.h"
 #include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_model/dashboard_overlay_state.h"
@@ -22,15 +22,21 @@ ConfigParseContext TestConfigParseContext() {
     return ConfigParseContext{TelemetryMetricCatalog()};
 }
 
-template <size_t... Index>
-std::vector<const UiFontConfig*> FontFieldPointers(const AppConfig& config, std::index_sequence<Index...>) {
-    using FontFields = std::remove_cvref_t<decltype(UiFontSetConfig::Section::fields)>;
-    return {&std::tuple_element_t<Index, FontFields>::RawGet(config.layout.fonts)...};
-}
-
 std::vector<const UiFontConfig*> FontFieldPointers(const AppConfig& config) {
-    using FontFields = std::remove_cvref_t<decltype(UiFontSetConfig::Section::fields)>;
-    return FontFieldPointers(config, std::make_index_sequence<std::tuple_size_v<FontFields>>{});
+    std::vector<const UiFontConfig*> fields;
+    const RuntimeConfigSectionDescriptor* fontsSection = FindRuntimeConfigSectionByName("fonts");
+    EXPECT_NE(fontsSection, nullptr);
+    if (fontsSection == nullptr) {
+        return fields;
+    }
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFields(*fontsSection)) {
+        if (field.kind != RuntimeConfigFieldValueKind::FontSpec) {
+            continue;
+        }
+        fields.push_back(
+            reinterpret_cast<const UiFontConfig*>(reinterpret_cast<const char*>(&config.layout.fonts) + field.offset));
+    }
+    return fields;
 }
 
 bool ActiveRegionsContainFontParameter(const LayoutEditActiveRegions& regions, LayoutEditParameter parameter) {

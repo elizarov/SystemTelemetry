@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config.h"
+#include "config/config_primitives.h"
 #include "config/metric_catalog.h"
 #include "telemetry/telemetry.h"
 #include "telemetry/timing.h"

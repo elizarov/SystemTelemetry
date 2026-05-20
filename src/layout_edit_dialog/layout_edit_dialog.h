@@ -27,7 +27,7 @@ public:
     virtual bool ApplyParameterPreview(LayoutEditParameter parameter, double value) = 0;
     virtual bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) = 0;
     virtual bool ApplyFontFamilyPreview(const std::string& family) = 0;
-    virtual bool ApplyFontSetPreview(const UiFontSetConfig& fonts) = 0;
+    virtual bool ApplyFontSetPreview(const FontsConfig& fonts) = 0;
     virtual bool ApplyLayoutPreview(const std::string& layoutName) = 0;
     virtual bool ApplyThemePreview(const std::string& themeName) = 0;
     virtual bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) = 0;
