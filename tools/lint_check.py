@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
@@ -176,14 +177,38 @@ def scan_file(entry: FileEntry) -> SourceRecord:
     )
 
 
+def truncate_progress_line(prefix: str, relative: str) -> str:
+    columns = shutil.get_terminal_size((120, 20)).columns
+    if columns <= 1:
+        return f"{prefix}{relative}"
+    max_length = columns - 1
+    full_line = f"{prefix}{relative}"
+    if len(full_line) <= max_length:
+        return full_line
+    path_budget = max_length - len(prefix)
+    if path_budget <= 3:
+        return full_line[:max_length]
+    return f"{prefix}...{relative[-(path_budget - 3):]}"
+
+
 def scan_lint_inputs(entries: list[FileEntry], show_progress: bool) -> tuple[SourceRecord, ...]:
     records: list[SourceRecord] = []
     total = len(entries)
+    use_single_line_progress = show_progress and sys.stdout.isatty()
+    previous_progress_length = 0
     if show_progress:
         print(f"Scanning {total} lint input file(s)...")
     for index, entry in enumerate(entries, start=1):
         if show_progress:
-            print(f"[{index}/{total}] lint-check {relpath(entry.path)}", flush=True)
+            relative = relpath(entry.path)
+            if use_single_line_progress:
+                progress = truncate_progress_line(f"[{index}/{total}] lint-check ", relative)
+                padding = " " * max(0, previous_progress_length - len(progress))
+                sys.stdout.write(f"\r{progress}{padding}")
+                sys.stdout.flush()
+                previous_progress_length = len(progress)
+            else:
+                print(f"[{index}/{total}] lint-check {relative}", flush=True)
         records.append(scan_file(entry))
     if show_progress:
         print()
