@@ -2,6 +2,8 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <vector>
 
 enum class GpuVendor {
     Unknown,
@@ -16,6 +18,7 @@ struct GpuVendorInfo {
 };
 
 struct GpuAdapterInfo : GpuVendorInfo {
+    std::string selectionName;
     unsigned int adapterIndex = 0;
     std::uint64_t dedicatedVideoMemoryBytes = 0;
     unsigned int deviceId = 0;
@@ -38,3 +41,8 @@ struct GpuAdapterCandidate {
 
 const char* GpuVendorName(GpuVendor vendor);
 GpuVendor SelectGpuVendor(const GpuVendorInfo& info);
+bool HasUsableGpuPciAddress(const GpuAdapterInfo& info);
+bool GpuAdapterViewsReferToSameHardware(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs);
+std::string GpuAdapterSelectionName(const GpuAdapterInfo& info);
+std::vector<std::string> BuildGpuAdapterSelectionNames(const std::vector<GpuAdapterInfo>& adapters);
+int GpuAdapterSelectionMatchRank(const GpuAdapterInfo& info, std::string_view preferredAdapterName);

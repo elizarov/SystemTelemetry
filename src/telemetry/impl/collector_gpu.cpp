@@ -204,7 +204,7 @@ void ResolveGpuSelection(RealTelemetryCollectorState& state) {
     state.gpu_.selectedAdapter = selection.selectedAdapter;
     state.gpu_.adapterCandidates = std::move(selection.candidates);
     state.resolvedSelections_.gpuAdapterName =
-        state.gpu_.selectedAdapter.has_value() ? state.gpu_.selectedAdapter->adapterName : std::string();
+        state.gpu_.selectedAdapter.has_value() ? GpuAdapterSelectionName(*state.gpu_.selectedAdapter) : std::string();
     state.snapshot_.gpu = GpuTelemetry{};
     ApplySelectedGpuAdapterInfo(state);
 }
