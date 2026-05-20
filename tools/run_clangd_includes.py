@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import queue
+import shutil
 import subprocess
 import sys
 import threading
@@ -185,6 +186,46 @@ def format_diagnostic(relative_path: str, diagnostic: dict[str, Any]) -> str:
     )
 
 
+def truncate_progress_line(prefix: str, relative_path: str, suffix: str) -> str:
+    columns = shutil.get_terminal_size((120, 20)).columns
+    if columns <= 1:
+        return f"{prefix}{relative_path}{suffix}"
+    max_length = columns - 1
+    full_line = f"{prefix}{relative_path}{suffix}"
+    if len(full_line) <= max_length:
+        return full_line
+    path_budget = max_length - len(prefix) - len(suffix)
+    if path_budget <= 3:
+        return full_line[:max_length]
+    return f"{prefix}...{relative_path[-(path_budget - 3):]}{suffix}"
+
+
+class ProgressLine:
+    def __init__(self, enabled: bool) -> None:
+        self.enabled = enabled
+        self.previous_length = 0
+
+    def update(self, completed: int, total: int, relative_path: str, elapsed_seconds: float) -> None:
+        if not self.enabled:
+            return
+        progress = truncate_progress_line(
+            f"[{completed}/{total}] include-lint ",
+            relative_path,
+            f" in {elapsed_seconds:.2f}s",
+        )
+        padding = " " * max(0, self.previous_length - len(progress))
+        sys.stdout.write(f"\r{progress}{padding}")
+        sys.stdout.flush()
+        self.previous_length = len(progress)
+
+    def finish(self) -> None:
+        if not self.enabled or self.previous_length <= 0:
+            return
+        sys.stdout.write(f"\r{' ' * self.previous_length}\r")
+        sys.stdout.flush()
+        self.previous_length = 0
+
+
 def initialize(client: ClangdClient, root: Path, timeout_seconds: int) -> None:
     request_id = client.request(
         "initialize",
@@ -260,6 +301,7 @@ def run(args: argparse.Namespace) -> int:
         next_file = 0
         active: dict[str, FileState] = {}
         completed: list[FileResult] = []
+        progress = ProgressLine(sys.stdout.isatty())
         failed = False
 
         with report_path.open("w", encoding="utf-8", newline="\n") as report:
@@ -280,7 +322,6 @@ def run(args: argparse.Namespace) -> int:
                     next_file += 1
                     state.started_at = time.monotonic()
                     text = (root / state.relative_path).read_text(encoding="utf-8")
-                    print(f"[{state.index + 1}/{len(files)}] queued {state.relative_path}")
                     client.send(
                         {
                             "jsonrpc": "2.0",
@@ -312,10 +353,7 @@ def run(args: argparse.Namespace) -> int:
                         completed.append(result)
                         failed = True
                         del active[uri]
-                        print(
-                            f"[{state.index + 1}/{len(files)}] timed out "
-                            f"{state.relative_path} after {result.elapsed_seconds:.2f}s"
-                        )
+                        progress.update(len(completed), len(files), state.relative_path, result.elapsed_seconds)
                         client.send(
                             {
                                 "jsonrpc": "2.0",
@@ -348,7 +386,7 @@ def run(args: argparse.Namespace) -> int:
                 completed.append(result)
                 if diagnostics:
                     failed = True
-                print(f"[{state.index + 1}/{len(files)}] completed {state.relative_path} in {elapsed:.2f}s")
+                progress.update(len(completed), len(files), state.relative_path, elapsed)
 
                 report.write("===============================================================================\n")
                 report.write(f"[{state.index + 1}/{len(files)}] {state.relative_path}\n")
@@ -375,6 +413,7 @@ def run(args: argparse.Namespace) -> int:
 
             total_seconds = time.monotonic() - started
             report.write(f"Total elapsed seconds: {total_seconds:.2f}\n")
+            progress.finish()
 
         if failed:
             print("clangd include lint failed.")
