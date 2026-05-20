@@ -64,8 +64,7 @@ Do not spend the main effort on tiny localized cleanups unless they are part of 
 ## Validation
 
 - Run `.\format.cmd changed` after C++ edits; use `.\format.cmd fix changed` if formatting needs repair.
-- Run `.\lint.cmd tidy changed` after retained C++ refactorings or code-shape rewrites, because size-oriented reshaping often breaks architecture, source-policy, include-style, or clang-tidy checks.
-- Treat the previous bullet as the optimize-size skill's explicit, scoped tidy request despite the repository's blanket local `lint.cmd tidy` avoidance rule. Do not run the full unscoped `.\lint.cmd tidy` unless the user explicitly asks for that broader sweep.
+- Run `.\lint.cmd includes changed` after retained C++ refactorings or code-shape rewrites, because size-oriented reshaping often breaks architecture, source-policy, include-style, or unused-include checks.
 - Run `.\build.cmd` before every shipped-size measurement and before headless validation.
 - Run `.\build_maps.cmd` after the final retained build and inspect `build\CaseDash.map.summary.txt`.
 - Run `.\test.cmd` when source behavior changes beyond trivial code-shape cleanup.

@@ -28,7 +28,6 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `web\` is the single maintained source of truth for the static website source and website build script.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy. `format.cmd` owns narrow exclusions for mixed-mode C++/CLI bridge `.cpp` files that clang-format versions do not format consistently.
 - `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
-- `.github/workflows/full-tidy.yml` is the single maintained source of truth for manual full clang-tidy automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
 
@@ -47,7 +46,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and unused-include checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
-- Keep local `NOLINT` suppressions out of source files; maintained clang-tidy false positives live in the lint tool allowlist.
+- Keep local `NOLINT` suppressions out of source files; maintained include-cleaner false positives live in the include lint allowlist.
 - Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.
 - Keep Win32 hygiene macros such as `NOMINMAX` and `WIN32_LEAN_AND_MEAN` in target compile definitions instead of local include preambles.
 - Keep each project `.cpp` paired with a matching header that owns its out-of-line declarations; `src/main/main.cpp` is the only headerless translation unit.
@@ -98,8 +97,8 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific lessons stay grouped in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
-- Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
-- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_TIDY_TIMEOUT_SECONDS` and `CASEDASH_TIDY_MAX_PARALLEL` for clang-tidy-backed include checks.
+- Clangd include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
+- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS` and `CASEDASH_INCLUDE_LINT_MAX_PARALLEL` for include checks.
 - `for /f` commands invoke `vswhere.exe` through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
 - Config metadata is generated into table descriptors from `src/config/config.h` and custom-section annotations in `src/config/config_primitives.h`; keep parser, writer, color, and layout-edit metadata consumers on the non-template runtime table APIs.
 - Font config keeps the C++ member `smallText` and maps it to the persisted `small` key with `config_meta: rename=small`, so Win32 RPC `small` macro handling stays outside the config schema.
