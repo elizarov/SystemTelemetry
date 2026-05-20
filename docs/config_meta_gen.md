@@ -24,7 +24,7 @@ Generated C++ is compiled into the app, tests, and benchmarks. The JSON manifest
 config_header     := (blank | comment | pragma_once | include | namespace_alias | struct_decl)*
 struct_decl       := struct_directive? "struct" type_name "{" field_decl* equality_decl "};"
 struct_directive  := "// config_meta:" struct_kind
-struct_kind       := "static" section_name
+struct_kind       := "static_section" section_name
                    | "dynamic_section" section_pattern "key=" identifier
                    | "container"
                    | "root"
@@ -47,7 +47,7 @@ Field keys default to snake case derived from lower-camel C++ member names. `ren
 Static sections map one schema struct to one persisted section:
 
 ```cpp
-// config_meta: static [fonts]
+// config_meta: static_section [fonts]
 struct FontsConfig {
     UiFontConfig title{};
     UiFontConfig smallText{};  // config_meta: rename=small

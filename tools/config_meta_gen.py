@@ -116,7 +116,7 @@ def parse_struct_directive(text: str, line_number: int) -> dict[str, str]:
         return {"kind": "container"}
     if text == "root":
         return {"kind": "root"}
-    match = re.fullmatch(r"static\s+\[([A-Za-z0-9_.]+)\]", text)
+    match = re.fullmatch(r"static_section\s+\[([A-Za-z0-9_.]+)\]", text)
     if match:
         return {"kind": "static", "section": match.group(1)}
     match = re.fullmatch(r"dynamic_section\s+\[([A-Za-z0-9_.]*)\$([A-Za-z_][A-Za-z0-9_]*)\]\s+key=([A-Za-z_][A-Za-z0-9_]*)", text)

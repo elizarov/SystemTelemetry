@@ -2,7 +2,7 @@
 
 #include "config/config_primitives.h"
 
-// config_meta: static [display]
+// config_meta: static_section [display]
 struct DisplayConfig {
     std::string monitorName{};
     std::string layout{};
@@ -14,21 +14,21 @@ struct DisplayConfig {
     bool operator==(const DisplayConfig& other) const = default;
 };
 
-// config_meta: static [gpu]
+// config_meta: static_section [gpu]
 struct GpuConfig {
     std::string adapterName{};
 
     bool operator==(const GpuConfig& other) const = default;
 };
 
-// config_meta: static [network]
+// config_meta: static_section [network]
 struct NetworkConfig {
     std::string adapterName{};
 
     bool operator==(const NetworkConfig& other) const = default;
 };
 
-// config_meta: static [storage]
+// config_meta: static_section [storage]
 struct StorageConfig {
     std::vector<std::string> drives{};
 
@@ -47,7 +47,7 @@ struct ThemeConfig {
     bool operator==(const ThemeConfig& other) const = default;
 };
 
-// config_meta: static [colors]
+// config_meta: static_section [colors]
 struct ColorsConfig {
     ColorConfig backgroundColor{};
     ColorConfig foregroundColor{};
@@ -68,7 +68,7 @@ struct ColorsConfig {
     bool operator==(const ColorsConfig& other) const = default;
 };
 
-// config_meta: static [layout_guide_sheet]
+// config_meta: static_section [layout_guide_sheet]
 struct LayoutGuideSheetConfig {
     ColorConfig calloutLeaderColor{};
     ColorConfig calloutFillColor{};
@@ -99,7 +99,7 @@ struct LayoutGuideSheetConfig {
     bool operator==(const LayoutGuideSheetConfig& other) const = default;
 };
 
-// config_meta: static [dashboard]
+// config_meta: static_section [dashboard]
 struct DashboardSectionConfig {
     int outerMargin{};  // config_meta: policy=non_negative_int
     int rowGap{};       // config_meta: policy=non_negative_int
@@ -108,7 +108,7 @@ struct DashboardSectionConfig {
     bool operator==(const DashboardSectionConfig& other) const = default;
 };
 
-// config_meta: static [card_style]
+// config_meta: static_section [card_style]
 struct CardStyleConfig {
     int cardPadding{};  // config_meta: policy=non_negative_int
     int cardRadius{};
@@ -122,7 +122,7 @@ struct CardStyleConfig {
     bool operator==(const CardStyleConfig& other) const = default;
 };
 
-// config_meta: static [fonts]
+// config_meta: static_section [fonts]
 struct FontsConfig {
     UiFontConfig title{};
     UiFontConfig big{};
@@ -137,7 +137,7 @@ struct FontsConfig {
     bool operator==(const FontsConfig& other) const = default;
 };
 
-// config_meta: static [metric_list]
+// config_meta: static_section [metric_list]
 struct MetricListWidgetConfig {
     int labelWidth{};
     int barHeight{};
@@ -146,7 +146,7 @@ struct MetricListWidgetConfig {
     bool operator==(const MetricListWidgetConfig& other) const = default;
 };
 
-// config_meta: static [drive_usage_list]
+// config_meta: static_section [drive_usage_list]
 struct DriveUsageListWidgetConfig {
     int labelGap{};  // config_meta: policy=non_negative_int
     int activityWidth{};
@@ -163,7 +163,7 @@ struct DriveUsageListWidgetConfig {
     bool operator==(const DriveUsageListWidgetConfig& other) const = default;
 };
 
-// config_meta: static [throughput]
+// config_meta: static_section [throughput]
 struct ThroughputWidgetConfig {
     int headerGap{};    // config_meta: policy=non_negative_int
     int axisPadding{};  // config_meta: policy=non_negative_int
@@ -174,7 +174,7 @@ struct ThroughputWidgetConfig {
     bool operator==(const ThroughputWidgetConfig& other) const = default;
 };
 
-// config_meta: static [gauge]
+// config_meta: static_section [gauge]
 struct GaugeWidgetConfig {
     int outerPadding{};  // config_meta: policy=non_negative_int
     int ringThickness{};
@@ -187,21 +187,21 @@ struct GaugeWidgetConfig {
     bool operator==(const GaugeWidgetConfig& other) const = default;
 };
 
-// config_meta: static [text]
+// config_meta: static_section [text]
 struct TextWidgetConfig {
     int bottomGap{};  // config_meta: policy=non_negative_int
 
     bool operator==(const TextWidgetConfig& other) const = default;
 };
 
-// config_meta: static [network_footer]
+// config_meta: static_section [network_footer]
 struct NetworkFooterWidgetConfig {
     int bottomGap{};  // config_meta: policy=non_negative_int
 
     bool operator==(const NetworkFooterWidgetConfig& other) const = default;
 };
 
-// config_meta: static [layout_editor]
+// config_meta: static_section [layout_editor]
 struct LayoutEditorConfig {
     int sizeSimilarityThreshold{};
 
