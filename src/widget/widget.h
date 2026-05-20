@@ -5,7 +5,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config_def.h"
+#include "config/config.h"
 #include "config/widget_class.h"
 #include "renderer/render_types.h"
 #include "widget/layout_edit_types.h"

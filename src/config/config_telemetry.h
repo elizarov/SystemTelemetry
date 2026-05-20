@@ -3,7 +3,7 @@
 #include <string>
 #include <string_view>
 
-#include "config/config_def.h"
+#include "config/config.h"
 #include "config/telemetry_settings.h"
 
 const MetricDefinitionConfig* FindMetricDefinition(const MetricsSectionConfig& metrics, std::string_view id);

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate CaseDash config metadata from src/config/config_desc.h."""
+"""Generate CaseDash config metadata from src/config/config.h."""
 
 from __future__ import annotations
 
@@ -31,11 +31,6 @@ POLICY_CODE = {
     "degrees": "Degrees",
 }
 
-KNOWN_CODECS = {
-    "board": "BoardSectionCodec",
-    "metrics": "MetricsSectionCodec",
-}
-
 class ConfigMetaError(RuntimeError):
     pass
 
@@ -65,6 +60,8 @@ class StructDesc:
     key_member: str | None = None
     codec: str | None = None
     line: int = 0
+    has_equality_operator: bool = False
+    equality_line: int = 0
 
     def config_fields(self) -> list[Field]:
         return [
@@ -136,11 +133,15 @@ def parse_struct_directive(text: str, line_number: int) -> dict[str, str]:
             "prefix": match.group(1),
             "key_member": key_member,
         }
-    match = re.fullmatch(r"custom_section\s+\[([A-Za-z0-9_.]+)\]\s+codec=([A-Za-z_][A-Za-z0-9_]*)", text)
+    match = re.fullmatch(
+        r"custom_section\s+\[([A-Za-z0-9_.]+)\]\s+codec=([A-Za-z_][A-Za-z0-9_]*)", text
+    )
     if match:
         codec = match.group(2)
-        if codec not in KNOWN_CODECS:
-            raise ConfigMetaError(f"line {line_number}: unknown custom section codec '{codec}'")
+        if not codec.endswith("SectionCodec"):
+            raise ConfigMetaError(
+                f"line {line_number}: custom section codec '{codec}' must end with SectionCodec"
+            )
         return {"kind": "custom", "section": match.group(1), "codec": codec}
     raise ConfigMetaError(f"line {line_number}: malformed struct directive '{text}'")
 
@@ -154,12 +155,17 @@ def parse_descriptor(path: Path) -> list[StructDesc]:
     struct_re = re.compile(r"struct\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{")
     field_re = re.compile(
         r"([A-Za-z_][A-Za-z0-9_:]*(?:\s*<\s*[A-Za-z_][A-Za-z0-9_:]*\s*>)?)\s+"
-        r"([A-Za-z_][A-Za-z0-9_]*)\s*;\s*(?://\s*config_meta:\s*(.*))?$"
+        r"([A-Za-z_][A-Za-z0-9_]*)\s*(?:\{\})?\s*;\s*(?://\s*config_meta:\s*(.*))?$"
+    )
+    equality_re = re.compile(
+        r"bool\s+operator==\(const\s+([A-Za-z_][A-Za-z0-9_]*)&\s+other\)\s+const\s+=\s+default;"
     )
 
     for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
         line = raw_line.strip()
         if not line:
+            continue
+        if active is None and line == "#pragma once":
             continue
         if active is None and line.startswith("#include "):
             continue
@@ -201,9 +207,27 @@ def parse_descriptor(path: Path) -> list[StructDesc]:
             pending_directive = None
             continue
         if active is not None:
+            match = equality_re.fullmatch(line)
+            if match:
+                if match.group(1) != active.name:
+                    raise ConfigMetaError(
+                        f"line {line_number}: equality operator type '{match.group(1)}' does not match struct "
+                        f"'{active.name}'"
+                    )
+                if active.has_equality_operator:
+                    raise ConfigMetaError(
+                        f"line {line_number}: duplicate equality operator in struct '{active.name}'"
+                    )
+                active.has_equality_operator = True
+                active.equality_line = line_number
+                continue
             match = field_re.fullmatch(line)
             if not match:
                 raise ConfigMetaError(f"line {line_number}: unsupported field declaration '{line}'")
+            if active.has_equality_operator:
+                raise ConfigMetaError(
+                    f"line {line_number}: field declaration appears after equality operator in struct '{active.name}'"
+                )
             runtime_only, policy, key_override = parse_field_attrs(match.group(3), line_number)
             type_name = re.sub(r"\s+", "", match.group(1))
             active.fields.append(
@@ -223,6 +247,45 @@ def parse_descriptor(path: Path) -> list[StructDesc]:
         raise ConfigMetaError(f"line {active.line}: struct '{active.name}' is not closed")
     if pending_directive is not None:
         raise ConfigMetaError("trailing config_meta directive does not apply to a struct")
+    return structs
+
+
+def parse_primitive_annotations(path: Path) -> list[StructDesc]:
+    structs: list[StructDesc] = []
+    pending_directive: dict[str, str] | None = None
+    pending_line = 0
+    struct_re = re.compile(r"struct\s+([A-Za-z_][A-Za-z0-9_]*)\b")
+
+    for line_number, raw_line in enumerate(path.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw_line.strip()
+        marker = re.fullmatch(r"//\s*config_meta:\s*(.+)", line)
+        if marker:
+            if pending_directive is not None:
+                raise ConfigMetaError(f"{path}:{line_number}: directive does not apply to a struct")
+            pending_directive = parse_struct_directive(marker.group(1).strip(), line_number)
+            pending_line = line_number
+            if pending_directive["kind"] != "custom":
+                raise ConfigMetaError(f"{path}:{line_number}: primitive annotations only support custom_section")
+            continue
+
+        if pending_directive is None:
+            continue
+
+        match = struct_re.search(line)
+        if match:
+            structs.append(
+                StructDesc(
+                    name=match.group(1),
+                    line=line_number,
+                    has_equality_operator=True,
+                    equality_line=line_number,
+                    **pending_directive,
+                )
+            )
+            pending_directive = None
+
+    if pending_directive is not None:
+        raise ConfigMetaError(f"{path}:{pending_line}: trailing config_meta directive does not apply to a struct")
     return structs
 
 
@@ -297,9 +360,14 @@ def words_to_pascal(words: list[str]) -> str:
 
 def parse_layout_edit_parameter_names(path: Path) -> list[str]:
     text = path.read_text(encoding="utf-8")
-    match = re.search(r"enum\s+class\s+LayoutEditParameter\s*:\s*std::uint8_t\s*\{(?P<body>.*?)\};", text, re.S)
+    match = re.search(
+        r"//\s*config_meta:\s*layout_enum\s*\n\s*enum\s+class\s+LayoutEditParameter\s*:\s*std::uint8_t\s*\{"
+        r"(?P<body>.*?)\};",
+        text,
+        re.S,
+    )
     if not match:
-        raise ConfigMetaError(f"{path}: missing LayoutEditParameter enum")
+        raise ConfigMetaError(f"{path}: missing config_meta layout_enum annotation on LayoutEditParameter enum")
 
     names: list[str] = []
     body_start_line = text[: match.start("body")].count("\n") + 1
@@ -378,6 +446,10 @@ def validate_descriptor(structs: list[StructDesc], resource_sections: dict[str, 
         if struct.name in by_name:
             raise ConfigMetaError(f"line {struct.line}: duplicate struct '{struct.name}'")
         by_name[struct.name] = struct
+        if struct.kind != "custom" and not struct.has_equality_operator:
+            raise ConfigMetaError(
+                f"line {struct.line}: struct '{struct.name}' must end with a defaulted equality operator"
+            )
         if struct.kind == "root":
             root_count += 1
         if struct.section is not None:
@@ -521,38 +593,6 @@ def cpp_string(value: str) -> str:
     return json.dumps(value)
 
 
-def generate_schema_struct(struct: StructDesc) -> str:
-    if struct.kind == "custom":
-        return ""
-
-    lines = ["// Generated from config_desc.h", f"struct {struct.name} {{"]
-    for item in struct.fields:
-        lines.append(f"    {item.type_name} {item.name}{{}};")
-
-    if struct.fields or struct.kind in {"static", "dynamic", "container", "root"}:
-        lines.append("")
-    lines.append(f"    bool operator==(const {struct.name}& other) const = default;")
-    lines.append("};")
-    return "\n".join(lines)
-
-
-def generate_schema_structs(structs: list[StructDesc]) -> str:
-    generated = [generate_schema_struct(item) for item in structs if item.kind != "custom"]
-    return "\n\n".join(item for item in generated if item)
-
-
-def generate_header(structs: list[StructDesc]) -> str:
-    lines = [
-        "#pragma once",
-        "",
-        '#include "config/config_primitives.h"',
-        "",
-        generate_schema_structs(structs),
-        "",
-    ]
-    return "\n".join(lines)
-
-
 def generate_runtime_field_array(struct: StructDesc) -> str:
     array_name = f"k{struct.name}Fields"
     lines = [f"constexpr RuntimeConfigFieldDescriptor {array_name}[] = {{"]
@@ -627,7 +667,7 @@ def field_array_count_expr(struct: StructDesc) -> str:
 
 def runtime_section_codec(struct: StructDesc) -> str:
     if struct.kind == "custom":
-        return KNOWN_CODECS[struct.codec or ""].removesuffix("SectionCodec")
+        return (struct.codec or "").removesuffix("SectionCodec")
     return "Structured"
 
 
@@ -860,7 +900,7 @@ def build_manifest(
                 )
         elif struct.kind == "custom":
             custom_sections.append(
-                {"name": f"[{struct.section}]", "type": struct.name, "codec": struct.codec, "codec_type": KNOWN_CODECS[struct.codec or ""]}
+                {"name": f"[{struct.section}]", "type": struct.name, "codec_type": struct.codec}
             )
 
     layout_parameters = []
@@ -903,27 +943,25 @@ def write_if_changed(path: Path, content: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--descriptor", required=True, type=Path)
+    parser.add_argument("--primitives", required=True, type=Path)
     parser.add_argument("--layout-edit-parameters", required=True, type=Path)
     parser.add_argument("--resource-config", required=True, type=Path)
-    parser.add_argument("--output-header", required=True, type=Path)
     parser.add_argument("--output-cpp", required=True, type=Path)
     parser.add_argument("--output-json", required=True, type=Path)
     parser.add_argument("--output-layout-edit-cpp", required=True, type=Path)
     args = parser.parse_args()
 
     try:
-        structs = parse_descriptor(args.descriptor)
+        structs = parse_descriptor(args.descriptor) + parse_primitive_annotations(args.primitives)
         resources = parse_resource_config(args.resource_config)
         validate_descriptor(structs, resources)
         global ROOT_CONTEXT_BY_NAME
         ROOT_CONTEXT_BY_NAME = {item.name: item for item in structs}
         paths = build_owner_paths(structs)
         layout_edit_parameters = resolve_layout_edit_parameters(args.layout_edit_parameters, structs)
-        header = generate_header(structs)
         cpp = generate_cpp(structs, paths)
         layout_edit_cpp = generate_layout_edit_cpp(structs, paths, layout_edit_parameters)
         manifest = json.dumps(build_manifest(structs, paths, layout_edit_parameters), indent=2) + "\n"
-        write_if_changed(args.output_header, header)
         write_if_changed(args.output_cpp, cpp)
         write_if_changed(args.output_layout_edit_cpp, layout_edit_cpp)
         write_if_changed(args.output_json, manifest)

@@ -1,6 +1,6 @@
 #include "renderer/impl/palette.h"
 
-#include "config/config_def.h"
+#include "config/config.h"
 
 namespace {
 

@@ -8,7 +8,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config_def.h"
+#include "config/config.h"
 #include "renderer/render_types.h"
 #include "util/file_path.h"
 #include "util/function_ref.h"

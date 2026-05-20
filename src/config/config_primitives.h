@@ -71,6 +71,7 @@ struct MetricDefinitionConfig {
     bool operator==(const MetricDefinitionConfig& other) const = default;
 };
 
+// config_meta: custom_section [board] codec=BoardSectionCodec
 struct BoardConfig {
     std::vector<std::string> requestedTemperatureNames;
     std::vector<std::string> requestedFanNames;
@@ -80,6 +81,7 @@ struct BoardConfig {
     bool operator==(const BoardConfig& other) const = default;
 };
 
+// config_meta: custom_section [metrics] codec=MetricsSectionCodec
 struct MetricsSectionConfig {
     std::vector<MetricDefinitionConfig> definitions;
 

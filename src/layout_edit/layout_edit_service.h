@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vector>
 
-#include "config/config_def.h"
+#include "config/config.h"
 #include "config/metric_catalog.h"
 #include "layout_model/layout_edit_layout_target.h"
 #include "widget/layout_edit_types.h"

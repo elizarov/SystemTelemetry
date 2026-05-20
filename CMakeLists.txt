@@ -114,35 +114,33 @@ add_custom_target(CaseDashGeneratedResources DEPENDS
 )
 
 set(CASEDASH_CONFIG_META_DIR "${CASEDASH_GENERATED_DIR}/config")
-set(CASEDASH_CONFIG_DEF_HEADER "${CASEDASH_CONFIG_META_DIR}/config_def.h")
 set(CASEDASH_CONFIG_META_CPP "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.cpp")
 set(CASEDASH_CONFIG_META_JSON "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.json")
 set(CASEDASH_LAYOUT_EDIT_META_CPP "${CASEDASH_GENERATED_DIR}/layout_model/layout_edit_parameter_metadata.generated.cpp")
 add_custom_command(
     OUTPUT
-        "${CASEDASH_CONFIG_DEF_HEADER}"
         "${CASEDASH_CONFIG_META_CPP}"
         "${CASEDASH_LAYOUT_EDIT_META_CPP}"
         "${CASEDASH_CONFIG_META_JSON}"
     COMMAND
         "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
-        --descriptor "${CMAKE_SOURCE_DIR}/src/config/config_desc.h"
+        --descriptor "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        --primitives "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
         --layout-edit-parameters "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
         --resource-config "${CMAKE_SOURCE_DIR}/resources/config.ini"
-        --output-header "${CASEDASH_CONFIG_DEF_HEADER}"
         --output-cpp "${CASEDASH_CONFIG_META_CPP}"
         --output-layout-edit-cpp "${CASEDASH_LAYOUT_EDIT_META_CPP}"
         --output-json "${CASEDASH_CONFIG_META_JSON}"
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
-        "${CMAKE_SOURCE_DIR}/src/config/config_desc.h"
+        "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
         "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
     VERBATIM
 )
 add_custom_target(CaseDashGeneratedConfigMeta DEPENDS
-    "${CASEDASH_CONFIG_DEF_HEADER}"
     "${CASEDASH_CONFIG_META_CPP}"
     "${CASEDASH_LAYOUT_EDIT_META_CPP}"
     "${CASEDASH_CONFIG_META_JSON}"

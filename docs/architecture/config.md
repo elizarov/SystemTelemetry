@@ -7,7 +7,7 @@
 - Parse the embedded config template and executable-side overlay into `AppConfig` and `LayoutConfig`.
 - Preserve text-oriented save behavior separately from higher-level config resolution.
 - Write minimal overlay saves and full embedded-template-shaped exports.
-- Own the hand-maintained config descriptor in `src/config/config_desc.h`, the generated schema and runtime field metadata under `build\cmake\generated\config\`, and the generated layout-edit metadata under `build\cmake\generated\layout_model\`.
+- Own the hand-maintained config schema in `src/config/config.h`, primitive custom-section annotations in `src/config/config_primitives.h`, generated runtime field metadata under `build\cmake\generated\config\`, and generated layout-edit metadata under `build\cmake\generated\layout_model\`.
 - Own config-facing enums and DTOs such as widget class, metric display style, telemetry settings, layout fields, and color expressions.
 - Own the shared metric-to-board-binding resolver for direct `board.temp.*` and `board.fan.*` metrics plus provider fallback metrics such as `gpu.temp` and `gpu.fan`.
 - Own config-language color text formatting, including the canonical `#RRGGBBAA` spelling shared by config saves, diagnostics traces, layout-edit text, and dialog traces.

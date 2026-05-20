@@ -2,7 +2,7 @@
 
 #include <algorithm>
 
-#include "config/config_def.h"
+#include "config/config.h"
 
 namespace {
 

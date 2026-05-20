@@ -2,6 +2,7 @@
 
 #include <cstdint>
 
+// config_meta: layout_enum
 enum class LayoutEditParameter : std::uint8_t {
     // Hit-testing priority follows this declaration order for actionable widget-local handles and guides.
     // Fonts

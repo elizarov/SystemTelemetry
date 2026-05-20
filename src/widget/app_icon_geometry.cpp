@@ -4,7 +4,7 @@
 #include <cmath>
 #include <cstring>
 
-#include "config/config_def.h"
+#include "config/config.h"
 
 namespace {
 
