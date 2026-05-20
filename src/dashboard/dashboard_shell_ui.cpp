@@ -74,6 +74,7 @@ private:
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
 constexpr size_t kConfigureDisplayMenuCapacity = kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1;
+constexpr WORD kCursorArrowResourceId = 32512;
 
 struct UnsavedLayoutEditDialogState {
     const DashboardApp* app = nullptr;
@@ -87,6 +88,11 @@ struct AboutDialogState {
     std::string text;
     HICON icon = nullptr;
 };
+
+HCURSOR LoadSystemCursorA(WORD resourceId) {
+    // Explicit A APIs need A resource pointers because UNICODE makes stock IDC_* macros wide.
+    return LoadCursorA(nullptr, MAKEINTRESOURCEA(resourceId));
+}
 
 BOOL AppendMenuText(HMENU menu, UINT flags, UINT_PTR id, std::string_view text) {
     return AppendMenuA(menu, flags, id, std::string(text).c_str());
@@ -618,7 +624,7 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     }
     app_.HideLayoutEditTooltip();
     app_.layoutEditMouseTracking_ = false;
-    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
+    SetCursor(LoadSystemCursorA(kCursorArrowResourceId));
     app_.TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }

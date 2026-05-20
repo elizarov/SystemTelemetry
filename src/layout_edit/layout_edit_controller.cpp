@@ -28,6 +28,17 @@ const char* AxisName(LayoutGuideAxis axis) {
     return axis == LayoutGuideAxis::Vertical ? "vertical" : "horizontal";
 }
 
+constexpr WORD kCursorArrowResourceId = 32512;
+constexpr WORD kCursorCrossResourceId = 32515;
+constexpr WORD kCursorSizeWeResourceId = 32644;
+constexpr WORD kCursorSizeNsResourceId = 32645;
+constexpr WORD kCursorSizeAllResourceId = 32646;
+
+HCURSOR LoadSystemCursorA(WORD resourceId) {
+    // Explicit A APIs need A resource pointers because UNICODE makes stock IDC_* macros wide.
+    return LoadCursorA(nullptr, MAKEINTRESOURCEA(resourceId));
+}
+
 std::string DescribeLayoutGuide(const LayoutEditGuide& guide) {
     std::string detail = FormatText("axis=%s separator=%zu path=%s",
         AxisName(guide.axis),
@@ -235,7 +246,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     host_.LayoutDashboardOverlayState().showLayoutEditGuides = showLayoutEditGuidesAfterStop;
     SyncRendererInteractionState();
     ReleaseCapture();
-    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
+    SetCursor(LoadSystemCursorA(kCursorArrowResourceId));
     host_.EndLayoutEditTraceSession("session_stop");
     host_.InvalidateLayoutEdit();
 }
@@ -650,37 +661,39 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
-        SetCursor(LoadCursorA(nullptr,
-            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
-            : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
-            : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
-                                                                              : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(
+            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? kCursorSizeAllResourceId
+            : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both         ? kCursorSizeAllResourceId
+            : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical     ? kCursorSizeWeResourceId
+                                                                              : kCursorSizeNsResourceId));
         return true;
     }
     if (activeMetricListReorderDrag_.has_value()) {
-        SetCursor(LoadCursorA(nullptr, IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(kCursorSizeNsResourceId));
         return true;
     }
     if (activeContainerChildReorderDrag_.has_value()) {
-        SetCursor(LoadCursorA(nullptr, activeContainerChildReorderDrag_->horizontal ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(
+            activeContainerChildReorderDrag_->horizontal ? kCursorSizeWeResourceId : kCursorSizeNsResourceId));
         return true;
     }
     if (activeGapEditDrag_.has_value()) {
-        SetCursor(LoadCursorA(
-            nullptr, activeGapEditDrag_->anchor.dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(activeGapEditDrag_->anchor.dragAxis == AnchorDragAxis::Horizontal
+                                        ? kCursorSizeWeResourceId
+                                        : kCursorSizeNsResourceId));
         return true;
     }
     if (activeWidgetEditDrag_.has_value()) {
         const auto& guide = activeWidgetEditDrag_->guide;
-        SetCursor(LoadCursorA(nullptr,
-            guide.angularDrag                         ? IDC_CROSS
-            : guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                      : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(guide.angularDrag                         ? kCursorCrossResourceId
+                                    : guide.axis == LayoutGuideAxis::Vertical ? kCursorSizeWeResourceId
+                                                                              : kCursorSizeNsResourceId));
         return true;
     }
     if (activeLayoutDrag_.has_value()) {
         const auto& guide = activeLayoutDrag_->guide;
-        SetCursor(LoadCursorA(nullptr, guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(
+            guide.axis == LayoutGuideAxis::Vertical ? kCursorSizeWeResourceId : kCursorSizeNsResourceId));
         return true;
     }
 
@@ -716,7 +729,7 @@ void LayoutEditController::CancelInteraction() {
     }
     SyncRendererInteractionState();
     ReleaseCapture();
-    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
+    SetCursor(LoadSystemCursorA(kCursorArrowResourceId));
     host_.EndLayoutEditTraceSession("modal_ui");
     host_.InvalidateLayoutEdit();
 }
@@ -924,7 +937,8 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     if (resolution.actionableGapEditAnchor.has_value()) {
         const LayoutEditGapAnchor* anchor = FindGapEditAnchor(regions, *resolution.actionableGapEditAnchor);
         const auto dragAxis = anchor != nullptr ? anchor->dragAxis : AnchorDragAxis::Vertical;
-        SetCursor(LoadCursorA(nullptr, dragAxis == AnchorDragAxis::Horizontal ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(
+            dragAxis == AnchorDragAxis::Horizontal ? kCursorSizeWeResourceId : kCursorSizeNsResourceId));
         return;
     }
 
@@ -932,35 +946,34 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const LayoutEditAnchorRegion* region = FindEditableAnchorRegion(regions, *resolution.actionableAnchorHandle);
         const auto dragAxis = region != nullptr ? region->dragAxis : AnchorDragAxis::Vertical;
         const auto dragMode = region != nullptr ? region->dragMode : AnchorDragMode::AxisDelta;
-        SetCursor(LoadCursorA(nullptr,
-            dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
-            : dragAxis == AnchorDragAxis::Both         ? IDC_SIZEALL
-            : dragAxis == AnchorDragAxis::Vertical     ? IDC_SIZEWE
-                                                       : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(dragMode == AnchorDragMode::RadialDistance ? kCursorSizeAllResourceId
+                                    : dragAxis == AnchorDragAxis::Both         ? kCursorSizeAllResourceId
+                                    : dragAxis == AnchorDragAxis::Vertical     ? kCursorSizeWeResourceId
+                                                                               : kCursorSizeNsResourceId));
         return;
     }
 
     if (resolution.hoveredWidgetEditGuide.has_value()) {
         const LayoutEditWidgetGuide& widgetGuide = *resolution.hoveredWidgetEditGuide;
-        SetCursor(LoadCursorA(nullptr,
-            widgetGuide.angularDrag                         ? IDC_CROSS
-            : widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                            : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(widgetGuide.angularDrag                         ? kCursorCrossResourceId
+                                    : widgetGuide.axis == LayoutGuideAxis::Vertical ? kCursorSizeWeResourceId
+                                                                                    : kCursorSizeNsResourceId));
         return;
     }
 
     if (resolution.hoveredLayoutGuide.has_value()) {
         const LayoutEditGuide& layoutGuide = *resolution.hoveredLayoutGuide;
-        SetCursor(LoadCursorA(nullptr, layoutGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE : IDC_SIZENS));
+        SetCursor(LoadSystemCursorA(
+            layoutGuide.axis == LayoutGuideAxis::Vertical ? kCursorSizeWeResourceId : kCursorSizeNsResourceId));
         return;
     }
 
     if (HitTestEditableColorRegion(regions, clientPoint) != nullptr) {
-        SetCursor(LoadCursorA(nullptr, IDC_CROSS));
+        SetCursor(LoadSystemCursorA(kCursorCrossResourceId));
         return;
     }
 
-    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
+    SetCursor(LoadSystemCursorA(kCursorArrowResourceId));
 }
 
 bool LayoutEditController::FindSnappedLayoutGuideWeights(LayoutDragState& drag, std::vector<int>& weights) {

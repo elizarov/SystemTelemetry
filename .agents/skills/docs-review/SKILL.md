@@ -69,7 +69,7 @@ For project's AGENTS.md file apply special considerations:
 
 ## Architecture
 
-When reviewing a project's `architecture.md`, carefully check its completeness against the source code. Source code is always the source of truth. Keep architecture notes concise and focused on directory-level packages and their subpackages. For actual architectural constraints, also consult the architecture checks in `lint.cmd`; do not run `lint.cmd tidy` unless the user explicitly requests it. Keep the top-level `architecture.md` as a general routing layer that lists major packages and their core responsibilities for easy lookup. When adding a new top-level package that needs detailed architecture notes, put those details in `docs/architecture/<package>.md` and link to it from the top-level file.
+When reviewing a project's `architecture.md`, carefully check its completeness against the source code. Source code is always the source of truth. Keep architecture notes concise and focused on directory-level packages and their subpackages. For actual architectural constraints, also consult the architecture checks in `lint.cmd`. Keep the top-level `architecture.md` as a general routing layer that lists major packages and their core responsibilities for easy lookup. When adding a new top-level package that needs detailed architecture notes, put those details in `docs/architecture/<package>.md` and link to it from the top-level file.
 
 ## Output
 

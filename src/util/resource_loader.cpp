@@ -16,6 +16,7 @@ constexpr size_t kTextAtlasHeaderSize = 8;
 constexpr int kMinMatchLength = 3;
 constexpr size_t kExtendedMatchLength = kMinMatchLength + 15;
 constexpr size_t kTextResourceCount = static_cast<size_t>(TextResourceId::Count);
+constexpr WORD kRcDataResourceType = 10;
 
 struct TextAtlas {
     std::string storage;
@@ -78,7 +79,8 @@ std::string LoadCompressedResourceData(int resourceId) {
         return {};
     }
 
-    HRSRC resource = FindResourceA(module, MAKEINTRESOURCEA(resourceId), RT_RCDATA);
+    // Explicit A APIs need A resource pointers because UNICODE makes stock RT_* macros wide.
+    HRSRC resource = FindResourceA(module, MAKEINTRESOURCEA(resourceId), MAKEINTRESOURCEA(kRcDataResourceType));
     if (resource == nullptr) {
         return {};
     }

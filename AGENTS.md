@@ -26,7 +26,6 @@ Write commit messages with a concise subject starting with an action verb. Good 
 - Use `build.cmd` for builds, then run validation commands sequentially against the fresh build.
 - Keep build artifacts and temporary compiler files under `build\`.
 - Use `format.cmd` for C++ formatting checks and fixes.
-- Do not run `lint.cmd tidy` locally unless explicitly requested.
 - Prefer headless verification commands after building; use the smallest `/exit` combination that proves the change.
 - Add `/default-config` when validation is meant to exercise the built-in `resources/config.ini`.
 - Put explicit diagnostics outputs under `build\`.
