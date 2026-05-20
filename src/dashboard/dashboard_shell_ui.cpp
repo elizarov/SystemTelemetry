@@ -618,6 +618,7 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     }
     app_.HideLayoutEditTooltip();
     app_.layoutEditMouseTracking_ = false;
+    app_.UpdateNativeTitlebarProbe();
     SetCursor(LoadCursorA(nullptr, IDC_ARROW));
     app_.TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
@@ -636,6 +637,7 @@ void DashboardShellUi::EndLayoutEditModalUi() {
         app_.layoutEditMouseTracking_ = false;
         app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal, "end_released_capture");
         app_.RefreshLayoutEditHoverFromCursor();
+        app_.UpdateNativeTitlebarHoverFromCursor();
     }
     app_.TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditModal, "end_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);

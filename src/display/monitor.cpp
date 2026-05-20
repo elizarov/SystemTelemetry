@@ -239,12 +239,10 @@ std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedN
     return context.result;
 }
 
-MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredScale) {
+MonitorPlacementInfo GetMonitorPlacementForRect(const RECT& screenRect, double configuredScale) {
     MonitorPlacementInfo info;
-    RECT windowRect{};
-    GetWindowRect(hwnd, &windowRect);
 
-    HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
+    HMONITOR monitor = MonitorFromRect(&screenRect, MONITOR_DEFAULTTONEAREST);
     MONITORINFOEXA monitorInfo{};
     monitorInfo.cbSize = sizeof(monitorInfo);
     if (GetMonitorInfoA(monitor, &monitorInfo)) {
@@ -254,12 +252,18 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredSc
         info.configMonitorName = identity.configName;
         info.monitorRect = monitorInfo.rcMonitor;
         info.dpi = GetMonitorDpi(monitor);
-        info.physicalRelativePosition.x = windowRect.left - monitorInfo.rcMonitor.left;
-        info.physicalRelativePosition.y = windowRect.top - monitorInfo.rcMonitor.top;
+        info.physicalRelativePosition.x = screenRect.left - monitorInfo.rcMonitor.left;
+        info.physicalRelativePosition.y = screenRect.top - monitorInfo.rcMonitor.top;
         info.relativePosition.x = ScalePhysicalToLogical(
-            windowRect.left - monitorInfo.rcMonitor.left, ResolveDisplayScale(configuredScale, info.dpi));
+            screenRect.left - monitorInfo.rcMonitor.left, ResolveDisplayScale(configuredScale, info.dpi));
         info.relativePosition.y = ScalePhysicalToLogical(
-            windowRect.top - monitorInfo.rcMonitor.top, ResolveDisplayScale(configuredScale, info.dpi));
+            screenRect.top - monitorInfo.rcMonitor.top, ResolveDisplayScale(configuredScale, info.dpi));
     }
     return info;
+}
+
+MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredScale) {
+    RECT windowRect{};
+    GetWindowRect(hwnd, &windowRect);
+    return GetMonitorPlacementForRect(windowRect, configuredScale);
 }

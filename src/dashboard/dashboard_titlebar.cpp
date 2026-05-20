@@ -1,0 +1,63 @@
+#include "dashboard/dashboard_titlebar.h"
+
+#include <algorithm>
+
+namespace {
+
+int RectWidth(const RECT& rect) {
+    return rect.right - rect.left;
+}
+
+int RectHeight(const RECT& rect) {
+    return rect.bottom - rect.top;
+}
+
+bool IsRectUsable(const RECT& rect) {
+    return RectWidth(rect) > 0 && RectHeight(rect) > 0;
+}
+
+bool RectContainsRect(const RECT& outer, const RECT& inner) {
+    return inner.left >= outer.left && inner.top >= outer.top && inner.right <= outer.right &&
+           inner.bottom <= outer.bottom;
+}
+
+bool RectsMatch(const RECT& left, const RECT& right) {
+    return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
+}
+
+int NonNegativeMargin(LONG value) {
+    return static_cast<int>(std::max<LONG>(0, value));
+}
+
+}  // namespace
+
+DashboardTitlebarFrameMargins DashboardTitlebarFrameMarginsFromAdjustedRect(
+    const RECT& adjustedRect, int clientWidth, int clientHeight) {
+    return DashboardTitlebarFrameMargins{NonNegativeMargin(-adjustedRect.left),
+        NonNegativeMargin(-adjustedRect.top),
+        NonNegativeMargin(adjustedRect.right - clientWidth),
+        NonNegativeMargin(adjustedRect.bottom - clientHeight)};
+}
+
+DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
+    const RECT& dashboardClientRect, const RECT& monitorRect, DashboardTitlebarFrameMargins margins) {
+    DashboardTitlebarGeometry geometry;
+    if (!IsRectUsable(dashboardClientRect) || !IsRectUsable(monitorRect) || margins.top <= 0 ||
+        RectsMatch(dashboardClientRect, monitorRect)) {
+        return geometry;
+    }
+
+    geometry.windowRect = RECT{dashboardClientRect.left - margins.left,
+        dashboardClientRect.top - margins.top,
+        dashboardClientRect.right + margins.right,
+        dashboardClientRect.bottom + margins.bottom};
+    geometry.virtualHoverRect =
+        RECT{dashboardClientRect.left, geometry.windowRect.top, dashboardClientRect.right, dashboardClientRect.top};
+    geometry.canShow = IsRectUsable(geometry.windowRect) && IsRectUsable(geometry.virtualHoverRect) &&
+                       RectContainsRect(monitorRect, geometry.windowRect);
+    if (!geometry.canShow) {
+        geometry.windowRect = {};
+        geometry.virtualHoverRect = {};
+    }
+    return geometry;
+}

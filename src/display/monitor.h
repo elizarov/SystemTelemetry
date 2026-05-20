@@ -44,4 +44,5 @@ std::string SimplifyDeviceName(const std::string& deviceName);
 bool IsUsefulFriendlyName(const std::string& name);
 size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity);
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName);
+MonitorPlacementInfo GetMonitorPlacementForRect(const RECT& screenRect, double configuredScale = 0.0);
 MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredScale = 0.0);

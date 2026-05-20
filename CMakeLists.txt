@@ -182,6 +182,7 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_menu_format.cpp
     src/dashboard/dashboard_shell_ui.cpp
+    src/dashboard/dashboard_titlebar.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
@@ -319,6 +320,7 @@ set(casedash_release_speed_sources
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_shell_ui.cpp
+    src/dashboard/dashboard_titlebar.cpp
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
@@ -599,6 +601,7 @@ add_executable(CaseDashTests
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp
+    tests/dashboard_titlebar_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -649,6 +652,7 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
+    src/dashboard/dashboard_titlebar.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp

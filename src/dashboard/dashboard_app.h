@@ -11,6 +11,7 @@
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
+#include "dashboard/dashboard_titlebar.h"
 #include "display/constants.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
@@ -58,7 +59,10 @@ private:
 
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK TitlebarProbeWndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK TitlebarProbeWndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    LRESULT HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
     void BringOnTop();
     void ScheduleBringToFrontRetries();
@@ -106,7 +110,27 @@ private:
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
-    void StartMoveMode(bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint);
+    RECT DashboardClientScreenRect() const;
+    DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMargins(int clientWidth, int clientHeight) const;
+    DashboardTitlebarGeometry ResolveNativeTitlebarGeometry(const RECT& dashboardClientRect) const;
+    RECT ResolveWindowRectForDashboardClientRect(const RECT& dashboardClientRect) const;
+    void UpdateNativeTitlebarHoverFromCursor();
+    void UpdateNativeTitlebarProbe();
+    bool CreateNativeTitlebarProbe();
+    void DestroyNativeTitlebarProbe();
+    void ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry);
+    void HideNativeTitlebar();
+    RECT NativeTitlebarCloseButtonRect() const;
+    bool HitTestNativeTitlebarCloseButton(POINT clientPoint) const;
+    void PaintNativeTitlebar(HDC hdc) const;
+    void SetNativeTitlebarCloseButtonState(bool hovered, bool pressed);
+    void ResetNativeTitlebarCloseButtonState();
+    void UpdateNativeTitlebarCloseButtonHover(POINT screenPoint);
+    void StartNativeTitlebarHoverTimer();
+    void StopNativeTitlebarHoverTimer();
+    void StartMoveMode(
+        bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint, bool clampCursorAnchorClientPoint);
+    void StartMoveModeFromNativeTitlebar(POINT screenPoint);
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -158,7 +182,15 @@ private:
     int layoutEditModalUiDepth_ = 0;
     POINT moveCursorAnchorClientPoint_{};
     bool hasMoveCursorAnchorClientPoint_ = false;
+    bool clampMoveCursorAnchorClientPoint_ = true;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
+    bool stopMoveModeWhenLeftButtonReleased_ = false;
+    HWND titlebarHoverProbeHwnd_ = nullptr;
+    bool nativeTitlebarVisible_ = false;
+    bool nativeTitlebarProbeVisible_ = false;
+    bool nativeTitlebarHoverTimerActive_ = false;
+    bool nativeTitlebarCloseHovered_ = false;
+    bool nativeTitlebarClosePressed_ = false;
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;
