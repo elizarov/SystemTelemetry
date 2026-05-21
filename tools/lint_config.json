@@ -12,7 +12,6 @@
     "roots": ["src"],
     "header_suffix": ".h",
     "implementation_suffix": ".cpp",
-    "header_body_allowlist": ["src/config/config_schema.h"],
     "cpp_without_header_allowlist": ["src/main/main.cpp"],
     "control_keywords": ["catch", "for", "if", "switch", "while"]
   },
