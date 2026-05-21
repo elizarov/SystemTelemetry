@@ -35,8 +35,8 @@ class IncludeStyleChecker:
         self.tracked_only = bool(config.get("tracked_only", False))
         self.nolint_message = str(config["nolint_message"])
         self.include_roots = tuple(
-            IncludeRoot(name=str(item["name"]), path=project_path(context.project_root, str(item["path"])).resolve())
-            for item in config.get("include_roots", [])
+            IncludeRoot(name=root, path=project_path(context.project_root, root).resolve())
+            for root in config_strings(config, "include_roots")
         )
         self.violations: list[Finding] = []
         self.checked_count = 0

@@ -19,16 +19,7 @@
     "roots": ["src", "tests", "resources"],
     "suffixes": [".h", ".cpp", ".rc"],
     "tracked_only": true,
-    "include_roots": [
-      {
-        "name": "src",
-        "path": "src"
-      },
-      {
-        "name": "resources",
-        "path": "resources"
-      }
-    ],
+    "include_roots": ["src", "resources"],
     "nolint_message": "Local NOLINT suppressions are not allowed; fix the finding or add a maintained checker-level exception instead."
   },
   "source_dependencies": {
