@@ -70,7 +70,6 @@ $ignoredUnusedIncludeWarnings = @(
     'src/util/trace.cpp|windows.h',
     'src/util/win32_format.cpp|windows.h',
     # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
-    'src/dashboard/dashboard_app.h|constants.h',
     'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',
     'src/diagnostics/diagnostics.h|snapshot_dump.h',
     'src/display/display_config.h|snapshot_dump.h',
@@ -512,14 +511,14 @@ if (-not $clangd) {
 }
 
 $manifestPath = Join-Path $resolvedRoot 'build\clangd_include_files.json'
-$manifest = foreach ($file in $files) {
+$manifest = @(foreach ($file in $files) {
     $relativePath = Get-RelativeRepoPath -RepoRoot $resolvedRoot -FullPath $file.FullName
     [pscustomobject]@{
         relativePath = $relativePath
         lineFilter = $lineFiltersByPath[$relativePath]
     }
-}
-$manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
+})
+ConvertTo-Json -InputObject $manifest -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding UTF8
 
 $script = Join-Path $resolvedRoot 'tools\run_clangd_includes.py'
 & python $script `
