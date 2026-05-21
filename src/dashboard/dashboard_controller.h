@@ -118,8 +118,9 @@ public:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis);
-    AppConfig BuildCurrentConfigForSaving(DashboardShellHost& shell) const;
-    bool UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
+    AppConfig BuildCurrentConfigForSaving() const;
+    void UpdateConfigFromMovePlacement(DashboardShellHost& shell);
+    bool SaveCurrentConfig(DashboardShellHost& shell);
 
 private:
     void BeginLayoutEditSessionTracking();

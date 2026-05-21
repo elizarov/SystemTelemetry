@@ -474,7 +474,7 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
             return false;
         }
         if (*action == UnsavedLayoutEditAction::Save) {
-            if (!app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+            if (!app_.controller_.SaveCurrentConfig(app_)) {
                 return false;
             }
         } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
@@ -543,7 +543,7 @@ bool DashboardShellUi::HandleReloadConfig() {
         if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
             return false;
         }
-        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.SaveCurrentConfig(app_)) {
             return false;
         }
     }
@@ -623,7 +623,7 @@ void DashboardShellUi::HandleExitRequest() {
         if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
             return;
         }
-        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.SaveCurrentConfig(app_)) {
             return;
         }
     }
@@ -1002,7 +1002,7 @@ void DashboardShellUi::ExecuteCommand(
             HandleReloadConfig();
             break;
         case kCommandSaveConfig:
-            if (app_.controller_.UpdateConfigFromCurrentPlacement(app_)) {
+            if (app_.controller_.SaveCurrentConfig(app_)) {
                 if (state.isEditingLayout) {
                     StopLayoutEditSession(UnsavedLayoutEditPrompt::StopEditing);
                 } else {

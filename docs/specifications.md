@@ -77,7 +77,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - MSI uninstall closes the running dashboard when needed and removes the install directory tree.
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
-- Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
+- Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard. Completing move mode updates the live display monitor and logical position once, so later layout or theme changes keep the placed position.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless `Edit Configuration` window refresh work runs.
 - The `Theme` and `Layout` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately before `Layout`.
 - The `Scale` submenu changes scale immediately.

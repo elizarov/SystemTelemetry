@@ -16,6 +16,7 @@ enum class TracePrefix : unsigned char {
     BoardVendor,
     Crash,
     DashboardTooltip,
+    DisplayPlacement,
     Diagnostics,
     Fake,
     FpsEtw,

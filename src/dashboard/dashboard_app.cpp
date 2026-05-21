@@ -1778,6 +1778,7 @@ void DashboardApp::StopMoveMode() {
     suppressMoveStopOnNextLeftButtonUp_ = false;
     stopMoveModeWhenLeftButtonReleased_ = false;
     nativeTitlebarDragMoveActive_ = false;
+    controller_.UpdateConfigFromMovePlacement(*this);
     controller_.State().isMoving = false;
     KillTimer(hwnd_, kMoveTimerId);
     HideLayoutEditTooltip();
