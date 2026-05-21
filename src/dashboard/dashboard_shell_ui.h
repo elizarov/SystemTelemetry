@@ -33,8 +33,6 @@ public:
     void InvokeDefaultAction(MenuSource source,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
-    bool HandleMenuMeasureItem(MEASUREITEMSTRUCT* item);
-    bool HandleMenuDrawItem(const DRAWITEMSTRUCT* item);
     void HandleExitRequest();
     void BeginLayoutEditModalUi();
     void EndLayoutEditModalUi();
@@ -57,11 +55,6 @@ private:
         ExitApplication,
         ReloadConfig,
         RunAsAdministrator,
-    };
-
-    struct ConfigureDisplayMenuDrawItem {
-        UINT commandId = 0;
-        DisplayMenuOption option;
     };
 
     std::optional<UnsavedLayoutEditAction> PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt prompt) const;
@@ -111,7 +104,8 @@ private:
     std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override;
     UINT ResolveDefaultCommand(MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const;
     size_t BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption* options, size_t capacity);
-    const ConfigureDisplayMenuDrawItem* FindConfigureDisplayMenuDrawItem(UINT commandId, ULONG_PTR itemData) const;
+    bool AttachConfigureDisplayMenuBitmap(HMENU menu, UINT commandId, const DisplayMenuOption& option);
+    void ClearConfigureDisplayMenuBitmaps();
     void ExecuteCommand(UINT selected,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
@@ -120,5 +114,5 @@ private:
 
     DashboardApp& app_;
     std::unique_ptr<LayoutEditDialog> layoutEditDialog_;
-    std::vector<ConfigureDisplayMenuDrawItem> configureDisplayMenuDrawItems_;
+    std::vector<HBITMAP> configureDisplayMenuBitmaps_;
 };
