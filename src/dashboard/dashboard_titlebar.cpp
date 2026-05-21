@@ -24,6 +24,10 @@ bool RectsMatch(const RECT& left, const RECT& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
 }
 
+bool PointInUsableRect(POINT point, const RECT& rect) {
+    return IsRectUsable(rect) && PtInRect(&rect, point) != FALSE;
+}
+
 int NonNegativeMargin(LONG value) {
     return static_cast<int>(std::max<LONG>(0, value));
 }
@@ -57,6 +61,54 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarFrameGeometry(
         geometry.virtualHoverRect = {};
     }
     return geometry;
+}
+
+const char* DashboardTitlebarTooltipLocalizationKey(DashboardTitlebarTooltipControl control) {
+    switch (control) {
+        case DashboardTitlebarTooltipControl::AppMenu:
+            return "titlebar.app_menu";
+        case DashboardTitlebarTooltipControl::Layout:
+            return "titlebar.layout";
+        case DashboardTitlebarTooltipControl::Theme:
+            return "titlebar.theme";
+        case DashboardTitlebarTooltipControl::EditLayout:
+            return "titlebar.edit_layout";
+        case DashboardTitlebarTooltipControl::Display:
+            return "titlebar.display";
+        case DashboardTitlebarTooltipControl::Close:
+            return "titlebar.close";
+        case DashboardTitlebarTooltipControl::None:
+            break;
+    }
+    return "";
+}
+
+DashboardTitlebarTooltipTarget ResolveDashboardTitlebarTooltipTarget(POINT clientPoint,
+    const RECT& appMenuRect,
+    const RECT& layoutComboRect,
+    const RECT& themeComboRect,
+    const RECT& editLayoutRect,
+    const RECT& displayRect,
+    const RECT& closeRect) {
+    const struct {
+        DashboardTitlebarTooltipControl control;
+        const RECT& rect;
+    } controls[] = {
+        {DashboardTitlebarTooltipControl::Close, closeRect},
+        {DashboardTitlebarTooltipControl::Display, displayRect},
+        {DashboardTitlebarTooltipControl::EditLayout, editLayoutRect},
+        {DashboardTitlebarTooltipControl::Theme, themeComboRect},
+        {DashboardTitlebarTooltipControl::Layout, layoutComboRect},
+        {DashboardTitlebarTooltipControl::AppMenu, appMenuRect},
+    };
+
+    for (const auto& control : controls) {
+        if (PointInUsableRect(clientPoint, control.rect)) {
+            return DashboardTitlebarTooltipTarget{
+                control.control, control.rect, DashboardTitlebarTooltipLocalizationKey(control.control)};
+        }
+    }
+    return {};
 }
 
 DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(

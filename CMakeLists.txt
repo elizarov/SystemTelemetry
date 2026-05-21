@@ -183,6 +183,7 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_menu_format.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
     src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
@@ -322,6 +323,7 @@ set(casedash_release_speed_sources
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
@@ -656,6 +658,7 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
     src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp

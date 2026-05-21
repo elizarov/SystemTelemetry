@@ -5,7 +5,8 @@
 ## Responsibilities
 
 - `DashboardApp` owns HWND lifetime, message dispatch, tray integration, repaint invalidation, move-mode presentation, and the shell side of layout-edit interaction.
-- `DashboardApp` also owns the hover-activated titlebar state, including the invisible virtual-titlebar hover probe, monitor-fit checks, client-rect-preserving style changes, DWM native-chrome hints, native titlebar combo HWNDs, and shared custom display or close button routing.
+- `DashboardApp` also owns the hover-activated titlebar state, including the invisible virtual-titlebar hover probe, monitor-fit checks, client-rect-preserving style changes, DWM native-chrome hints, native titlebar combo HWNDs, shared titlebar control tooltip routing, and shared custom display or close button routing.
+- `DashboardTooltip` owns the shared Win32 tooltip window used by titlebar controls and layout-edit dashboard hover targets; layout-edit continues to own tooltip payload interpretation and text formatting.
 - `DashboardController` owns active config state, runtime instance lifetime, diagnostics session lifetime, save and reload actions, layout and scale switching, runtime target selection, and layout-edit session state.
 - `DashboardShellUi` owns popup-menu construction, dashboard menu label formatting, focused command dispatch, custom prompts, titlebar command forwarding, and the host bridge for the modeless editor window.
 - Auto-start enablement installs or updates the `CashDashService` LocalSystem service, starts it, waits for `SERVICE_RUNNING`, then writes the machine-wide Run entry for per-user dashboard UI startup; if Run registration fails, the service change is rolled back. Disabling auto-start removes the Run entry, stops the service, requests deletion, and accepts SCM pending-delete as cleaned up.

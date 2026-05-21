@@ -13,6 +13,7 @@
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
 #include "dashboard/dashboard_titlebar.h"
+#include "dashboard/dashboard_tooltip.h"
 #include "dashboard/dashboard_window_chrome.h"
 #include "display/constants.h"
 #include "display/monitor.h"
@@ -67,6 +68,12 @@ private:
         Close,
     };
 
+    enum class DashboardTooltipOwner {
+        None,
+        LayoutEdit,
+        Titlebar,
+    };
+
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK TitlebarProbeWndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -92,9 +99,10 @@ private:
     void StopMoveMode();
     void UpdateMoveTracking();
     void SyncDashboardMoveOverlayState();
-    bool CreateLayoutEditTooltip();
-    void DestroyLayoutEditTooltip();
+    bool CreateDashboardTooltip();
+    void DestroyDashboardTooltip();
     void HideLayoutEditTooltip();
+    void HideTitlebarTooltip();
     void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
@@ -159,6 +167,7 @@ private:
     void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
     void ResetNativeTitlebarButtonState();
     void UpdateNativeTitlebarButtonHover(POINT screenPoint);
+    void UpdateNativeTitlebarTooltip(POINT screenPoint);
     void InvokeNativeTitlebarButton(NativeTitlebarButton button);
     void StartNativeTitlebarHoverTimer();
     void StopNativeTitlebarHoverTimer();
@@ -207,13 +216,10 @@ private:
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;
-    HWND layoutEditTooltipHwnd_ = nullptr;
-    std::string layoutEditTooltipText_;
+    DashboardTooltip dashboardTooltip_;
+    DashboardTooltipOwner dashboardTooltipOwner_ = DashboardTooltipOwner::None;
     std::string lastError_;
-    bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;
-    RECT layoutEditTooltipRect_{};
-    bool layoutEditTooltipRectValid_ = false;
     bool layoutEditTooltipRefreshSuppressed_ = false;
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;

@@ -134,3 +134,52 @@ TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
     EXPECT_EQ(result.textColor, E_HANDLE);
     EXPECT_EQ(result.darkMode, E_HANDLE);
 }
+
+TEST(DashboardTitlebarTooltip, ResolvesControlKeys) {
+    const RECT appMenu{0, 0, 36, 32};
+    const RECT layout{100, 5, 178, 27};
+    const RECT theme{184, 5, 296, 27};
+    const RECT editLayout{302, 0, 338, 32};
+    const RECT display{344, 0, 380, 32};
+    const RECT close{386, 0, 422, 32};
+
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{10, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.app_menu");
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{120, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.layout");
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{200, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.theme");
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{320, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.edit_layout");
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{360, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.display");
+    EXPECT_STREQ(
+        ResolveDashboardTitlebarTooltipTarget(POINT{400, 10}, appMenu, layout, theme, editLayout, display, close)
+            .localizationKey,
+        "titlebar.close");
+}
+
+TEST(DashboardTitlebarTooltip, SkipsUnavailableControls) {
+    const RECT empty{};
+    const RECT close{386, 0, 422, 32};
+
+    const DashboardTitlebarTooltipTarget missing =
+        ResolveDashboardTitlebarTooltipTarget(POINT{120, 10}, empty, empty, empty, empty, empty, close);
+    EXPECT_EQ(missing.control, DashboardTitlebarTooltipControl::None);
+    EXPECT_STREQ(missing.localizationKey, "");
+
+    const DashboardTitlebarTooltipTarget available =
+        ResolveDashboardTitlebarTooltipTarget(POINT{400, 10}, empty, empty, empty, empty, empty, close);
+    EXPECT_EQ(available.control, DashboardTitlebarTooltipControl::Close);
+    EXPECT_STREQ(available.localizationKey, "titlebar.close");
+}
