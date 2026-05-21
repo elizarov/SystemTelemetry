@@ -25,10 +25,11 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, auto-detected board metric bindings, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
-- `Configure Display` offers one section per display. A display whose aspect ratio matches the active layout has one fullscreen entry labeled `<display name> <monitor_w>x<monitor_h> full screen`; a nonmatching display has either top and bottom entries or left and right entries labeled with the resulting CaseDash size.
+- `Configure Display` offers one section per display. A display whose aspect ratio matches the active layout has one fullscreen entry labeled `<display name> full screen`; a nonmatching display has either top and bottom entries or left and right entries labeled `<display name> top|bottom|left|right`.
+- Each real `Configure Display` entry shows a schematic icon before the text. The icon preserves the display aspect ratio as a simple rectangle and shades the region occupied by the CaseDash window for fullscreen, top, bottom, left, or right placement.
 - Fullscreen display configuration saves the display origin, an explicit fitted scale, and `wallpaper = casedash_blank.png`, renders the blank wallpaper image, applies it to the selected monitor, and clears the previous CaseDash-owned monitor wallpaper when switching monitors.
 - Edge display configuration saves the selected monitor, explicit fitted scale, logical edge placement, and `wallpaper = ` without rendering or applying a new wallpaper. It clears the previous CaseDash-owned wallpaper, including same-monitor wallpaper ownership from a previous fullscreen configuration.
-- `Configure Display` marks an entry with a checkbox when the live config targets the same monitor rectangle, explicit scale, and logical position, while still allowing that checked entry to be invoked again.
+- `Configure Display` marks an entry with a checkbox when the live config targets the same monitor rectangle, explicit scale, and logical position, while still allowing that checked entry to be invoked again. The checkbox remains separate from the schematic placement icon.
 
 ## Dashboard Composition And Rendering
 

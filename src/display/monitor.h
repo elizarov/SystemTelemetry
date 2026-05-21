@@ -54,12 +54,21 @@ struct DisplayMenuOption {
     bool matchesCurrentConfig = false;
 };
 
+struct DisplayPlacementSchematicGeometry {
+    RECT displayRect{};
+    RECT caseDashRect{};
+    RECT dividerRect{};
+    bool hasDivider = false;
+};
+
 bool RectsEqual(const RECT& lhs, const RECT& rhs);
 UINT GetMonitorDpi(HMONITOR monitor);
 double ResolveDisplayScale(const AppConfig& config, UINT dpi);
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale);
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
+DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(
+    const DisplayMenuOption& option, const RECT& bounds);
 std::string SimplifyDeviceName(const std::string& deviceName);
 bool IsUsefulFriendlyName(const std::string& name);
 size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,

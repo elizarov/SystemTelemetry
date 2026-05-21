@@ -6,6 +6,7 @@
 
 - Enumerate monitors and expose display identities used by runtime placement and configure-display flows.
 - Generate the flat `Configure Display` option list with one section per monitor, fullscreen entries for matching aspect ratios, and top/bottom or left/right edge-placement entries for nonmatching aspect ratios.
+- Provide placement schematic geometry for the dashboard shell menu icons that show display aspect ratio and the shaded CaseDash footprint.
 - Resolve saved placement against current monitor availability.
 - Keep watching for a configured `display.monitor_name` when login startup or monitor hotplug races ahead of enumeration.
 - Let `WM_DPICHANGED` apply cross-monitor DPI transitions before destination window size scaling.

@@ -29,6 +29,22 @@ TargetMonitorInfo MakeTargetMonitor(int width, int height) {
     return TargetMonitorInfo{MakeRect(width, height), USER_DEFAULT_SCREEN_DPI};
 }
 
+DisplayMenuOption MakeSchematicOption(
+    DisplayPlacementMode mode, int monitorWidth, int monitorHeight, int targetWidth, int targetHeight) {
+    DisplayMenuOption option;
+    option.monitorRect = MakeRect(monitorWidth, monitorHeight);
+    option.targetSize = SIZE{targetWidth, targetHeight};
+    option.placementMode = mode;
+    return option;
+}
+
+void ExpectRect(const RECT& rect, LONG left, LONG top, LONG right, LONG bottom) {
+    EXPECT_EQ(rect.left, left);
+    EXPECT_EQ(rect.top, top);
+    EXPECT_EQ(rect.right, right);
+    EXPECT_EQ(rect.bottom, bottom);
+}
+
 }  // namespace
 
 TEST(DisplayMenuOptions, MatchingAspectRatioYieldsOneFullscreenOption) {
@@ -39,7 +55,7 @@ TEST(DisplayMenuOptions, MatchingAspectRatioYieldsOneFullscreenOption) {
         BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1920, 1080), std::nullopt, false, options, 3);
 
     ASSERT_EQ(count, 1u);
-    EXPECT_EQ(options[0].label, "Panel 1920x1080 full screen");
+    EXPECT_EQ(options[0].label, "Panel full screen");
     EXPECT_EQ(options[0].placementMode, DisplayPlacementMode::FullScreen);
     EXPECT_EQ(options[0].targetSize.cx, 1920);
     EXPECT_EQ(options[0].targetSize.cy, 1080);
@@ -56,14 +72,14 @@ TEST(DisplayMenuOptions, WiderLayoutYieldsTopAndBottomOptions) {
         BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1200, 1000), std::nullopt, false, options, 3);
 
     ASSERT_EQ(count, 2u);
-    EXPECT_EQ(options[0].label, "Panel 1200x675 top");
+    EXPECT_EQ(options[0].label, "Panel top");
     EXPECT_EQ(options[0].placementMode, DisplayPlacementMode::Top);
     EXPECT_EQ(options[0].targetSize.cx, 1200);
     EXPECT_EQ(options[0].targetSize.cy, 675);
     EXPECT_EQ(options[0].position, LogicalPointConfig{});
     EXPECT_NEAR(options[0].targetScale, 0.75, 0.000001);
     EXPECT_FALSE(options[0].writesWallpaper);
-    EXPECT_EQ(options[1].label, "Panel 1200x675 bottom");
+    EXPECT_EQ(options[1].label, "Panel bottom");
     EXPECT_EQ(options[1].placementMode, DisplayPlacementMode::Bottom);
     EXPECT_EQ(options[1].position, (LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)}));
     EXPECT_NEAR(options[1].targetScale, 0.75, 0.000001);
@@ -78,11 +94,11 @@ TEST(DisplayMenuOptions, EdgeScaleIsRoundedToThreeDecimals) {
         BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1000, 600), std::nullopt, false, options, 3);
 
     ASSERT_EQ(count, 2u);
-    EXPECT_EQ(options[0].label, "Panel 999x333 top");
+    EXPECT_EQ(options[0].label, "Panel top");
     EXPECT_EQ(options[0].targetSize.cx, 999);
     EXPECT_EQ(options[0].targetSize.cy, 333);
     EXPECT_NEAR(options[0].targetScale, 0.333, 0.000001);
-    EXPECT_EQ(options[1].label, "Panel 999x333 bottom");
+    EXPECT_EQ(options[1].label, "Panel bottom");
 }
 
 TEST(DisplayMenuOptions, NarrowerLayoutYieldsLeftAndRightOptions) {
@@ -93,14 +109,14 @@ TEST(DisplayMenuOptions, NarrowerLayoutYieldsLeftAndRightOptions) {
         BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1200, 1000), std::nullopt, false, options, 3);
 
     ASSERT_EQ(count, 2u);
-    EXPECT_EQ(options[0].label, "Panel 563x1000 left");
+    EXPECT_EQ(options[0].label, "Panel left");
     EXPECT_EQ(options[0].placementMode, DisplayPlacementMode::Left);
     EXPECT_EQ(options[0].targetSize.cx, 563);
     EXPECT_EQ(options[0].targetSize.cy, 1000);
     EXPECT_EQ(options[0].position, LogicalPointConfig{});
     EXPECT_NEAR(options[0].targetScale, 0.625, 0.000001);
     EXPECT_FALSE(options[0].writesWallpaper);
-    EXPECT_EQ(options[1].label, "Panel 563x1000 right");
+    EXPECT_EQ(options[1].label, "Panel right");
     EXPECT_EQ(options[1].placementMode, DisplayPlacementMode::Right);
     EXPECT_EQ(options[1].position, (LogicalPointConfig{ScalePhysicalToLogical(637, 0.625), 0}));
     EXPECT_NEAR(options[1].targetScale, 0.625, 0.000001);
@@ -137,6 +153,62 @@ TEST(DisplayMenuOptions, GeneratedOptionsHaveActionableTargets) {
         EXPECT_GT(options[i].targetSize.cx, 0);
         EXPECT_GT(options[i].targetSize.cy, 0);
     }
+}
+
+TEST(DisplayPlacementSchematic, PreservesDisplayAspectRatioInsideBounds) {
+    const DisplayMenuOption option = MakeSchematicOption(DisplayPlacementMode::FullScreen, 1600, 900, 1600, 900);
+
+    const DisplayPlacementSchematicGeometry geometry =
+        ComputeDisplayPlacementSchematicGeometry(option, RECT{0, 0, 32, 32});
+
+    ExpectRect(geometry.displayRect, 0, 7, 32, 25);
+    ExpectRect(geometry.caseDashRect, 0, 7, 32, 25);
+    EXPECT_FALSE(geometry.hasDivider);
+}
+
+TEST(DisplayPlacementSchematic, FullscreenFillsDisplayRect) {
+    const DisplayMenuOption option = MakeSchematicOption(DisplayPlacementMode::FullScreen, 1200, 1000, 1200, 1000);
+
+    const DisplayPlacementSchematicGeometry geometry =
+        ComputeDisplayPlacementSchematicGeometry(option, RECT{0, 0, 120, 100});
+
+    ExpectRect(geometry.displayRect, 0, 0, 120, 100);
+    ExpectRect(geometry.caseDashRect, 0, 0, 120, 100);
+    EXPECT_FALSE(geometry.hasDivider);
+}
+
+TEST(DisplayPlacementSchematic, TopAndBottomUseFittedLayoutHeightRatio) {
+    const DisplayMenuOption top = MakeSchematicOption(DisplayPlacementMode::Top, 1200, 1000, 1200, 675);
+    const DisplayMenuOption bottom = MakeSchematicOption(DisplayPlacementMode::Bottom, 1200, 1000, 1200, 675);
+
+    const DisplayPlacementSchematicGeometry topGeometry =
+        ComputeDisplayPlacementSchematicGeometry(top, RECT{0, 0, 120, 100});
+    const DisplayPlacementSchematicGeometry bottomGeometry =
+        ComputeDisplayPlacementSchematicGeometry(bottom, RECT{0, 0, 120, 100});
+
+    ExpectRect(topGeometry.caseDashRect, 0, 0, 120, 68);
+    EXPECT_TRUE(topGeometry.hasDivider);
+    ExpectRect(topGeometry.dividerRect, 0, 68, 120, 69);
+    ExpectRect(bottomGeometry.caseDashRect, 0, 32, 120, 100);
+    EXPECT_TRUE(bottomGeometry.hasDivider);
+    ExpectRect(bottomGeometry.dividerRect, 0, 32, 120, 33);
+}
+
+TEST(DisplayPlacementSchematic, LeftAndRightUseFittedLayoutWidthRatio) {
+    const DisplayMenuOption left = MakeSchematicOption(DisplayPlacementMode::Left, 1200, 1000, 563, 1000);
+    const DisplayMenuOption right = MakeSchematicOption(DisplayPlacementMode::Right, 1200, 1000, 563, 1000);
+
+    const DisplayPlacementSchematicGeometry leftGeometry =
+        ComputeDisplayPlacementSchematicGeometry(left, RECT{0, 0, 120, 100});
+    const DisplayPlacementSchematicGeometry rightGeometry =
+        ComputeDisplayPlacementSchematicGeometry(right, RECT{0, 0, 120, 100});
+
+    ExpectRect(leftGeometry.caseDashRect, 0, 0, 56, 100);
+    EXPECT_TRUE(leftGeometry.hasDivider);
+    ExpectRect(leftGeometry.dividerRect, 56, 0, 57, 100);
+    ExpectRect(rightGeometry.caseDashRect, 64, 0, 120, 100);
+    EXPECT_TRUE(rightGeometry.hasDivider);
+    ExpectRect(rightGeometry.dividerRect, 64, 0, 65, 100);
 }
 
 TEST(DisplayConfiguration, FullscreenConfigWritesWallpaper) {

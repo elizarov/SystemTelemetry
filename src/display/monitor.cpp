@@ -1,5 +1,6 @@
 #include "display/monitor.h"
 
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -29,6 +30,36 @@ int RectHeight(const RECT& rect) {
 
 bool AreScalesEqual(double left, double right) {
     return std::abs(left - right) <= kMonitorFitEpsilon;
+}
+
+bool IsRectEmptyOrInvalid(const RECT& rect) {
+    return RectWidth(rect) <= 0 || RectHeight(rect) <= 0;
+}
+
+RECT FitRectToAspectRatio(const RECT& bounds, int sourceWidth, int sourceHeight) {
+    if (IsRectEmptyOrInvalid(bounds) || sourceWidth <= 0 || sourceHeight <= 0) {
+        return {};
+    }
+
+    const int boundsWidth = RectWidth(bounds);
+    const int boundsHeight = RectHeight(bounds);
+    const double scale = std::min(static_cast<double>(boundsWidth) / static_cast<double>(sourceWidth),
+        static_cast<double>(boundsHeight) / static_cast<double>(sourceHeight));
+    const int width =
+        std::clamp(static_cast<int>(std::lround(static_cast<double>(sourceWidth) * scale)), 1, boundsWidth);
+    const int height =
+        std::clamp(static_cast<int>(std::lround(static_cast<double>(sourceHeight) * scale)), 1, boundsHeight);
+    const int left = bounds.left + (boundsWidth - width) / 2;
+    const int top = bounds.top + (boundsHeight - height) / 2;
+    return RECT{left, top, left + width, top + height};
+}
+
+int ClampScaledExtent(int sourceExtent, int targetExtent, int displayExtent) {
+    if (sourceExtent <= 0 || targetExtent <= 0 || displayExtent <= 0) {
+        return 0;
+    }
+    const double ratio = std::clamp(static_cast<double>(targetExtent) / static_cast<double>(sourceExtent), 0.0, 1.0);
+    return std::clamp(static_cast<int>(std::lround(static_cast<double>(displayExtent) * ratio)), 1, displayExtent);
 }
 
 const char* DisplayPlacementModeLabel(DisplayPlacementMode mode) {
@@ -107,6 +138,74 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
     return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? RoundDisplayScale(widthScale) : 0.0;
 }
 
+DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(
+    const DisplayMenuOption& option, const RECT& bounds) {
+    DisplayPlacementSchematicGeometry geometry;
+    const int monitorWidth = RectWidth(option.monitorRect);
+    const int monitorHeight = RectHeight(option.monitorRect);
+    geometry.displayRect = FitRectToAspectRatio(bounds, monitorWidth, monitorHeight);
+    if (IsRectEmptyOrInvalid(geometry.displayRect) || monitorWidth <= 0 || monitorHeight <= 0) {
+        return geometry;
+    }
+
+    const int displayWidth = RectWidth(geometry.displayRect);
+    const int displayHeight = RectHeight(geometry.displayRect);
+    geometry.caseDashRect = geometry.displayRect;
+    switch (option.placementMode) {
+        case DisplayPlacementMode::FullScreen:
+            return geometry;
+        case DisplayPlacementMode::Top: {
+            const int height = ClampScaledExtent(monitorHeight, option.targetSize.cy, displayHeight);
+            geometry.caseDashRect.bottom = geometry.caseDashRect.top + height;
+            if (height < displayHeight) {
+                geometry.hasDivider = true;
+                geometry.dividerRect = RECT{geometry.displayRect.left,
+                    geometry.caseDashRect.bottom,
+                    geometry.displayRect.right,
+                    geometry.caseDashRect.bottom + 1};
+            }
+            return geometry;
+        }
+        case DisplayPlacementMode::Bottom: {
+            const int height = ClampScaledExtent(monitorHeight, option.targetSize.cy, displayHeight);
+            geometry.caseDashRect.top = geometry.caseDashRect.bottom - height;
+            if (height < displayHeight) {
+                geometry.hasDivider = true;
+                geometry.dividerRect = RECT{geometry.displayRect.left,
+                    geometry.caseDashRect.top,
+                    geometry.displayRect.right,
+                    geometry.caseDashRect.top + 1};
+            }
+            return geometry;
+        }
+        case DisplayPlacementMode::Left: {
+            const int width = ClampScaledExtent(monitorWidth, option.targetSize.cx, displayWidth);
+            geometry.caseDashRect.right = geometry.caseDashRect.left + width;
+            if (width < displayWidth) {
+                geometry.hasDivider = true;
+                geometry.dividerRect = RECT{geometry.caseDashRect.right,
+                    geometry.displayRect.top,
+                    geometry.caseDashRect.right + 1,
+                    geometry.displayRect.bottom};
+            }
+            return geometry;
+        }
+        case DisplayPlacementMode::Right: {
+            const int width = ClampScaledExtent(monitorWidth, option.targetSize.cx, displayWidth);
+            geometry.caseDashRect.left = geometry.caseDashRect.right - width;
+            if (width < displayWidth) {
+                geometry.hasDivider = true;
+                geometry.dividerRect = RECT{geometry.caseDashRect.left,
+                    geometry.displayRect.top,
+                    geometry.caseDashRect.left + 1,
+                    geometry.displayRect.bottom};
+            }
+            return geometry;
+        }
+    }
+    return geometry;
+}
+
 size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
     const DisplayMenuMonitorInfo& monitor,
     const std::optional<TargetMonitorInfo>& configuredMonitor,
@@ -148,8 +247,7 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
 
         DisplayMenuOption& option = options[count];
         option = {};
-        option.label =
-            FormatText("%s %dx%d %s", labelName.c_str(), targetSize.cx, targetSize.cy, DisplayPlacementModeLabel(mode));
+        option.label = FormatText("%s %s", labelName.c_str(), DisplayPlacementModeLabel(mode));
         option.configMonitorName = monitor.configMonitorName;
         option.monitorRect = monitor.rect;
         option.dpi = monitor.dpi;

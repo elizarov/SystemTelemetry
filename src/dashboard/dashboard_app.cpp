@@ -2393,6 +2393,16 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             RefreshThemedIcons();
             CreateTrayIcon();
             return 0;
+        case WM_MEASUREITEM:
+            if (shellUi_ != nullptr && shellUi_->HandleMenuMeasureItem(reinterpret_cast<MEASUREITEMSTRUCT*>(lParam))) {
+                return TRUE;
+            }
+            break;
+        case WM_DRAWITEM:
+            if (shellUi_ != nullptr && shellUi_->HandleMenuDrawItem(reinterpret_cast<DRAWITEMSTRUCT*>(lParam))) {
+                return TRUE;
+            }
+            break;
         case WM_TIMER:
             if (wParam == kMoveTimerId) {
                 UpdateMoveTracking();

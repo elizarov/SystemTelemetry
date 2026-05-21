@@ -4,6 +4,7 @@
 #include <cmath>
 #include <commctrl.h>
 #include <commdlg.h>
+#include <cstdint>
 
 #include "build_version.h"
 #include "config/config_telemetry.h"
@@ -90,8 +91,124 @@ struct AboutDialogState {
     HICON icon = nullptr;
 };
 
+struct MenuDrawMetrics {
+    int checkGutter = 0;
+    int iconSlot = 0;
+    int iconGap = 0;
+    int horizontalPadding = 0;
+    int verticalPadding = 0;
+};
+
 BOOL AppendMenuText(HMENU menu, UINT flags, UINT_PTR id, std::string_view text) {
     return AppendMenuA(menu, flags, id, std::string(text).c_str());
+}
+
+int RectWidth(const RECT& rect) {
+    return rect.right - rect.left;
+}
+
+int RectHeight(const RECT& rect) {
+    return rect.bottom - rect.top;
+}
+
+COLORREF BlendColor(COLORREF foreground, COLORREF background, int foregroundPercent) {
+    const int clampedPercent = std::clamp(foregroundPercent, 0, 100);
+    const int backgroundPercent = 100 - clampedPercent;
+    const auto blendChannel = [&](int foregroundChannel, int backgroundChannel) {
+        return static_cast<BYTE>((foregroundChannel * clampedPercent + backgroundChannel * backgroundPercent) / 100);
+    };
+    return RGB(blendChannel(GetRValue(foreground), GetRValue(background)),
+        blendChannel(GetGValue(foreground), GetGValue(background)),
+        blendChannel(GetBValue(foreground), GetBValue(background)));
+}
+
+int ScaleMenuValue(int value, UINT dpi) {
+    return ScaleLogicalToPhysical(value, dpi);
+}
+
+MenuDrawMetrics ResolveMenuDrawMetrics(UINT dpi) {
+    MenuDrawMetrics metrics;
+    metrics.checkGutter = std::max(GetSystemMetrics(SM_CXMENUCHECK) + ScaleMenuValue(8, dpi), ScaleMenuValue(24, dpi));
+    metrics.iconSlot = ScaleMenuValue(28, dpi);
+    metrics.iconGap = ScaleMenuValue(8, dpi);
+    metrics.horizontalPadding = ScaleMenuValue(8, dpi);
+    metrics.verticalPadding = ScaleMenuValue(4, dpi);
+    return metrics;
+}
+
+HFONT MenuFont() {
+    return static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+}
+
+void DrawSimpleCheckmark(HDC hdc, const RECT& rect, COLORREF color) {
+    const int width = std::max(1, RectWidth(rect) / 8);
+    HPEN pen = CreatePen(PS_SOLID, width, color);
+    if (pen == nullptr) {
+        return;
+    }
+    HGDIOBJ oldPen = SelectObject(hdc, pen);
+    const int left = rect.left + RectWidth(rect) / 4;
+    const int midX = rect.left + RectWidth(rect) / 2;
+    const int right = rect.right - RectWidth(rect) / 5;
+    const int midY = rect.top + RectHeight(rect) * 3 / 5;
+    const int bottom = rect.bottom - RectHeight(rect) / 4;
+    const int top = rect.top + RectHeight(rect) / 3;
+    MoveToEx(hdc, left, midY, nullptr);
+    LineTo(hdc, midX, bottom);
+    LineTo(hdc, right, top);
+    SelectObject(hdc, oldPen);
+    DeleteObject(pen);
+}
+
+void FillRectWithColor(HDC hdc, const RECT& rect, COLORREF color) {
+    if (rect.right <= rect.left || rect.bottom <= rect.top) {
+        return;
+    }
+    HBRUSH brush = CreateSolidBrush(color);
+    if (brush == nullptr) {
+        return;
+    }
+    FillRect(hdc, &rect, brush);
+    DeleteObject(brush);
+}
+
+void DrawDisplayPlacementSchematic(HDC hdc,
+    const DisplayMenuOption& option,
+    const RECT& bounds,
+    COLORREF backgroundColor,
+    COLORREF textColor,
+    bool selected) {
+    const DisplayPlacementSchematicGeometry geometry = ComputeDisplayPlacementSchematicGeometry(option, bounds);
+    if (geometry.displayRect.right <= geometry.displayRect.left ||
+        geometry.displayRect.bottom <= geometry.displayRect.top) {
+        return;
+    }
+
+    const COLORREF highlight = selected ? GetSysColor(COLOR_HIGHLIGHTTEXT) : GetSysColor(COLOR_HIGHLIGHT);
+    const COLORREF fillColor = BlendColor(highlight, backgroundColor, selected ? 35 : 30);
+    const COLORREF outlineColor = BlendColor(textColor, backgroundColor, selected ? 75 : 65);
+    const COLORREF dividerColor = BlendColor(textColor, backgroundColor, selected ? 85 : 70);
+
+    FillRectWithColor(hdc, geometry.caseDashRect, fillColor);
+    if (geometry.hasDivider) {
+        FillRectWithColor(hdc, geometry.dividerRect, dividerColor);
+    }
+
+    HPEN pen = CreatePen(PS_SOLID, std::max(1, RectHeight(bounds) / 18), outlineColor);
+    HGDIOBJ oldBrush = SelectObject(hdc, GetStockObject(NULL_BRUSH));
+    HGDIOBJ oldPen = pen != nullptr ? SelectObject(hdc, pen) : nullptr;
+    Rectangle(hdc,
+        geometry.displayRect.left,
+        geometry.displayRect.top,
+        geometry.displayRect.right,
+        geometry.displayRect.bottom);
+    if (oldPen != nullptr) {
+        SelectObject(hdc, oldPen);
+    }
+    SelectObject(hdc, oldBrush);
+    if (pen != nullptr) {
+        DeleteObject(pen);
+    }
 }
 
 int MakeAboutIconSlotSquare(HWND hwnd) {
@@ -619,6 +736,7 @@ void DashboardShellUi::ShowTitlebarConfigureDisplayMenu(POINT screenPoint) {
         app_.hwnd_,
         nullptr);
     DestroyMenu(menu);
+    configureDisplayMenuDrawItems_.clear();
 
     if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
         const size_t index = selected - kCommandConfigureDisplayBase;
@@ -958,8 +1076,118 @@ UINT DashboardShellUi::ResolveDefaultCommand(
     return layoutEditTarget != nullptr ? kCommandEditLayoutTarget : kCommandMove;
 }
 
-size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption* options, size_t capacity) const {
+const DashboardShellUi::ConfigureDisplayMenuDrawItem* DashboardShellUi::FindConfigureDisplayMenuDrawItem(
+    UINT commandId, ULONG_PTR itemData) const {
+    if (itemData == 0 || configureDisplayMenuDrawItems_.empty()) {
+        return nullptr;
+    }
+    const std::uintptr_t itemAddress = static_cast<std::uintptr_t>(itemData);
+    const std::uintptr_t beginAddress = reinterpret_cast<std::uintptr_t>(configureDisplayMenuDrawItems_.data());
+    const std::uintptr_t endAddress =
+        beginAddress + configureDisplayMenuDrawItems_.size() * sizeof(ConfigureDisplayMenuDrawItem);
+    if (itemAddress < beginAddress || itemAddress >= endAddress) {
+        return nullptr;
+    }
+    const auto* item = reinterpret_cast<const ConfigureDisplayMenuDrawItem*>(itemData);
+    if (item->commandId != commandId) {
+        return nullptr;
+    }
+    return item;
+}
+
+bool DashboardShellUi::HandleMenuMeasureItem(MEASUREITEMSTRUCT* item) {
+    if (item == nullptr || item->CtlType != ODT_MENU) {
+        return false;
+    }
+    const ConfigureDisplayMenuDrawItem* drawItem = FindConfigureDisplayMenuDrawItem(item->itemID, item->itemData);
+    if (drawItem == nullptr) {
+        return false;
+    }
+
+    const UINT dpi = app_.CurrentWindowDpi();
+    const MenuDrawMetrics metrics = ResolveMenuDrawMetrics(dpi);
+    SIZE textSize{};
+    HDC hdc = GetDC(app_.hwnd_);
+    if (hdc != nullptr) {
+        HGDIOBJ oldFont = SelectObject(hdc, MenuFont());
+        GetTextExtentPoint32A(
+            hdc, drawItem->option.label.c_str(), static_cast<int>(drawItem->option.label.size()), &textSize);
+        SelectObject(hdc, oldFont);
+        ReleaseDC(app_.hwnd_, hdc);
+    }
+
+    item->itemHeight = static_cast<UINT>(std::max({GetSystemMetrics(SM_CYMENU),
+        metrics.iconSlot + metrics.verticalPadding * 2,
+        static_cast<int>(textSize.cy) + 8}));
+    item->itemWidth = static_cast<UINT>(
+        metrics.checkGutter + metrics.iconSlot + metrics.iconGap + textSize.cx + metrics.horizontalPadding * 2);
+    return true;
+}
+
+bool DashboardShellUi::HandleMenuDrawItem(const DRAWITEMSTRUCT* item) {
+    if (item == nullptr || item->CtlType != ODT_MENU || item->hDC == nullptr) {
+        return false;
+    }
+    const ConfigureDisplayMenuDrawItem* drawItem = FindConfigureDisplayMenuDrawItem(item->itemID, item->itemData);
+    if (drawItem == nullptr) {
+        return false;
+    }
+
+    const bool selected = (item->itemState & ODS_SELECTED) != 0;
+    const bool disabled = (item->itemState & ODS_DISABLED) != 0;
+    const COLORREF backgroundColor = GetSysColor(selected ? COLOR_HIGHLIGHT : COLOR_MENU);
+    const COLORREF textColor =
+        GetSysColor(disabled ? COLOR_GRAYTEXT : (selected ? COLOR_HIGHLIGHTTEXT : COLOR_MENUTEXT));
+    FillRectWithColor(item->hDC, item->rcItem, backgroundColor);
+
+    const UINT dpi = app_.CurrentWindowDpi();
+    const MenuDrawMetrics metrics = ResolveMenuDrawMetrics(dpi);
+    const int rowHeight = RectHeight(item->rcItem);
+    RECT checkRect{item->rcItem.left + metrics.horizontalPadding / 2,
+        item->rcItem.top + std::max(0, rowHeight - metrics.iconSlot) / 2,
+        item->rcItem.left + metrics.checkGutter - metrics.horizontalPadding / 2,
+        item->rcItem.top + std::max(0, rowHeight - metrics.iconSlot) / 2 + metrics.iconSlot};
+    if (drawItem->option.matchesCurrentConfig) {
+        DrawSimpleCheckmark(item->hDC, checkRect, textColor);
+    }
+
+    const int iconLeft = item->rcItem.left + metrics.checkGutter;
+    RECT iconBounds{iconLeft,
+        item->rcItem.top + std::max(0, rowHeight - metrics.iconSlot) / 2,
+        iconLeft + metrics.iconSlot,
+        item->rcItem.top + std::max(0, rowHeight - metrics.iconSlot) / 2 + metrics.iconSlot};
+    RECT schematicBounds{iconBounds.left + metrics.verticalPadding,
+        iconBounds.top + metrics.verticalPadding,
+        iconBounds.right - metrics.verticalPadding,
+        iconBounds.bottom - metrics.verticalPadding};
+    DrawDisplayPlacementSchematic(item->hDC, drawItem->option, schematicBounds, backgroundColor, textColor, selected);
+
+    RECT textRect{iconBounds.right + metrics.iconGap,
+        item->rcItem.top,
+        item->rcItem.right - metrics.horizontalPadding,
+        item->rcItem.bottom};
+    const int oldBkMode = SetBkMode(item->hDC, TRANSPARENT);
+    const COLORREF oldTextColor = SetTextColor(item->hDC, textColor);
+    HGDIOBJ oldFont = SelectObject(item->hDC, MenuFont());
+    DrawTextA(item->hDC,
+        drawItem->option.label.c_str(),
+        static_cast<int>(drawItem->option.label.size()),
+        &textRect,
+        DT_SINGLELINE | DT_VCENTER | DT_NOPREFIX | DT_END_ELLIPSIS);
+    SelectObject(item->hDC, oldFont);
+    SetTextColor(item->hDC, oldTextColor);
+    SetBkMode(item->hDC, oldBkMode);
+
+    if ((item->itemState & ODS_FOCUS) != 0) {
+        DrawFocusRect(item->hDC, &item->rcItem);
+    }
+    return true;
+}
+
+size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption* options, size_t capacity) {
     const DashboardSessionState& state = app_.controller_.State();
+    configureDisplayMenuDrawItems_.clear();
+    configureDisplayMenuDrawItems_.reserve(capacity);
     const size_t optionCount = EnumerateDisplayMenuOptions(state.config, options, capacity);
     if (optionCount == 0) {
         AppendMenuText(menu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
@@ -972,8 +1200,11 @@ size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption
             AppendMenuA(menu, MF_SEPARATOR, 0, nullptr);
         }
         const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
-        const UINT flags = MF_STRING | MF_ENABLED | (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
-        AppendMenuText(menu, flags, commandId, option.label);
+        const UINT flags = MF_OWNERDRAW | MF_ENABLED | (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
+        ConfigureDisplayMenuDrawItem& drawItem = configureDisplayMenuDrawItems_.emplace_back();
+        drawItem.commandId = commandId;
+        drawItem.option = option;
+        AppendMenuA(menu, flags, commandId, reinterpret_cast<LPCSTR>(&drawItem));
     }
     return optionCount;
 }
@@ -1339,6 +1570,7 @@ void DashboardShellUi::ShowContextMenu(
         app_.hwnd_,
         nullptr);
     DestroyMenu(menu);
+    configureDisplayMenuDrawItems_.clear();
     if (selected != 0) {
         if (selected >= kCommandConfigureDisplayBase && selected <= kCommandConfigureDisplayMax) {
             const size_t index = selected - kCommandConfigureDisplayBase;
