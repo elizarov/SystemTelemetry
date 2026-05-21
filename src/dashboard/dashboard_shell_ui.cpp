@@ -1303,10 +1303,10 @@ void DashboardShellUi::ShowContextMenu(
     }
     AppendMenuText(menu, MF_STRING, kCommandMove, "Move");
     AppendMenuText(menu, MF_STRING, kCommandBringOnTop, "Bring to Front");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(devicesMenu), "Devices");
     AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), "Theme");
     AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), "Layout");
     AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(displayMenu), "Display");
-    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(devicesMenu), "Devices");
     AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(editLayoutMenu), "Edit Layout");
     AppendMenuText(menu, autoStartFlags, kCommandAutoStart, "Start with Windows");
     if (advancedMenu != nullptr) {
