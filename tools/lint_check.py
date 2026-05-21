@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from re import Pattern
@@ -28,8 +29,8 @@ from lint.common import (
 )
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_PATH = Path(__file__).with_name("lint_config.json")
+PROJECT_ROOT = Path.cwd().resolve()
+DEFAULT_CONFIG_PATH = Path(__file__).with_name("lint_config.json")
 
 
 class Checker(Protocol):
@@ -59,8 +60,17 @@ def relpath(path: Path) -> str:
     return path.relative_to(PROJECT_ROOT).as_posix()
 
 
-def load_config() -> Config:
-    return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
+def resolve_config_path(path: Path) -> Path:
+    return path if path.is_absolute() else PROJECT_ROOT / path
+
+
+def load_config(config_path: Path) -> Config:
+    try:
+        return json.loads(config_path.read_text(encoding="utf-8"))
+    except OSError as error:
+        raise ValueError(f"could not read {config_path}: {error}") from error
+    except json.JSONDecodeError as error:
+        raise ValueError(f"{config_path}: {error.msg} at line {error.lineno}, column {error.colno}") from error
 
 
 def parse_suffix_groups(config: Config) -> dict[str, frozenset[str]]:
@@ -255,11 +265,28 @@ def absolute_project_path(path: Path) -> Path:
     return path if path.is_absolute() else PROJECT_ROOT / path
 
 
-def parse_args(config: Config) -> argparse.Namespace:
+def parse_config_args() -> Path:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=DEFAULT_CONFIG_PATH,
+    )
+    args, _unknown = parser.parse_known_args()
+    return resolve_config_path(args.config)
+
+
+def parse_args(config: Config, config_path: Path) -> argparse.Namespace:
     source_dependency_config = config["source_dependencies"]
     default_dot_path = project_path(PROJECT_ROOT, str(source_dependency_config["default_dot_output"]))
     parser = argparse.ArgumentParser(
         description="Run combined architecture, source dependency, include style, and source policy lint checks."
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=config_path,
+        help=f"Lint configuration file. Defaults to {DEFAULT_CONFIG_PATH}. Scan roots are relative to the current working directory.",
     )
     parser.add_argument(
         "--output",
@@ -344,16 +371,25 @@ def print_failure_result(result: CheckResult) -> None:
         print(result.summary)
 
 
+def format_elapsed(seconds: float) -> str:
+    if seconds < 1:
+        return f"{round(seconds * 1000):.0f}ms"
+    return f"{seconds:.3f}s"
+
+
 def main() -> int:
+    started = time.perf_counter()
     try:
-        config = load_config()
+        config_path = parse_config_args()
+        config = load_config(config_path)
         suffix_groups = parse_suffix_groups(config)
         validate_config(config, suffix_groups)
         settings = parse_scan_settings(config, suffix_groups)
     except ValueError as error:
         print(f"lint config error: {error}", file=sys.stderr)
+        print(f"Lint failed in {format_elapsed(time.perf_counter() - started)}.")
         return 2
-    args = parse_args(config)
+    args = parse_args(config, config_path)
     context = create_context(args, settings, suffix_groups)
     checkers = create_checkers(config, context)
 
@@ -377,7 +413,7 @@ def main() -> int:
     if any(result.failed for result in results):
         if printed_report:
             print()
-        print("Combined lint check failed.")
+        print(f"Lint failed in {format_elapsed(time.perf_counter() - started)}.")
         return 1
 
     print_scanned_loc_summary(records)
@@ -387,6 +423,7 @@ def main() -> int:
             print()
             for line in verbose_lines:
                 print(line)
+    print(f"Lint succeeded in {format_elapsed(time.perf_counter() - started)}.")
     return 0
 
 

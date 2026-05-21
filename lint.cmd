@@ -40,8 +40,9 @@ goto :usage
 
 :lint_args_done
 
-python tools\lint_check.py !lint_check_args!
-if errorlevel 1 set "failed=1"
+python "%root%tools\lint_check.py" --config "%root%tools\lint_config.json" !lint_check_args!
+set "lint_check_result=!errorlevel!"
+if not "!lint_check_result!"=="0" set "failed=1"
 
 if "!include_lint!"=="1" (
     if /I "!include_scope!"=="changed" (
@@ -62,7 +63,7 @@ if "%failed%"=="0" (
     exit /b 0
 )
 
-echo Lint failed.
+if "!lint_check_result!"=="0" echo Lint failed.
 popd >nul
 exit /b 1
 
