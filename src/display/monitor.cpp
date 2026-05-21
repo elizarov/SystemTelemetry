@@ -104,7 +104,7 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
     if (!std::isfinite(widthScale) || !std::isfinite(heightScale) || widthScale <= 0.0 || heightScale <= 0.0) {
         return 0.0;
     }
-    return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? widthScale : 0.0;
+    return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? RoundDisplayScale(widthScale) : 0.0;
 }
 
 size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
@@ -124,13 +124,16 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
         return 0;
     }
 
-    const double widthScale =
+    const double rawWidthScale =
         static_cast<double>(monitorWidth) / static_cast<double>(config.layout.structure.window.width);
-    const double heightScale =
+    const double rawHeightScale =
         static_cast<double>(monitorHeight) / static_cast<double>(config.layout.structure.window.height);
-    if (!std::isfinite(widthScale) || !std::isfinite(heightScale) || widthScale <= 0.0 || heightScale <= 0.0) {
+    if (!std::isfinite(rawWidthScale) || !std::isfinite(rawHeightScale) || rawWidthScale <= 0.0 ||
+        rawHeightScale <= 0.0) {
         return 0;
     }
+    const double widthScale = RoundDisplayScale(rawWidthScale);
+    const double heightScale = RoundDisplayScale(rawHeightScale);
 
     const std::string labelName = !monitor.displayName.empty() ? monitor.displayName : monitor.configMonitorName;
     size_t count = 0;
@@ -163,18 +166,18 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
         ++count;
     };
 
-    if (AreScalesEqual(widthScale, heightScale)) {
+    if (AreScalesEqual(rawWidthScale, rawHeightScale)) {
         appendOption(DisplayPlacementMode::FullScreen,
             widthScale,
-            SIZE{monitorWidth, monitorHeight},
+            ComputeWindowSizeForScale(config, widthScale),
             LogicalPointConfig{},
             true);
         return count;
     }
 
-    if (widthScale < heightScale) {
+    if (rawWidthScale < rawHeightScale) {
         const double targetScale = widthScale;
-        const SIZE targetSize{monitorWidth, ScaleLogicalToPhysical(config.layout.structure.window.height, targetScale)};
+        const SIZE targetSize = ComputeWindowSizeForScale(config, targetScale);
         appendOption(DisplayPlacementMode::Top, targetScale, targetSize, LogicalPointConfig{}, false);
         appendOption(DisplayPlacementMode::Bottom,
             targetScale,
@@ -185,7 +188,7 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
     }
 
     const double targetScale = heightScale;
-    const SIZE targetSize{ScaleLogicalToPhysical(config.layout.structure.window.width, targetScale), monitorHeight};
+    const SIZE targetSize = ComputeWindowSizeForScale(config, targetScale);
     appendOption(DisplayPlacementMode::Left, targetScale, targetSize, LogicalPointConfig{}, false);
     appendOption(DisplayPlacementMode::Right,
         targetScale,

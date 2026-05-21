@@ -16,6 +16,8 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_hit_priority.h"
 #include "layout_model/layout_edit_service.h"
+#include "util/numeric_format.h"
+#include "util/scale.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
@@ -337,8 +339,8 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
     const std::string positionText =
         FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
-    const std::string scaleText =
-        FormatText("Scale: %.0f%% (%.2fx)", overlayState.monitorScale * 100.0, overlayState.monitorScale);
+    const std::string scaleText = FormatText("Display scale: %s%%",
+        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.monitorScale) * 100.0, 1).c_str());
     const std::string hintText = overlayState.placeOnRelease ? "Release to place" : "Left-click to place";
 
     const int minContentWidth = ScaleLogical(220);

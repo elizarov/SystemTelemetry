@@ -19,6 +19,7 @@
 #include "telemetry/metrics.h"
 #include "util/command_line.h"
 #include "util/elevated_process.h"
+#include "util/scale.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
 #include "util/text_format.h"
@@ -591,10 +592,11 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     const DisplayConfig previousDisplay = state_.config.display;
     state_.config.display.monitorName =
         !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
-    const double targetScale = HasExplicitDisplayScale(scale) ? scale : ScaleFromDpi(placement.dpi);
+    const double requestedScale = RoundDisplayScale(scale);
+    const double targetScale = HasExplicitDisplayScale(requestedScale) ? requestedScale : ScaleFromDpi(placement.dpi);
     state_.config.display.position.x = ScalePhysicalToLogical(placement.physicalRelativePosition.x, targetScale);
     state_.config.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
-    state_.config.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
+    state_.config.display.scale = HasExplicitDisplayScale(requestedScale) ? requestedScale : 0.0;
     TraceDisplayPositionUpdate(
         shell.TraceLog(), "set_display_scale", previousDisplay, state_.config.display, &placement);
     SyncRenderer(shell, state_.isEditingLayout);

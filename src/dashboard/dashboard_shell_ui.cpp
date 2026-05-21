@@ -13,6 +13,7 @@
 #include "dashboard/dashboard_menu_format.h"
 #include "diagnostics/diagnostics.h"
 #include "display/constants.h"
+#include "display/monitor.h"
 #include "layout_edit/layout_edit_service.h"
 #include "layout_edit/layout_edit_target_descriptor.h"
 #include "layout_edit/layout_edit_tooltip_payload.h"
@@ -28,6 +29,7 @@
 #include "util/message_box.h"
 #include "util/numeric_format.h"
 #include "util/paths.h"
+#include "util/scale.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 
@@ -202,20 +204,27 @@ INT_PTR CALLBACK AboutDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM 
 }
 
 bool IsPredefinedDisplayScale(double scale) {
+    const double roundedScale = RoundDisplayScale(scale);
     for (double predefinedScale : kPredefinedDisplayScales) {
-        if (AreScalesEqual(scale, predefinedScale)) {
+        if (AreScalesEqual(roundedScale, RoundDisplayScale(predefinedScale))) {
             return true;
         }
     }
     return false;
 }
 
-std::string FormatScaleLabel(double scale) {
-    return FormatText("%s%%", FormatDoubleGeneral(scale * 100.0, 12).c_str());
+std::string FormatScalePercentageValue(double scale) {
+    return FormatDoubleFixedTrimmed(RoundDisplayScale(scale) * 100.0, 1);
 }
 
-std::string FormatScalePercentageValue(double scale) {
-    return FormatDoubleGeneral(scale * 100.0, 12);
+std::string FormatScaleMenuLabel(const AppConfig& config, double scale) {
+    const double roundedScale = RoundDisplayScale(scale);
+    const SIZE windowSize = ComputeWindowSizeForScale(config, roundedScale);
+    return FormatText("%s%% - %dx%d", FormatScalePercentageValue(roundedScale).c_str(), windowSize.cx, windowSize.cy);
+}
+
+std::string FormatDefaultScaleMenuLabel(const AppConfig& config, UINT dpi) {
+    return FormatText("Default - %s", FormatScaleMenuLabel(config, ScaleFromDpi(dpi)).c_str());
 }
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
@@ -228,23 +237,25 @@ std::string FormatNamedMenuLabel(std::string_view name, std::string_view descrip
 }
 
 size_t BuildScaleMenuEntries(double currentScale, double* entries, size_t capacity) {
+    const double roundedCurrentScale = RoundDisplayScale(currentScale);
     size_t count = 0;
     for (double predefinedScale : kPredefinedDisplayScales) {
         if (count < capacity) {
-            entries[count++] = predefinedScale;
+            entries[count++] = RoundDisplayScale(predefinedScale);
         }
     }
-    if (!HasExplicitDisplayScale(currentScale) || IsPredefinedDisplayScale(currentScale) || count >= capacity) {
+    if (!HasExplicitDisplayScale(roundedCurrentScale) || IsPredefinedDisplayScale(roundedCurrentScale) ||
+        count >= capacity) {
         return count;
     }
     size_t insertAt = 0;
-    while (insertAt < count && entries[insertAt] < currentScale) {
+    while (insertAt < count && entries[insertAt] < roundedCurrentScale) {
         ++insertAt;
     }
     for (size_t i = count; i > insertAt; --i) {
         entries[i] = entries[i - 1];
     }
-    entries[insertAt] = currentScale;
+    entries[insertAt] = roundedCurrentScale;
     return count + 1;
 }
 
@@ -342,7 +353,7 @@ INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, L
                         SendDlgItemMessageA(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
                         return TRUE;
                     }
-                    state->result = *percentage / 100.0;
+                    state->result = RoundDisplayScale(*percentage / 100.0);
                     EndDialog(hwnd, IDOK);
                     return TRUE;
                 }
@@ -1227,15 +1238,16 @@ void DashboardShellUi::ShowContextMenu(
     AppendMenuText(scaleMenu,
         MF_STRING | (!HasExplicitDisplayScale(state.config.display.scale) ? MF_CHECKED : MF_UNCHECKED),
         kCommandScaleBase,
-        "Default");
+        FormatDefaultScaleMenuLabel(state.config, app_.CurrentWindowDpi()));
     SetMenuItemRadioStyle(scaleMenu, kCommandScaleBase);
     for (size_t i = 0; i < scaleEntryCount && (kCommandScaleBase + 1 + i) <= kCommandScaleMax; ++i) {
         const UINT commandId = kCommandScaleBase + 1 + static_cast<UINT>(i);
-        const UINT flags = MF_STRING | (HasExplicitDisplayScale(state.config.display.scale) &&
-                                                   AreScalesEqual(state.config.display.scale, scaleEntries[i])
-                                               ? MF_CHECKED
-                                               : MF_UNCHECKED);
-        const std::string label = FormatScaleLabel(scaleEntries[i]);
+        const UINT flags =
+            MF_STRING | (HasExplicitDisplayScale(state.config.display.scale) &&
+                                    AreScalesEqual(RoundDisplayScale(state.config.display.scale), scaleEntries[i])
+                                ? MF_CHECKED
+                                : MF_UNCHECKED);
+        const std::string label = FormatScaleMenuLabel(state.config, scaleEntries[i]);
         AppendMenuText(scaleMenu, flags, commandId, label);
         SetMenuItemRadioStyle(scaleMenu, commandId);
     }

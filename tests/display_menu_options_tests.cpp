@@ -70,6 +70,21 @@ TEST(DisplayMenuOptions, WiderLayoutYieldsTopAndBottomOptions) {
     EXPECT_FALSE(options[1].writesWallpaper);
 }
 
+TEST(DisplayMenuOptions, EdgeScaleIsRoundedToThreeDecimals) {
+    const AppConfig config = MakeDisplayConfig(3000, 1000);
+    DisplayMenuOption options[3]{};
+
+    const size_t count =
+        BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1000, 600), std::nullopt, false, options, 3);
+
+    ASSERT_EQ(count, 2u);
+    EXPECT_EQ(options[0].label, "Panel 999x333 top");
+    EXPECT_EQ(options[0].targetSize.cx, 999);
+    EXPECT_EQ(options[0].targetSize.cy, 333);
+    EXPECT_NEAR(options[0].targetScale, 0.333, 0.000001);
+    EXPECT_EQ(options[1].label, "Panel 999x333 bottom");
+}
+
 TEST(DisplayMenuOptions, NarrowerLayoutYieldsLeftAndRightOptions) {
     const AppConfig config = MakeDisplayConfig(900, 1600);
     DisplayMenuOption options[3]{};

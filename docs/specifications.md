@@ -14,7 +14,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The runtime loads the embedded `resources/config.ini` defaults first, then overlays `config.ini` beside `CaseDash.exe` when that file exists.
 - The executable manifest declares UTF-8 as the process active code page, and runtime Win32 A API text boundaries use the same narrow UTF-8 text as the app model.
 - The embedded template remains the shipped default source, while [resources/config.ini](../resources/config.ini) remains the maintained example and spelling authority for config entries.
-- The runtime treats window size, placement, and UI geometry as logical units and converts them to device pixels through either the current monitor DPI scale or the active explicit scale override.
+- The runtime treats window size, placement, and UI geometry as logical units and converts them to device pixels through either the current monitor DPI scale or the active explicit scale override. Resolved display scales are rounded to three decimal places before window sizing.
 - When the configured target monitor is temporarily unavailable, the runtime keeps watching for it and restores the saved placement there once the monitor becomes enumerable.
 - `Reload Config` reapplies live configuration immediately without restarting.
 - `Save Config` writes only the live values that differ from the loaded executable-side config state, preserving unchanged explicit overrides and unknown lines.
@@ -60,7 +60,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 ## Runtime Controls And Menus
 
 - Right-clicking the dashboard opens a popup menu with `Move`, `Bring to Front`, `Devices`, `Theme`, `Layout`, `Edit Layout`, `Display`, `Start with Windows`, `About CaseDash`, and `Exit` actions.
-- The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists enabled display placement entries separated by display section, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog.
+- The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists enabled display placement entries separated by display section, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Scale entries show the scale percentage and resulting dashboard window size as `<percent>% - <width>x<height>`.
 - The `Devices` submenu contains `GPU`, `Network`, and `Storage Drives`.
 - The `Edit Layout` submenu contains the checked `Edit Layout` mode toggle, `Layout Editor...`, and `Save Config`.
 - Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Run as administrator`, `Reload Config`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, `Save Screenshot...`, and `Save Layout Guide Sheet...`.
@@ -77,7 +77,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - MSI uninstall closes the running dashboard when needed and removes the install directory tree.
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
-- Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard. Completing move mode updates the live display monitor and logical position once, so later layout or theme changes keep the placed position.
+- Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, display scale percentage, and logical relative coordinates inside the same frame as the dashboard. Completing move mode updates the live display monitor and logical position once, so later layout or theme changes keep the placed position.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless `Edit Configuration` window refresh work runs.
 - The `Theme` and `Layout` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately before `Layout`.
 - The `Scale` submenu changes scale immediately.

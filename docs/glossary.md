@@ -34,7 +34,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | dashboard UI | The normal interactive shell with popup menus, tray icon, telemetry updates, and rendering. |
 | tray icon | The notification-area icon exposing the same menu action set as the dashboard menu. |
 | popup menu | The right-click dashboard or tray menu. |
-| move mode | The pointer-attached placement mode that overlays monitor name, effective scale, and relative coordinates. |
+| move mode | The pointer-attached placement mode that overlays monitor name, display scale percentage, and relative coordinates. |
 | runtime config | The loaded embedded config plus the executable-side config overlay and any live in-memory edits. |
 | embedded template | The `resources/config.ini` defaults compiled into the executable. |
 | executable-side config | The `config.ini` file beside `CaseDash.exe`. |
