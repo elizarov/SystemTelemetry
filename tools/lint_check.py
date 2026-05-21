@@ -24,6 +24,7 @@ from lint.common import (
     has_root,
     is_excluded,
     project_path,
+    strip_comments_and_strings,
 )
 
 
@@ -49,12 +50,9 @@ class FileEntry:
 class ScanSettings:
     roots: tuple[str, ...]
     suffixes: frozenset[str]
-    source_suffixes: frozenset[str]
-    tracked_only_suffixes: frozenset[str]
+    stripped_suffixes: frozenset[str]
     excluded_prefixes: tuple[str, ...]
     include_pattern: Pattern[str]
-    nolint_pattern: Pattern[str]
-    wide_literal_allowance: Pattern[str]
 
 
 def relpath(path: Path) -> str:
@@ -65,17 +63,63 @@ def load_config() -> Config:
     return json.loads(CONFIG_PATH.read_text(encoding="utf-8"))
 
 
-def parse_scan_settings(config: Config) -> ScanSettings:
+def parse_suffix_groups(config: Config) -> dict[str, frozenset[str]]:
+    groups = config.get("suffix_groups", {})
+    if not isinstance(groups, dict):
+        raise ValueError("suffix_groups must be an object")
+    return {str(name): frozenset(str(item) for item in values) for name, values in groups.items()}
+
+
+def require_suffix_group(suffix_groups: dict[str, frozenset[str]], config_path: str, group_name: str) -> frozenset[str]:
+    try:
+        return suffix_groups[group_name]
+    except KeyError as error:
+        raise ValueError(f"{config_path} references unknown suffix group {group_name}") from error
+
+
+def require_single_suffix_group(suffix_groups: dict[str, frozenset[str]], config_path: str, group_name: str) -> None:
+    values = require_suffix_group(suffix_groups, config_path, group_name)
+    if len(values) != 1:
+        raise ValueError(f"{config_path} must reference a suffix group with exactly one suffix")
+
+
+def validate_config(config: Config, suffix_groups: dict[str, frozenset[str]]) -> None:
+    require_suffix_group(suffix_groups, "scan.suffix_group", str(config["scan"]["suffix_group"]))
+    require_single_suffix_group(
+        suffix_groups,
+        "architecture.header_suffix_group",
+        str(config["architecture"]["header_suffix_group"]),
+    )
+    require_single_suffix_group(
+        suffix_groups,
+        "architecture.implementation_suffix_group",
+        str(config["architecture"]["implementation_suffix_group"]),
+    )
+    require_suffix_group(suffix_groups, "include_style.suffix_group", str(config["include_style"]["suffix_group"]))
+    require_suffix_group(
+        suffix_groups,
+        "source_dependencies.suffix_group",
+        str(config["source_dependencies"]["suffix_group"]),
+    )
+    require_suffix_group(
+        suffix_groups,
+        "source_dependencies.header_suffix_group",
+        str(config["source_dependencies"]["header_suffix_group"]),
+    )
+    require_suffix_group(suffix_groups, "source_policy.suffix_group", str(config["source_policy"]["suffix_group"]))
+    source_dependency_roots = config_strings(config["source_dependencies"], "roots")
+    if len(source_dependency_roots) != 1:
+        raise ValueError("source_dependencies.roots must contain exactly one root")
+
+
+def parse_scan_settings(config: Config, suffix_groups: dict[str, frozenset[str]]) -> ScanSettings:
     scan_config = config["scan"]
     return ScanSettings(
         roots=config_strings(scan_config, "roots"),
-        suffixes=frozenset(config_strings(scan_config, "suffixes")),
-        source_suffixes=frozenset(config_strings(scan_config, "source_suffixes")),
-        tracked_only_suffixes=frozenset(config_strings(scan_config, "tracked_only_suffixes")),
+        suffixes=require_suffix_group(suffix_groups, "scan.suffix_group", str(scan_config["suffix_group"])),
+        stripped_suffixes=require_suffix_group(suffix_groups, "suffix_groups.source", "source"),
         excluded_prefixes=config_strings(scan_config, "excluded_prefixes"),
         include_pattern=re.compile(str(scan_config["include_pattern"])),
-        nolint_pattern=re.compile(str(scan_config["nolint_pattern"])),
-        wide_literal_allowance=source_policy.compile_wide_literal_allowance(config["source_policy"]),
     )
 
 
@@ -104,8 +148,6 @@ def is_lint_input(path: Path, tracked: bool, settings: ScanSettings) -> bool:
     if settings.roots and not has_root(relative, settings.roots):
         return False
     if is_excluded(relative, settings.excluded_prefixes):
-        return False
-    if path.suffix in settings.tracked_only_suffixes and not tracked:
         return False
     return True
 
@@ -141,12 +183,8 @@ def scan_file(entry: FileEntry, settings: ScanSettings) -> FileRecord:
     text = entry.path.read_text(encoding="utf-8")
     lines = tuple(text.splitlines())
     includes: list[IncludeDirective] = []
-    nolint_lines: list[int] = []
 
     for line_number, line in enumerate(lines, start=1):
-        if settings.nolint_pattern.search(line):
-            nolint_lines.append(line_number)
-
         match = settings.include_pattern.match(line)
         if match:
             quoted_text = match.group(1)
@@ -160,11 +198,9 @@ def scan_file(entry: FileEntry, settings: ScanSettings) -> FileRecord:
 
     stripped_text = ""
     stripped_lines: tuple[str, ...] = ()
-    wide_literal_lines: tuple[int, ...] = ()
-    if entry.path.suffix in settings.source_suffixes:
-        stripped_text = source_policy.strip_comments_and_strings(text)
+    if entry.path.suffix in settings.stripped_suffixes:
+        stripped_text = strip_comments_and_strings(text)
         stripped_lines = tuple(stripped_text.splitlines())
-        wide_literal_lines = tuple(source_policy.find_undocumented_wide_literal_lines(text, settings.wide_literal_allowance))
 
     return FileRecord(
         path=entry.path,
@@ -173,10 +209,8 @@ def scan_file(entry: FileEntry, settings: ScanSettings) -> FileRecord:
         text=text,
         lines=lines,
         includes=tuple(includes),
-        nolint_lines=tuple(nolint_lines),
         stripped_text=stripped_text,
         stripped_lines=stripped_lines,
-        wide_literal_lines=wide_literal_lines,
     )
 
 
@@ -270,12 +304,13 @@ def parse_args(config: Config) -> argparse.Namespace:
     return parser.parse_args()
 
 
-def create_context(args: argparse.Namespace, settings: ScanSettings) -> CheckerContext:
+def create_context(args: argparse.Namespace, settings: ScanSettings, suffix_groups: dict[str, frozenset[str]]) -> CheckerContext:
     dot_output = absolute_project_path(args.output)
     graphml_output = absolute_project_path(args.graphml_output) if args.graphml_output else dot_output.with_suffix(".graphml")
     svg_output = absolute_project_path(args.svg_output) if args.svg_output else dot_output.with_suffix(".svg")
     return CheckerContext(
         project_root=PROJECT_ROOT,
+        suffix_groups=suffix_groups,
         excluded_prefixes=settings.excluded_prefixes,
         check_dependencies=bool(args.check),
         dot_output=dot_output,
@@ -310,10 +345,16 @@ def print_failure_result(result: CheckResult) -> None:
 
 
 def main() -> int:
-    config = load_config()
-    settings = parse_scan_settings(config)
+    try:
+        config = load_config()
+        suffix_groups = parse_suffix_groups(config)
+        validate_config(config, suffix_groups)
+        settings = parse_scan_settings(config, suffix_groups)
+    except ValueError as error:
+        print(f"lint config error: {error}", file=sys.stderr)
+        return 2
     args = parse_args(config)
-    context = create_context(args, settings)
+    context = create_context(args, settings, suffix_groups)
     checkers = create_checkers(config, context)
 
     records = scan_lint_inputs(

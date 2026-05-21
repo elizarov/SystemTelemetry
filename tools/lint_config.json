@@ -1,52 +1,54 @@
 {
+  "suffix_groups": {
+    "lint_inputs": [".h", ".cpp", ".rc"],
+    "source": [".h", ".cpp"],
+    "headers": [".h"],
+    "implementations": [".cpp"]
+  },
   "scan": {
     "roots": ["src", "tests", "resources"],
-    "suffixes": [".cpp", ".h", ".rc"],
-    "source_suffixes": [".cpp", ".h"],
-    "tracked_only_suffixes": [".rc"],
+    "suffix_group": "lint_inputs",
     "excluded_prefixes": ["src/vendor/"],
-    "include_pattern": "^\\s*#include\\s+(?:\"([^\"]+)\"|<([^>]+)>)",
-    "nolint_pattern": "\\bNOLINT(?:NEXTLINE|BEGIN|END)?\\b"
+    "include_pattern": "^\\s*#include\\s+(?:\"([^\"]+)\"|<([^>]+)>)"
   },
   "architecture": {
     "roots": ["src"],
-    "header_suffix": ".h",
-    "implementation_suffix": ".cpp",
+    "header_suffix_group": "headers",
+    "implementation_suffix_group": "implementations",
     "cpp_without_header_allowlist": ["src/main/main.cpp"],
     "control_keywords": ["catch", "for", "if", "switch", "while"]
   },
   "include_style": {
     "roots": ["src", "tests", "resources"],
-    "suffixes": [".h", ".cpp", ".rc"],
+    "suffix_group": "lint_inputs",
     "tracked_only": true,
     "include_roots": ["src", "resources"],
+    "nolint_pattern": "\\bNOLINT(?:NEXTLINE|BEGIN|END)?\\b",
     "nolint_message": "Local NOLINT suppressions are not allowed; fix the finding or add a maintained checker-level exception instead."
   },
   "source_dependencies": {
     "roots": ["src"],
-    "source_root": "src",
-    "root_label": "src",
-    "suffixes": [".cpp", ".h"],
-    "header_suffixes": [".h"],
+    "suffix_group": "source",
+    "header_suffix_group": "headers",
     "default_dot_output": "build/architecture/source_dependencies.dot",
     "graphml_namespace": "http://graphml.graphdrawing.org/xmlns",
     "dot_label": "CaseDash src module dependencies",
     "large_source_file_loc_threshold": 1000,
     "universal_package_dependencies": ["util"],
     "package_dependency_limits": {
-      "main": ["dashboard", "diagnostics", "display", "util"],
-      "dashboard": ["config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "util", "widget"],
-      "display": ["config", "diagnostics", "telemetry", "util"],
-      "diagnostics": ["config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "renderer", "telemetry", "util", "widget"],
-      "layout_edit_dialog": ["config", "layout_edit", "layout_model", "telemetry", "util", "widget"],
-      "layout_guide_sheet": ["config", "dashboard_renderer", "layout_edit", "layout_model", "renderer", "util", "widget"],
-      "dashboard_renderer": ["config", "layout_model", "renderer", "telemetry", "util", "widget"],
-      "layout_edit": ["config", "layout_model", "util", "widget"],
+      "main": ["dashboard", "diagnostics", "display"],
+      "dashboard": ["config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "widget"],
+      "display": ["config", "diagnostics", "telemetry"],
+      "diagnostics": ["config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "renderer", "telemetry", "widget"],
+      "layout_edit_dialog": ["config", "layout_edit", "layout_model", "telemetry", "widget"],
+      "layout_guide_sheet": ["config", "dashboard_renderer", "layout_edit", "layout_model", "renderer", "widget"],
+      "dashboard_renderer": ["config", "layout_model", "renderer", "telemetry", "widget"],
+      "layout_edit": ["config", "layout_model", "widget"],
       "layout_model": ["config", "renderer", "widget"],
-      "widget": ["config", "renderer", "telemetry", "util"],
-      "renderer": ["config", "util"],
-      "telemetry": ["config", "util"],
-      "config": ["util"],
+      "widget": ["config", "renderer", "telemetry"],
+      "renderer": ["config"],
+      "telemetry": ["config"],
+      "config": [],
       "util": []
     },
     "package_encapsulation_message": "{source} depends on package-private module {target}; only {target_package_root}/ files may include modules below {target_package_root}/*/.",
@@ -64,7 +66,7 @@
   },
   "source_policy": {
     "roots": ["src", "tests"],
-    "suffixes": [".h", ".cpp"],
+    "suffix_group": "source",
     "guardrails_doc": "docs/source_policy_guardrails.md",
     "line_rules": [
       {

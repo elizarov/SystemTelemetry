@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass
 from re import Pattern
 
-from .common import CheckResult, CheckerContext, Config, FileRecord, Finding, config_strings, has_root, is_excluded
+from .common import CheckResult, CheckerContext, Config, FileRecord, Finding, config_strings, has_root, is_excluded, suffix_group
 
 
 @dataclass(frozen=True)
@@ -18,83 +18,6 @@ class LineRule:
 
 def create_checker(config: Config, context: CheckerContext) -> "SourcePolicyChecker":
     return SourcePolicyChecker(config, context)
-
-
-def strip_comments_and_strings(text: str) -> str:
-    result: list[str] = []
-    i = 0
-    in_line_comment = False
-    in_block_comment = False
-    in_string = False
-    in_char = False
-    while i < len(text):
-        ch = text[i]
-        nxt = text[i + 1] if i + 1 < len(text) else ""
-        if in_line_comment:
-            if ch == "\n":
-                in_line_comment = False
-                result.append("\n")
-            else:
-                result.append(" ")
-            i += 1
-            continue
-        if in_block_comment:
-            if ch == "*" and nxt == "/":
-                result.extend("  ")
-                in_block_comment = False
-                i += 2
-            else:
-                result.append("\n" if ch == "\n" else " ")
-                i += 1
-            continue
-        if in_string:
-            if ch == "\\" and nxt:
-                result.extend("  ")
-                i += 2
-                continue
-            result.append("\n" if ch == "\n" else " ")
-            if ch == '"':
-                in_string = False
-            i += 1
-            continue
-        if in_char:
-            if ch == "\\" and nxt:
-                result.extend("  ")
-                i += 2
-                continue
-            result.append("\n" if ch == "\n" else " ")
-            if ch == "'":
-                in_char = False
-            i += 1
-            continue
-        if ch == "/" and nxt == "/":
-            result.extend("  ")
-            in_line_comment = True
-            i += 2
-            continue
-        if ch == "/" and nxt == "*":
-            result.extend("  ")
-            in_block_comment = True
-            i += 2
-            continue
-        if ch == '"':
-            result.append(" ")
-            in_string = True
-            i += 1
-            continue
-        if ch == "'":
-            result.append(" ")
-            in_char = True
-            i += 1
-            continue
-        result.append(ch)
-        i += 1
-    return "".join(result)
-
-
-def compile_wide_literal_allowance(source_policy_config: Config) -> Pattern[str]:
-    wide_literal_config = source_policy_config.get("wide_literals", {})
-    return re.compile(str(wide_literal_config["allowed_const_declaration_pattern"]))
 
 
 def is_identifier_char(ch: str) -> bool:
@@ -219,10 +142,11 @@ class SourcePolicyChecker:
     def __init__(self, config: Config, context: CheckerContext) -> None:
         self.context = context
         self.roots = config_strings(config, "roots")
-        self.suffixes = set(config_strings(config, "suffixes"))
+        self.suffixes = suffix_group(context, str(config["suffix_group"]))
         self.guardrails_doc = str(config.get("guardrails_doc", ""))
         self.line_rules = tuple(self._parse_rule(rule) for rule in config.get("line_rules", []))
         wide_literal_config = config.get("wide_literals", {})
+        self.wide_literal_allowance = re.compile(str(wide_literal_config["allowed_const_declaration_pattern"]))
         self.wide_literal_message = str(wide_literal_config.get("message", ""))
         self.violations: list[Finding] = []
         self.checked_count = 0
@@ -248,7 +172,7 @@ class SourcePolicyChecker:
                     if rule.capture_group is None:
                         break
 
-        for line_number in record.wide_literal_lines:
+        for line_number in find_undocumented_wide_literal_lines(record.text, self.wide_literal_allowance):
             self.violations.append(
                 Finding(
                     location=f"{record.relative}:{line_number}",

@@ -18,6 +18,7 @@ from .common import (
     is_excluded,
     normalize_include,
     project_path,
+    suffix_group,
 )
 
 
@@ -87,11 +88,11 @@ class SourceDependencyChecker:
     def __init__(self, config: Config, context: CheckerContext) -> None:
         self.context = context
         self.config = config
-        self.source_root = project_path(context.project_root, str(config["source_root"])).resolve()
-        self.root_label = str(config.get("root_label", self.source_root.name))
         self.roots = config_strings(config, "roots")
-        self.suffixes = set(config_strings(config, "suffixes"))
-        self.header_suffixes = set(config_strings(config, "header_suffixes"))
+        self.source_root_name = self.roots[0]
+        self.source_root = project_path(context.project_root, self.source_root_name).resolve()
+        self.suffixes = suffix_group(context, str(config["suffix_group"]))
+        self.header_suffixes = suffix_group(context, str(config["header_suffix_group"]))
         self.large_source_file_loc_threshold = int(config.get("large_source_file_loc_threshold", 1000))
         self.graphml_namespace = str(config.get("graphml_namespace", "http://graphml.graphdrawing.org/xmlns"))
         self.dot_label = str(config.get("dot_label", "Source dependencies"))
@@ -271,7 +272,7 @@ class SourceDependencyChecker:
                         target=target,
                         source_package=source_package,
                         target_package=target_package,
-                        target_package_root=f"{self.root_label}/{target_package}",
+                        target_package_root=f"{self.source_root_name}/{target_package}",
                     ),
                 )
             )
@@ -421,7 +422,7 @@ class SourceDependencyChecker:
 
     def _cluster_id(self, directory: str) -> str:
         if directory == ".":
-            safe_root = "".join(ch if ch.isalnum() else "_" for ch in self.root_label)
+            safe_root = "".join(ch if ch.isalnum() else "_" for ch in self.source_root_name)
             return f"cluster_{safe_root or 'root'}"
         safe = "".join(ch if ch.isalnum() else "_" for ch in directory)
         return f"cluster_{safe or 'root'}"
@@ -441,7 +442,7 @@ class SourceDependencyChecker:
         ]
 
         for directory in sorted(modules_by_directory):
-            label = self.root_label if directory == "." else directory.replace("/", "\\")
+            label = self.source_root_name if directory == "." else directory.replace("/", "\\")
             lines.extend(
                 [
                     f"  subgraph {self._cluster_id(directory)} {{",
@@ -551,7 +552,7 @@ class SourceDependencyChecker:
             module = self.modules[module_name]
             node = ET.SubElement(graph, self._graphml_tag("node"), id=module_ids[module_name])
             self._add_graphml_data(node, "node_label", self._format_node_label(module))
-            self._add_graphml_data(node, "node_directory", self.root_label if module.directory == "." else module.directory)
+            self._add_graphml_data(node, "node_directory", self.source_root_name if module.directory == "." else module.directory)
             self._add_graphml_data(node, "node_header_loc", str(module.header_loc))
             self._add_graphml_data(node, "node_cpp_loc", str(module.cpp_loc))
             self._add_graphml_data(node, "node_total_loc", str(module.total_loc))

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from pathlib import Path
+from re import Pattern
 
 from .common import (
     CheckResult,
@@ -14,6 +16,7 @@ from .common import (
     is_excluded,
     normalize_include,
     project_path,
+    suffix_group,
 )
 
 
@@ -31,8 +34,9 @@ class IncludeStyleChecker:
     def __init__(self, config: Config, context: CheckerContext) -> None:
         self.context = context
         self.roots = config_strings(config, "roots")
-        self.suffixes = set(config_strings(config, "suffixes"))
+        self.suffixes = suffix_group(context, str(config["suffix_group"]))
         self.tracked_only = bool(config.get("tracked_only", False))
+        self.nolint_pattern: Pattern[str] = re.compile(str(config["nolint_pattern"]))
         self.nolint_message = str(config["nolint_message"])
         self.include_roots = tuple(
             IncludeRoot(name=root, path=project_path(context.project_root, root).resolve())
@@ -45,10 +49,11 @@ class IncludeStyleChecker:
         if not self._is_eligible(record):
             return
         self.checked_count += 1
-        for line_number in record.nolint_lines:
-            self.violations.append(
-                Finding(location=f"{record.relative}:{line_number}", kind="include-style", message=self.nolint_message)
-            )
+        for line_number, line in enumerate(record.lines, start=1):
+            if self.nolint_pattern.search(line):
+                self.violations.append(
+                    Finding(location=f"{record.relative}:{line_number}", kind="include-style", message=self.nolint_message)
+                )
 
         for include in record.includes:
             if not include.quoted:

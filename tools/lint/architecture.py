@@ -3,7 +3,17 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from .common import CheckResult, CheckerContext, Config, FileRecord, Finding, config_strings, has_root, is_excluded
+from .common import (
+    CheckResult,
+    CheckerContext,
+    Config,
+    FileRecord,
+    Finding,
+    config_strings,
+    has_root,
+    is_excluded,
+    suffix_group,
+)
 
 
 CLASS_DECL_RE = re.compile(r"\b(?:class|struct)\s+([A-Za-z_]\w*(?:::[A-Za-z_]\w*)*)\b")
@@ -74,8 +84,10 @@ class ArchitectureChecker:
     def __init__(self, config: Config, context: CheckerContext) -> None:
         self.context = context
         self.roots = config_strings(config, "roots")
-        self.header_suffix = str(config.get("header_suffix", ".h"))
-        self.implementation_suffix = str(config.get("implementation_suffix", ".cpp"))
+        self.header_suffixes = suffix_group(context, str(config["header_suffix_group"]))
+        self.implementation_suffixes = suffix_group(context, str(config["implementation_suffix_group"]))
+        self.header_suffix = next(iter(self.header_suffixes))
+        self.implementation_suffix = next(iter(self.implementation_suffixes))
         self.header_body_allowlist = set(config_strings(config, "header_body_allowlist"))
         self.cpp_without_header_allowlist = set(config_strings(config, "cpp_without_header_allowlist"))
         self.control_keywords = set(config_strings(config, "control_keywords"))
@@ -89,10 +101,10 @@ class ArchitectureChecker:
     def process_file(self, record: FileRecord) -> None:
         if not self._is_eligible(record):
             return
-        if record.path.suffix == self.header_suffix:
+        if record.path.suffix in self.header_suffixes:
             self.header_count += 1
             self._process_header(record)
-        elif record.path.suffix == self.implementation_suffix:
+        elif record.path.suffix in self.implementation_suffixes:
             self.cpp_count += 1
             self._process_implementation(record)
 
@@ -106,7 +118,7 @@ class ArchitectureChecker:
         return CheckResult(title="Architecture check:", findings=tuple(self.violations), summary=summary)
 
     def _is_eligible(self, record: FileRecord) -> bool:
-        if record.path.suffix not in {self.header_suffix, self.implementation_suffix}:
+        if record.path.suffix not in self.header_suffixes | self.implementation_suffixes:
             return False
         if self.roots and not has_root(record.relative, self.roots):
             return False

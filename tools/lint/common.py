@@ -23,10 +23,8 @@ class FileRecord:
     text: str
     lines: tuple[str, ...]
     includes: tuple[IncludeDirective, ...]
-    nolint_lines: tuple[int, ...]
     stripped_text: str
     stripped_lines: tuple[str, ...]
-    wide_literal_lines: tuple[int, ...]
 
     @property
     def line_count(self) -> int:
@@ -36,6 +34,7 @@ class FileRecord:
 @dataclass(frozen=True)
 class CheckerContext:
     project_root: Path
+    suffix_groups: dict[str, frozenset[str]]
     excluded_prefixes: tuple[str, ...]
     check_dependencies: bool
     dot_output: Path
@@ -71,6 +70,13 @@ def config_strings(config: Config, key: str, default: tuple[str, ...] = ()) -> t
     return tuple(str(item) for item in value)
 
 
+def suffix_group(context: CheckerContext, group_name: str) -> frozenset[str]:
+    try:
+        return context.suffix_groups[group_name]
+    except KeyError as error:
+        raise ValueError(f"unknown suffix group {group_name}") from error
+
+
 def has_root(relative: str, roots: tuple[str, ...]) -> bool:
     return any(relative == root or relative.startswith(f"{root}/") for root in roots)
 
@@ -92,3 +98,75 @@ def project_path(project_root: Path, value: str | Path) -> Path:
     if path.is_absolute():
         return path
     return project_root / path
+
+
+def strip_comments_and_strings(text: str) -> str:
+    result: list[str] = []
+    i = 0
+    in_line_comment = False
+    in_block_comment = False
+    in_string = False
+    in_char = False
+    while i < len(text):
+        ch = text[i]
+        nxt = text[i + 1] if i + 1 < len(text) else ""
+        if in_line_comment:
+            if ch == "\n":
+                in_line_comment = False
+                result.append("\n")
+            else:
+                result.append(" ")
+            i += 1
+            continue
+        if in_block_comment:
+            if ch == "*" and nxt == "/":
+                result.extend("  ")
+                in_block_comment = False
+                i += 2
+            else:
+                result.append("\n" if ch == "\n" else " ")
+                i += 1
+            continue
+        if in_string:
+            if ch == "\\" and nxt:
+                result.extend("  ")
+                i += 2
+                continue
+            result.append("\n" if ch == "\n" else " ")
+            if ch == '"':
+                in_string = False
+            i += 1
+            continue
+        if in_char:
+            if ch == "\\" and nxt:
+                result.extend("  ")
+                i += 2
+                continue
+            result.append("\n" if ch == "\n" else " ")
+            if ch == "'":
+                in_char = False
+            i += 1
+            continue
+        if ch == "/" and nxt == "/":
+            result.extend("  ")
+            in_line_comment = True
+            i += 2
+            continue
+        if ch == "/" and nxt == "*":
+            result.extend("  ")
+            in_block_comment = True
+            i += 2
+            continue
+        if ch == '"':
+            result.append(" ")
+            in_string = True
+            i += 1
+            continue
+        if ch == "'":
+            result.append(" ")
+            in_char = True
+            i += 1
+            continue
+        result.append(ch)
+        i += 1
+    return "".join(result)
