@@ -97,8 +97,8 @@ DashboardTitlebarTooltipTarget ResolveDashboardTitlebarTooltipTarget(POINT clien
         {DashboardTitlebarTooltipControl::Close, closeRect},
         {DashboardTitlebarTooltipControl::Display, displayRect},
         {DashboardTitlebarTooltipControl::EditLayout, editLayoutRect},
-        {DashboardTitlebarTooltipControl::Theme, themeComboRect},
         {DashboardTitlebarTooltipControl::Layout, layoutComboRect},
+        {DashboardTitlebarTooltipControl::Theme, themeComboRect},
         {DashboardTitlebarTooltipControl::AppMenu, appMenuRect},
     };
 

@@ -91,7 +91,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The visible titlebar strip uses the dashboard width and stays hidden when its native frame would extend above the monitor or past the monitor sides, including fitted full-monitor dashboard placement. Bottom-frame overflow from a dashboard placement that is taller than the monitor does not by itself suppress the titlebar.
 - Leaving the dashboard, titlebar, or virtual titlebar band hides the strip unless a titlebar control dropdown, titlebar menu, close action, or titlebar move interaction is in progress.
 - The left side of the titlebar shows a small CaseDash icon button before the `CaseDash` title; left-clicking it opens the same full menu as right-clicking the dashboard.
-- Right-aligned titlebar controls appear left to right as a layout dropdown, a theme dropdown, an edit-layout button, a display setup button, and a close button.
+- Right-aligned titlebar controls appear left to right as a theme dropdown, a layout dropdown, an edit-layout button, a display setup button, and a close button.
 - Hovering a titlebar control shows a localized tooltip for that control without rebuilding the titlebar or interrupting layout-edit dashboard tooltip transitions.
 - The layout dropdown is a native Windows dropdown, shows layout names only, reflects the active layout, and applies a new layout through the same behavior as the `Layout` submenu.
 - The theme dropdown is a native Windows dropdown, shows theme names with spaces such as `dark cyan`, reflects the active theme, and applies a new theme through the same behavior as the `Theme` submenu.

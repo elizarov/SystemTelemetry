@@ -1068,13 +1068,13 @@ RECT DashboardApp::NativeTitlebarLayoutComboRect() const {
     RECT clientRect{};
     GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
     const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
-    const RECT themeRect = NativeTitlebarThemeComboRect();
+    const RECT editLayoutRect = NativeTitlebarButtonRect(NativeTitlebarButton::EditLayout);
     const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
     const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
     const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
-    const int right = IsRectUsable(themeRect)     ? themeRect.left - gap
-                      : IsRectUsable(displayRect) ? displayRect.left - gap
-                                                  : closeRect.left - gap;
+    const int right = IsRectUsable(editLayoutRect) ? editLayoutRect.left - gap
+                      : IsRectUsable(displayRect)  ? displayRect.left - gap
+                                                   : closeRect.left - gap;
     const int minWidth = ScaleLogicalToPhysical(58, CurrentWindowDpi());
     const int desiredWidth = ScaleLogicalToPhysical(kTitlebarLayoutComboWidthLogical, CurrentWindowDpi());
     const LONG leftLimit = IsRectUsable(appMenuRect) ? appMenuRect.right + gap : clientRect.left;
@@ -1096,13 +1096,13 @@ RECT DashboardApp::NativeTitlebarThemeComboRect() const {
     RECT clientRect{};
     GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
     const RECT appMenuRect = NativeTitlebarButtonRect(NativeTitlebarButton::AppMenu);
-    const RECT editLayoutRect = NativeTitlebarButtonRect(NativeTitlebarButton::EditLayout);
+    const RECT layoutRect = NativeTitlebarLayoutComboRect();
     const RECT displayRect = NativeTitlebarButtonRect(NativeTitlebarButton::Display);
     const RECT closeRect = NativeTitlebarButtonRect(NativeTitlebarButton::Close);
     const int gap = ScaleLogicalToPhysical(kTitlebarControlGapLogical, CurrentWindowDpi());
-    const int right = IsRectUsable(editLayoutRect) ? editLayoutRect.left - gap
-                      : IsRectUsable(displayRect)  ? displayRect.left - gap
-                                                   : closeRect.left - gap;
+    const int right = IsRectUsable(layoutRect)    ? layoutRect.left - gap
+                      : IsRectUsable(displayRect) ? displayRect.left - gap
+                                                  : closeRect.left - gap;
     const int minWidth = ScaleLogicalToPhysical(76, CurrentWindowDpi());
     const int desiredWidth = ScaleLogicalToPhysical(kTitlebarThemeComboWidthLogical, CurrentWindowDpi());
     const LONG leftLimit = IsRectUsable(appMenuRect) ? appMenuRect.right + gap : clientRect.left;
