@@ -607,6 +607,7 @@ add_executable(CaseDashTests
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp
     tests/dashboard_titlebar_tests.cpp
+    tests/display_menu_options_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -660,6 +661,7 @@ add_executable(CaseDashTests
     src/dashboard/dashboard_titlebar.cpp
     src/dashboard/dashboard_tooltip.cpp
     src/dashboard/dashboard_window_chrome.cpp
+    src/display/monitor.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
@@ -671,6 +673,7 @@ add_executable(CaseDashTests
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
+    src/util/scale.cpp
     src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/board/board_vendor_selection.cpp

@@ -5,6 +5,7 @@
 #include <optional>
 #include <string>
 
+#include "config/config_primitives.h"
 #include "util/scale.h"
 
 struct AppConfig;
@@ -24,14 +25,33 @@ struct TargetMonitorInfo {
     UINT dpi = USER_DEFAULT_SCREEN_DPI;
 };
 
-struct DisplayMenuOption {
+enum class DisplayPlacementMode {
+    FullScreen,
+    Top,
+    Bottom,
+    Left,
+    Right,
+};
+
+struct DisplayMenuMonitorInfo {
     std::string displayName;
     std::string configMonitorName;
     RECT rect{};
     UINT dpi = USER_DEFAULT_SCREEN_DPI;
-    bool layoutFits = false;
+};
+
+struct DisplayMenuOption {
+    std::string label;
+    std::string configMonitorName;
+    RECT monitorRect{};
+    UINT dpi = USER_DEFAULT_SCREEN_DPI;
+    bool startsSection = false;
+    DisplayPlacementMode placementMode = DisplayPlacementMode::FullScreen;
+    SIZE targetSize{};
+    LogicalPointConfig position{};
+    double targetScale = 0.0;
+    bool writesWallpaper = false;
     bool matchesCurrentConfig = false;
-    double fittedScale = 0.0;
 };
 
 bool RectsEqual(const RECT& lhs, const RECT& rhs);
@@ -42,6 +62,16 @@ SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
 std::string SimplifyDeviceName(const std::string& deviceName);
 bool IsUsefulFriendlyName(const std::string& name);
+size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
+    const DisplayMenuMonitorInfo& monitor,
+    const std::optional<TargetMonitorInfo>& configuredMonitor,
+    bool startsSection,
+    DisplayMenuOption* options,
+    size_t capacity);
+AppConfig BuildConfiguredDisplayConfig(const AppConfig& config, const DisplayMenuOption& option);
+bool ShouldClearPreviousDisplayWallpaper(const AppConfig& previousConfig,
+    const std::optional<TargetMonitorInfo>& previousMonitor,
+    const DisplayMenuOption& option);
 size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity);
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName);
 MonitorPlacementInfo GetMonitorPlacementForRect(const RECT& screenRect, double configuredScale = 0.0);

@@ -11,7 +11,6 @@
 #include "config/config_writer.h"
 #include "dashboard/autostart.h"
 #include "diagnostics/constants.h"
-#include "display/constants.h"
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
@@ -455,25 +454,28 @@ void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
 }
 
 bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option) {
-    if (state_.telemetry == nullptr || !option.layoutFits || option.fittedScale <= 0.0) {
+    if (state_.telemetry == nullptr || option.targetScale <= 0.0) {
         return false;
     }
 
-    AppConfig updatedConfig = state_.config;
+    const AppConfig previousConfig = state_.config;
+    const std::optional<TargetMonitorInfo> previousMonitor = FindTargetMonitor(previousConfig.display.monitorName);
+    AppConfig updatedConfig = BuildConfiguredDisplayConfig(state_.config, option);
     ApplyResolvedTelemetrySelections(updatedConfig, state_.telemetryUpdate.resolvedSelections);
-    updatedConfig.display.monitorName = option.configMonitorName;
-    updatedConfig.display.position = {};
-    updatedConfig.display.scale = option.fittedScale;
-    updatedConfig.display.wallpaper = kDefaultBlankWallpaperFileName;
-    if (!::ConfigureDisplay(
-            updatedConfig, state_.telemetryUpdate.dump, option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
+    const bool clearPreviousWallpaper = ShouldClearPreviousDisplayWallpaper(previousConfig, previousMonitor, option);
+    if (!::ConfigureDisplay(updatedConfig,
+            state_.telemetryUpdate.dump,
+            option.targetScale,
+            option.writesWallpaper,
+            clearPreviousWallpaper ? &previousConfig : nullptr,
+            shell.TraceLog(),
+            shell.WindowHandle())) {
         shell.ShowError("Failed to configure the selected display.");
         return false;
     }
 
     state_.config = std::move(updatedConfig);
     SyncRenderer(shell, state_.isEditingLayout);
-    ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();

@@ -91,10 +91,13 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         const auto configureDisplayTarget = GetSwitchValue(commandLine, "/configure-display-target");
         const auto configureDisplayDump = GetSwitchValue(commandLine, "/configure-display-dump");
         const auto configureDisplayImageTarget = GetSwitchValue(commandLine, "/configure-display-image-target");
+        const auto configureDisplayPrevious = GetSwitchValue(commandLine, "/configure-display-clear-wallpaper");
         return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
             configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
             configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
-            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{});
+            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{},
+            HasSwitch(commandLine, "/configure-display-write-wallpaper"),
+            configureDisplayPrevious.has_value() ? FilePath(*configureDisplayPrevious) : FilePath{});
     }
     if (const auto autoStartSetting = GetSwitchValue(commandLine, "/set-autostart"); autoStartSetting.has_value()) {
         if (_stricmp(autoStartSetting->c_str(), "on") == 0) {

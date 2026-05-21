@@ -25,8 +25,10 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Save and export omit runtime-only placeholder metric metadata such as `nothing`, even when metric-list bindings still reference that placeholder id.
 - If the executable-side `config.ini` is not writable, `Save Config` completes through the elevated helper path instead of relying on file virtualization.
 - `Save Config` persists live placement, active theme selection, runtime network selection, runtime storage-drive selection, auto-detected board metric bindings, and any in-memory layout-edit changes that belong to the current edit session, then ends layout-edit mode when that mode is active.
-- `Configure Display` computes a fitted explicit scale for the chosen display, resets placement to the display origin, writes `casedash_blank.png`, updates the live config, and applies that blank image as the display wallpaper.
-- `Configure Display` marks a display entry with a checkbox when the live config already targets that display at `0,0` and the configured wallpaper path is non-empty, while still allowing that checked entry to be invoked again.
+- `Configure Display` offers one section per display. A display whose aspect ratio matches the active layout has one fullscreen entry labeled `<display name> <monitor_w>x<monitor_h> full screen`; a nonmatching display has either top and bottom entries or left and right entries labeled with the resulting CaseDash size.
+- Fullscreen display configuration saves the display origin, an explicit fitted scale, and `wallpaper = casedash_blank.png`, renders the blank wallpaper image, applies it to the selected monitor, and clears the previous CaseDash-owned monitor wallpaper when switching monitors.
+- Edge display configuration saves the selected monitor, explicit fitted scale, logical edge placement, and `wallpaper = ` without rendering or applying a new wallpaper. It clears the previous CaseDash-owned wallpaper, including same-monitor wallpaper ownership from a previous fullscreen configuration.
+- `Configure Display` marks an entry with a checkbox when the live config targets the same monitor rectangle, explicit scale, and logical position, while still allowing that checked entry to be invoked again.
 
 ## Dashboard Composition And Rendering
 
@@ -57,8 +59,8 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 
 ## Runtime Controls And Menus
 
-- Right-clicking the dashboard opens a popup menu with `Move`, `Bring to Front`, `Layout`, `Theme`, `Display`, `Devices`, `Edit Layout`, `Start with Windows`, `About CaseDash`, and `Exit` actions.
-- The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists target displays, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog.
+- Right-clicking the dashboard opens a popup menu with `Move`, `Bring to Front`, `Devices`, `Theme`, `Layout`, `Edit Layout`, `Display`, `Start with Windows`, `About CaseDash`, and `Exit` actions.
+- The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists enabled display placement entries separated by display section, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog.
 - The `Devices` submenu contains `GPU`, `Network`, and `Storage Drives`.
 - The `Edit Layout` submenu contains the checked `Edit Layout` mode toggle, `Layout Editor...`, and `Save Config`.
 - Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Run as administrator`, `Reload Config`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, `Save Screenshot...`, and `Save Layout Guide Sheet...`.
@@ -77,7 +79,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, effective scale, and logical relative coordinates inside the same frame as the dashboard.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless `Edit Configuration` window refresh work runs.
-- The `Layout` and `Theme` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately after `Layout`.
+- The `Theme` and `Layout` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately before `Layout`.
 - The `Scale` submenu changes scale immediately.
 - The `GPU` submenu lists unique runtime GPU adapter candidates, numbers candidates with duplicate hardware descriptions in stable PCI-address order, marks the active selection, and applies a new choice immediately.
 - The `Network` submenu lists runtime IPv4-capable adapter candidates, marks the active selection, and applies a new choice immediately.

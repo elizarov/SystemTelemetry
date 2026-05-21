@@ -957,10 +957,12 @@ size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption
 
     for (size_t i = 0; i < optionCount; ++i) {
         const DisplayMenuOption& option = options[i];
+        if (option.startsSection && i > 0) {
+            AppendMenuA(menu, MF_SEPARATOR, 0, nullptr);
+        }
         const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
-        const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
-                           (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
-        AppendMenuText(menu, flags, commandId, option.displayName);
+        const UINT flags = MF_STRING | MF_ENABLED | (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
+        AppendMenuText(menu, flags, commandId, option.label);
     }
     return optionCount;
 }

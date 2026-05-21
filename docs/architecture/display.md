@@ -5,10 +5,12 @@
 ## Responsibilities
 
 - Enumerate monitors and expose display identities used by runtime placement and configure-display flows.
+- Generate the flat `Configure Display` option list with one section per monitor, fullscreen entries for matching aspect ratios, and top/bottom or left/right edge-placement entries for nonmatching aspect ratios.
 - Resolve saved placement against current monitor availability.
 - Keep watching for a configured `display.monitor_name` when login startup or monitor hotplug races ahead of enumeration.
 - Let `WM_DPICHANGED` apply cross-monitor DPI transitions before destination window size scaling.
-- Support wallpaper and configure-display helpers used by dashboard shell commands.
+- Build display config updates from menu choices, including explicit scale, logical position, wallpaper ownership, current-config checkmark state, and previous-wallpaper clear requests.
+- Support wallpaper and configure-display helpers used by dashboard shell commands. Fullscreen choices render and apply the CaseDash blank wallpaper; edge placements save config without creating new wallpaper and clear previous CaseDash wallpaper ownership.
 
 ## Boundaries
 

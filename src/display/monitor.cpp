@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "display/constants.h"
 #include "util/strings.h"
 #include "util/text_encoding.h"
 #include "util/text_format.h"
@@ -17,6 +18,34 @@ struct MonitorIdentity {
 
 constexpr double kMonitorFitEpsilon = 0.0001;
 constexpr char kShcoreDllName[] = "Shcore.dll";
+
+int RectWidth(const RECT& rect) {
+    return rect.right - rect.left;
+}
+
+int RectHeight(const RECT& rect) {
+    return rect.bottom - rect.top;
+}
+
+bool AreScalesEqual(double left, double right) {
+    return std::abs(left - right) <= kMonitorFitEpsilon;
+}
+
+const char* DisplayPlacementModeLabel(DisplayPlacementMode mode) {
+    switch (mode) {
+        case DisplayPlacementMode::FullScreen:
+            return "full screen";
+        case DisplayPlacementMode::Top:
+            return "top";
+        case DisplayPlacementMode::Bottom:
+            return "bottom";
+        case DisplayPlacementMode::Left:
+            return "left";
+        case DisplayPlacementMode::Right:
+            return "right";
+    }
+    return "";
+}
 
 }  // namespace
 
@@ -76,6 +105,115 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
         return 0.0;
     }
     return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? widthScale : 0.0;
+}
+
+size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
+    const DisplayMenuMonitorInfo& monitor,
+    const std::optional<TargetMonitorInfo>& configuredMonitor,
+    bool startsSection,
+    DisplayMenuOption* options,
+    size_t capacity) {
+    if (options == nullptr || capacity == 0 || config.layout.structure.window.width <= 0 ||
+        config.layout.structure.window.height <= 0) {
+        return 0;
+    }
+
+    const int monitorWidth = RectWidth(monitor.rect);
+    const int monitorHeight = RectHeight(monitor.rect);
+    if (monitorWidth <= 0 || monitorHeight <= 0) {
+        return 0;
+    }
+
+    const double widthScale =
+        static_cast<double>(monitorWidth) / static_cast<double>(config.layout.structure.window.width);
+    const double heightScale =
+        static_cast<double>(monitorHeight) / static_cast<double>(config.layout.structure.window.height);
+    if (!std::isfinite(widthScale) || !std::isfinite(heightScale) || widthScale <= 0.0 || heightScale <= 0.0) {
+        return 0;
+    }
+
+    const std::string labelName = !monitor.displayName.empty() ? monitor.displayName : monitor.configMonitorName;
+    size_t count = 0;
+    auto appendOption = [&](DisplayPlacementMode mode,
+                            double targetScale,
+                            SIZE targetSize,
+                            LogicalPointConfig position,
+                            bool writesWallpaper) {
+        if (count >= capacity) {
+            return;
+        }
+
+        DisplayMenuOption& option = options[count];
+        option = {};
+        option.label =
+            FormatText("%s %dx%d %s", labelName.c_str(), targetSize.cx, targetSize.cy, DisplayPlacementModeLabel(mode));
+        option.configMonitorName = monitor.configMonitorName;
+        option.monitorRect = monitor.rect;
+        option.dpi = monitor.dpi;
+        option.startsSection = startsSection && count == 0;
+        option.placementMode = mode;
+        option.targetSize = targetSize;
+        option.position = position;
+        option.targetScale = targetScale;
+        option.writesWallpaper = writesWallpaper;
+        option.matchesCurrentConfig =
+            configuredMonitor.has_value() && RectsEqual(configuredMonitor->rect, monitor.rect) &&
+            AreScalesEqual(ResolveDisplayScale(config.display.scale, monitor.dpi), targetScale) &&
+            config.display.position == position;
+        ++count;
+    };
+
+    if (AreScalesEqual(widthScale, heightScale)) {
+        appendOption(DisplayPlacementMode::FullScreen,
+            widthScale,
+            SIZE{monitorWidth, monitorHeight},
+            LogicalPointConfig{},
+            true);
+        return count;
+    }
+
+    if (widthScale < heightScale) {
+        const double targetScale = widthScale;
+        const SIZE targetSize{monitorWidth, ScaleLogicalToPhysical(config.layout.structure.window.height, targetScale)};
+        appendOption(DisplayPlacementMode::Top, targetScale, targetSize, LogicalPointConfig{}, false);
+        appendOption(DisplayPlacementMode::Bottom,
+            targetScale,
+            targetSize,
+            LogicalPointConfig{0, ScalePhysicalToLogical(monitorHeight - targetSize.cy, targetScale)},
+            false);
+        return count;
+    }
+
+    const double targetScale = heightScale;
+    const SIZE targetSize{ScaleLogicalToPhysical(config.layout.structure.window.width, targetScale), monitorHeight};
+    appendOption(DisplayPlacementMode::Left, targetScale, targetSize, LogicalPointConfig{}, false);
+    appendOption(DisplayPlacementMode::Right,
+        targetScale,
+        targetSize,
+        LogicalPointConfig{ScalePhysicalToLogical(monitorWidth - targetSize.cx, targetScale), 0},
+        false);
+    return count;
+}
+
+AppConfig BuildConfiguredDisplayConfig(const AppConfig& config, const DisplayMenuOption& option) {
+    AppConfig updatedConfig = config;
+    updatedConfig.display.monitorName = option.configMonitorName;
+    updatedConfig.display.position = option.position;
+    updatedConfig.display.scale = option.targetScale;
+    updatedConfig.display.wallpaper = option.writesWallpaper ? kDefaultBlankWallpaperFileName : "";
+    return updatedConfig;
+}
+
+bool ShouldClearPreviousDisplayWallpaper(const AppConfig& previousConfig,
+    const std::optional<TargetMonitorInfo>& previousMonitor,
+    const DisplayMenuOption& option) {
+    if (previousConfig.display.wallpaper.empty()) {
+        return false;
+    }
+    if (!option.writesWallpaper) {
+        return true;
+    }
+    return !previousMonitor.has_value() || !RectsEqual(previousMonitor->rect, option.monitorRect);
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
@@ -152,8 +290,6 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
 
 size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity) {
     const std::optional<TargetMonitorInfo> configuredMonitor = FindTargetMonitor(config.display.monitorName);
-    const bool hasConfiguredWallpaper = !config.display.wallpaper.empty();
-    const bool isConfiguredAtOrigin = config.display.position.x == 0 && config.display.position.y == 0;
 
     struct SearchContext {
         const AppConfig* config = nullptr;
@@ -161,9 +297,7 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
         DisplayMenuOption* options = nullptr;
         size_t capacity = 0;
         size_t count = 0;
-        bool hasConfiguredWallpaper = false;
-        bool isConfiguredAtOrigin = false;
-    } context{&config, &configuredMonitor, options, capacity, 0, hasConfiguredWallpaper, isConfiguredAtOrigin};
+    } context{&config, &configuredMonitor, options, capacity, 0};
 
     EnumDisplayMonitors(
         nullptr,
@@ -181,21 +315,16 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
 
             const std::string deviceName = info.szDevice;
             const MonitorIdentity identity = GetMonitorIdentity(deviceName);
-            const LONG monitorWidth = info.rcMonitor.right - info.rcMonitor.left;
-            const LONG monitorHeight = info.rcMonitor.bottom - info.rcMonitor.top;
-            const UINT dpi = GetMonitorDpi(monitor);
-            const double fittedScale = ComputeMonitorFittedScale(*context->config, monitorWidth, monitorHeight);
-
-            DisplayMenuOption& option = context->options[context->count++];
-            option.displayName = FormatText("%s (%ldx%ld)", identity.displayName.c_str(), monitorWidth, monitorHeight);
-            option.configMonitorName = !identity.configName.empty() ? identity.configName : deviceName;
-            option.rect = info.rcMonitor;
-            option.dpi = dpi;
-            option.layoutFits = fittedScale > 0.0;
-            option.matchesCurrentConfig = context->hasConfiguredWallpaper && context->isConfiguredAtOrigin &&
-                                          context->configuredMonitor->has_value() &&
-                                          RectsEqual((*context->configuredMonitor)->rect, option.rect);
-            option.fittedScale = fittedScale;
+            const DisplayMenuMonitorInfo monitorInfo{identity.displayName,
+                !identity.configName.empty() ? identity.configName : deviceName,
+                info.rcMonitor,
+                GetMonitorDpi(monitor)};
+            context->count += BuildDisplayMenuOptionsForMonitor(*context->config,
+                monitorInfo,
+                *context->configuredMonitor,
+                context->count > 0,
+                context->options + context->count,
+                context->capacity - context->count);
             return context->count < context->capacity;
         },
         reinterpret_cast<LPARAM>(&context));

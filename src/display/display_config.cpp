@@ -25,15 +25,42 @@ std::string ReadBinaryFile(const FilePath& path) {
     return ReadFileBinary(path).value_or(std::string{});
 }
 
-}  // namespace
-
-bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
-    if (config.display.wallpaper.empty()) {
-        return true;
+bool WriteTelemetryDumpFile(const FilePath& path, const TelemetryDump& dump) {
+    std::FILE* output = nullptr;
+    if (fopen_s(&output, path.string().c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
+        return false;
     }
+    const bool written = WriteTelemetryDump(output, dump);
+    fclose(output);
+    return written;
+}
+
+bool SaveBlankWallpaperImage(
+    const FilePath& path, const TelemetryDump& dump, const AppConfig& config, double targetScale, Trace& trace) {
+    std::string screenshotError;
+    return SaveDumpScreenshot(path,
+        dump.snapshot,
+        config,
+        targetScale,
+        DashboardRenderer::RenderMode::Blank,
+        false,
+        LayoutSimilarityIndicatorMode::ActiveGuide,
+        std::string{},
+        trace,
+        false,
+        RenderPoint{},
+        &screenshotError);
+}
+
+bool SetConfiguredMonitorWallpaper(const AppConfig& config,
+    const std::wstring& wideWallpaperPath,
+    const std::string& pathText,
+    const char* action,
+    Trace& trace) {
     if (config.display.monitorName.empty()) {
         trace.WriteFmt(TracePrefix::Wallpaper,
-            RES_STR("skipped_missing_monitor wallpaper=\"%s\""),
+            RES_STR("%s_skipped_missing_monitor wallpaper=\"%s\""),
+            action,
             config.display.wallpaper.c_str());
         return false;
     }
@@ -41,24 +68,20 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
         trace.WriteFmt(TracePrefix::Wallpaper,
-            RES_STR("monitor_unresolved monitor=\"%s\" wallpaper=\"%s\""),
+            RES_STR("%s_monitor_unresolved monitor=\"%s\" wallpaper=\"%s\""),
+            action,
             config.display.monitorName.c_str(),
             config.display.wallpaper.c_str());
-        return false;
-    }
-
-    const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(config.display.wallpaper));
-    if (wallpaperPath.empty()) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper, RES_STR("path_empty monitor=\"%s\""), config.display.monitorName.c_str());
         return false;
     }
 
     const HRESULT initStatus = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
     const bool shouldUninitialize = initStatus == S_OK || initStatus == S_FALSE;
     if (FAILED(initStatus) && initStatus != RPC_E_CHANGED_MODE) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper, RES_STR("coinitialize_failed hr=0x%08lX"), static_cast<unsigned long>(initStatus));
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("%s_coinitialize_failed hr=0x%08lX"),
+            action,
+            static_cast<unsigned long>(initStatus));
         return false;
     }
 
@@ -66,8 +89,10 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT createStatus =
         CoCreateInstance(CLSID_DesktopWallpaper, nullptr, CLSCTX_ALL, IID_PPV_ARGS(&desktopWallpaper));
     if (FAILED(createStatus) || desktopWallpaper == nullptr) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper, RES_STR("create_failed hr=0x%08lX"), static_cast<unsigned long>(createStatus));
+        trace.WriteFmt(TracePrefix::Wallpaper,
+            RES_STR("%s_create_failed hr=0x%08lX"),
+            action,
+            static_cast<unsigned long>(createStatus));
         if (shouldUninitialize) {
             CoUninitialize();
         }
@@ -80,7 +105,8 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
     if (FAILED(countStatus)) {
         trace.WriteFmt(TracePrefix::Wallpaper,
-            RES_STR("monitor_count_failed hr=0x%08lX"),
+            RES_STR("%s_monitor_count_failed hr=0x%08lX"),
+            action,
             static_cast<unsigned long>(countStatus));
     } else {
         for (UINT index = 0; index < monitorCount; ++index) {
@@ -94,12 +120,11 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
             const HRESULT rectStatus = desktopWallpaper->GetMonitorRECT(monitorId, &monitorRect);
             if (SUCCEEDED(rectStatus) && RectsEqual(monitorRect, targetMonitor->rect)) {
                 targetFound = true;
-                const std::wstring wideWallpaperPath = wallpaperPath.WideForNativeApi();
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
-                const std::string pathText = wallpaperPath.string();
                 trace.WriteFmt(TracePrefix::Wallpaper,
-                    RES_STR("apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX"),
+                    RES_STR("%s_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX"),
+                    action,
                     applied ? "done" : "failed",
                     config.display.monitorName.c_str(),
                     pathText.c_str(),
@@ -112,9 +137,9 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     }
 
     if (!targetFound) {
-        const std::string pathText = wallpaperPath.string();
         trace.WriteFmt(TracePrefix::Wallpaper,
-            RES_STR("target_not_found monitor=\"%s\" path=\"%s\""),
+            RES_STR("%s_target_not_found monitor=\"%s\" path=\"%s\""),
+            action,
             config.display.monitorName.c_str(),
             pathText.c_str());
     }
@@ -126,75 +151,115 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     return applied;
 }
 
-bool ConfigureDisplay(
-    const AppConfig& config, const TelemetryDump& dump, double targetScale, Trace& trace, HWND owner) {
+}  // namespace
+
+bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
+    if (config.display.wallpaper.empty()) {
+        return true;
+    }
+
+    const FilePath wallpaperPath = ResolveExecutableRelativePath(FilePath(config.display.wallpaper));
+    if (wallpaperPath.empty()) {
+        trace.WriteFmt(
+            TracePrefix::Wallpaper, RES_STR("path_empty monitor=\"%s\""), config.display.monitorName.c_str());
+        return false;
+    }
+
+    return SetConfiguredMonitorWallpaper(
+        config, wallpaperPath.WideForNativeApi(), wallpaperPath.string(), "apply", trace);
+}
+
+bool ClearConfiguredWallpaper(const AppConfig& config, Trace& trace) {
+    if (config.display.wallpaper.empty()) {
+        return true;
+    }
+    const std::wstring emptyWallpaperPath;
+    return SetConfiguredMonitorWallpaper(config, emptyWallpaperPath, std::string{}, "clear", trace);
+}
+
+bool ConfigureDisplay(const AppConfig& config,
+    const TelemetryDump& dump,
+    double targetScale,
+    bool writeWallpaper,
+    const AppConfig* previousWallpaperConfig,
+    Trace& trace,
+    HWND owner) {
     const FilePath configPath = GetRuntimeConfigPath();
     const FilePath imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
 
-    if (CanWriteRuntimeConfig(configPath) && CanWriteRuntimeConfig(imagePath)) {
-        std::string screenshotError;
-        const bool imageSaved = SaveDumpScreenshot(imagePath,
-            dump.snapshot,
-            config,
-            targetScale,
-            DashboardRenderer::RenderMode::Blank,
-            false,
-            LayoutSimilarityIndicatorMode::ActiveGuide,
-            std::string{},
-            trace,
-            false,
-            RenderPoint{},
-            &screenshotError);
-        return imageSaved && SaveConfig(configPath, config, ConfigParseContext{TelemetryMetricCatalog()}) &&
-               ApplyConfiguredWallpaper(config, trace);
+    if (CanWriteRuntimeConfig(configPath) && (!writeWallpaper || CanWriteRuntimeConfig(imagePath))) {
+        if (writeWallpaper && !SaveBlankWallpaperImage(imagePath, dump, config, targetScale, trace)) {
+            return false;
+        }
+        const bool configSaved = SaveConfig(configPath, config, ConfigParseContext{TelemetryMetricCatalog()});
+        const bool wallpaperApplied = configSaved && (!writeWallpaper || ApplyConfiguredWallpaper(config, trace));
+        const bool previousWallpaperCleared =
+            wallpaperApplied &&
+            (previousWallpaperConfig == nullptr || ClearConfiguredWallpaper(*previousWallpaperConfig, trace));
+        return previousWallpaperCleared;
     }
 
     const FilePath tempConfigPath = CreateTempFilePath("CaseDashConfigureDisplayConfig");
-    const FilePath tempDumpPath = CreateTempFilePath("CaseDashConfigureDisplayDump");
-    if (tempConfigPath.empty() || tempDumpPath.empty()) {
+    const FilePath tempDumpPath = writeWallpaper ? CreateTempFilePath("CaseDashConfigureDisplayDump") : FilePath{};
+    const FilePath tempPreviousConfigPath =
+        previousWallpaperConfig != nullptr ? CreateTempFilePath("CaseDashConfigureDisplayPreviousConfig") : FilePath{};
+    if (tempConfigPath.empty() || (writeWallpaper && tempDumpPath.empty()) ||
+        (previousWallpaperConfig != nullptr && tempPreviousConfigPath.empty())) {
         return false;
     }
 
     bool prepared = SaveConfig(tempConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
-    if (prepared) {
-        std::FILE* output = nullptr;
-        prepared = fopen_s(&output, tempDumpPath.string().c_str(), kWriteBinaryMode) == 0 && output != nullptr;
-        if (prepared) {
-            prepared = WriteTelemetryDump(output, dump);
-            fclose(output);
-        }
+    if (prepared && writeWallpaper) {
+        prepared = WriteTelemetryDumpFile(tempDumpPath, dump);
+    }
+    if (prepared && previousWallpaperConfig != nullptr) {
+        prepared =
+            SaveConfig(tempPreviousConfigPath, *previousWallpaperConfig, ConfigParseContext{TelemetryMetricCatalog()});
     }
     if (!prepared) {
         RemoveFileIfExists(tempConfigPath);
         RemoveFileIfExists(tempDumpPath);
+        RemoveFileIfExists(tempPreviousConfigPath);
         return false;
     }
 
-    const std::string parameters = FormatText("/configure-display %s /configure-display-target %s "
-                                              "/configure-display-dump %s /configure-display-image-target %s",
+    std::string parameters = FormatText("/configure-display %s /configure-display-target %s",
         QuoteCommandLineArgument(tempConfigPath.string()).c_str(),
-        QuoteCommandLineArgument(configPath.string()).c_str(),
-        QuoteCommandLineArgument(tempDumpPath.string()).c_str(),
-        QuoteCommandLineArgument(imagePath.string()).c_str());
+        QuoteCommandLineArgument(configPath.string()).c_str());
+    if (writeWallpaper) {
+        AppendFormat(parameters,
+            " /configure-display-write-wallpaper /configure-display-dump %s /configure-display-image-target %s",
+            QuoteCommandLineArgument(tempDumpPath.string()).c_str(),
+            QuoteCommandLineArgument(imagePath.string()).c_str());
+    }
+    if (previousWallpaperConfig != nullptr) {
+        AppendFormat(parameters,
+            " /configure-display-clear-wallpaper %s",
+            QuoteCommandLineArgument(tempPreviousConfigPath.string()).c_str());
+    }
 
     DWORD exitCode = 1;
     const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempConfigPath);
     RemoveFileIfExists(tempDumpPath);
+    RemoveFileIfExists(tempPreviousConfigPath);
     return launched && exitCode == 0;
 }
 
 int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
     const FilePath& sourceDumpPath,
     const FilePath& targetConfigPath,
-    const FilePath& targetImagePath) {
-    if (sourceConfigPath.empty() || sourceDumpPath.empty() || targetConfigPath.empty() || targetImagePath.empty()) {
+    const FilePath& targetImagePath,
+    bool writeWallpaper,
+    const FilePath& previousConfigPath) {
+    if (sourceConfigPath.empty() || targetConfigPath.empty() ||
+        (writeWallpaper && (sourceDumpPath.empty() || targetImagePath.empty()))) {
         return 2;
     }
 
     const AppConfig config = LoadConfig(sourceConfigPath, true, ConfigParseContext{TelemetryMetricCatalog()});
     TelemetryDump dump;
-    {
+    if (writeWallpaper) {
         const std::string input = ReadBinaryFile(sourceDumpPath);
         std::string error;
         if (input.empty() || !LoadTelemetryDump(input, dump, &error)) {
@@ -202,38 +267,27 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
         }
     }
 
-    const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
-    if (!targetMonitor.has_value()) {
-        return 1;
-    }
-
-    std::string screenshotError;
     Trace trace;
-    const double targetScale = HasExplicitDisplayScale(config.display.scale)
-                                   ? config.display.scale
-                                   : ComputeMonitorFittedScale(config,
-                                         targetMonitor->rect.right - targetMonitor->rect.left,
-                                         targetMonitor->rect.bottom - targetMonitor->rect.top);
-    if (targetScale <= 0.0) {
-        return 1;
+    bool imageSaved = true;
+    if (writeWallpaper) {
+        const double targetScale = HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 0.0;
+        if (targetScale <= 0.0) {
+            return 1;
+        }
+        imageSaved = SaveBlankWallpaperImage(targetImagePath, dump, config, targetScale, trace);
     }
 
-    const bool imageSaved = SaveDumpScreenshot(targetImagePath,
-        dump.snapshot,
-        config,
-        targetScale,
-        DashboardRenderer::RenderMode::Blank,
-        false,
-        LayoutSimilarityIndicatorMode::ActiveGuide,
-        std::string{},
-        trace,
-        false,
-        RenderPoint{},
-        &screenshotError);
     const bool configSaved =
         imageSaved && SaveConfig(targetConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
-    const bool wallpaperApplied = configSaved && ApplyConfiguredWallpaper(config, trace);
+    const bool wallpaperApplied = configSaved && (!writeWallpaper || ApplyConfiguredWallpaper(config, trace));
+    bool previousWallpaperCleared = true;
+    if (wallpaperApplied && !previousConfigPath.empty()) {
+        const AppConfig previousConfig =
+            LoadConfig(previousConfigPath, true, ConfigParseContext{TelemetryMetricCatalog()});
+        previousWallpaperCleared = ClearConfiguredWallpaper(previousConfig, trace);
+    }
     RemoveFileIfExists(sourceConfigPath);
     RemoveFileIfExists(sourceDumpPath);
-    return wallpaperApplied ? 0 : 1;
+    RemoveFileIfExists(previousConfigPath);
+    return wallpaperApplied && previousWallpaperCleared ? 0 : 1;
 }
