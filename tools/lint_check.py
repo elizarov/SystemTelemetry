@@ -11,7 +11,7 @@ import time
 from dataclasses import dataclass
 from pathlib import Path
 from re import Pattern
-from typing import Protocol
+from typing import Any, Protocol
 
 from lint import architecture, include_style, source_dependencies, source_policy
 from lint.common import (
@@ -54,6 +54,9 @@ class ScanSettings:
     stripped_suffixes: frozenset[str]
     excluded_prefixes: tuple[str, ...]
     include_pattern: Pattern[str]
+
+
+Diagnostic = dict[str, Any]
 
 
 def relpath(path: Path) -> str:
@@ -323,6 +326,12 @@ def parse_args(config: Config, config_path: Path) -> argparse.Namespace:
         help="Do not print per-file scan progress.",
     )
     parser.add_argument(
+        "--report-json",
+        type=Path,
+        default=None,
+        help="Write machine-readable lint diagnostics to this JSON file.",
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -361,12 +370,50 @@ def print_scanned_loc_summary(records: tuple[FileRecord, ...]) -> None:
     print(f"Scanned {format_count(total_loc)} LOC across {len(records)} lint input file(s).")
 
 
+def check_name(result: CheckResult) -> str:
+    title = result.title.removesuffix(":").removesuffix(" check")
+    return title.strip().lower().replace(" ", "_")
+
+
+def diagnostics_for_result(result: CheckResult) -> list[Diagnostic]:
+    check = check_name(result)
+    diagnostics: list[Diagnostic] = []
+    for error in result.errors:
+        diagnostics.append({"check": check, "type": "error", "message": error})
+    for finding in result.findings:
+        diagnostics.append(
+            {
+                "check": check,
+                "type": "finding",
+                "location": finding.location,
+                "kind": finding.kind,
+                "message": finding.message,
+            }
+        )
+    return diagnostics
+
+
+def collect_diagnostics(results: tuple[CheckResult, ...]) -> list[Diagnostic]:
+    return [diagnostic for result in results for diagnostic in diagnostics_for_result(result)]
+
+
+def write_report_json(path: Path, failed: bool, diagnostics: list[Diagnostic]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "schema_version": 1,
+        "failed": failed,
+        "diagnostics": diagnostics,
+    }
+    path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+
+
 def print_failure_result(result: CheckResult) -> None:
     print(result.title)
-    for error in result.errors:
-        print(error)
-    for finding in result.findings:
-        print(f"{finding.location}: {finding.kind}: {finding.message}")
+    for diagnostic in diagnostics_for_result(result):
+        if diagnostic["type"] == "error":
+            print(diagnostic["message"])
+        else:
+            print(f"{diagnostic['location']}: {diagnostic['kind']}: {diagnostic['message']}")
     if result.summary:
         print(result.summary)
 
@@ -400,6 +447,16 @@ def main() -> int:
         show_progress=not args.no_progress,
     )
     results = tuple(checker.finish(args.verbose) for checker in checkers)
+    failed = any(result.failed for result in results)
+    diagnostics = collect_diagnostics(results)
+
+    if args.report_json:
+        try:
+            write_report_json(absolute_project_path(args.report_json), failed, diagnostics)
+        except OSError as error:
+            print(f"lint report error: could not write {args.report_json}: {error}", file=sys.stderr)
+            print(f"Lint failed in {format_elapsed(time.perf_counter() - started)}.")
+            return 2
 
     printed_report = False
     for result in results:
@@ -410,7 +467,7 @@ def main() -> int:
         print_failure_result(result)
         printed_report = True
 
-    if any(result.failed for result in results):
+    if failed:
         if printed_report:
             print()
         print(f"Lint failed in {format_elapsed(time.perf_counter() - started)}.")

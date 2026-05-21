@@ -1,0 +1,126 @@
+[
+  {
+    "check": "architecture",
+    "type": "finding",
+    "location": "src/dashboard/no_header.cpp:1",
+    "kind": "missing-header",
+    "message": "src/dashboard/no_header.cpp has no matching header src/dashboard/no_header.h; add one or allowlist the translation unit."
+  },
+  {
+    "check": "architecture",
+    "type": "finding",
+    "location": "src/dashboard/violations.h:7",
+    "kind": "header-body",
+    "message": "Function body for HeaderBodyViolation appears in a header; move non-template logic to a matching .cpp file."
+  },
+  {
+    "check": "architecture",
+    "type": "finding",
+    "location": "src/dashboard/wrong_place.cpp:4",
+    "kind": "impl-mismatch",
+    "message": "MismatchedFunction is declared from src/dashboard/mismatch_decl.h but implemented in src/dashboard/wrong_place.cpp; expected src/dashboard/mismatch_decl.cpp."
+  },
+  {
+    "check": "source_dependency",
+    "type": "error",
+    "message": "Package dependency graph is not a DAG; cycle detected among: config, dashboard, renderer, util."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "dashboard/violations -> config/private/secret",
+    "kind": "package-encapsulation",
+    "message": "dashboard/violations depends on package-private module config/private/secret; only src/config/ files may include modules below src/config/*/."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "dashboard/violations -> d2d",
+    "kind": "layer-d2d",
+    "message": "dashboard/violations must not depend on Direct2D/DirectWrite/WIC/WRL module d2d; only renderer may."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "dashboard/violations -> renderer/render",
+    "kind": "package-dependency-dashboard",
+    "message": "dashboard/violations is in the dashboard package and must depend only on dashboard, config, diagnostics, display, layout_edit, layout_edit_dialog, layout_model, telemetry, util, or widget modules, not project module renderer/render."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "renderer/render -> dashboard/violations",
+    "kind": "package-dependency-renderer",
+    "message": "renderer/render is in the renderer package and must depend only on renderer, config, or util modules, not project module dashboard/violations."
+  },
+  {
+    "check": "include_style",
+    "type": "finding",
+    "location": "src/dashboard/violations.cpp:2",
+    "kind": "include-style",
+    "message": "Project header \"../util/include_style_target.h\" resolves to src/util/include_style_target.h; use \"util/include_style_target.h\" from the src include root instead of a relative or local shorthand path."
+  },
+  {
+    "check": "include_style",
+    "type": "finding",
+    "location": "src/dashboard/violations.cpp:4",
+    "kind": "include-style",
+    "message": "Local NOLINT suppressions are not allowed; fix the finding or add a maintained checker-level exception instead."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:1",
+    "kind": "source-policy",
+    "message": "std::filesystem is not allowed in maintained source; use src/util/file_path.* helpers so path handling stays Win32-backed without pulling filesystem machinery into the app. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:10",
+    "kind": "source-policy",
+    "message": "wide literals must stay narrow UTF-8 by default; only const wchar_t string constants initialized with L\"...\" and an end-of-line reason comment are allowed for wide-native boundaries with no A-style API. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:2",
+    "kind": "source-policy",
+    "message": "STL threading primitives are not allowed in maintained source; use LightweightMutex for small locks and direct Win32 thread or event handles for worker wakeups so prior size-optimization wins stay enforced. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:5",
+    "kind": "source-policy",
+    "message": "std::function is not allowed in maintained source; use FunctionRef for synchronous borrowed callbacks or a purpose-built interface when ownership must escape the call. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:6",
+    "kind": "source-policy",
+    "message": "std::hash is not allowed in maintained source; use a concrete project-owned hash helper for fixed lookup tables so small caches do not grow broad STL hashing machinery. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:7",
+    "kind": "source-policy",
+    "message": "conditional compilation guards are not allowed in maintained source; keep code compiled for every native target and let the linker remove unreferenced target-specific helpers. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:8",
+    "kind": "source-policy",
+    "message": "MessageBoxW is not allowed in maintained source; CaseDash declares UTF-8 as the process code page and calls Win32 A APIs by default. Keep W calls only for documented wide-native APIs that have no A-style boundary. See docs/source_policy_guardrails.md."
+  },
+  {
+    "check": "source_policy",
+    "type": "finding",
+    "location": "tests/source_policy_violations.cpp:9",
+    "kind": "source-policy",
+    "message": "obsolete conversion-only Utf8 helper names are not allowed; UTF-8 is the app default, so call A APIs directly or use no-suffix app helpers. See docs/source_policy_guardrails.md."
+  }
+]
