@@ -11,6 +11,7 @@
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "util/file_path.h"
+#include "util/scale.h"
 
 struct DashboardSessionState {
     AppConfig config;

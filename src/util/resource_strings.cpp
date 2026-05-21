@@ -7,6 +7,19 @@
 
 #include "util/resource_loader.h"
 
+namespace resource_strings_detail {
+
+std::uint32_t ResourceStringHash(const char* text, std::size_t length) {
+    std::uint32_t hash = ResourceStringHashSeed;
+    for (std::size_t index = 0; index < length; ++index) {
+        hash ^= static_cast<std::uint8_t>(text[index]);
+        hash *= ResourceStringHashPrime;
+    }
+    return hash;
+}
+
+}  // namespace resource_strings_detail
+
 namespace {
 
 struct ResourceStringLookupEntry {

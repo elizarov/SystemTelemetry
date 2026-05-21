@@ -5,8 +5,6 @@
 #include <optional>
 #include <string>
 
-#include "util/scale.h"
-
 struct AppConfig;
 
 struct MonitorPlacementInfo {

@@ -103,8 +103,8 @@ def collect_violations(files: list[Path]) -> list[Violation]:
                         relpath=file_rel,
                         line=line_number,
                         message=(
-                            "Local NOLINT suppressions are not allowed; add maintained false positives to the "
-                            "lint tool allowlist instead."
+                            "Local NOLINT suppressions are not allowed; fix the finding or add a maintained "
+                            "checker-level exception instead."
                         ),
                     )
                 )

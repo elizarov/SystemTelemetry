@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "util/scale.h"
 #include "util/strings.h"
 #include "util/text_encoding.h"
 #include "util/text_format.h"

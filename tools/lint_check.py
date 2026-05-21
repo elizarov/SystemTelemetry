@@ -525,8 +525,8 @@ def collect_include_style_violations(records: tuple[SourceRecord, ...]) -> tuple
                     relpath=record.relative,
                     line=line_number,
                     message=(
-                        "Local NOLINT suppressions are not allowed; add maintained false positives to the "
-                        "lint tool allowlist instead."
+                        "Local NOLINT suppressions are not allowed; fix the finding or add a maintained "
+                        "checker-level exception instead."
                     ),
                 )
             )

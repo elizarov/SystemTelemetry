@@ -313,7 +313,7 @@ def run(args: argparse.Namespace) -> int:
             report.write(f"Generated: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
             report.write(f"Using clangd: {args.clangd}\n")
             report.write(f"Build database: {compile_commands_dir}\n")
-            report.write("Line filter: non-ignored include directives only\n\n")
+            report.write("Line filter: include directives only\n\n")
 
             def open_next_files() -> None:
                 nonlocal next_file

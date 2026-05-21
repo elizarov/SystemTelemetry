@@ -19,6 +19,7 @@
 #include "config/config_writer.h"
 #include "diagnostics/app_icon_export.h"
 #include "diagnostics/constants.h"
+#include "diagnostics/snapshot_dump.h"
 #include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
