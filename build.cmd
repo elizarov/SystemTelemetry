@@ -120,6 +120,7 @@ if "%NEED_CONFIGURE%"=="1" (
 
 set "BUILD_CONFIG=Release"
 set "BUILD_BENCHMARKS=0"
+set "BUILD_TOOLS_ONLY=0"
 
 :parse_build_args
 if "%~1"=="" goto build_args_done
@@ -127,6 +128,10 @@ if /I "%~1"=="/benchmarks" (
     set "BUILD_BENCHMARKS=1"
 ) else if /I "%~1"=="/benchmark" (
     set "BUILD_BENCHMARKS=1"
+) else if /I "%~1"=="/tools" (
+    set "BUILD_TOOLS_ONLY=1"
+) else if /I "%~1"=="/tool" (
+    set "BUILD_TOOLS_ONLY=1"
 ) else (
     set "BUILD_CONFIG=%~1"
 )
@@ -135,10 +140,12 @@ goto parse_build_args
 
 :build_args_done
 
-if "%BUILD_BENCHMARKS%"=="1" (
-    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashBenchmarks
+if "%BUILD_TOOLS_ONLY%"=="1" (
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDashTools
+) else if "%BUILD_BENCHMARKS%"=="1" (
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashBenchmarks CaseDashTools
 ) else (
-    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashTools
 )
 
 :build_done
