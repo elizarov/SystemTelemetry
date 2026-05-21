@@ -4,6 +4,8 @@
 #include <cmath>
 #include <utility>
 
+#include "layout_model/layout_edit_parameter_metadata.h"
+
 namespace {
 
 void* FieldAddress(AppConfig& config, const LayoutEditConfigFieldMetadata& field) {

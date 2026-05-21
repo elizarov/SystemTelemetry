@@ -12,115 +12,6 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-$ignoredUnusedIncludeWarnings = @(
-    # The active include-cleaner build does not model these Win32 interface headers correctly.
-    'src/dashboard/constants.h|windows.h',
-    'src/dashboard/dashboard_app.h|windows.h',
-    'src/dashboard/dashboard_menu_types.h|windows.h',
-    'src/dashboard/dashboard_shell_ui.h|windows.h',
-    'src/dashboard_renderer/dashboard_renderer.h|windows.h',
-    'src/diagnostics/app_icon_export.cpp|windows.h',
-    'src/diagnostics/crash_report.cpp|windows.h',
-    'src/diagnostics/crash_report.cpp|dbghelp.h',
-    'src/diagnostics/diagnostics.h|windows.h',
-    'src/display/constants.h|windows.h',
-    'src/display/display_config.h|windows.h',
-    'src/display/display_config.cpp|shobjidl.h',
-    'src/display/monitor.h|windows.h',
-    'src/layout_edit/layout_edit_controller.h|windows.h',
-    'src/layout_edit_dialog/impl/dialog_proc.h|windows.h',
-    'src/layout_edit_dialog/impl/state.h|windows.h',
-    'src/layout_edit_dialog/impl/trace.h|windows.h',
-    'src/layout_edit_dialog/impl/util.h|windows.h',
-    'src/layout_edit_dialog/layout_edit_dialog.h|windows.h',
-    'src/layout_edit_dialog/theme_preview.h|windows.h',
-    'src/config/config_io.cpp|windows.h',
-    'src/dashboard/autostart.h|windows.h',
-    'src/dashboard/fps_service.h|windows.h',
-    'src/main/main.cpp|windows.h',
-    'src/renderer/png_export.cpp|windows.h',
-    'src/renderer/impl/d2d_renderer.h|windows.h',
-    'src/renderer/impl/d2d_renderer.h|dwrite.h',
-    'src/renderer/renderer.h|windows.h',
-    'src/util/elevated_process.h|windows.h',
-    'src/telemetry/board/asus/board_asus_armoury_crate.cpp|windows.h',
-    'src/telemetry/board/msi/board_msi_center.cpp|windows.h',
-    'src/telemetry/fps/fps_etw_provider.cpp|windows.h',
-    'src/telemetry/gpu/gpu_vendor.cpp|windows.h',
-    'src/telemetry/gpu/intel/gpu_intel_level_zero.cpp|windows.h',
-    'src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp|windows.h',
-    'src/telemetry/impl/collector_state.h|winsock2.h',
-    'src/telemetry/impl/collector_state.h|ws2tcpip.h',
-    'src/telemetry/impl/collector_state.h|windows.h',
-    'src/telemetry/impl/collector_state.h|dxgi.h',
-    'src/telemetry/impl/collector_state.h|iphlpapi.h',
-    'src/telemetry/impl/collector_state.h|netioapi.h',
-    'src/telemetry/impl/collector_state.h|pdhmsg.h',
-    'src/telemetry/impl/collector_storage_selection.h|windows.h',
-    'src/telemetry/impl/system_info_support.h|windows.h',
-    'src/telemetry/telemetry.h|windows.h',
-    'src/util/file_path.cpp|windows.h',
-    'src/util/command_line.cpp|windows.h',
-    'src/util/high_precision_timer.cpp|windows.h',
-    'src/util/message_box.cpp|windows.h',
-    'src/util/paths.cpp|windows.h',
-    'src/util/scale.h|windows.h',
-    'src/util/lightweight_mutex.cpp|windows.h',
-    'src/util/temp_file.cpp|windows.h',
-    'src/util/trace.cpp|windows.h',
-    'src/util/win32_format.cpp|windows.h',
-    # These headers expose declarations through project macros or umbrella types that include-cleaner cannot map.
-    'src/dashboard/dashboard_shell_ui.h|dashboard_menu_types.h',
-    'src/diagnostics/diagnostics.h|snapshot_dump.h',
-    'src/display/display_config.h|snapshot_dump.h',
-    'src/display/monitor.h|scale.h',
-    'src/layout_edit/layout_edit_parameter_edit.h|layout_edit_parameter_metadata.h',
-    'src/util/resource_strings.h|resource_strings.generated.h',
-    'src/util/resource_loader.cpp|windows.h',
-    'src/util/text_encoding.cpp|windows.h',
-    'src/telemetry/fps/fps_service_client_provider.cpp|windows.h'
-)
-
-$ignoredUnusedIncludeWarningSet = [System.Collections.Generic.HashSet[string]]::new(
-    [System.StringComparer]::OrdinalIgnoreCase)
-foreach ($warning in $ignoredUnusedIncludeWarnings) {
-    [void]$ignoredUnusedIncludeWarningSet.Add($warning)
-}
-
-function ConvertTo-RepoSlashPath {
-    param(
-        [string]$Path
-    )
-
-    return $Path -replace '\\', '/'
-}
-
-function Get-HeaderKeyLeaf {
-    param(
-        [string]$Header
-    )
-
-    $normalizedHeader = ConvertTo-RepoSlashPath -Path $Header
-    $parts = $normalizedHeader -split '/'
-    return $parts[$parts.Count - 1]
-}
-
-function Test-IgnoredUnusedIncludeKey {
-    param(
-        [string]$RelativePath,
-        [string]$Header
-    )
-
-    $relativeSlashPath = ConvertTo-RepoSlashPath -Path $RelativePath
-    $normalizedHeader = ConvertTo-RepoSlashPath -Path $Header
-    if ($ignoredUnusedIncludeWarningSet.Contains("$relativeSlashPath|$normalizedHeader")) {
-        return $true
-    }
-
-    $headerLeaf = Get-HeaderKeyLeaf -Header $normalizedHeader
-    return $ignoredUnusedIncludeWarningSet.Contains("$relativeSlashPath|$headerLeaf")
-}
-
 function Add-Candidate {
     param(
         [System.Collections.Generic.List[string]]$List,
@@ -425,18 +316,12 @@ function Get-IncludeCleanerLineFilter {
         return $null
     }
 
-    $relativeSlashPath = ConvertTo-RepoSlashPath -Path $RelativePath
     $ranges = [System.Collections.Generic.List[string]]::new()
     $lineNumber = 0
     foreach ($line in [System.IO.File]::ReadLines($fullPath)) {
         $lineNumber++
-        $match = [regex]::Match($line, '^\s*#\s*include\s*[<"](?<header>[^>"]+)[>"]')
+        $match = [regex]::Match($line, '^\s*#\s*include\s*[<"][^>"]+[>"]')
         if (-not $match.Success) {
-            continue
-        }
-
-        $header = ConvertTo-RepoSlashPath -Path $match.Groups['header'].Value
-        if (Test-IgnoredUnusedIncludeKey -RelativePath $relativeSlashPath -Header $header) {
             continue
         }
 
@@ -491,9 +376,9 @@ foreach ($file in $files) {
 $files = @($includeFiles.ToArray())
 if ($files.Count -eq 0) {
     if ($Scope -eq 'changed') {
-        Write-Host 'No eligible changed project source or header files with non-ignored include lines were found.'
+        Write-Host 'No eligible changed project source or header files with include lines were found.'
     } else {
-        Write-Host 'No eligible project source or header files with non-ignored include lines were found.'
+        Write-Host 'No eligible project source or header files with include lines were found.'
     }
     exit 0
 }

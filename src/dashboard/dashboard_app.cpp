@@ -19,6 +19,7 @@
 #include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/paths.h"
+#include "util/scale.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 #include "widget/app_icon_geometry.h"
