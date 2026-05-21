@@ -25,7 +25,7 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, profiling, generated asset, and source dependency graph helper scripts. `tools/lint_check.py` is the combined source scanner behind the maintained lint entrypoint.
+- `tools/` contains shared formatting, lint, profiling, generated asset, and source dependency graph helper scripts. `tools/lint_check.py` is the combined source scanner behind the maintained lint entrypoint, `tools/lint_config.json` owns the lint policy data, and `tools/lint/` contains the map-reduce checkers.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
 - `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, package, release, and website deployment automation.
@@ -71,6 +71,6 @@ Other top-level areas:
 
 - `lint.cmd` writes DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
-- Graph generation records header, implementation, and total LOC, package totals, strongly connected components, lower-level dependencies, and non-vendored files above 1,000 LOC.
+- Graph generation records header, implementation, and total LOC, package totals, DAG topological package dependency order, lower-level dependencies, and non-vendored files above the configured LOC threshold.
 - The graph includes a synthetic `d2d` package for Direct2D, DirectWrite, WIC, and WRL includes so every package except `renderer` rejects accidental graphics-stack coupling.
 - DOT clusters group nodes by containing source directory; GraphML nodes and edges carry labels, directory, LOC, dependency kind, and annotation data.

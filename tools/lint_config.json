@@ -1,0 +1,125 @@
+{
+  "scan": {
+    "roots": ["src", "tests", "resources"],
+    "suffixes": [".cpp", ".h", ".rc"],
+    "source_suffixes": [".cpp", ".h"],
+    "tracked_only_suffixes": [".rc"],
+    "excluded_prefixes": ["src/vendor/"],
+    "include_pattern": "^\\s*#include\\s+(?:\"([^\"]+)\"|<([^>]+)>)",
+    "nolint_pattern": "\\bNOLINT(?:NEXTLINE|BEGIN|END)?\\b"
+  },
+  "architecture": {
+    "roots": ["src"],
+    "header_suffix": ".h",
+    "implementation_suffix": ".cpp",
+    "header_body_allowlist": ["src/config/config_schema.h"],
+    "cpp_without_header_allowlist": ["src/main/main.cpp"],
+    "control_keywords": ["catch", "for", "if", "switch", "while"]
+  },
+  "include_style": {
+    "roots": ["src", "tests", "resources"],
+    "suffixes": [".h", ".cpp", ".rc"],
+    "tracked_only": true,
+    "include_roots": [
+      {
+        "name": "src",
+        "path": "src"
+      },
+      {
+        "name": "resources",
+        "path": "resources"
+      }
+    ],
+    "nolint_message": "Local NOLINT suppressions are not allowed; fix the finding or add a maintained checker-level exception instead."
+  },
+  "source_dependencies": {
+    "roots": ["src"],
+    "source_root": "src",
+    "root_label": "src",
+    "suffixes": [".cpp", ".h"],
+    "header_suffixes": [".h"],
+    "default_dot_output": "build/architecture/source_dependencies.dot",
+    "graphml_namespace": "http://graphml.graphdrawing.org/xmlns",
+    "dot_label": "CaseDash src module dependencies",
+    "large_source_file_loc_threshold": 1000,
+    "universal_package_dependencies": ["util"],
+    "package_dependency_limits": {
+      "main": ["dashboard", "diagnostics", "display", "util"],
+      "dashboard": ["config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "util", "widget"],
+      "display": ["config", "diagnostics", "telemetry", "util"],
+      "diagnostics": ["config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "renderer", "telemetry", "util", "widget"],
+      "layout_edit_dialog": ["config", "layout_edit", "layout_model", "telemetry", "util", "widget"],
+      "layout_guide_sheet": ["config", "dashboard_renderer", "layout_edit", "layout_model", "renderer", "util", "widget"],
+      "dashboard_renderer": ["config", "layout_model", "renderer", "telemetry", "util", "widget"],
+      "layout_edit": ["config", "layout_model", "util", "widget"],
+      "layout_model": ["config", "renderer", "widget"],
+      "widget": ["config", "renderer", "telemetry", "util"],
+      "renderer": ["config", "util"],
+      "telemetry": ["config", "util"],
+      "config": ["util"],
+      "util": []
+    },
+    "package_encapsulation_message": "{source} depends on package-private module {target}; only {target_package_root}/ files may include modules below {target_package_root}/*/.",
+    "package_dependency_message": "{source} is in the {source_package} package and must depend only on {allowed_dependencies}, not project module {target}.",
+    "external_modules": [
+      {
+        "name": "d2d",
+        "directory": "external",
+        "include_names": ["d2d1.h", "dwrite.h", "wincodec.h", "wrl/client.h"],
+        "allowed_packages": ["renderer"],
+        "violation_kind": "layer-d2d",
+        "violation_message": "{source} must not depend on Direct2D/DirectWrite/WIC/WRL module {target}; only renderer may."
+      }
+    ]
+  },
+  "source_policy": {
+    "roots": ["src", "tests"],
+    "suffixes": [".h", ".cpp"],
+    "guardrails_doc": "docs/source_policy_guardrails.md",
+    "line_rules": [
+      {
+        "kind": "source-policy",
+        "pattern": "\\bstd\\s*::\\s*function\\b",
+        "message": "std::function is not allowed in maintained source; use FunctionRef for synchronous borrowed callbacks or a purpose-built interface when ownership must escape the call. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "\\bstd\\s*::\\s*filesystem\\b|^\\s*#\\s*include\\s*<\\s*filesystem\\s*>",
+        "message": "std::filesystem is not allowed in maintained source; use src/util/file_path.* helpers so path handling stays Win32-backed without pulling filesystem machinery into the app. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "\\bstd\\s*::\\s*hash\\b",
+        "message": "std::hash is not allowed in maintained source; use a concrete project-owned hash helper for fixed lookup tables so small caches do not grow broad STL hashing machinery. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "\\bstd\\s*::\\s*(?:condition_variable(?:_any)?|jthread|mutex|recursive_mutex|shared_mutex|thread|timed_mutex)\\b|^\\s*#\\s*include\\s*<\\s*(?:condition_variable|mutex|shared_mutex|thread)\\s*>",
+        "message": "STL threading primitives are not allowed in maintained source; use LightweightMutex for small locks and direct Win32 thread or event handles for worker wakeups so prior size-optimization wins stay enforced. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "^\\s*#\\s*(?:if|ifdef|ifndef|elif|else|endif)\\b",
+        "message": "conditional compilation guards are not allowed in maintained source; keep code compiled for every native target and let the linker remove unreferenced target-specific helpers. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "\\b([A-Za-z_][A-Za-z0-9_]*W)\\s*\\(",
+        "capture_group": 1,
+        "allowed_matches_by_file": {
+          "src/util/command_line.cpp": ["CommandLineToArgvW", "GetCommandLineW"]
+        },
+        "message": "{match1} is not allowed in maintained source; CaseDash declares UTF-8 as the process code page and calls Win32 A APIs by default. Keep W calls only for documented wide-native APIs that have no A-style boundary. See {guardrails_doc}."
+      },
+      {
+        "kind": "source-policy",
+        "pattern": "\\b(?:AddComboStringUtf8|AppendMenuUtf8|CleanProcessDisplayNameUtf8|LoadUtf8ResourceData|ManagedStringFromUtf8|MessageBoxUtf8|ReadComboTextUtf8|ReadConfigFileUtf8|ReadDialogControlTextUtf8|SetDiagnosticsUtf8|SetDialogControlTextUtf8|SetWindowTextUtf8|Utf8FromAnsi|Utf8FromWide|WideFromUtf8|WriteConfigFileUtf8|kAppTitleUtf8)\\b",
+        "message": "obsolete conversion-only Utf8 helper names are not allowed; UTF-8 is the app default, so call A APIs directly or use no-suffix app helpers. See {guardrails_doc}."
+      }
+    ],
+    "wide_literals": {
+      "allowed_const_declaration_pattern": "^\\s*(?:(?:static|inline)\\s+)*(?:constexpr|const)\\b(?=[^=;\\n]*\\bwchar_t\\b)[^=;\\n]*=\\s*$",
+      "message": "wide literals must stay narrow UTF-8 by default; only const wchar_t string constants initialized with L\"...\" and an end-of-line reason comment are allowed for wide-native boundaries with no A-style API. See {guardrails_doc}."
+    }
+  }
+}
