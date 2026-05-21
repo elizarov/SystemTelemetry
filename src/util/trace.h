@@ -15,6 +15,7 @@ enum class TracePrefix : unsigned char {
     AsusArmouryCrate,
     BoardVendor,
     Crash,
+    DashboardTooltip,
     Diagnostics,
     Fake,
     FpsEtw,

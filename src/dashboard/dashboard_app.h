@@ -101,8 +101,9 @@ private:
     void SyncDashboardMoveOverlayState();
     bool CreateDashboardTooltip();
     void DestroyDashboardTooltip();
-    void HideLayoutEditTooltip();
-    void HideTitlebarTooltip();
+    void HideLayoutEditTooltip(std::string_view reason = "layout_edit_inactive");
+    void HideTitlebarTooltip(std::string_view reason = "titlebar_inactive");
+    void HideTooltipForLayoutEditUpdate(std::string_view reason);
     void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
@@ -243,6 +244,9 @@ private:
     bool nativeTitlebarHoverTimerActive_ = false;
     bool nativeTitlebarControlsVisible_ = false;
     bool nativeTitlebarComboDropdownOpen_ = false;
+    DashboardTitlebarTooltipControl nativeTitlebarTooltipControl_ = DashboardTitlebarTooltipControl::None;
+    RECT nativeTitlebarTooltipRect_{};
+    bool nativeTitlebarTooltipRectValid_ = false;
     BYTE nativeTitlebarProbeAlpha_ = 0;
     NativeTitlebarButton nativeTitlebarHoveredButton_ = NativeTitlebarButton::None;
     NativeTitlebarButton nativeTitlebarPressedButton_ = NativeTitlebarButton::None;
