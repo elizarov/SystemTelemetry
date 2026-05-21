@@ -487,6 +487,7 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
     app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
     app_.HideLayoutEditTooltip();
     DestroyLayoutEditDialogWindow();
+    app_.InvalidateNativeTitlebar();
     return true;
 }
 
@@ -494,6 +495,7 @@ bool DashboardShellUi::HandleEditLayoutToggle() {
     DashboardSessionState& state = app_.controller_.State();
     if (!state.isEditingLayout) {
         app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+        app_.InvalidateNativeTitlebar();
         return true;
     }
 
@@ -520,11 +522,13 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
     const bool startedLayoutEdit = !state.isEditingLayout;
     if (startedLayoutEdit) {
         app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+        app_.InvalidateNativeTitlebar();
     }
 
     if (!EnsureLayoutEditDialog(std::nullopt, true)) {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+            app_.InvalidateNativeTitlebar();
         }
         ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
@@ -550,6 +554,7 @@ bool DashboardShellUi::HandleReloadConfig() {
         return false;
     }
     RefreshLayoutEditDialog();
+    app_.InvalidateNativeTitlebar();
     return true;
 }
 
@@ -562,6 +567,7 @@ bool DashboardShellUi::HandleConfigureDisplay(const DisplayMenuOption& option) {
         app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         app_.HideLayoutEditTooltip();
         DestroyLayoutEditDialogWindow();
+        app_.InvalidateNativeTitlebar();
     }
     return true;
 }
@@ -896,11 +902,13 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
     bool startedLayoutEdit = false;
     if (!app_.controller_.State().isEditingLayout) {
         app_.controller_.StartLayoutEditMode(app_, app_.layoutEditController_);
+        app_.InvalidateNativeTitlebar();
         startedLayoutEdit = true;
     }
     if (!EnsureLayoutEditDialog(focusKey, true)) {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
+            app_.InvalidateNativeTitlebar();
         }
         ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);

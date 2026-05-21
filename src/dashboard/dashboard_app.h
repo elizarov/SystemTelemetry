@@ -62,6 +62,7 @@ private:
     enum class NativeTitlebarButton {
         None,
         AppMenu,
+        EditLayout,
         Display,
         Close,
     };
@@ -154,6 +155,7 @@ private:
     void PaintNativeTitlebar(HDC hdc) const;
     void PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const;
     void RefreshNativeTitlebarChrome();
+    void InvalidateNativeTitlebar() const;
     void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
     void ResetNativeTitlebarButtonState();
     void UpdateNativeTitlebarButtonHover(POINT screenPoint);
