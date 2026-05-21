@@ -201,10 +201,7 @@ bool ConfigureDisplay(const AppConfig& config,
 
     const FilePath tempConfigPath = CreateTempFilePath("CaseDashConfigureDisplayConfig");
     const FilePath tempDumpPath = writeWallpaper ? CreateTempFilePath("CaseDashConfigureDisplayDump") : FilePath{};
-    const FilePath tempPreviousConfigPath =
-        previousWallpaperConfig != nullptr ? CreateTempFilePath("CaseDashConfigureDisplayPreviousConfig") : FilePath{};
-    if (tempConfigPath.empty() || (writeWallpaper && tempDumpPath.empty()) ||
-        (previousWallpaperConfig != nullptr && tempPreviousConfigPath.empty())) {
+    if (tempConfigPath.empty() || (writeWallpaper && tempDumpPath.empty())) {
         return false;
     }
 
@@ -212,55 +209,38 @@ bool ConfigureDisplay(const AppConfig& config,
     if (prepared && writeWallpaper) {
         prepared = WriteTelemetryDumpFile(tempDumpPath, dump);
     }
-    if (prepared && previousWallpaperConfig != nullptr) {
-        prepared =
-            SaveConfig(tempPreviousConfigPath, *previousWallpaperConfig, ConfigParseContext{TelemetryMetricCatalog()});
-    }
     if (!prepared) {
         RemoveFileIfExists(tempConfigPath);
         RemoveFileIfExists(tempDumpPath);
-        RemoveFileIfExists(tempPreviousConfigPath);
         return false;
     }
 
-    std::string parameters = FormatText("/configure-display %s /configure-display-target %s",
-        QuoteCommandLineArgument(tempConfigPath.string()).c_str(),
-        QuoteCommandLineArgument(configPath.string()).c_str());
+    std::string parameters =
+        FormatText("/configure-display %s", QuoteCommandLineArgument(tempConfigPath.string()).c_str());
     if (writeWallpaper) {
         AppendFormat(parameters,
-            " /configure-display-write-wallpaper /configure-display-dump %s /configure-display-image-target %s",
-            QuoteCommandLineArgument(tempDumpPath.string()).c_str(),
-            QuoteCommandLineArgument(imagePath.string()).c_str());
+            " /configure-display-write-wallpaper /configure-display-dump %s",
+            QuoteCommandLineArgument(tempDumpPath.string()).c_str());
     }
-    if (previousWallpaperConfig != nullptr) {
-        AppendFormat(parameters,
-            " /configure-display-clear-wallpaper %s",
-            QuoteCommandLineArgument(tempPreviousConfigPath.string()).c_str());
-    }
-
     DWORD exitCode = 1;
     const bool launched = RunElevatedSelfAndWait(owner, parameters, {}, SW_HIDE, &exitCode);
     RemoveFileIfExists(tempConfigPath);
     RemoveFileIfExists(tempDumpPath);
-    RemoveFileIfExists(tempPreviousConfigPath);
-    return launched && exitCode == 0;
+    const bool elevatedConfigured = launched && exitCode == 0;
+    return elevatedConfigured &&
+           (previousWallpaperConfig == nullptr || ClearConfiguredWallpaper(*previousWallpaperConfig, trace));
 }
 
-int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
-    const FilePath& sourceDumpPath,
-    const FilePath& targetConfigPath,
-    const FilePath& targetImagePath,
-    bool writeWallpaper,
-    const FilePath& previousConfigPath) {
-    if (sourceConfigPath.empty() || targetConfigPath.empty() ||
-        (writeWallpaper && (sourceDumpPath.empty() || targetImagePath.empty()))) {
+int RunElevatedConfigureDisplayMode(
+    const FilePath& configPayloadPath, const FilePath& dumpPayloadPath, bool writeWallpaper) {
+    if (configPayloadPath.empty() || (writeWallpaper && dumpPayloadPath.empty())) {
         return 2;
     }
 
-    const AppConfig config = LoadConfig(sourceConfigPath, true, ConfigParseContext{TelemetryMetricCatalog()});
+    const AppConfig config = LoadConfig(configPayloadPath, true, ConfigParseContext{TelemetryMetricCatalog()});
     TelemetryDump dump;
     if (writeWallpaper) {
-        const std::string input = ReadBinaryFile(sourceDumpPath);
+        const std::string input = ReadBinaryFile(dumpPayloadPath);
         std::string error;
         if (input.empty() || !LoadTelemetryDump(input, dump, &error)) {
             return 1;
@@ -268,26 +248,21 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
     }
 
     Trace trace;
+    const FilePath runtimeConfigPath = GetRuntimeConfigPath();
+    const FilePath imagePath = GetExecutableDirectory() / kDefaultBlankWallpaperFileName;
     bool imageSaved = true;
     if (writeWallpaper) {
         const double targetScale = HasExplicitDisplayScale(config.display.scale) ? config.display.scale : 0.0;
         if (targetScale <= 0.0) {
             return 1;
         }
-        imageSaved = SaveBlankWallpaperImage(targetImagePath, dump, config, targetScale, trace);
+        imageSaved = SaveBlankWallpaperImage(imagePath, dump, config, targetScale, trace);
     }
 
     const bool configSaved =
-        imageSaved && SaveConfig(targetConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
+        imageSaved && SaveConfig(runtimeConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
     const bool wallpaperApplied = configSaved && (!writeWallpaper || ApplyConfiguredWallpaper(config, trace));
-    bool previousWallpaperCleared = true;
-    if (wallpaperApplied && !previousConfigPath.empty()) {
-        const AppConfig previousConfig =
-            LoadConfig(previousConfigPath, true, ConfigParseContext{TelemetryMetricCatalog()});
-        previousWallpaperCleared = ClearConfiguredWallpaper(previousConfig, trace);
-    }
-    RemoveFileIfExists(sourceConfigPath);
-    RemoveFileIfExists(sourceDumpPath);
-    RemoveFileIfExists(previousConfigPath);
-    return wallpaperApplied && previousWallpaperCleared ? 0 : 1;
+    RemoveFileIfExists(configPayloadPath);
+    RemoveFileIfExists(dumpPayloadPath);
+    return wallpaperApplied ? 0 : 1;
 }

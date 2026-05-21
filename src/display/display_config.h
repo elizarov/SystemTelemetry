@@ -17,9 +17,5 @@ bool ConfigureDisplay(const AppConfig& config,
     const AppConfig* previousWallpaperConfig,
     Trace& trace,
     HWND owner);
-int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
-    const FilePath& sourceDumpPath,
-    const FilePath& targetConfigPath,
-    const FilePath& targetImagePath,
-    bool writeWallpaper,
-    const FilePath& previousConfigPath);
+int RunElevatedConfigureDisplayMode(
+    const FilePath& configPayloadPath, const FilePath& dumpPayloadPath, bool writeWallpaper);

@@ -86,18 +86,12 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         return RunElevatedSaveConfigMode(
             FilePath(*elevatedSaveSource), elevatedSaveTarget.has_value() ? FilePath(*elevatedSaveTarget) : FilePath{});
     }
-    if (const auto configureDisplaySource = GetSwitchValue(commandLine, "/configure-display");
-        configureDisplaySource.has_value()) {
-        const auto configureDisplayTarget = GetSwitchValue(commandLine, "/configure-display-target");
+    if (const auto configureDisplayPayload = GetSwitchValue(commandLine, "/configure-display");
+        configureDisplayPayload.has_value()) {
         const auto configureDisplayDump = GetSwitchValue(commandLine, "/configure-display-dump");
-        const auto configureDisplayImageTarget = GetSwitchValue(commandLine, "/configure-display-image-target");
-        const auto configureDisplayPrevious = GetSwitchValue(commandLine, "/configure-display-clear-wallpaper");
-        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
+        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplayPayload),
             configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
-            configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
-            configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{},
-            HasSwitch(commandLine, "/configure-display-write-wallpaper"),
-            configureDisplayPrevious.has_value() ? FilePath(*configureDisplayPrevious) : FilePath{});
+            HasSwitch(commandLine, "/configure-display-write-wallpaper"));
     }
     if (const auto autoStartSetting = GetSwitchValue(commandLine, "/set-autostart"); autoStartSetting.has_value()) {
         if (_stricmp(autoStartSetting->c_str(), "on") == 0) {
