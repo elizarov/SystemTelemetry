@@ -4,7 +4,6 @@ import json
 import os
 import shutil
 import subprocess
-import sys
 import unittest
 from pathlib import Path
 from typing import Any
@@ -13,6 +12,7 @@ from typing import Any
 TEST_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TEST_ROOT.parents[2]
 REPORT_PATH = TEST_ROOT / "build" / "lint_report.json"
+TOOLS_EXE = REPO_ROOT / "build" / "CaseDashTools.exe"
 
 
 def canonical_diagnostics(diagnostics: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -38,16 +38,13 @@ class LintCheckTests(unittest.TestCase):
         env["GIT_CEILING_DIRECTORIES"] = str(TEST_ROOT.parent)
         result = subprocess.run(
             [
-                sys.executable,
-                str(REPO_ROOT / "tools" / "lint_check.py"),
+                str(TOOLS_EXE),
+                "lint_check",
                 "--config",
                 str(REPO_ROOT / "tools" / "lint_config.json"),
                 "--check",
-                "--skip-svg",
                 "--report-json",
                 str(REPORT_PATH.relative_to(TEST_ROOT)),
-                "--output",
-                "build/source_dependencies.dot",
             ],
             cwd=TEST_ROOT,
             env=env,
@@ -61,7 +58,7 @@ class LintCheckTests(unittest.TestCase):
             result.returncode,
             msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}",
         )
-        self.assertTrue(REPORT_PATH.is_file(), "lint_check.py did not write the JSON report")
+        self.assertTrue(REPORT_PATH.is_file(), "CaseDashTools lint_check did not write the JSON report")
 
         report = json.loads(REPORT_PATH.read_text(encoding="utf-8"))
         expected = json.loads((TEST_ROOT / "lint_testcases.json").read_text(encoding="utf-8"))
@@ -69,6 +66,21 @@ class LintCheckTests(unittest.TestCase):
         self.assertEqual(1, report["schema_version"])
         self.assertTrue(report["failed"])
         self.assertEqual(canonical_diagnostics(expected), canonical_diagnostics(report["diagnostics"]))
+
+    def test_lint_check_rejects_removed_graph_arguments(self) -> None:
+        result = subprocess.run(
+            [
+                str(TOOLS_EXE),
+                "lint_check",
+                "--skip-svg",
+            ],
+            cwd=TEST_ROOT,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(2, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
 
 
 if __name__ == "__main__":
