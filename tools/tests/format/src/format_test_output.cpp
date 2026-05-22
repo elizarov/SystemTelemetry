@@ -149,6 +149,19 @@ ColorConfig EmptyColor() {
     return {};
 }
 
+DashboardApp::DashboardApp(
+    const DiagnosticsOptions& diagnosticsOptions,
+    bool bringToFrontOnRun
+) :
+    renderer_(trace_),
+    diagnosticsOptions_(diagnosticsOptions),
+    layoutEditController_(*this),
+    shellUi_(std::make_unique<DashboardShellUi>(*this)),
+    bringToFrontOnRun_(bringToFrontOnRun)
+{
+    renderer_.SetLiveAnimationEnabled(true);
+}
+
 HANDLE OpenProbe(FilePath probePath) {
     HANDLE probe = CreateFileA(
         probePath.string().c_str(),

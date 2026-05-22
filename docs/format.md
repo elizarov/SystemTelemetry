@@ -292,6 +292,25 @@ void declaredLong(
 );
 ```
 
+Constructor initializer lists follow the same compact-or-fully-split rule. A short constructor initializer list stays with the declaration. A long constructor initializer list keeps `) :` on the header line, then emits each initializer on its own structural line indented one level deeper. For a non-empty body, the opening body brace is emitted on its own line after the initializer list. Empty bodies keep `{}` compact.
+
+```cpp
+Widget::Widget(int value) : value_(value) {}
+
+DashboardApp::DashboardApp(
+    const DiagnosticsOptions& diagnosticsOptions,
+    bool bringToFrontOnRun
+) :
+    renderer_(trace_),
+    diagnosticsOptions_(diagnosticsOptions),
+    layoutEditController_(*this),
+    shellUi_(std::make_unique<DashboardShellUi>(*this)),
+    bringToFrontOnRun_(bringToFrontOnRun)
+{
+    renderer_.SetLiveAnimationEnabled(true);
+}
+```
+
 Control-statement headers use the same treatment. This applies to `if`, `else if`, `while`, `for`, `switch`, `catch`, and similar parenthesized control constructs. A short header stays on one line. A long header puts the opening parenthesis at the end of the keyword line, formats the whole condition or header as structural contents, and puts the closing parenthesis on the line that opens the body.
 
 Long conditions split by logical-chain element before splitting nested calls or comparisons. A simple comparison such as `value > 0` stays atomic when the surrounding `&&` or `||` chain wraps.
