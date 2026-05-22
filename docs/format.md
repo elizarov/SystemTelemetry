@@ -118,6 +118,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put no space before a statement-terminating semicolon.
 - Put spaces around assignment, comparison, arithmetic, bitwise, logical, and compound-assignment binary operators, including assignment to an empty braced value: `const Context& context = {};`.
 - Treat `operator` plus a following symbolic operator as one composite function name, with no spaces inside the name or before the parameter list: `operator==(...)`, `operator&(...)`, and `operator[](...)`.
+- Treat destructor `~` plus the following type name as one composite function name, but keep declaration specifiers separated from it: `virtual ~Widget() = default;`.
 - Do not put spaces between unary operators and their operands: `!ready`, `++index`, `value--`, `*ptr`, `&value`, `-value`, and `+value`.
 - Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `Type&& value`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
 - Treat `&&` as a logical binary operator with spaces when it follows an expression, including qualified enum values: `field.kind == ValueKind::HexColor && IsNamedColor(name)`.

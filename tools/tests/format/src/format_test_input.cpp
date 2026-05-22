@@ -46,6 +46,11 @@ void MethodAfterMacro(){}
 int fieldAfterMethod;
 };
 
+class DashboardShellHost{
+public:
+virtual~DashboardShellHost()=default;
+};
+
 struct FormatTableRow{
 const char * name;
 int labelControl;

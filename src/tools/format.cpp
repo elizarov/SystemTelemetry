@@ -1860,6 +1860,9 @@ private:
         if (current == "(" && previous.kind == TokenKind::Word) {
             return IsControlKeyword(prev);
         }
+        if (current == "~" && previous.kind == TokenKind::Word && IsDestructorNameToken(tokens, index)) {
+            return true;
+        }
         if (current == ":" && IsLabelColonToken(tokens, index)) {
             return false;
         }
@@ -1929,6 +1932,18 @@ private:
         }
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
         return previous && tokens[*previous].text == "operator";
+    }
+
+    bool IsDestructorNameToken(const std::vector<Token>& tokens, size_t index) const {
+        if (index >= tokens.size() || tokens[index].text != "~") {
+            return false;
+        }
+        const size_t nameIndex = NextSignificantIndex(tokens, index + 1);
+        if (nameIndex >= tokens.size() || tokens[nameIndex].kind != TokenKind::Word) {
+            return false;
+        }
+        const size_t afterName = NextSignificantIndex(tokens, nameIndex + 1);
+        return afterName < tokens.size() && tokens[afterName].text == "(";
     }
 
     std::optional<size_t> PreviousNonNewlineIndex(const std::vector<Token>& tokens, size_t index) const {
