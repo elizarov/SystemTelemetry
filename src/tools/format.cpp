@@ -315,7 +315,7 @@ std::vector<Token> Tokenize(std::string_view text) {
             tokens.push_back({TokenKind::Number, std::string(text.substr(start, index - start))});
             continue;
         }
-        static constexpr std::string_view kThreeCharOps[] = {"<<=", ">>=", "<=>", "..."};
+        static constexpr std::string_view kThreeCharOps[] = {"<<=", ">>=", "<=>", "...", "->*"};
         bool matched = false;
         for (std::string_view op : kThreeCharOps) {
             if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
@@ -350,8 +350,7 @@ std::vector<Token> Tokenize(std::string_view text) {
             "<<",
             ">>",
             "##",
-            ".*",
-            "->*"
+            ".*"
         };
         for (std::string_view op : kTwoCharOps) {
             if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
@@ -425,6 +424,8 @@ bool IsNoSpaceBefore(std::string_view text) {
         text == "," ||
         text == "." ||
         text == "->" ||
+        text == ".*" ||
+        text == "->*" ||
         text == "::" ||
         text == "++" ||
         text == "--";
@@ -436,6 +437,8 @@ bool IsNoSpaceAfter(std::string_view text) {
         text == "{" ||
         text == "." ||
         text == "->" ||
+        text == ".*" ||
+        text == "->*" ||
         text == "::" ||
         text == "~" ||
         text == "!";

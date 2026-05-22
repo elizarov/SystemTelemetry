@@ -128,7 +128,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put spaces around ternary `?` and `:`.
 - Put spaces around the range-for colon and the constructor-initializer colon: `for (const auto& item : items)` and `Widget() : member(value) {}`.
 - Put no space before access-specifier, label, or `case` colons: `public:`, `label:`, and `case Value:`.
-- Put no spaces around namespace, member-access, and pointer-member-access operators: `Namespace::Type`, `object.field`, and `pointer->field`.
+- Put no spaces around namespace, member-access, and pointer-member-access operators: `Namespace::Type`, `object.field`, `pointer->field`, `object.*member`, and `pointer->*member`.
 - Put one space between `template` and its parameter list: `template <typename T>`.
 - Put two spaces before a trailing `//` comment after code. Do not vertically align trailing comments.
 - Put one space after a preprocessor directive keyword before its operand: `#include <vector>` and `#define NAME value`.

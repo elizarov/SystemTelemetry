@@ -380,6 +380,11 @@ static constexpr OutputPath kOutputPaths[] = {
     }
 };
 
+void DiagnosticsSession::ResolveOutputPathMember(const OutputPath& outputPath, const FilePath& workingDirectory) {
+    this->*outputPath.resolvedPath =
+        ResolveDiagnosticsOutputPath(workingDirectory, options_.*outputPath.configuredPath, outputPath.defaultFileName);
+}
+
 int kAlignedAssignment = 1;
 int kMuchLongerAlignedAssignment = 2;
 int kTrailingComment = 1;  // short
