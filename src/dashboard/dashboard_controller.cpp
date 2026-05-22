@@ -279,10 +279,17 @@ __declspec(noinline) bool DashboardController::FinishConfigMutation(
 
 bool DashboardController::ApplyConfiguredWallpaper(Trace& trace) {
     const bool applied = ::ApplyConfiguredWallpaper(NormalizeCommittedDisplayWallpaperConfig(state_.config), trace);
-    if (applied) {
-        RefreshCommittedWallpaperOwner(state_.config);
+    if (applied &&
+        (!state_.committedDisplayConfig.has_value() || state_.config.display == *state_.committedDisplayConfig)) {
+        // Placement retry can run after live-only changes; only advance the committed snapshot when it still matches.
+        RefreshCommittedDisplayConfig(state_.config);
     }
     return applied;
+}
+
+void DashboardController::RefreshCommittedDisplayConfig(const AppConfig& config) {
+    state_.committedDisplayConfig = config.display;
+    RefreshCommittedWallpaperOwner(config);
 }
 
 void DashboardController::RefreshCommittedWallpaperOwner(const AppConfig& config) {
@@ -316,7 +323,7 @@ bool DashboardController::CommitDisplayWallpaperTransition(
     if (!previousCleared) {
         return false;
     }
-    RefreshCommittedWallpaperOwner(nextConfig);
+    RefreshCommittedDisplayConfig(nextConfig);
     return true;
 }
 
@@ -365,6 +372,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         BeginLayoutEditSessionTracking();
     }
     ApplyConfiguredWallpaper(shell.TraceLog());
+    RefreshCommittedDisplayConfig(state_.config);
     return true;
 }
 
@@ -561,7 +569,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 
     TraceDisplayPositionUpdate(shell.TraceLog(), "configure_display", previousConfig.display, updatedConfig.display);
     state_.config = std::move(updatedConfig);
-    RefreshCommittedWallpaperOwner(state_.config);
+    RefreshCommittedDisplayConfig(state_.config);
     SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();

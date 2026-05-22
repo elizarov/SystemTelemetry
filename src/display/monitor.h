@@ -52,7 +52,7 @@ struct DisplayMenuOption {
     LogicalPointConfig position{};
     double targetScale = 0.0;
     bool writesWallpaper = false;
-    bool matchesCurrentConfig = false;
+    bool matchesCommittedConfig = false;
 };
 
 struct DisplayPlacementSchematicGeometry {
@@ -83,7 +83,14 @@ std::string SimplifyDeviceName(const std::string& deviceName);
 bool IsUsefulFriendlyName(const std::string& name);
 size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
     const DisplayMenuMonitorInfo& monitor,
-    const std::optional<TargetMonitorInfo>& configuredMonitor,
+    const DisplayConfig* committedDisplay,
+    const std::optional<TargetMonitorInfo>& committedMonitor,
+    bool startsSection,
+    DisplayMenuOption* options,
+    size_t capacity);
+size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
+    const DisplayMenuMonitorInfo& monitor,
+    const std::optional<TargetMonitorInfo>& committedMonitor,
     bool startsSection,
     DisplayMenuOption* options,
     size_t capacity);
@@ -99,6 +106,8 @@ AppConfig NormalizeCommittedDisplayWallpaperConfig(
 AppConfig NormalizeCommittedDisplayWallpaperConfig(const AppConfig& config);
 bool ShouldClearCommittedDisplayWallpaper(
     const std::optional<DisplayWallpaperOwner>& previousOwner, const std::optional<DisplayWallpaperOwner>& nextOwner);
+size_t EnumerateDisplayMenuOptions(
+    const AppConfig& config, const DisplayConfig* committedDisplay, DisplayMenuOption* options, size_t capacity);
 size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity);
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName);
 MonitorPlacementInfo GetMonitorPlacementForRect(const RECT& screenRect, double configuredScale = 0.0);

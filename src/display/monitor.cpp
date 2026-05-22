@@ -80,6 +80,22 @@ const char* DisplayPlacementModeLabel(DisplayPlacementMode mode) {
     return "";
 }
 
+bool DisplayMenuOptionMatchesCommittedConfig(const DisplayMenuOption& option,
+    const DisplayConfig* committedDisplay,
+    const std::optional<TargetMonitorInfo>& committedMonitor) {
+    if (committedDisplay == nullptr || !committedMonitor.has_value()) {
+        return false;
+    }
+    if (!RectsEqual(committedMonitor->rect, option.monitorRect)) {
+        return false;
+    }
+    const bool wallpaperMatches = option.writesWallpaper ? committedDisplay->wallpaper == kDefaultBlankWallpaperFileName
+                                                         : committedDisplay->wallpaper.empty();
+    return wallpaperMatches &&
+           AreScalesEqual(ResolveDisplayScale(committedDisplay->scale, committedMonitor->dpi), option.targetScale) &&
+           committedDisplay->position == option.position;
+}
+
 }  // namespace
 
 bool RectsEqual(const RECT& lhs, const RECT& rhs) {
@@ -233,7 +249,8 @@ DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(
 
 size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
     const DisplayMenuMonitorInfo& monitor,
-    const std::optional<TargetMonitorInfo>& configuredMonitor,
+    const DisplayConfig* committedDisplay,
+    const std::optional<TargetMonitorInfo>& committedMonitor,
     bool startsSection,
     DisplayMenuOption* options,
     size_t capacity) {
@@ -282,10 +299,8 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
         option.position = position;
         option.targetScale = targetScale;
         option.writesWallpaper = writesWallpaper;
-        option.matchesCurrentConfig =
-            configuredMonitor.has_value() && RectsEqual(configuredMonitor->rect, monitor.rect) &&
-            AreScalesEqual(ResolveDisplayScale(config.display.scale, monitor.dpi), targetScale) &&
-            config.display.position == position;
+        option.matchesCommittedConfig =
+            DisplayMenuOptionMatchesCommittedConfig(option, committedDisplay, committedMonitor);
         ++count;
     };
 
@@ -319,6 +334,16 @@ size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
         LogicalPointConfig{ScalePhysicalToLogical(monitorWidth - targetSize.cx, targetScale), 0},
         false);
     return count;
+}
+
+size_t BuildDisplayMenuOptionsForMonitor(const AppConfig& config,
+    const DisplayMenuMonitorInfo& monitor,
+    const std::optional<TargetMonitorInfo>& committedMonitor,
+    bool startsSection,
+    DisplayMenuOption* options,
+    size_t capacity) {
+    return BuildDisplayMenuOptionsForMonitor(
+        config, monitor, &config.display, committedMonitor, startsSection, options, capacity);
 }
 
 AppConfig BuildConfiguredDisplayConfig(const AppConfig& config, const DisplayMenuOption& option) {
@@ -458,16 +483,19 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
     return identity;
 }
 
-size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity) {
-    const std::optional<TargetMonitorInfo> configuredMonitor = FindTargetMonitor(config.display.monitorName);
+size_t EnumerateDisplayMenuOptions(
+    const AppConfig& config, const DisplayConfig* committedDisplay, DisplayMenuOption* options, size_t capacity) {
+    const std::optional<TargetMonitorInfo> committedMonitor =
+        committedDisplay != nullptr ? FindTargetMonitor(committedDisplay->monitorName) : std::nullopt;
 
     struct SearchContext {
         const AppConfig* config = nullptr;
-        const std::optional<TargetMonitorInfo>* configuredMonitor = nullptr;
+        const DisplayConfig* committedDisplay = nullptr;
+        const std::optional<TargetMonitorInfo>* committedMonitor = nullptr;
         DisplayMenuOption* options = nullptr;
         size_t capacity = 0;
         size_t count = 0;
-    } context{&config, &configuredMonitor, options, capacity, 0};
+    } context{&config, committedDisplay, &committedMonitor, options, capacity, 0};
 
     EnumDisplayMonitors(
         nullptr,
@@ -491,7 +519,8 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
                 GetMonitorDpi(monitor)};
             context->count += BuildDisplayMenuOptionsForMonitor(*context->config,
                 monitorInfo,
-                *context->configuredMonitor,
+                context->committedDisplay,
+                *context->committedMonitor,
                 context->count > 0,
                 context->options + context->count,
                 context->capacity - context->count);
@@ -500,6 +529,10 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
         reinterpret_cast<LPARAM>(&context));
 
     return context.count;
+}
+
+size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity) {
+    return EnumerateDisplayMenuOptions(config, &config.display, options, capacity);
 }
 
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName) {

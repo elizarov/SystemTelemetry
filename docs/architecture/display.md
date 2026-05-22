@@ -10,7 +10,8 @@
 - Resolve saved placement against current monitor availability.
 - Keep watching for a configured `display.monitor_name` when login startup or monitor hotplug races ahead of enumeration.
 - Let `WM_DPICHANGED` apply cross-monitor DPI transitions before destination window size scaling.
-- Build display config updates from menu choices, including explicit scale, logical position, wallpaper ownership, current-config checkmark state, and committed wallpaper owner transitions.
+- Build display config updates from menu choices, including explicit scale, logical position, wallpaper ownership, committed-config checkmark state, and committed wallpaper owner transitions.
+- Generate configure-display checkmark state from the dashboard controller's committed display snapshot while still using the live layout config for option sizing and schematic geometry.
 - Round resolved display scales to three decimal places before using them for window sizing or saved display placement.
 - Provide the pure aspect-preserving interactive resize scale helper used by dashboard resize mode before committing explicit display scale and placement.
 - Resolve committed CaseDash wallpaper ownership from config plus monitor geometry so stale nonfullscreen `display.wallpaper` values are normalized during committed saves and exports.

@@ -1132,7 +1132,10 @@ size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption
     const DashboardSessionState& state = app_.controller_.State();
     ClearConfigureDisplayMenuBitmaps();
     configureDisplayMenuBitmaps_.reserve(capacity);
-    const size_t optionCount = EnumerateDisplayMenuOptions(state.config, options, capacity);
+    const size_t optionCount = EnumerateDisplayMenuOptions(state.config,
+        state.committedDisplayConfig.has_value() ? &*state.committedDisplayConfig : nullptr,
+        options,
+        capacity);
     if (optionCount == 0) {
         AppendMenuText(menu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
         return 0;
@@ -1144,7 +1147,7 @@ size_t DashboardShellUi::BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption
             AppendMenuA(menu, MF_SEPARATOR, 0, nullptr);
         }
         const UINT commandId = kCommandConfigureDisplayBase + static_cast<UINT>(i);
-        const UINT flags = MF_STRING | MF_ENABLED | (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
+        const UINT flags = MF_STRING | MF_ENABLED | (option.matchesCommittedConfig ? MF_CHECKED : MF_UNCHECKED);
         AppendMenuText(menu, flags, commandId, option.label);
         AttachConfigureDisplayMenuBitmap(menu, commandId, option);
     }

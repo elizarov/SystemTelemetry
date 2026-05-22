@@ -142,18 +142,113 @@ TEST(DisplayMenuOptions, NarrowerLayoutYieldsLeftAndRightOptions) {
     EXPECT_FALSE(options[1].writesWallpaper);
 }
 
-TEST(DisplayMenuOptions, CurrentConfigMatchesMonitorScaleAndPosition) {
-    AppConfig config = MakeDisplayConfig(1600, 900);
-    config.display.scale = 0.75;
-    config.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+TEST(DisplayMenuCheckmark, FullscreenCommittedConfigRequiresExpectedWallpaper) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1920, 1080);
+    const AppConfig liveConfig = MakeDisplayConfig(1600, 900);
+    AppConfig committed = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+    DisplayMenuOption options[3]{};
+
+    size_t count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1920, 1080), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 1u);
+    EXPECT_TRUE(options[0].matchesCommittedConfig);
+
+    committed.display.wallpaper = "other.png";
+    count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1920, 1080), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 1u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+}
+
+TEST(DisplayMenuCheckmark, EdgeCommittedConfigRequiresEmptyWallpaper) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1200, 1000);
+    const AppConfig liveConfig = MakeDisplayConfig(1600, 900);
+    AppConfig committed = liveConfig;
+    committed.display.monitorName = "Panel";
+    committed.display.scale = 0.75;
+    committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+    committed.display.wallpaper.clear();
+    DisplayMenuOption options[3]{};
+
+    size_t count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_TRUE(options[1].matchesCommittedConfig);
+
+    committed.display.wallpaper = kDefaultBlankWallpaperFileName;
+    count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+}
+
+TEST(DisplayMenuCheckmark, LivePlacementDoesNotMoveCommittedCheckmark) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1200, 1000);
+    AppConfig liveConfig = MakeDisplayConfig(1600, 900);
+    liveConfig.display.monitorName = "Other";
+    liveConfig.display.scale = 1.1;
+    liveConfig.display.position = LogicalPointConfig{17, 23};
+    AppConfig committed = MakeDisplayConfig(1600, 900);
+    committed.display.monitorName = "Panel";
+    committed.display.scale = 0.75;
+    committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
     DisplayMenuOption options[3]{};
 
     const size_t count = BuildDisplayMenuOptionsForMonitor(
-        config, MakeMonitor(1200, 1000), MakeTargetMonitor(1200, 1000), false, options, 3);
+        liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
 
     ASSERT_EQ(count, 2u);
-    EXPECT_FALSE(options[0].matchesCurrentConfig);
-    EXPECT_TRUE(options[1].matchesCurrentConfig);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_TRUE(options[1].matchesCommittedConfig);
+}
+
+TEST(DisplayMenuCheckmark, InconsistentCommittedPlacementChecksNothing) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1200, 1000);
+    const AppConfig liveConfig = MakeDisplayConfig(1600, 900);
+    AppConfig committed = liveConfig;
+    committed.display.monitorName = "Panel";
+    committed.display.scale = 0.75;
+    committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+    DisplayMenuOption options[3]{};
+
+    AppConfig wrongScale = committed;
+    wrongScale.display.scale = 0.751;
+    ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(
+                  liveConfig, MakeMonitor(1200, 1000), &wrongScale.display, monitor, false, options, 3),
+        2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+
+    AppConfig wrongPosition = committed;
+    wrongPosition.display.position = LogicalPointConfig{1, ScalePhysicalToLogical(325, 0.75)};
+    ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(
+                  liveConfig, MakeMonitor(1200, 1000), &wrongPosition.display, monitor, false, options, 3),
+        2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+
+    ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(liveConfig,
+                  MakeMonitor(1200, 1000),
+                  &committed.display,
+                  MakeTargetMonitorAt(1200, 0, 1200, 1000),
+                  false,
+                  options,
+                  3),
+        2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+
+    ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(
+                  liveConfig, MakeMonitor(1200, 1000), &committed.display, std::nullopt, false, options, 3),
+        2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
 }
 
 TEST(DisplayMenuOptions, GeneratedOptionsHaveActionableTargets) {

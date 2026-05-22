@@ -32,7 +32,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Fullscreen display configuration saves the display origin, an explicit fitted scale, and `wallpaper = casedash_blank.png`, renders the blank wallpaper image, applies it to the selected monitor, and clears the previous committed CaseDash-owned monitor wallpaper when switching ownership.
 - Edge display configuration saves the selected monitor, explicit fitted scale, logical edge placement, and `wallpaper = ` without rendering or applying a new wallpaper. It clears the previous committed CaseDash-owned wallpaper, including same-monitor wallpaper ownership from a previous fullscreen configuration.
 - Applying a configure-display placement live preserves the saved dashboard client origin; if a currently visible hover titlebar cannot fit at the new fullscreen or edge placement, the titlebar frame is hidden before the target window rectangle is applied.
-- `Configure Display` marks an entry with a checkbox when the live config targets the same monitor rectangle, explicit scale, and logical position, while still allowing that checked entry to be invoked again. The checkbox remains separate from the schematic placement icon.
+- `Configure Display` marks an entry with a checkbox when the last committed display config targets the same monitor rectangle, explicit scale, logical position, and expected wallpaper value for that entry. Unsaved move, resize, or scale changes do not move the checkbox until `Save Config` or `Configure Display` commits them. The checkbox remains separate from the schematic placement icon.
 
 ## Dashboard Composition And Rendering
 
