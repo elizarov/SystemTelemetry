@@ -46,7 +46,7 @@ bool OptionalDoubleEqual(std::optional<double> left, std::optional<double> right
 
 bool ScalarEqual(const ScalarFillSample& left, const ScalarFillSample& right) {
     return OptionalDoubleEqual(left.valueRatio, right.valueRatio) &&
-           OptionalDoubleEqual(left.peakRatio, right.peakRatio);
+        OptionalDoubleEqual(left.peakRatio, right.peakRatio);
 }
 
 double Lerp(double start, double target, double progress) {
@@ -182,7 +182,8 @@ bool ThroughputHasActiveChange(const ThroughputChartSample& start, const Through
     }
     const size_t outputCount = (std::max)(start.samples.size(), target.samples.size());
     for (size_t index = 0; index < outputCount; ++index) {
-        if (!DoublesEqual(AlignedSampleValue(start.samples, index, outputCount),
+        if (!DoublesEqual(
+                AlignedSampleValue(start.samples, index, outputCount),
                 AlignedSampleValue(target.samples, index, outputCount))) {
             return true;
         }
@@ -249,7 +250,8 @@ std::vector<double> ScrollSamplesForShift(
     return samples;
 }
 
-void ConfigureThroughputScroll(std::vector<double>& scrollSamples,
+void ConfigureThroughputScroll(
+    std::vector<double>& scrollSamples,
     double& targetPlotShiftSamples,
     const ThroughputChartSample& start,
     const ThroughputChartSample& target) {
@@ -316,7 +318,8 @@ public:
         } else {
             sample.samples.reserve(outputCount);
             for (size_t index = 0; index < outputCount; ++index) {
-                sample.samples.push_back(Lerp(AlignedSampleValue(start_.samples, index, outputCount),
+                sample.samples.push_back(Lerp(
+                    AlignedSampleValue(start_.samples, index, outputCount),
                     AlignedSampleValue(target_.samples, index, outputCount),
                     progress));
             }

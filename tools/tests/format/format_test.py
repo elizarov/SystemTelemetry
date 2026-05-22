@@ -29,7 +29,16 @@ FORMAT_OPTION_COVERAGE = {
     "PointerAlignment": "pointer declarations and parameters bind the star to the type",
     "ReferenceAlignment": "reference declarations and parameters bind the ampersand to the type",
     "SpaceBeforeParens": "control statements gain a space and function declarations do not",
-    "AlignAfterOpenBracket": "wrapped parameter and argument lines use continuation indentation",
+    "AlignAfterOpenBracket": "wrapped braced lists, parameters, and arguments start on following lines",
+    "AlignArrayOfStructures": "table rows are not column-aligned",
+    "AlignConsecutiveAssignments": "consecutive assignments keep ordinary spacing",
+    "AlignConsecutiveBitFields": "bitfield colons are not column-aligned",
+    "AlignConsecutiveDeclarations": "consecutive declarations are not column-aligned",
+    "AlignConsecutiveMacros": "consecutive macro definitions are not column-aligned",
+    "AlignConsecutiveShortCaseStatements": "short case labels do not use case-column alignment",
+    "AlignEscapedNewlines": "macro continuation backslashes are not right-aligned",
+    "AlignOperands": "wrapped boolean operands use continuation indentation instead of operand alignment",
+    "AlignTrailingComments": "trailing comments are not column-aligned",
     "BinPackArguments": "long call arguments wrap onto separate continuation lines",
     "BinPackParameters": "long function parameters wrap onto separate continuation lines",
     "AllowShortBlocksOnASingleLine": "short loop blocks expand across multiple lines",
@@ -45,6 +54,7 @@ FORMAT_OPTION_COVERAGE = {
     "SeparateDefinitionBlocks": "function definitions are separated by blank lines",
     "ReflowComments": "the over-limit comment remains on one physical line",
     "SpacesBeforeTrailingComments": "the trailing comment is separated by two spaces",
+    "PenaltyReturnTypeOnItsOwnLine": "long method declarations keep the return type with the function name",
 }
 
 

@@ -13,7 +13,8 @@ enum class ConfigSaveShape {
     ExistingTemplateOnly,
 };
 
-std::string BuildSavedConfigText(const std::string& initialText,
+std::string BuildSavedConfigText(
+    const std::string& initialText,
     const AppConfig& config,
     const AppConfig* compareConfig,
     ConfigSaveShape shape = ConfigSaveShape::UpdateOrAppend);

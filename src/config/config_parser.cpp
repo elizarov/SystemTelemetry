@@ -68,7 +68,8 @@ bool ApplyStructuredSectionFields(
     return false;
 }
 
-bool ApplySectionValue(const RuntimeConfigSectionDescriptor& section,
+bool ApplySectionValue(
+    const RuntimeConfigSectionDescriptor& section,
     void* owner,
     const std::string& key,
     const std::string& value,
@@ -84,7 +85,8 @@ bool ApplySectionValue(const RuntimeConfigSectionDescriptor& section,
     return false;
 }
 
-bool DispatchRuntimeConfigSection(AppConfig& config,
+bool DispatchRuntimeConfigSection(
+    AppConfig& config,
     const std::string& section,
     const std::string& key,
     const std::string& value,
@@ -304,7 +306,8 @@ bool ApplyBoardSectionValue(BoardConfig& board, const std::string& key, const st
     return false;
 }
 
-bool ApplyMetricsSectionValue(MetricsSectionConfig& metrics,
+bool ApplyMetricsSectionValue(
+    MetricsSectionConfig& metrics,
     const std::string& key,
     const std::string& value,
     const ConfigParseContext& context) {

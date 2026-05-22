@@ -41,7 +41,8 @@ public:
 
     void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey&, const RenderRect&) override {}
 
-    void RegisterStaticTextAnchor(const RenderRect&,
+    void RegisterStaticTextAnchor(
+        const RenderRect&,
         const std::string&,
         TextStyleId,
         const TextLayoutOptions&,
@@ -49,12 +50,14 @@ public:
         std::optional<LayoutEditParameter>,
         LayoutEditTargetOutline) override {}
 
-    void RegisterDynamicTextAnchor(const TextLayoutResult&,
+    void RegisterDynamicTextAnchor(
+        const TextLayoutResult&,
         const LayoutEditAnchorBinding&,
         std::optional<LayoutEditParameter>,
         LayoutEditTargetOutline) override {}
 
-    void RegisterDynamicTextAnchor(const RenderRect&,
+    void RegisterDynamicTextAnchor(
+        const RenderRect&,
         const std::string&,
         TextStyleId,
         const TextLayoutOptions&,
@@ -286,7 +289,8 @@ public:
     LayoutEditAnchorBinding MakeMetricTextBinding(
         const WidgetLayout& widget, std::string_view metricId, int anchorId) const override {
         return LayoutEditAnchorBinding{
-            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            LayoutEditAnchorKey{
+                LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 LayoutMetricEditKey{std::string(metricId)},
                 anchorId},
             0,
@@ -347,7 +351,8 @@ WidgetLayout BuildUploadWidgetLayout() {
     return layout;
 }
 
-CapturedWidgetAnimation DrawUploadTarget(ThroughputChartTestRenderer& renderer,
+CapturedWidgetAnimation DrawUploadTarget(
+    ThroughputChartTestRenderer& renderer,
     ThroughputWidget& widget,
     const WidgetLayout& layout,
     const SystemSnapshot& snapshot) {
@@ -394,7 +399,8 @@ RenderPoint RightmostPointAtY(const std::vector<RenderPoint>& points, int y) {
     return match;
 }
 
-RenderPoint DrawSampledTrackedPoint(ThroughputChartTestRenderer& renderer,
+RenderPoint DrawSampledTrackedPoint(
+    ThroughputChartTestRenderer& renderer,
     DashboardAnimationTimeline& timeline,
     const CapturedWidgetAnimation& captured,
     std::uint64_t targetVersion,

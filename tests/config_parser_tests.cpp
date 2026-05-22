@@ -23,15 +23,16 @@ ConfigParseContext TestConfigParseContext() {
 }  // namespace
 
 TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
-    const FilePath path = WriteTestConfig("[fonts]\n"
-                                          "label = Segoe UI,-5,600\n"
-                                          "\n"
-                                          "[drive_usage_list]\n"
-                                          "activity_segment_gap = -9\n"
-                                          "\n"
-                                          "[gauge]\n"
-                                          "sweep_degrees = 500\n"
-                                          "segment_gap_degrees = -12\n");
+    const FilePath path = WriteTestConfig(
+        "[fonts]\n"
+        "label = Segoe UI,-5,600\n"
+        "\n"
+        "[drive_usage_list]\n"
+        "activity_segment_gap = -9\n"
+        "\n"
+        "[gauge]\n"
+        "sweep_degrees = 500\n"
+        "segment_gap_degrees = -12\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -44,11 +45,12 @@ TEST(ConfigParser, ClampsParsedEditableValuesThroughSchemaPolicies) {
 }
 
 TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
-    const FilePath path = WriteTestConfig("[card_style]\n"
-                                          "header_icon_size = 21\n"
-                                          "header_icon_gap = 7\n"
-                                          "header_content_gap = 5\n"
-                                          "row_gap = 4\n");
+    const FilePath path = WriteTestConfig(
+        "[card_style]\n"
+        "header_icon_size = 21\n"
+        "header_icon_gap = 7\n"
+        "header_content_gap = 5\n"
+        "row_gap = 4\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -61,10 +63,11 @@ TEST(ConfigParser, ParsesRenamedCardStyleKeys) {
 }
 
 TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
-    const FilePath path = WriteTestConfig("[dashboard]\n"
-                                          "outer_margin = 8\n"
-                                          "row_gap = 9\n"
-                                          "column_gap = 11\n");
+    const FilePath path = WriteTestConfig(
+        "[dashboard]\n"
+        "outer_margin = 8\n"
+        "row_gap = 9\n"
+        "column_gap = 11\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -76,8 +79,9 @@ TEST(ConfigParser, ParsesRenamedDashboardColumnGapKey) {
 }
 
 TEST(ConfigParser, ParsesGpuAdapterSelection) {
-    const FilePath path = WriteTestConfig("[gpu]\n"
-                                          "adapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\n");
+    const FilePath path = WriteTestConfig(
+        "[gpu]\n"
+        "adapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -87,9 +91,10 @@ TEST(ConfigParser, ParsesGpuAdapterSelection) {
 }
 
 TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
-    const FilePath path = WriteTestConfig("[colors]\n"
-                                          "accent_color = #12345678\n"
-                                          "track_color = #ABCDEF\n");
+    const FilePath path = WriteTestConfig(
+        "[colors]\n"
+        "accent_color = #12345678\n"
+        "track_color = #ABCDEF\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
     const AppConfig defaults;
@@ -101,21 +106,22 @@ TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
 }
 
 TEST(ConfigParser, ResolvesThemeTokensAndDerivedColors) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "theme = dark_cyan\n"
-                                          "\n"
-                                          "[theme.dark_cyan]\n"
-                                          "background = #000000FF\n"
-                                          "foreground = #FFFFFFFF\n"
-                                          "accent = #00BFFFFF\n"
-                                          "guide = #FF6A00FF\n"
-                                          "\n"
-                                          "[colors]\n"
-                                          "accent_color = accent\n"
-                                          "peak_ghost_color = accent(alpha: 0x60)\n"
-                                          "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
-                                          "panel_border_color = background(mix: 0.34 accent)\n"
-                                          "muted_text_color = foreground(mix: 0.55 accent)\n");
+    const FilePath path = WriteTestConfig(
+        "[display]\n"
+        "theme = dark_cyan\n"
+        "\n"
+        "[theme.dark_cyan]\n"
+        "background = #000000FF\n"
+        "foreground = #FFFFFFFF\n"
+        "accent = #00BFFFFF\n"
+        "guide = #FF6A00FF\n"
+        "\n"
+        "[colors]\n"
+        "accent_color = accent\n"
+        "peak_ghost_color = accent(alpha: 0x60)\n"
+        "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
+        "panel_border_color = background(mix: 0.34 accent)\n"
+        "muted_text_color = foreground(mix: 0.55 accent)\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -161,23 +167,24 @@ TEST(ColorMath, ConvertsHsvAndRgbRoundTrip) {
 }
 
 TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "theme = dark_cyan\n"
-                                          "\n"
-                                          "[theme.dark_cyan]\n"
-                                          "background = #000000FF\n"
-                                          "foreground = #FFFFFFFF\n"
-                                          "accent = #00BFFFFF\n"
-                                          "guide = #FF6A00FF\n"
-                                          "\n"
-                                          "[colors]\n"
-                                          "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
-                                          "muted_text_color = foreground(mix: 0.55 accent)\n"
-                                          "\n"
-                                          "[layout_guide_sheet]\n"
-                                          "callout_leader_color = foreground(mix: 0.59 guide, alpha: 0xE6)\n"
-                                          "callout_border_color = guide(rotate_hue: 53)\n"
-                                          "callout_description_color = muted_text_color\n");
+    const FilePath path = WriteTestConfig(
+        "[display]\n"
+        "theme = dark_cyan\n"
+        "\n"
+        "[theme.dark_cyan]\n"
+        "background = #000000FF\n"
+        "foreground = #FFFFFFFF\n"
+        "accent = #00BFFFFF\n"
+        "guide = #FF6A00FF\n"
+        "\n"
+        "[colors]\n"
+        "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
+        "muted_text_color = foreground(mix: 0.55 accent)\n"
+        "\n"
+        "[layout_guide_sheet]\n"
+        "callout_leader_color = foreground(mix: 0.59 guide, alpha: 0xE6)\n"
+        "callout_border_color = guide(rotate_hue: 53)\n"
+        "callout_description_color = muted_text_color\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -189,13 +196,14 @@ TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
 }
 
 TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
-    const FilePath path = WriteTestConfig("[layout_guide_sheet]\n"
-                                          "callout_leader_color = #FFE45CE6\n"
-                                          "callout_border_color = #B88A22FF\n"
-                                          "sheet_margin = 41\n"
-                                          "callout_gap = 42\n"
-                                          "leader_stroke_width = 3\n"
-                                          "leader_endpoint_diameter = 7\n");
+    const FilePath path = WriteTestConfig(
+        "[layout_guide_sheet]\n"
+        "callout_leader_color = #FFE45CE6\n"
+        "callout_border_color = #B88A22FF\n"
+        "sheet_margin = 41\n"
+        "callout_gap = 42\n"
+        "leader_stroke_width = 3\n"
+        "leader_endpoint_diameter = 7\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -210,9 +218,10 @@ TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
 }
 
 TEST(ConfigParser, ParsesMetricsSectionEntries) {
-    const FilePath path = WriteTestConfig("[metrics]\n"
-                                          "cpu.load = *,%,Processor Load\n"
-                                          "gpu.temp = 110,C,GPU Temp\n");
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "cpu.load = *,%,Processor Load\n"
+        "gpu.temp = 110,C,GPU Temp\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -235,9 +244,10 @@ TEST(ConfigParser, ParsesMetricsSectionEntries) {
 }
 
 TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
-    const FilePath path = WriteTestConfig("[metrics]\n"
-                                          "nothing = 7,ignored,Overridden Placeholder\n"
-                                          "cpu.load = *,%,Processor Load\n");
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "nothing = 7,ignored,Overridden Placeholder\n"
+        "cpu.load = *,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -250,13 +260,14 @@ TEST(ConfigParser, IgnoresRuntimePlaceholderMetricMetadataInMetricsSection) {
 }
 
 TEST(ConfigParser, ParsesNamedLayoutSectionsThroughGeneratedSectionTable) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "layout = portrait\n"
-                                          "\n"
-                                          "[layout.portrait]\n"
-                                          "description = Portrait Mode\n"
-                                          "window = 480,800\n"
-                                          "cards = columns(cpu,gpu)\n");
+    const FilePath path = WriteTestConfig(
+        "[display]\n"
+        "layout = portrait\n"
+        "\n"
+        "[layout.portrait]\n"
+        "description = Portrait Mode\n"
+        "window = 480,800\n"
+        "cards = columns(cpu,gpu)\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -274,15 +285,16 @@ TEST(ConfigParser, ParsesNamedLayoutSectionsThroughGeneratedSectionTable) {
 }
 
 TEST(ConfigParser, ParsesNamedThemeSectionsThroughGeneratedSectionTable) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "theme = dusk\n"
-                                          "\n"
-                                          "[theme.dusk]\n"
-                                          "description = Dusk Contrast\n"
-                                          "background = #101820FF\n"
-                                          "foreground = #F2F5F8FF\n"
-                                          "accent = #FFB000FF\n"
-                                          "guide = #00A6FFFF\n");
+    const FilePath path = WriteTestConfig(
+        "[display]\n"
+        "theme = dusk\n"
+        "\n"
+        "[theme.dusk]\n"
+        "description = Dusk Contrast\n"
+        "background = #101820FF\n"
+        "foreground = #F2F5F8FF\n"
+        "accent = #FFB000FF\n"
+        "guide = #00A6FFFF\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -298,14 +310,15 @@ TEST(ConfigParser, ParsesNamedThemeSectionsThroughGeneratedSectionTable) {
 }
 
 TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "layout = test\n"
-                                          "\n"
-                                          "[layout.test]\n"
-                                          "cards = time\n"
-                                          "\n"
-                                          "[card.time]\n"
-                                          "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
+    const FilePath path = WriteTestConfig(
+        "[display]\n"
+        "layout = test\n"
+        "\n"
+        "[layout.test]\n"
+        "cards = time\n"
+        "\n"
+        "[card.time]\n"
+        "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -320,8 +333,9 @@ TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
 }
 
 TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
-    const FilePath path = WriteTestConfig("[metrics]\n"
-                                          "cpu.load = *,%,Processor Load\n");
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "cpu.load = *,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -336,8 +350,9 @@ TEST(ConfigParser, UsesMetadataOwnedMetricStyleInsteadOfSerializedStyleToken) {
 }
 
 TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
-    const FilePath path = WriteTestConfig("[metrics]\n"
-                                          "cpu.load = percent,*,%,Processor Load\n");
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "cpu.load = percent,*,%,Processor Load\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 
@@ -347,8 +362,9 @@ TEST(ConfigParser, RejectsSerializedMetricStyleTokensInMetricsSection) {
 }
 
 TEST(ConfigParser, RejectsUnknownMetricIdsWithoutMetadataStyle) {
-    const FilePath path = WriteTestConfig("[metrics]\n"
-                                          "custom.metric = 100,U,Custom\n");
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "custom.metric = 100,U,Custom\n");
 
     const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
 

@@ -92,12 +92,14 @@ public:
     virtual int MeasureTextWidth(TextStyleId style, std::string_view text) const = 0;
     virtual TextLayoutResult MeasureTextBlock(
         const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const = 0;
-    virtual void DrawText(const RenderRect& rect,
+    virtual void DrawText(
+        const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
         const TextLayoutOptions& options) const = 0;
-    virtual TextLayoutResult DrawTextBlock(const RenderRect& rect,
+    virtual TextLayoutResult DrawTextBlock(
+        const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,

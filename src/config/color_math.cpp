@@ -42,7 +42,8 @@ double Max3Double(double first, double second, double third) {
 }  // namespace
 
 ColorBytes ColorBytesFromRgba(std::uint32_t rgba) {
-    return ColorBytes{static_cast<double>((rgba >> 24) & 0xFFu),
+    return ColorBytes{
+        static_cast<double>((rgba >> 24) & 0xFFu),
         static_cast<double>((rgba >> 16) & 0xFFu),
         static_cast<double>((rgba >> 8) & 0xFFu),
         static_cast<double>(rgba & 0xFFu)};
@@ -65,7 +66,8 @@ OklabColor OklabFromColorBytes(ColorBytes color) {
     const double mRoot = std::cbrt(m);
     const double sRoot = std::cbrt(s);
 
-    return OklabColor{0.2104542553 * lRoot + 0.7936177850 * mRoot - 0.0040720468 * sRoot,
+    return OklabColor{
+        0.2104542553 * lRoot + 0.7936177850 * mRoot - 0.0040720468 * sRoot,
         1.9779984951 * lRoot - 2.4285922050 * mRoot + 0.4505937099 * sRoot,
         0.0259040371 * lRoot + 0.7827717662 * mRoot - 0.8086757660 * sRoot};
 }

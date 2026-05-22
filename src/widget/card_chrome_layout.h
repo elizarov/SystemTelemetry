@@ -25,7 +25,8 @@ struct CardChromeLayout {
 CardChromeLayoutMetrics ResolveCardChromeLayoutMetrics(const WidgetHost& renderer);
 CardChromeLayout ResolveCardChromeLayout(
     const LayoutCardConfig& card, const RenderRect& cardRect, const CardChromeLayoutMetrics& metrics);
-CardChromeLayout ResolveCardChromeLayout(std::string_view title,
+CardChromeLayout ResolveCardChromeLayout(
+    std::string_view title,
     std::string_view iconName,
     const RenderRect& cardRect,
     const CardChromeLayoutMetrics& metrics);

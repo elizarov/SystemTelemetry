@@ -33,7 +33,8 @@ public:
     virtual bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) = 0;
     virtual bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) = 0;
     virtual bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) = 0;
-    virtual bool ApplyMetricPreview(const LayoutMetricEditKey& key,
+    virtual bool ApplyMetricPreview(
+        const LayoutMetricEditKey& key,
         const std::optional<double>& scale,
         const std::string& unit,
         const std::string& label,

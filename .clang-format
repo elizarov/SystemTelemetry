@@ -17,9 +17,24 @@ AccessModifierOffset: -4
 PointerAlignment: Left
 ReferenceAlignment: Left
 SpaceBeforeParens: ControlStatements
-AlignAfterOpenBracket: DontAlign
+AlignAfterOpenBracket: AlwaysBreak
+AlignArrayOfStructures: None
+AlignConsecutiveAssignments: None
+AlignConsecutiveBitFields: None
+AlignConsecutiveDeclarations: None
+AlignConsecutiveMacros: None
+AlignConsecutiveShortCaseStatements:
+  Enabled: false
+  AlignCaseArrows: false
+  AlignCaseColons: false
+AlignEscapedNewlines: DontAlign
+AlignOperands: DontAlign
+AlignTrailingComments:
+  Kind: Never
+  OverEmptyLines: 0
 BinPackArguments: false
 BinPackParameters: false
+PenaltyReturnTypeOnItsOwnLine: 1000000
 
 AllowShortBlocksOnASingleLine: Never
 AllowShortCaseLabelsOnASingleLine: false

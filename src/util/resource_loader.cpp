@@ -25,9 +25,9 @@ struct TextAtlas {
 
 uint32_t ReadLittleEndianUint32(const char* data) {
     return static_cast<uint32_t>(static_cast<unsigned char>(data[0])) |
-           (static_cast<uint32_t>(static_cast<unsigned char>(data[1])) << 8) |
-           (static_cast<uint32_t>(static_cast<unsigned char>(data[2])) << 16) |
-           (static_cast<uint32_t>(static_cast<unsigned char>(data[3])) << 24);
+        (static_cast<uint32_t>(static_cast<unsigned char>(data[1])) << 8) |
+        (static_cast<uint32_t>(static_cast<unsigned char>(data[2])) << 16) |
+        (static_cast<uint32_t>(static_cast<unsigned char>(data[3])) << 24);
 }
 
 std::string DecompressResourceData(std::string_view data) {
@@ -50,7 +50,7 @@ std::string DecompressResourceData(std::string_view data) {
                 return {};
             }
             const uint16_t token = static_cast<uint16_t>(static_cast<unsigned char>(data[input])) |
-                                   (static_cast<uint16_t>(static_cast<unsigned char>(data[input + 1])) << 8);
+                (static_cast<uint16_t>(static_cast<unsigned char>(data[input + 1])) << 8);
             input += 2;
             const size_t offset = static_cast<size_t>(token >> 4) + 1;
             size_t length = static_cast<size_t>(token & 0x0F) + kMinMatchLength;

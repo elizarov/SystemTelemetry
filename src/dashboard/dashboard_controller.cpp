@@ -74,7 +74,8 @@ bool SaveConfigElevated(
         return false;
     }
 
-    const std::string parameters = FormatText("/save-config %s /save-config-target %s",
+    const std::string parameters = FormatText(
+        "/save-config %s /save-config-target %s",
         QuoteCommandLineArgument(tempPath.string()).c_str(),
         QuoteCommandLineArgument(targetPath.string()).c_str());
 
@@ -100,7 +101,8 @@ double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double valu
 
     const double minSegmentSweep = (std::min)(0.25, totalSweep / static_cast<double>(segmentCount));
     const double maxSegmentGap = (std::max)(0.0,
-        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
+                                            (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) /
+                                                static_cast<double>(segmentCount - 1));
     return std::clamp(value, 0.0, maxSegmentGap);
 }
 
@@ -110,8 +112,9 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
         return 0.0;
     }
 
-    const int rowContentHeight = (std::max)(config.layout.fonts.label.size,
-        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int rowContentHeight =
+        (std::max)(config.layout.fonts.label.size,
+                   (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
     const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
@@ -320,7 +323,8 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     std::string telemetryError;
-    if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
+    if (!ReloadTelemetryCollectorFromDisk(
+            GetRuntimeConfigPath(),
             state_.config,
             state_.telemetry,
             diagnosticsOptions,
@@ -385,7 +389,8 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
         return;
     }
     std::string errorText;
-    if (!SaveDumpScreenshot(*path,
+    if (!SaveDumpScreenshot(
+            *path,
             state_.telemetryUpdate.dump.snapshot,
             BuildCurrentConfigForSaving(shell),
             shell.CurrentRenderScale(),
@@ -418,7 +423,8 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
         return;
     }
     std::string errorText;
-    if (!SaveLayoutGuideSheet(*path,
+    if (!SaveLayoutGuideSheet(
+            *path,
             state_.telemetryUpdate.dump.snapshot,
             BuildCurrentConfigForSaving(shell),
             shell.CurrentRenderScale(),
@@ -485,7 +491,8 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
     if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
+        state_.diagnostics->WriteTraceMarkerFmt(
+            TracePrefix::LayoutSwitch,
             RES_STR("begin current_layout=\"%s\" requested_layout=\"%s\""),
             state_.config.display.layout.c_str(),
             layoutName.c_str());
@@ -502,7 +509,8 @@ bool DashboardController::SwitchLayout(
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
+            state_.diagnostics->WriteTraceMarkerFmt(
+                TracePrefix::LayoutSwitch,
                 RES_STR("sync_failed requested_layout=\"%s\" renderer_error=\"%s\""),
                 layoutName.c_str(),
                 shell.Renderer().LastError().c_str());
@@ -636,8 +644,8 @@ void DashboardController::StopLayoutEditMode(
 
 bool DashboardController::HasUnsavedLayoutEditChanges() const {
     return state_.isEditingLayout && state_.layoutEditSessionSavedLayout != nullptr &&
-           state_.hasUnsavedLayoutEditChanges &&
-           LayoutConfigHasDifferences(state_.config.layout, *state_.layoutEditSessionSavedLayout);
+        state_.hasUnsavedLayoutEditChanges &&
+        LayoutConfigHasDifferences(state_.config.layout, *state_.layoutEditSessionSavedLayout);
 }
 
 bool DashboardController::RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell) {
@@ -671,7 +679,8 @@ bool DashboardController::ApplyLayoutGuideWeights(
     return FinishConfigMutation(shell, false);
 }
 
-bool DashboardController::ApplyLayoutGuideAdjacentWeights(DashboardShellHost& shell,
+bool DashboardController::ApplyLayoutGuideAdjacentWeights(
+    DashboardShellHost& shell,
     const LayoutEditLayoutTarget& target,
     size_t separatorIndex,
     int firstWeight,
@@ -798,7 +807,8 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
     FinishConfigMutation(shell);
 }
 
-std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
+std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(
+    DashboardShellHost& shell,
     const LayoutEditLayoutTarget& target,
     const std::vector<int>& weights,
     const LayoutEditWidgetIdentity& widget,

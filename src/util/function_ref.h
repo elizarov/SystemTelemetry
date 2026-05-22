@@ -10,7 +10,7 @@ template <typename Result, typename... Args> class FunctionRef<Result(Args...)> 
 public:
     template <typename Callable>
         requires(!std::is_same_v<std::remove_cvref_t<Callable>, FunctionRef> &&
-                    std::is_invocable_r_v<Result, Callable &&, Args...>)
+                 std::is_invocable_r_v<Result, Callable &&, Args...>)
     FunctionRef(Callable&& callable)
         : context_(const_cast<void*>(static_cast<const void*>(std::addressof(callable)))),
           invoke_([](void* context, Args... args) -> Result {

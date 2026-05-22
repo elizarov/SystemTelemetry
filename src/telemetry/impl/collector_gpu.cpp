@@ -41,7 +41,8 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
     auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_A*>(state.gpu_.counterArrayBuffer.data());
     status = PdhGetFormattedCounterArrayA(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
     if (status != ERROR_SUCCESS) {
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("pdh_array_fetch status=%ld count=%lu"),
             static_cast<long>(status),
             static_cast<unsigned long>(itemCount));
@@ -59,7 +60,8 @@ CounterArrayTotals ReadCounterArrayTotals(RealTelemetryCollectorState& state, PD
         }
     }
 
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_array_done status=%ld count=%lu total=value=%.2f total3d=value=%.2f"),
         static_cast<long>(status),
         static_cast<unsigned long>(itemCount),
@@ -177,8 +179,8 @@ void ResetGpuProviderState(RealTelemetryCollectorState& state) {
 void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
     if (!state.gpu_.selectedAdapter.has_value()) {
         state.snapshot_.gpu.name = state.settings_.selection.preferredGpuAdapterName.empty()
-                                       ? "GPU"
-                                       : state.settings_.selection.preferredGpuAdapterName;
+            ? "GPU"
+            : state.settings_.selection.preferredGpuAdapterName;
         state.snapshot_.gpu.vram.totalGb = 0.0;
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_adapter_selected none"));
         return;
@@ -189,7 +191,8 @@ void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
     state.snapshot_.gpu.vram.totalGb =
         static_cast<double>(adapter.dedicatedVideoMemoryBytes) / (1024.0 * 1024.0 * 1024.0);
 
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("gpu_adapter_selected index=%u vendor_id=0x%04X dedicated_bytes=%llu dedicated_gb=%.2f name=\"%s\""),
         adapter.adapterIndex,
         adapter.vendorId,
@@ -219,7 +222,8 @@ void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
     state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_provider_initialize_begin"));
     if (state.gpu_.provider->Initialize()) {
         ApplyGpuVendorSample(state, state.gpu_.provider->Sample());
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("gpu_provider_initialize_done provider=%s available=%s diagnostics=\"%s\""),
             state.gpu_.providerName.c_str(),
             Trace::BoolText(state.gpu_.providerAvailable),
@@ -228,9 +232,10 @@ void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
         const GpuVendorTelemetrySample sample = state.gpu_.provider->Sample();
         state.gpu_.providerName = sample.providerName.empty() ? "GPU vendor" : sample.providerName;
         state.gpu_.providerDiagnostics = sample.diagnostics.empty()
-                                             ? ResourceStringText(RES_STR("Provider initialization failed."))
-                                             : sample.diagnostics;
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+            ? ResourceStringText(RES_STR("Provider initialization failed."))
+            : sample.diagnostics;
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("gpu_provider_initialize_failed provider=%s diagnostics=\"%s\""),
             state.gpu_.providerName.c_str(),
             state.gpu_.providerDiagnostics.c_str());
@@ -249,7 +254,8 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
         TracePrefix::Telemetry, RES_STR("pdh_open gpu_query status=%ld"), static_cast<long>(queryStatus));
     const PDH_STATUS loadStatus =
         AddCounterCompat(state.gpu_.query, "\\GPU Engine(*)\\Utilization Percentage", &state.gpu_.loadCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" status=%ld"),
         static_cast<long>(loadStatus));
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
@@ -261,11 +267,13 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
         TracePrefix::Telemetry, RES_STR("pdh_open gpu_memory_query status=%ld"), static_cast<long>(memoryQueryStatus));
     const PDH_STATUS memoryCounterStatus = AddCounterCompat(
         state.gpu_.memoryQuery, "\\GPU Adapter Memory(*)\\Dedicated Usage", &state.gpu_.dedicatedCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" status=%ld"),
         static_cast<long>(memoryCounterStatus));
     const PDH_STATUS memoryCollectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_collect gpu_memory_query status=%ld"),
         static_cast<long>(memoryCollectStatus));
 }
@@ -289,7 +297,8 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         hasVendorLoad = sample.loadPercent.has_value();
         hasVendorVram = sample.usedVramGb.has_value();
         ApplyGpuVendorSample(state, sample);
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("gpu_vendor_sample provider=%s available=%s diagnostics=\"%s\""),
             state.gpu_.providerName.c_str(),
             Trace::BoolText(state.gpu_.providerAvailable),
@@ -306,7 +315,8 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
         const double load3d = loadTotals.total3d;
         const double loadAll = loadTotals.total;
         state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("gpu_load load3d=value=%.2f loadAll=value=%.2f selected=value=%.2f"),
             load3d,
             loadAll,
@@ -321,7 +331,8 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
             TracePrefix::Telemetry, RES_STR("gpu_memory_collect status=%ld"), static_cast<long>(collectStatus));
         const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter);
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("gpu_memory bytes=value=%.0f used_gb=value=%.2f"),
             bytes,
             state.snapshot_.gpu.vram.usedGb);

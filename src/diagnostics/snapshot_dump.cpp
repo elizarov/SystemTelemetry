@@ -32,9 +32,9 @@ struct DumpFieldDescriptor {
 
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 
-#define DUMP_FIELD(key, kind, field)                                                                                   \
-    DumpFieldDescriptor {                                                                                              \
-        key, static_cast<std::uint32_t>(offsetof(TelemetryDump, field)), kind                                          \
+#define DUMP_FIELD(key, kind, field) \
+    DumpFieldDescriptor { \
+        key, static_cast<std::uint32_t>(offsetof(TelemetryDump, field)), kind \
     }
 
 // Size: fixed metadata avoids function-local vector construction/destruction code.
@@ -274,7 +274,8 @@ void WriteRetainedHistories(
         WriteDoubleArray(
             output, DumpKey(historyPrefix, ".throughput_live_samples"), histories[i].throughputLiveSamples);
         WriteDouble(output, DumpKey(historyPrefix, ".throughput_bucket_total"), histories[i].throughputBucketTotal, 6);
-        WriteInteger(output,
+        WriteInteger(
+            output,
             DumpKey(historyPrefix, ".throughput_bucket_sample_count"),
             histories[i].throughputBucketSampleCount);
     }
@@ -519,7 +520,8 @@ bool LoadNamedScalarMetrics(
     return true;
 }
 
-bool LoadRetainedHistories(const DumpValues& values,
+bool LoadRetainedHistories(
+    const DumpValues& values,
     const std::string& prefix,
     std::vector<RetainedHistorySeries>& field,
     std::string* error) {
@@ -539,7 +541,8 @@ bool LoadRetainedHistories(const DumpValues& values,
                 values, DumpKey(historyPrefix, ".throughput_live_samples"), history.throughputLiveSamples, error) ||
             !LoadDouble(
                 values, DumpKey(historyPrefix, ".throughput_bucket_total"), history.throughputBucketTotal, error) ||
-            !LoadUnsigned(values,
+            !LoadUnsigned(
+                values,
                 DumpKey(historyPrefix, ".throughput_bucket_sample_count"),
                 history.throughputBucketSampleCount,
                 error)) {

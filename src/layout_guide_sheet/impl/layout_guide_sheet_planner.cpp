@@ -88,7 +88,8 @@ bool PayloadBelongsToSelectedCard(
     return true;
 }
 
-SourceCardResolution ResolveLayoutGuideSheetSourceCard(const LayoutEditActiveRegion& region,
+SourceCardResolution ResolveLayoutGuideSheetSourceCard(
+    const LayoutEditActiveRegion& region,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
     const std::vector<std::string>& selectedCardIds) {
     std::string bestCardId;
@@ -124,7 +125,7 @@ SourceCardResolution ResolveLayoutGuideSheetSourceCard(const LayoutEditActiveReg
 
 bool IsRepresentativeWidgetClass(WidgetClass widgetClass) {
     return widgetClass != WidgetClass::Unknown && widgetClass != WidgetClass::NetworkFooter &&
-           widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
+        widgetClass != WidgetClass::VerticalSpacer && widgetClass != WidgetClass::VerticalSpring;
 }
 
 bool IsContainerChildOrderAnchor(const LayoutEditActiveRegionPayload& payload) {
@@ -184,7 +185,8 @@ std::string LayoutGuideSheetCalloutKey(
     return FormatText("%s\n%s", parameterLine.c_str(), descriptionLine.c_str());
 }
 
-void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
+void AddOrUpdateCallout(
+    std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const std::string& key,
     const std::string& sourceCardId,
     const std::string& parameterLine,
@@ -220,8 +222,7 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     const auto existing =
         std::find_if(callouts.begin(), callouts.end(), [&](const auto& callout) { return callout.key == key; });
     if (existing != callouts.end()) {
-        const bool beforeExisting =
-            region.box.top < existing->targetRect.top ||
+        const bool beforeExisting = region.box.top < existing->targetRect.top ||
             (region.box.top == existing->targetRect.top && region.box.left < existing->targetRect.left);
         if (beforeExisting) {
             existing->targetRect = region.box;
@@ -239,19 +240,21 @@ void AddOrUpdateCallout(std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         return;
     }
 
-    callouts.push_back(LayoutGuideSheetCalloutRequest{key,
-        sourceCardId,
-        parameterLine,
-        descriptionLine,
-        hoverAnchorKey,
-        hoverWidgetGuide,
-        hoverLayoutGuide,
-        hoverGapAnchorKey,
-        hoverAnchorShape,
-        hoverColorParameter,
-        region.box,
-        priority,
-        order++});
+    callouts.push_back(
+        LayoutGuideSheetCalloutRequest{
+            key,
+            sourceCardId,
+            parameterLine,
+            descriptionLine,
+            hoverAnchorKey,
+            hoverWidgetGuide,
+            hoverLayoutGuide,
+            hoverGapAnchorKey,
+            hoverAnchorShape,
+            hoverColorParameter,
+            region.box,
+            priority,
+            order++});
 }
 
 }  // namespace
@@ -292,8 +295,8 @@ std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGui
         }
         const size_t coverage = CountBits(covered);
         const bool better = bestMask == 0 || coverage > bestCoverage ||
-                            (coverage == bestCoverage && cardCount < bestCardCount) ||
-                            (coverage == bestCoverage && cardCount == bestCardCount && widgetCount > bestWidgetCount);
+            (coverage == bestCoverage && cardCount < bestCardCount) ||
+            (coverage == bestCoverage && cardCount == bestCardCount && widgetCount > bestWidgetCount);
         if (better) {
             bestMask = mask;
             bestCoverage = coverage;
@@ -315,7 +318,8 @@ std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGui
     return selected;
 }
 
-void BuildLayoutGuideSheetCallouts(const AppConfig& config,
+void BuildLayoutGuideSheetCallouts(
+    const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
     const std::vector<std::string>& selectedCardIds,
@@ -355,7 +359,8 @@ void BuildLayoutGuideSheetCallouts(const AppConfig& config,
     }
 }
 
-void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
+void BuildLayoutGuideSheetOverviewCallouts(
+    const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     std::vector<LayoutGuideSheetCalloutRequest>& callouts) {
     size_t order = callouts.size();
@@ -381,7 +386,8 @@ void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
     }
 }
 
-void AppendLayoutGuideSheetCardCallouts(std::vector<LayoutGuideSheetCalloutRequest>& merged,
+void AppendLayoutGuideSheetCardCallouts(
+    std::vector<LayoutGuideSheetCalloutRequest>& merged,
     const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts) {
     std::array<bool, static_cast<size_t>(LayoutEditParameter::Count)> coveredColorParameters{};
     for (const LayoutGuideSheetCalloutRequest& callout : merged) {

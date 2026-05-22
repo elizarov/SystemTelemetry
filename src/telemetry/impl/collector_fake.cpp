@@ -103,7 +103,7 @@ std::string ReadBinaryFile(const FilePath& path) {
 double SyntheticHistoryValue(uint64_t sampleTick, const SyntheticHistorySpec& spec) {
     const double position = static_cast<double>(sampleTick);
     const double value = spec.base + std::sin(position / spec.periodA) * spec.amplitudeA +
-                         std::cos((position + 7.0) / spec.periodB) * spec.amplitudeB;
+        std::cos((position + 7.0) / spec.periodB) * spec.amplitudeB;
     return (std::max)(0.0, value);
 }
 
@@ -211,7 +211,8 @@ double LastHistorySample(const std::vector<double>& samples) {
     return samples.empty() ? 0.0 : samples.back();
 }
 
-double PushSyntheticThroughputSample(SystemSnapshot& snapshot,
+double PushSyntheticThroughputSample(
+    SystemSnapshot& snapshot,
     const RetainedHistoryStore& retainedHistoryStore,
     RetainedHistoryKey key,
     uint64_t sampleTick,
@@ -221,7 +222,8 @@ double PushSyntheticThroughputSample(SystemSnapshot& snapshot,
     return value;
 }
 
-double SeedSyntheticThroughputHistory(SystemSnapshot& snapshot,
+double SeedSyntheticThroughputHistory(
+    SystemSnapshot& snapshot,
     const RetainedHistoryStore& retainedHistoryStore,
     RetainedHistoryKey key,
     const SyntheticThroughputSpec& spec) {
@@ -324,12 +326,14 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     dump.boardProvider.driverLibrary = "Synthetic";
     AssignStringList(
         dump.boardProvider.requestedFanNames, kSyntheticRequestedFanNames, ARRAYSIZE(kSyntheticRequestedFanNames));
-    AssignStringList(dump.boardProvider.requestedTemperatureNames,
+    AssignStringList(
+        dump.boardProvider.requestedTemperatureNames,
         kSyntheticRequestedTemperatureNames,
         ARRAYSIZE(kSyntheticRequestedTemperatureNames));
     AssignStringList(
         dump.boardProvider.availableFanNames, kSyntheticAvailableFanNames, ARRAYSIZE(kSyntheticAvailableFanNames));
-    AssignStringList(dump.boardProvider.availableTemperatureNames,
+    AssignStringList(
+        dump.boardProvider.availableTemperatureNames,
         kSyntheticAvailableTemperatureNames,
         ARRAYSIZE(kSyntheticAvailableTemperatureNames));
     dump.boardProvider.fans = snapshot.boardFans;
@@ -506,7 +510,7 @@ void MarkSelectedNetworkAdapterCandidates(
     for (auto& candidate : candidates) {
         const bool sameName = candidate.adapterName == selectedCandidate.adapterName;
         const bool sameIp = selectedCandidate.ipAddress.empty() || selectedCandidate.ipAddress == "N/A" ||
-                            candidate.ipAddress == selectedCandidate.ipAddress;
+            candidate.ipAddress == selectedCandidate.ipAddress;
         candidate.selected = !selected && sameName && sameIp;
         selected = selected || candidate.selected;
     }
@@ -565,7 +569,8 @@ public:
         }
         selectionSettings_ = settings.selection;
         if (useSyntheticSource_) {
-            trace_.WriteFmt(TracePrefix::Fake,
+            trace_.WriteFmt(
+                TracePrefix::Fake,
                 RES_STR("initialize_begin source=synthetic mode=%s"),
                 liveSyntheticSource_ ? "live" : "static");
         } else {
@@ -636,7 +641,8 @@ public:
                 UpdateSyntheticTelemetryDump(sourceDump_, tick, retainedHistoryStore_);
                 dump_ = sourceDump_;
                 RefreshSelectionsAndSnapshot();
-                trace_.WriteFmt(TracePrefix::Fake,
+                trace_.WriteFmt(
+                    TracePrefix::Fake,
                     RES_STR("load_done source=synthetic mode=live tick=%llu"),
                     static_cast<unsigned long long>(tick));
             }
@@ -701,7 +707,8 @@ private:
             dump_ = sourceDump_;
             RefreshSelectionsAndSnapshot();
             lastReload_ = std::chrono::steady_clock::now();
-            trace_.WriteFmt(TracePrefix::Fake,
+            trace_.WriteFmt(
+                TracePrefix::Fake,
                 RES_STR("load_done source=synthetic mode=%s tick=%llu"),
                 liveSyntheticSource_ ? "live" : "static",
                 static_cast<unsigned long long>(tick));
@@ -766,7 +773,8 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const FilePath& workingDirectory,
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
+    const FilePath& workingDirectory,
     const FilePath& configuredPath,
     TelemetryDumpLoader loadFakeDump,
     bool liveSyntheticSource,

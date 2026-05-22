@@ -55,7 +55,8 @@ double ResolveDisplayScale(const AppConfig& config, UINT dpi) {
 }
 
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale) {
-    return SIZE{ScaleLogicalToPhysical(config.layout.structure.window.width, scale),
+    return SIZE{
+        ScaleLogicalToPhysical(config.layout.structure.window.width, scale),
         ScaleLogicalToPhysical(config.layout.structure.window.height, scale)};
 }
 
@@ -194,8 +195,7 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
             option.dpi = dpi;
             option.layoutFits = fittedScale > 0.0;
             option.matchesCurrentConfig = context->hasConfiguredWallpaper && context->isConfiguredAtOrigin &&
-                                          context->configuredMonitor->has_value() &&
-                                          RectsEqual((*context->configuredMonitor)->rect, option.rect);
+                context->configuredMonitor->has_value() && RectsEqual((*context->configuredMonitor)->rect, option.rect);
             option.fittedScale = fittedScale;
             return context->count < context->capacity;
         },

@@ -286,8 +286,8 @@ bool IsPreferredTemperatureType(int type) {
 
 bool IsFallbackTemperatureType(int type) {
     return type == kZesTemperatureMemory ||
-           (type >= 0 && type != kZesTemperatureGlobalMin && type != kZesTemperatureGpuMin &&
-               type != kZesTemperatureMemoryMin && type != kZesTemperatureGpuBoardMin);
+        (type >= 0 && type != kZesTemperatureGlobalMin && type != kZesTemperatureGpuMin &&
+         type != kZesTemperatureMemoryMin && type != kZesTemperatureGpuBoardMin);
 }
 
 std::string FormatOptionalMetric(const char* label, std::optional<double> value, int precision) {
@@ -350,8 +350,8 @@ public:
         }
 
         bool loaded = true;
-#define CASEDASH_LOAD_REQUIRED(function, name)                                                                         \
-    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name));                                    \
+#define CASEDASH_LOAD_REQUIRED(function, name) \
+    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name)); \
     loaded = function != nullptr && loaded
         CASEDASH_LOAD_REQUIRED(sysmanInit_, "zesInit");
         CASEDASH_LOAD_REQUIRED(driverGet_, "zesDriverGet");
@@ -549,9 +549,11 @@ public:
         EnumerateMetricHandles();
         CaptureEngineBaselines();
 
-        diagnostics_ = FormatText(RES_STR("Level Zero GPU=%s display_name=%s engine_groups=%zu temperature_sensors=%zu "
-                                          "frequency_domains=%zu memory_modules=%zu device_memory_modules=%zu "
-                                          "fan_rpm_supported=%s native_fps_supported=no"),
+        diagnostics_ = FormatText(
+            RES_STR(
+                "Level Zero GPU=%s display_name=%s engine_groups=%zu temperature_sensors=%zu "
+                "frequency_domains=%zu memory_modules=%zu device_memory_modules=%zu "
+                "fan_rpm_supported=%s native_fps_supported=no"),
             sysmanGpuName_.c_str(),
             gpuName_.c_str(),
             engines_.size(),
@@ -568,12 +570,13 @@ public:
             const FpsTelemetrySample fpsSample =
                 fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
             fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+                ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                : fpsSample.diagnostics;
         }
 
         initialized_ = true;
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("initialize_done diagnostics=\"%s\" fps=\"%s\""),
             diagnostics_.c_str(),
             fpsDiagnostics_.c_str());
@@ -595,7 +598,8 @@ public:
         bool hasAnyMetric = false;
 
         const std::optional<double> loadPercent = QueryLoadPercent();
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("get_engine_load %s engines=%zu"),
             FormatOptionalMetric("value", loadPercent, 2).c_str(),
             engines_.size());
@@ -605,7 +609,8 @@ public:
         }
 
         const std::optional<double> temperatureC = QueryTemperatureC();
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("get_temperature %s sensors=%zu"),
             FormatOptionalMetric("value", temperatureC, 1).c_str(),
             temperatureProbeCount_);
@@ -615,7 +620,8 @@ public:
         }
 
         const std::optional<double> clockMhz = QueryClockMhz();
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("get_clock %s domains=%zu"),
             FormatOptionalMetric("value", clockMhz, 1).c_str(),
             frequencyProbeCount_);
@@ -626,7 +632,8 @@ public:
 
         const std::optional<MemorySample> memory = QueryMemory();
         if (memory.has_value()) {
-            trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            trace_.WriteFmt(
+                TracePrefix::IntelLevelZero,
                 RES_STR("get_memory used_gb=value=%.2f total_gb=value=%.2f"),
                 memory->usedGb,
                 memory->totalGb);
@@ -640,7 +647,8 @@ public:
         }
 
         const std::optional<double> fanRpm = QueryFanRpm();
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("get_fan_rpm %s fans=%zu"),
             FormatOptionalMetric("value", fanRpm, 0).c_str(),
             fanProbeCount_);
@@ -658,7 +666,8 @@ public:
                 sample.fps = *fpsSample.fps;
                 hasAnyMetric = true;
             }
-            trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            trace_.WriteFmt(
+                TracePrefix::IntelLevelZero,
                 RES_STR("get_presented_fps available=%s value=%s process=\"%s\" diagnostics=\"%s\""),
                 Trace::BoolText(fpsSample.fps.has_value()),
                 FormatOptionalMetric("fps", fpsSample.fps, 1).c_str(),
@@ -668,7 +677,8 @@ public:
 
         sample.available = hasAnyMetric;
         AppendFormat(sample.diagnostics, RES_STR(" fps=%s"), fpsDiagnostics_.c_str());
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
             sample.diagnostics.c_str());
@@ -679,7 +689,8 @@ private:
     bool SelectIntelGpuDevice() {
         std::vector<ZesDriver> drivers;
         const ZeResult driverResult = levelZero_.Drivers(drivers);
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("get_drivers result=\"%s\" count=%zu"),
             ResultCodeString(driverResult).c_str(),
             drivers.size());
@@ -697,7 +708,8 @@ private:
         for (size_t driverIndex = 0; driverIndex < drivers.size(); ++driverIndex) {
             std::vector<ZesDevice> devices;
             const ZeResult deviceResult = levelZero_.Devices(drivers[driverIndex], devices);
-            trace_.WriteFmt(TracePrefix::IntelLevelZero,
+            trace_.WriteFmt(
+                TracePrefix::IntelLevelZero,
                 RES_STR("get_devices driver=%zu result=\"%s\" count=%zu"),
                 driverIndex,
                 ResultCodeString(deviceResult).c_str(),
@@ -710,15 +722,16 @@ private:
                 ZesDeviceProperties properties;
                 const ZeResult propertiesResult = levelZero_.DeviceProperties(devices[deviceIndex], properties);
                 const bool intelGpu = propertiesResult == kZeResultSuccess &&
-                                      properties.core.vendorId == kIntelVendorId &&
-                                      properties.core.type == kZeDeviceTypeGpu;
+                    properties.core.vendorId == kIntelVendorId && properties.core.type == kZeDeviceTypeGpu;
                 const bool deviceIdMatch = intelGpu && adapter_.has_value() && adapter_->deviceId != 0 &&
-                                           properties.core.deviceId == adapter_->deviceId;
+                    properties.core.deviceId == adapter_->deviceId;
                 const int nameMatchRank =
                     intelGpu && adapter_.has_value() ? AdapterNameMatchRank(properties, adapter_->adapterName) : 0;
-                trace_.WriteFmt(TracePrefix::IntelLevelZero,
-                    RES_STR("device_properties driver=%zu device=%zu result=\"%s\" vendor_id=0x%04X device_id=0x%04X "
-                            "type=%d device_id_match=%s name_match_rank=%d selected=%s"),
+                trace_.WriteFmt(
+                    TracePrefix::IntelLevelZero,
+                    RES_STR(
+                        "device_properties driver=%zu device=%zu result=\"%s\" vendor_id=0x%04X device_id=0x%04X "
+                        "type=%d device_id_match=%s name_match_rank=%d selected=%s"),
                     driverIndex,
                     deviceIndex,
                     ResultCodeString(propertiesResult).c_str(),
@@ -771,10 +784,11 @@ private:
         device_ = device;
         sysmanGpuName_ = ResolveGpuName(properties);
         gpuName_ = matchKind != nullptr && std::string_view(matchKind) == "device_id" && adapter_.has_value() &&
-                           !adapter_->adapterName.empty()
-                       ? adapter_->adapterName
-                       : sysmanGpuName_;
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
+                !adapter_->adapterName.empty()
+            ? adapter_->adapterName
+            : sysmanGpuName_;
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
             RES_STR("device_selected match=\"%s\" sysman_name=\"%s\" display_name=\"%s\" selected_adapter=\"%s\""),
             matchKind != nullptr ? matchKind : "unknown",
             sysmanGpuName_.c_str(),
@@ -837,9 +851,11 @@ private:
             }
         }
 
-        trace_.WriteFmt(TracePrefix::IntelLevelZero,
-            RES_STR("enumerate_metrics engines=%zu result=\"%s\" fans=%zu result=\"%s\" frequencies=%zu result=\"%s\" "
-                    "memory_modules=%zu result=\"%s\" temperature_sensors=%zu result=\"%s\""),
+        trace_.WriteFmt(
+            TracePrefix::IntelLevelZero,
+            RES_STR(
+                "enumerate_metrics engines=%zu result=\"%s\" fans=%zu result=\"%s\" frequencies=%zu result=\"%s\" "
+                "memory_modules=%zu result=\"%s\" temperature_sensors=%zu result=\"%s\""),
             engines_.size(),
             ResultCodeString(engineEnumResult_).c_str(),
             fanProbeCount_,

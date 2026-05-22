@@ -11,7 +11,7 @@ std::string LoadTextResourceData(TextResourceId resourceId) {
     }
 
     const FilePath path = FilePath(CASEDASH_SOURCE_DIR) / "build" / "cmake" / "generated" / "compressed_resources" /
-                          "resource_strings.txt";
+        "resource_strings.txt";
     std::ifstream input(path.string(), std::ios::binary);
     std::ostringstream text;
     text << input.rdbuf();

@@ -29,8 +29,8 @@ std::optional<double> TooltipPayloadNumericValue(const TooltipPayload& payload) 
     }
     if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload)) {
         return LayoutEditAnchorParameter(anchor->key).has_value()
-                   ? std::optional<double>(static_cast<double>(anchor->value))
-                   : std::nullopt;
+            ? std::optional<double>(static_cast<double>(anchor->value))
+            : std::nullopt;
     }
     if (const auto* guide = std::get_if<LayoutEditWidgetGuide>(&payload)) {
         return guide->value;

@@ -87,7 +87,8 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
     if (const auto* weightKey = std::get_if<LayoutWeightEditKey>(&leaf->focusKey)) {
         const std::string focus =
             leaf->sectionName.empty() ? "weight" : FormatText("%s.layout", leaf->sectionName.c_str());
-        std::string text = FormatText("focus=%s edit_card=%s node_path=%s",
+        std::string text = FormatText(
+            "focus=%s edit_card=%s node_path=%s",
             QuoteTraceText(focus).c_str(),
             QuoteTraceText(weightKey->editCardId).c_str(),
             QuoteTraceText(JoinNodePath(weightKey->nodePath)).c_str());
@@ -103,7 +104,8 @@ std::string BuildTraceFocusKeyText(const LayoutEditTreeLeaf* leaf) {
         return FormatText("focus=%s", QuoteTraceText(focus).c_str());
     }
     if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&leaf->focusKey)) {
-        return FormatText("focus=%s edit_card=%s node_path=%s",
+        return FormatText(
+            "focus=%s edit_card=%s node_path=%s",
             QuoteTraceText(LayoutNodeFieldEditTraceLabel(*nodeFieldKey, leaf->sectionName)).c_str(),
             QuoteTraceText(nodeFieldKey->editCardId).c_str(),
             QuoteTraceText(JoinNodePath(nodeFieldKey->nodePath)).c_str());
@@ -116,7 +118,8 @@ std::string BuildTraceNodeText(const LayoutEditTreeNode* node) {
         return "node=\"none\"";
     }
 
-    std::string text = FormatText("node_kind=%s label=%s location=%s",
+    std::string text = FormatText(
+        "node_kind=%s label=%s location=%s",
         QuoteTraceText(TreeNodeKindTraceName(node->kind)).c_str(),
         QuoteTraceText(node->label).c_str(),
         QuoteTraceText(node->locationText).c_str());
@@ -143,7 +146,8 @@ std::string BuildTraceNodeDetail(const LayoutEditTreeNode* node, const char* for
 }
 
 std::string BuildColorDialogTraceValues(HWND hwnd) {
-    static constexpr DialogTraceField kFields[] = {{"hex", IDC_LAYOUT_EDIT_COLOR_HEX_EDIT},
+    static constexpr DialogTraceField kFields[] = {
+        {"hex", IDC_LAYOUT_EDIT_COLOR_HEX_EDIT},
         {"red", IDC_LAYOUT_EDIT_COLOR_RED_EDIT},
         {"green", IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT},
         {"blue", IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT},
@@ -152,7 +156,8 @@ std::string BuildColorDialogTraceValues(HWND hwnd) {
 }
 
 std::string BuildMetricDialogTraceValues(HWND hwnd) {
-    static constexpr DialogTraceField kFields[] = {{"style", IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE},
+    static constexpr DialogTraceField kFields[] = {
+        {"style", IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE},
         {"scale", IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT},
         {"unit", IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT},
         {"label", IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT},

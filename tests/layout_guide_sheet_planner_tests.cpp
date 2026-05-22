@@ -65,7 +65,8 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
     EXPECT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
     LayoutGuideSheetRenderer sheetRenderer(renderer);
 
-    return BuiltInLayoutGuideSheetContext{config,
+    return BuiltInLayoutGuideSheetContext{
+        config,
         renderer.CollectLayoutEditActiveRegions(overlayState),
         sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
         renderer.CollectLayoutGuideSheetCardSummaries()};
@@ -134,7 +135,7 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
         }
         if (callout.parameterLine.rfind("[colors]", 0) != 0) {
             const bool hasHoverState = callout.hoverAnchorKey.has_value() || callout.hoverWidgetGuide.has_value() ||
-                                       callout.hoverLayoutGuide.has_value() || callout.hoverGapAnchorKey.has_value();
+                callout.hoverLayoutGuide.has_value() || callout.hoverGapAnchorKey.has_value();
             EXPECT_TRUE(hasHoverState) << callout.parameterLine;
         }
     }
@@ -171,9 +172,9 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsUseDashboardAndCardChromeTargets) 
         hasCardRadius |= callout.parameterLine.find("[card_style] card_radius") != std::string::npos;
         hasCardIconSize |= callout.parameterLine.find("[card_style] header_icon_size") != std::string::npos;
         hasForegroundColor |= callout.parameterLine.find("[colors] foreground_color") != std::string::npos &&
-                              callout.hoverColorParameter == LayoutEditParameter::ColorForeground;
+            callout.hoverColorParameter == LayoutEditParameter::ColorForeground;
         hasIconColor |= callout.parameterLine.find("[colors] icon_color") != std::string::npos &&
-                        callout.hoverColorParameter == LayoutEditParameter::ColorIcon;
+            callout.hoverColorParameter == LayoutEditParameter::ColorIcon;
         if (callout.key == "overview_horizontal_layout_reorder") {
             ++horizontalReorderCallouts;
             EXPECT_NE(callout.descriptionLine.find("left or right"), std::string::npos) << callout.descriptionLine;
@@ -217,8 +218,9 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsDoNotUseWidgetColorTargets) {
         if (!callout.hoverColorParameter.has_value()) {
             continue;
         }
-        EXPECT_TRUE(*callout.hoverColorParameter == LayoutEditParameter::ColorForeground ||
-                    *callout.hoverColorParameter == LayoutEditParameter::ColorIcon)
+        EXPECT_TRUE(
+            *callout.hoverColorParameter == LayoutEditParameter::ColorForeground ||
+            *callout.hoverColorParameter == LayoutEditParameter::ColorIcon)
             << callout.parameterLine;
         EXPECT_EQ(callout.parameterLine.find("track_color"), std::string::npos) << callout.parameterLine;
         EXPECT_EQ(callout.parameterLine.find("peak_ghost_color"), std::string::npos) << callout.parameterLine;
@@ -290,28 +292,36 @@ TEST(LayoutGuideSheetPlanner, PlacementPromotesOuterSideItemsToTopAndBottom) {
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Right));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Top));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Bottom));
-    EXPECT_EQ(std::count_if(callouts.begin(),
-                  callouts.end(),
-                  [](const LayoutGuideSheetPlacementCallout& callout) {
-                      return callout.exitSide == LayoutGuideSheetExitSide::Left;
-                  }),
+    EXPECT_EQ(
+        std::count_if(
+            callouts.begin(),
+            callouts.end(),
+            [](const LayoutGuideSheetPlacementCallout& callout) {
+                return callout.exitSide == LayoutGuideSheetExitSide::Left;
+            }),
         2);
-    EXPECT_EQ(std::count_if(callouts.begin(),
-                  callouts.end(),
-                  [](const LayoutGuideSheetPlacementCallout& callout) {
-                      return callout.exitSide == LayoutGuideSheetExitSide::Right;
-                  }),
+    EXPECT_EQ(
+        std::count_if(
+            callouts.begin(),
+            callouts.end(),
+            [](const LayoutGuideSheetPlacementCallout& callout) {
+                return callout.exitSide == LayoutGuideSheetExitSide::Right;
+            }),
         2);
-    EXPECT_EQ(std::count_if(callouts.begin(),
-                  callouts.end(),
-                  [](const LayoutGuideSheetPlacementCallout& callout) {
-                      return callout.exitSide == LayoutGuideSheetExitSide::Top;
-                  }),
+    EXPECT_EQ(
+        std::count_if(
+            callouts.begin(),
+            callouts.end(),
+            [](const LayoutGuideSheetPlacementCallout& callout) {
+                return callout.exitSide == LayoutGuideSheetExitSide::Top;
+            }),
         1);
-    EXPECT_EQ(std::count_if(callouts.begin(),
-                  callouts.end(),
-                  [](const LayoutGuideSheetPlacementCallout& callout) {
-                      return callout.exitSide == LayoutGuideSheetExitSide::Bottom;
-                  }),
+    EXPECT_EQ(
+        std::count_if(
+            callouts.begin(),
+            callouts.end(),
+            [](const LayoutGuideSheetPlacementCallout& callout) {
+                return callout.exitSide == LayoutGuideSheetExitSide::Bottom;
+            }),
         1);
 }

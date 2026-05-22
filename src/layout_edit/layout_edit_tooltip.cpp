@@ -32,28 +32,32 @@ std::string FormatLayoutEditTooltipValue(std::string_view value) {
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, double value) {
-    return FormatText("[%s] %s = %s",
+    return FormatText(
+        "[%s] %s = %s",
         descriptor.sectionName.c_str(),
         descriptor.memberName.c_str(),
         FormatLayoutEditTooltipValue(value, descriptor.valueFormat).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, unsigned int value) {
-    return FormatText("[%s] %s = %s",
+    return FormatText(
+        "[%s] %s = %s",
         descriptor.sectionName.c_str(),
         descriptor.memberName.c_str(),
         FormatLayoutEditTooltipValue(value).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, const UiFontConfig& value) {
-    return FormatText("[%s] %s = %s",
+    return FormatText(
+        "[%s] %s = %s",
         descriptor.sectionName.c_str(),
         descriptor.memberName.c_str(),
         FormatLayoutEditTooltipValue(value).c_str());
 }
 
 std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descriptor, std::string_view value) {
-    return FormatText("[%s] %s = %s",
+    return FormatText(
+        "[%s] %s = %s",
         descriptor.sectionName.c_str(),
         descriptor.memberName.c_str(),
         FormatLayoutEditTooltipValue(value).c_str());
@@ -72,11 +76,12 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
     }
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
-                                        ? FormatText("layout.%s", config.display.layout.c_str())
-                                    : key.editCardId.empty() ? "layout"
-                                                             : FormatText("card.%s", key.editCardId.c_str());
+        ? FormatText("layout.%s", config.display.layout.c_str())
+        : key.editCardId.empty() ? "layout"
+                                 : FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    return FormatText("[%s] %s = metric_list(%s)",
+    return FormatText(
+        "[%s] %s = metric_list(%s)",
         sectionName.c_str(),
         memberName.c_str(),
         metricRefs[static_cast<size_t>(rowIndex)].c_str());
@@ -90,9 +95,9 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
     }
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
-                                        ? FormatText("layout.%s", config.display.layout.c_str())
-                                    : key.editCardId.empty() ? "layout"
-                                                             : FormatText("card.%s", key.editCardId.c_str());
+        ? FormatText("layout.%s", config.display.layout.c_str())
+        : key.editCardId.empty() ? "layout"
+                                 : FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     return FormatText("[%s] %s = metric_list()", sectionName.c_str(), memberName.c_str());
 }
@@ -105,9 +110,9 @@ std::optional<std::string> BuildContainerChildOrderTooltipLine(
     }
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
-                                        ? FormatText("layout.%s", config.display.layout.c_str())
-                                    : key.editCardId.empty() ? "layout"
-                                                             : FormatText("card.%s", key.editCardId.c_str());
+        ? FormatText("layout.%s", config.display.layout.c_str())
+        : key.editCardId.empty() ? "layout"
+                                 : FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     std::string text = FormatText("[%s] %s = %s(", sectionName.c_str(), memberName.c_str(), node->name.c_str());
     for (size_t i = 0; i < node->children.size(); ++i) {

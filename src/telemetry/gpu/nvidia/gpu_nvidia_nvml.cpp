@@ -94,10 +94,10 @@ public:
         }
 
         bool loaded = true;
-#define CASEDASH_LOAD_REQUIRED(function, name)                                                                         \
-    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name));                                    \
+#define CASEDASH_LOAD_REQUIRED(function, name) \
+    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name)); \
     loaded = function != nullptr && loaded
-#define CASEDASH_LOAD_OPTIONAL(function, name)                                                                         \
+#define CASEDASH_LOAD_OPTIONAL(function, name) \
     function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name))
         CASEDASH_LOAD_REQUIRED(init_, "nvmlInit_v2");
         CASEDASH_LOAD_REQUIRED(shutdown_, "nvmlShutdown");
@@ -216,7 +216,7 @@ bool NvmlPackedDeviceIdMatches(unsigned int pciDeviceId, const GpuAdapterInfo& a
     const unsigned int low = pciDeviceId & 0xffffu;
     const unsigned int high = (pciDeviceId >> 16) & 0xffffu;
     return (low == adapter.vendorId && high == adapter.deviceId) ||
-           (low == adapter.deviceId && high == adapter.vendorId);
+        (low == adapter.deviceId && high == adapter.vendorId);
 }
 
 int NvidiaDeviceMatchRank(const GpuAdapterInfo& adapter, const NvmlPciInfo* pci, const std::string& name) {
@@ -260,7 +260,8 @@ public:
 
         unsigned int deviceCount = 0;
         result = nvml_.DeviceCount(deviceCount);
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+        trace_.WriteFmt(
+            TracePrefix::NvidiaNvml,
             RES_STR("get_count result=\"%s\" count=%u"),
             nvml_.ResultText(result).c_str(),
             deviceCount);
@@ -279,7 +280,8 @@ public:
 
         NvmlMemory memory{};
         const NvmlReturn memoryResult = nvml_.MemoryInfo(device_, memory);
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+        trace_.WriteFmt(
+            TracePrefix::NvidiaNvml,
             RES_STR("get_total_vram result=\"%s\" total_bytes=%llu"),
             nvml_.ResultText(memoryResult).c_str(),
             static_cast<unsigned long long>(memory.total));
@@ -287,7 +289,8 @@ public:
             totalVramGb_ = static_cast<double>(memory.total) / (1024.0 * 1024.0 * 1024.0);
         }
 
-        diagnostics_ = FormatText(RES_STR("NVML GPU=%s fan_rpm_supported=%s native_fps_supported=no"),
+        diagnostics_ = FormatText(
+            RES_STR("NVML GPU=%s fan_rpm_supported=%s native_fps_supported=no"),
             gpuName_.c_str(),
             HasFanSpeedRpm() ? "yes" : "no");
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
@@ -297,11 +300,12 @@ public:
             const FpsTelemetrySample fpsSample =
                 fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
             fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                  ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                  : fpsSample.diagnostics;
+                ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
+                : fpsSample.diagnostics;
         }
         initialized_ = true;
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+        trace_.WriteFmt(
+            TracePrefix::NvidiaNvml,
             RES_STR("initialize_done diagnostics=\"%s\" fps=\"%s\""),
             diagnostics_.c_str(),
             fpsDiagnostics_.c_str());
@@ -326,7 +330,8 @@ public:
         NvmlUtilization utilization{};
         NvmlReturn result = nvml_.UtilizationRates(device_, utilization);
         if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
+            trace_.WriteFmt(
+                TracePrefix::NvidiaNvml,
                 RES_STR("get_utilization result=\"%s\" gpu=%u"),
                 nvml_.ResultText(result).c_str(),
                 utilization.gpu);
@@ -339,7 +344,8 @@ public:
         unsigned int temperatureC = 0;
         result = nvml_.Temperature(device_, temperatureC);
         if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
+            trace_.WriteFmt(
+                TracePrefix::NvidiaNvml,
                 RES_STR("get_temperature result=\"%s\" value=%u"),
                 nvml_.ResultText(result).c_str(),
                 temperatureC);
@@ -352,7 +358,8 @@ public:
         unsigned int clockMhz = 0;
         result = nvml_.GraphicsClock(device_, clockMhz);
         if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
+            trace_.WriteFmt(
+                TracePrefix::NvidiaNvml,
                 RES_STR("get_clock result=\"%s\" value=%u"),
                 nvml_.ResultText(result).c_str(),
                 clockMhz);
@@ -365,7 +372,8 @@ public:
         NvmlMemory memory{};
         result = nvml_.MemoryInfo(device_, memory);
         if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
+            trace_.WriteFmt(
+                TracePrefix::NvidiaNvml,
                 RES_STR("get_memory result=\"%s\" used_bytes=%llu total_bytes=%llu"),
                 nvml_.ResultText(result).c_str(),
                 static_cast<unsigned long long>(memory.used),
@@ -383,7 +391,8 @@ public:
         const std::optional<NvmlReturn> fanResult = nvml_.FanSpeedRpm(device_, fanRpm);
         if (fanResult.has_value()) {
             if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
-                trace_.WriteFmt(TracePrefix::NvidiaNvml,
+                trace_.WriteFmt(
+                    TracePrefix::NvidiaNvml,
                     RES_STR("get_fan_rpm result=\"%s\" value=%u"),
                     nvml_.ResultText(*fanResult).c_str(),
                     fanRpm);
@@ -408,7 +417,8 @@ public:
             if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
                 const std::string fpsText =
                     fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
-                trace_.WriteFmt(TracePrefix::NvidiaNvml,
+                trace_.WriteFmt(
+                    TracePrefix::NvidiaNvml,
                     RES_STR("get_presented_fps available=%s value=%s process=\"%s\" diagnostics=\"%s\""),
                     Trace::BoolText(fpsSample.fps.has_value()),
                     fpsText.c_str(),
@@ -419,7 +429,8 @@ public:
 
         sample.available = hasAnyMetric;
         AppendFormat(sample.diagnostics, RES_STR(" fps=%s"), fpsDiagnostics_.c_str());
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+        trace_.WriteFmt(
+            TracePrefix::NvidiaNvml,
             RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
             sample.diagnostics.c_str());
@@ -438,22 +449,24 @@ private:
             NvmlDevice candidate = nullptr;
             const NvmlReturn handleResult = nvml_.DeviceHandleByIndex(index, candidate);
             std::array<char, 128> name{};
-            const NvmlReturn nameResult =
-                candidate != nullptr ? nvml_.DeviceName(candidate, name.data(), static_cast<unsigned int>(name.size()))
-                                     : handleResult;
+            const NvmlReturn nameResult = candidate != nullptr
+                ? nvml_.DeviceName(candidate, name.data(), static_cast<unsigned int>(name.size()))
+                : handleResult;
             NvmlPciInfo pci{};
             const std::optional<NvmlReturn> pciResult =
                 candidate != nullptr ? nvml_.PciInfo(candidate, pci) : std::nullopt;
             const bool pciOk = pciResult.has_value() && *pciResult == kNvmlSuccess;
             const std::string candidateName = nameResult == kNvmlSuccess ? KnownNvmlName(name) : std::string();
             const int rank = candidate != nullptr && adapter_.has_value()
-                                 ? NvidiaDeviceMatchRank(*adapter_, pciOk ? &pci : nullptr, candidateName)
-                                 : (candidate != nullptr ? 1 : 0);
+                ? NvidiaDeviceMatchRank(*adapter_, pciOk ? &pci : nullptr, candidateName)
+                : (candidate != nullptr ? 1 : 0);
             const std::string pciResultText =
                 pciResult.has_value() ? nvml_.ResultText(*pciResult) : std::string("unavailable");
-            trace_.WriteFmt(TracePrefix::NvidiaNvml,
-                RES_STR("device_candidate index=%u handle_result=\"%s\" name_result=\"%s\" pci_result=\"%s\" "
-                        "pci=%u:%u:%u pci_device_id=0x%08X subsystem_id=0x%08X match_rank=%d name=\"%s\""),
+            trace_.WriteFmt(
+                TracePrefix::NvidiaNvml,
+                RES_STR(
+                    "device_candidate index=%u handle_result=\"%s\" name_result=\"%s\" pci_result=\"%s\" "
+                    "pci=%u:%u:%u pci_device_id=0x%08X subsystem_id=0x%08X match_rank=%d name=\"%s\""),
                 index,
                 nvml_.ResultText(handleResult).c_str(),
                 nvml_.ResultText(nameResult).c_str(),
@@ -477,7 +490,8 @@ private:
         device_ = bestDevice;
         gpuName_ = bestMatch == "pci" && adapter_.has_value() && !adapter_->adapterName.empty() ? adapter_->adapterName
                                                                                                 : bestName;
-        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+        trace_.WriteFmt(
+            TracePrefix::NvidiaNvml,
             RES_STR("device_selected match=\"%s\" rank=%d display_name=\"%s\" selected_adapter=\"%s\""),
             bestMatch.c_str(),
             bestRank,

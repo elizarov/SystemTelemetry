@@ -220,25 +220,25 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
             return *reinterpret_cast<const double*>(address) == *reinterpret_cast<const double*>(compareAddress);
         case RuntimeConfigFieldValueKind::String:
             return *reinterpret_cast<const std::string*>(address) ==
-                   *reinterpret_cast<const std::string*>(compareAddress);
+                *reinterpret_cast<const std::string*>(compareAddress);
         case RuntimeConfigFieldValueKind::StringList:
             return *reinterpret_cast<const std::vector<std::string>*>(address) ==
-                   *reinterpret_cast<const std::vector<std::string>*>(compareAddress);
+                *reinterpret_cast<const std::vector<std::string>*>(compareAddress);
         case RuntimeConfigFieldValueKind::LogicalPoint:
             return *reinterpret_cast<const LogicalPointConfig*>(address) ==
-                   *reinterpret_cast<const LogicalPointConfig*>(compareAddress);
+                *reinterpret_cast<const LogicalPointConfig*>(compareAddress);
         case RuntimeConfigFieldValueKind::LogicalSize:
             return *reinterpret_cast<const LogicalSizeConfig*>(address) ==
-                   *reinterpret_cast<const LogicalSizeConfig*>(compareAddress);
+                *reinterpret_cast<const LogicalSizeConfig*>(compareAddress);
         case RuntimeConfigFieldValueKind::HexColor:
             return ColorConfigPersistedValueEquals(
                 *reinterpret_cast<const ColorConfig*>(address), *reinterpret_cast<const ColorConfig*>(compareAddress));
         case RuntimeConfigFieldValueKind::FontSpec:
             return *reinterpret_cast<const UiFontConfig*>(address) ==
-                   *reinterpret_cast<const UiFontConfig*>(compareAddress);
+                *reinterpret_cast<const UiFontConfig*>(compareAddress);
         case RuntimeConfigFieldValueKind::LayoutExpression:
             return *reinterpret_cast<const LayoutNodeConfig*>(address) ==
-                   *reinterpret_cast<const LayoutNodeConfig*>(compareAddress);
+                *reinterpret_cast<const LayoutNodeConfig*>(compareAddress);
     }
     return false;
 }

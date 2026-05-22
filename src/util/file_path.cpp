@@ -19,7 +19,7 @@ bool IsSeparator(char ch) {
 
 bool HasDrivePrefix(std::string_view path) {
     return path.size() >= 2 && path[1] == ':' &&
-           ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+        ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
 }
 
 size_t RootLength(std::string_view path) {
@@ -114,8 +114,9 @@ FilePath JoinPath(const FilePath& base, const FilePath& child) {
     }
     const std::string baseText = base.string();
     const std::string childText = child.string();
-    return FilePath(IsSeparator(baseText.back()) ? FormatText("%s%s", baseText.c_str(), childText.c_str())
-                                                 : FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
+    return FilePath(
+        IsSeparator(baseText.back()) ? FormatText("%s%s", baseText.c_str(), childText.c_str())
+                                     : FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
 }
 
 FilePath JoinPath(const FilePath& base, const char* child) {

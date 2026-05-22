@@ -44,7 +44,8 @@ std::string FormatLayoutEditParameterPath(LayoutEditParameter parameter) {
 }
 
 std::string FormatLayoutEditParameterDetail(LayoutEditParameter parameter) {
-    return FormatText("%s (%s)",
+    return FormatText(
+        "%s (%s)",
         GetLayoutEditParameterDisplayName(parameter).c_str(),
         FormatLayoutEditParameterPath(parameter).c_str());
 }
@@ -96,7 +97,8 @@ std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorK
         return FormatText("card title %s", title->cardId.c_str());
     }
     if (const auto nodeField = LayoutEditAnchorNodeFieldKey(key); nodeField.has_value()) {
-        return FormatText("%s parameter %s",
+        return FormatText(
+            "%s parameter %s",
             EnumToString(nodeField->widgetClass),
             FormatLayoutConfigPath(config, nodeField->editCardId, nodeField->nodePath).c_str());
     }
@@ -120,7 +122,7 @@ std::string FormatActiveRegionPhase(LayoutEditActiveRegionKind kind) {
 
 bool IsActiveRegionAnchorHandle(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticEditAnchorHandle ||
-           kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
+        kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
 }
 
 std::string FormatActiveRegionVisualType(LayoutEditActiveRegionKind kind) {
@@ -156,7 +158,8 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
     switch (activeRegion.kind) {
         case LayoutEditActiveRegionKind::Card: {
             if (const auto* card = LayoutEditActiveRegionPayloadAs<LayoutEditCardRegion>(activeRegion)) {
-                return FormatText("%s.cards/%s/card[%s]",
+                return FormatText(
+                    "%s.cards/%s/card[%s]",
                     ActiveLayoutSectionName(config).c_str(),
                     FormatNodePath(card->nodePath).c_str(),
                     card->id.c_str());
@@ -165,7 +168,8 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
         }
         case LayoutEditActiveRegionKind::CardHeader: {
             if (const auto* card = LayoutEditActiveRegionPayloadAs<LayoutEditCardRegion>(activeRegion)) {
-                return FormatText("%s.cards/%s/card[%s]/header",
+                return FormatText(
+                    "%s.cards/%s/card[%s]/header",
                     ActiveLayoutSectionName(config).c_str(),
                     FormatNodePath(card->nodePath).c_str(),
                     card->id.c_str());
@@ -174,7 +178,8 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
         }
         case LayoutEditActiveRegionKind::WidgetHover: {
             if (const auto* widget = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetRegion>(activeRegion)) {
-                return FormatText("%s/widget[%s]",
+                return FormatText(
+                    "%s/widget[%s]",
                     FormatLayoutConfigPath(config, widget->widget.editCardId, widget->widget.nodePath).c_str(),
                     EnumToString(widget->widgetClass));
             }
@@ -182,7 +187,8 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
         }
         case LayoutEditActiveRegionKind::LayoutWeightGuide: {
             if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(activeRegion)) {
-                return FormatText("%s/separator[%zu]",
+                return FormatText(
+                    "%s/separator[%zu]",
                     FormatLayoutConfigPath(config, guide->editCardId, guide->nodePath).c_str(),
                     guide->separatorIndex);
             }
@@ -191,14 +197,16 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
         case LayoutEditActiveRegionKind::ContainerChildReorderTarget: {
             if (const auto* target =
                     LayoutEditActiveRegionPayloadAs<LayoutEditContainerChildReorderRegion>(activeRegion)) {
-                return FormatText("%s/child-reorder-target",
+                return FormatText(
+                    "%s/child-reorder-target",
                     FormatLayoutConfigPath(config, target->editCardId, target->nodePath).c_str());
             }
             break;
         }
         case LayoutEditActiveRegionKind::GapHandle: {
             if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditGapAnchor>(activeRegion)) {
-                return FormatText("%s/gap/%s",
+                return FormatText(
+                    "%s/gap/%s",
                     FormatWidgetIdentityPath(config, anchor->key.widget).c_str(),
                     FormatLayoutConfigPath(config, anchor->key.widget.editCardId, anchor->key.nodePath).c_str());
             }
@@ -217,7 +225,8 @@ std::string FormatActiveRegionPath(const AppConfig& config, const LayoutEditActi
         case LayoutEditActiveRegionKind::DynamicEditAnchorTarget: {
             if (const auto* region = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(activeRegion)) {
                 const std::string suffix = IsActiveRegionAnchorHandle(activeRegion.kind) ? "/handle" : "/target";
-                return FormatText("%s/anchor[%d]%s",
+                return FormatText(
+                    "%s/anchor[%d]%s",
                     FormatWidgetIdentityPath(config, region->key.widget).c_str(),
                     region->key.anchorId,
                     suffix.c_str());
@@ -251,7 +260,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
         }
         case LayoutEditActiveRegionKind::WidgetHover: {
             if (const auto* widget = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetRegion>(activeRegion)) {
-                return FormatText("hoverable widget %s in card %s",
+                return FormatText(
+                    "hoverable widget %s in card %s",
                     EnumToString(widget->widgetClass),
                     widget->widget.renderCardId.c_str());
             }
@@ -266,7 +276,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
         case LayoutEditActiveRegionKind::ContainerChildReorderTarget: {
             if (const auto* target =
                     LayoutEditActiveRegionPayloadAs<LayoutEditContainerChildReorderRegion>(activeRegion)) {
-                return FormatText("%s container child reorder target",
+                return FormatText(
+                    "%s container child reorder target",
                     FormatGuideAxis(target->horizontal ? LayoutGuideAxis::Horizontal : LayoutGuideAxis::Vertical)
                         .c_str());
             }
@@ -280,7 +291,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
         }
         case LayoutEditActiveRegionKind::WidgetGuide: {
             if (const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetGuide>(activeRegion)) {
-                return FormatText("%s %s",
+                return FormatText(
+                    "%s %s",
                     FormatGuideAxis(guide->axis).c_str(),
                     FormatLayoutEditParameterDetail(guide->parameter).c_str());
             }
@@ -291,7 +303,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
         case LayoutEditActiveRegionKind::DynamicEditAnchorHandle:
         case LayoutEditActiveRegionKind::DynamicEditAnchorTarget: {
             if (const auto* region = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(activeRegion)) {
-                return FormatText("%s %s %s",
+                return FormatText(
+                    "%s %s %s",
                     FormatActiveRegionPhase(activeRegion.kind).c_str(),
                     FormatAnchorShape(region->shape).c_str(),
                     FormatAnchorSubject(config, region->key).c_str());
@@ -301,7 +314,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
         case LayoutEditActiveRegionKind::StaticColorTarget:
         case LayoutEditActiveRegionKind::DynamicColorTarget: {
             if (const auto* region = LayoutEditActiveRegionPayloadAs<LayoutEditColorRegion>(activeRegion)) {
-                return FormatText("%s color %s",
+                return FormatText(
+                    "%s color %s",
                     FormatActiveRegionPhase(activeRegion.kind).c_str(),
                     FormatLayoutEditParameterDetail(region->parameter).c_str());
             }
@@ -313,7 +327,8 @@ std::string FormatActiveRegionDetail(const AppConfig& config, const LayoutEditAc
 
 }  // namespace
 
-void WriteLayoutEditActiveRegionTrace(Trace& trace,
+void WriteLayoutEditActiveRegionTrace(
+    Trace& trace,
     const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const DashboardOverlayState& overlayState) {
@@ -321,7 +336,8 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
         const std::string visualType = FormatActiveRegionVisualType(region.kind);
         const std::string path = FormatActiveRegionPath(config, region);
         const std::string detail = FormatActiveRegionDetail(config, region);
-        trace.WriteFmt(TracePrefix::Diagnostics,
+        trace.WriteFmt(
+            TracePrefix::Diagnostics,
             RES_STR("active_region box=(%d,%d,%d,%d) visual_type=\"%s\" path=\"%s\" detail=\"%s\""),
             region.box.left,
             region.box.top,
@@ -332,7 +348,8 @@ void WriteLayoutEditActiveRegionTrace(Trace& trace,
             detail.c_str());
     }
 
-    trace.WriteFmt(TracePrefix::Diagnostics,
+    trace.WriteFmt(
+        TracePrefix::Diagnostics,
         RES_STR("active_regions count=%zu layout_edit=%s"),
         regions.Size(),
         Trace::BoolText(overlayState.showLayoutEditGuides));

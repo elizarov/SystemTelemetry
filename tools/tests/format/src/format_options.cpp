@@ -8,7 +8,20 @@
 #include <algorithm>
 #include <ws2tcpip.h>
 
+#define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) \
+    ((firstValue) + \
+        (secondValue) + \
+        (thirdValue) + \
+        (firstValue) + \
+        (secondValue) + \
+        (thirdValue))
+#define FORMAT_FIXTURE_SHORT_MACRO(value) (value)
+#define FORMAT_FIXTURE_MUCH_LONGER_MACRO(value) (value)
+
 namespace format_fixture{
+class LayoutEditWidgetIdentity{};
+namespace std_fixture{template<typename T> class vector{}; class string{};}
+
 class FormattingExample{
 	public:
 	int * pointer;
@@ -25,16 +38,31 @@ int editControl;
 int flags;
 };
 
+struct FormatBitFields{
+unsigned shortBits : 1;
+unsigned muchLongerBits : 2;
+};
+
 constexpr int kPrimaryFlag=1;
 constexpr int kSecondaryFlag=2;
 constexpr int kTertiaryFlag=4;
 constexpr FormatTableRow kFormatRows[]={{"alpha.metric.row.with.extra.detail.and.column.limit.coverage",100,200,kPrimaryFlag | kSecondaryFlag | kTertiaryFlag},{"beta.metric.row.with.extra.detail",300,400,kPrimaryFlag | kTertiaryFlag},{"gamma.metric.row",500,600,kSecondaryFlag}};
+
+int kAlignedAssignment=1;
+int kMuchLongerAlignedAssignment=2;
+int kTrailingComment=1; // short
+int kMuchLongerTrailingComment=2; // long
+
+class BenchmarkLikeHost{
+    bool ApplyMetricListOrder(const LayoutEditWidgetIdentity& widget,const std_fixture::vector<std_fixture::string>& metricRefs) override { return true; }
+};
 
 int ShortNonEmpty(){return 1;}
 void EmptyFunction(){}
 
 int ManyParameters(int * firstPointerWithLongName,int & firstReferenceWithLongName,int secondValueWithLongName,int thirdValueWithLongName,int fourthValueWithLongName,int fifthValueWithLongName,int sixthValueWithLongName){
 int localValueWithLongName=firstPointerWithLongName ? *firstPointerWithLongName:0;// trailing
+bool combinedValue=firstReferenceWithLongName > 0 && secondValueWithLongName > 0 && thirdValueWithLongName > 0 && fourthValueWithLongName > 0 && fifthValueWithLongName > 0 && sixthValueWithLongName > 0;
 if(localValueWithLongName)return firstReferenceWithLongName;
 while(localValueWithLongName<secondValueWithLongName)++localValueWithLongName;
 for(int index=0;index<thirdValueWithLongName;++index){localValueWithLongName+=index;}

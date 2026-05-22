@@ -20,7 +20,8 @@ CardChromeLayout ResolveCardChromeLayout(
     return ResolveCardChromeLayout(card.title, card.icon, cardRect, metrics);
 }
 
-CardChromeLayout ResolveCardChromeLayout(std::string_view title,
+CardChromeLayout ResolveCardChromeLayout(
+    std::string_view title,
     std::string_view iconName,
     const RenderRect& cardRect,
     const CardChromeLayoutMetrics& metrics) {
@@ -32,7 +33,8 @@ CardChromeLayout ResolveCardChromeLayout(std::string_view title,
     const int iconSize = (std::max)(0, metrics.iconSize);
 
     if (!iconName.empty()) {
-        layout.iconRect = RenderRect{cardRect.left + padding,
+        layout.iconRect = RenderRect{
+            cardRect.left + padding,
             cardRect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2),
             cardRect.left + padding + iconSize,
             cardRect.top + padding + (std::max)(0, (headerHeight - iconSize) / 2) + iconSize};
@@ -45,7 +47,8 @@ CardChromeLayout ResolveCardChromeLayout(std::string_view title,
         !iconName.empty() ? layout.iconRect.right + (std::max)(0, metrics.iconGap) : cardRect.left + padding;
     layout.titleRect =
         RenderRect{titleLeft, cardRect.top + padding, cardRect.right - padding, cardRect.top + padding + headerHeight};
-    layout.contentRect = RenderRect{cardRect.left + padding,
+    layout.contentRect = RenderRect{
+        cardRect.left + padding,
         cardRect.top + padding + headerHeight + (layout.hasHeader ? (std::max)(0, metrics.headerContentGap) : 0),
         cardRect.right - padding,
         cardRect.bottom - padding};

@@ -33,14 +33,14 @@
 #include "util/lightweight_mutex.h"
 #include "util/trace.h"
 
-#define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
-    X(Animation, "animation")                                                                                          \
-    X(EditLayout, "edit-layout")                                                                                       \
-    X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
-    X(LayoutSwitch, "layout-switch")                                                                                   \
-    X(MouseHover, "mouse-hover")                                                                                       \
-    X(SnapshotHandoff, "snapshot-handoff")                                                                             \
-    X(ThemeChange, "theme-change")                                                                                     \
+#define CASEDASH_BENCHMARK_ITEMS(X) \
+    X(Animation, "animation") \
+    X(EditLayout, "edit-layout") \
+    X(LayoutGuideSheet, "layout-guide-sheet") \
+    X(LayoutSwitch, "layout-switch") \
+    X(MouseHover, "mouse-hover") \
+    X(SnapshotHandoff, "snapshot-handoff") \
+    X(ThemeChange, "theme-change") \
     X(UpdateTelemetry, "update-telemetry")
 
 ENUM_STRING_DECLARE(Benchmark, CASEDASH_BENCHMARK_ITEMS);
@@ -255,7 +255,7 @@ std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& render
         }
         const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
         return guide != nullptr && guide->editCardId.empty() && guide->nodePath.size() <= 1 &&
-               guide->childExtents.size() >= 2;
+            guide->childExtents.size() >= 2;
     });
     const auto* guide = it != regions.end() ? LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(*it) : nullptr;
     return guide != nullptr ? std::optional<LayoutEditGuide>(*guide) : std::nullopt;
@@ -314,8 +314,10 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
     const double denominator = static_cast<double>((std::max)(size_t{1}, iterations - 1));
     for (size_t index = 0; index < iterations; ++index) {
         const double t = static_cast<double>(index) / denominator;
-        path.push_back(RenderPoint{static_cast<int>(std::lround(t * static_cast<double>(maxX))),
-            static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
+        path.push_back(
+            RenderPoint{
+                static_cast<int>(std::lround(t * static_cast<double>(maxX))),
+                static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
     }
     return path;
 }
@@ -341,7 +343,8 @@ void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
 
 HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
     const std::string windowTitle(title);
-    return CreateWindowExA(WS_EX_TOOLWINDOW,
+    return CreateWindowExA(
+        WS_EX_TOOLWINDOW,
         "STATIC",
         windowTitle.c_str(),
         WS_POPUP,
@@ -537,7 +540,8 @@ private:
         return applied;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
+        const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override {
@@ -1043,7 +1047,8 @@ ThemeChangeBenchTotals RunThemeChangeBenchmark(
     return totals;
 }
 
-BenchResult RunDragBenchmark(BenchmarkHost& host,
+BenchResult RunDragBenchmark(
+    BenchmarkHost& host,
     const LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
     const std::vector<std::vector<int>>& weightSequence) {
@@ -1413,7 +1418,8 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
     std::cout << "layout_guide_sheet_benchmark iterations=" << iterations << " render_scale=" << renderScale
               << " selected_cards=" << totals.selectedCards << " callouts=" << totals.callouts << "\n";
     PrintLayoutGuideSheetBenchResult(totals);
-    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideActiveRegions),
+    PrintPhaseResult(
+        PhaseName(BenchPhase::LayoutGuideActiveRegions),
         totals.phases[PhaseIndex(BenchPhase::LayoutGuideActiveRegions)]);
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuidePlan), totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlan)]);
     PrintPhaseResult(

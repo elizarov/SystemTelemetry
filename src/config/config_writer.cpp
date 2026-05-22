@@ -14,7 +14,8 @@ std::string RuntimeSectionName(const RuntimeConfigSectionDescriptor& section) {
 }
 
 std::string RuntimeDynamicSectionName(const RuntimeConfigSectionDescriptor& section, std::string_view suffix) {
-    return FormatText("[%.*s%.*s]",
+    return FormatText(
+        "[%.*s%.*s]",
         static_cast<int>(section.nameLength),
         section.name,
         static_cast<int>(suffix.size()),
@@ -34,8 +35,8 @@ void SaveBoardSectionDifferences(
     for (const std::string& logicalName : board.requestedTemperatureNames) {
         const auto currentIt = board.temperatureSensorNames.find(logicalName);
         const std::string currentValue = currentIt != board.temperatureSensorNames.end() && !currentIt->second.empty()
-                                             ? currentIt->second
-                                             : logicalName;
+            ? currentIt->second
+            : logicalName;
 
         std::string compareValue = logicalName;
         if (compareBoard != nullptr) {
@@ -64,7 +65,8 @@ void SaveBoardSectionDifferences(
 }
 
 template <typename UpdateKeyFn>
-void SaveMetricsSectionDifferences(const MetricsSectionConfig& metrics,
+void SaveMetricsSectionDifferences(
+    const MetricsSectionConfig& metrics,
     const MetricsSectionConfig* compareMetrics,
     const std::string& sectionName,
     UpdateKeyFn& updateKey) {
@@ -84,7 +86,8 @@ void SaveMetricsSectionDifferences(const MetricsSectionConfig& metrics,
 }
 
 template <typename UpdateKeyFn>
-void SaveStructuredSectionDifferences(const RuntimeConfigSectionDescriptor& section,
+void SaveStructuredSectionDifferences(
+    const RuntimeConfigSectionDescriptor& section,
     const void* owner,
     const void* compareOwner,
     const std::string& sectionName,
@@ -97,7 +100,8 @@ void SaveStructuredSectionDifferences(const RuntimeConfigSectionDescriptor& sect
 }
 
 template <typename UpdateKeyFn>
-void SaveSectionDifferences(const RuntimeConfigSectionDescriptor& section,
+void SaveSectionDifferences(
+    const RuntimeConfigSectionDescriptor& section,
     const void* owner,
     const void* compareOwner,
     const std::string& sectionName,
@@ -107,13 +111,15 @@ void SaveSectionDifferences(const RuntimeConfigSectionDescriptor& section,
             SaveStructuredSectionDifferences(section, owner, compareOwner, sectionName, updateKey);
             break;
         case RuntimeConfigSectionCodec::Board:
-            SaveBoardSectionDifferences(*reinterpret_cast<const BoardConfig*>(owner),
+            SaveBoardSectionDifferences(
+                *reinterpret_cast<const BoardConfig*>(owner),
                 reinterpret_cast<const BoardConfig*>(compareOwner),
                 sectionName,
                 updateKey);
             break;
         case RuntimeConfigSectionCodec::Metrics:
-            SaveMetricsSectionDifferences(*reinterpret_cast<const MetricsSectionConfig*>(owner),
+            SaveMetricsSectionDifferences(
+                *reinterpret_cast<const MetricsSectionConfig*>(owner),
                 reinterpret_cast<const MetricsSectionConfig*>(compareOwner),
                 sectionName,
                 updateKey);
@@ -130,9 +136,10 @@ template <typename UpdateKeyFn> struct DynamicSectionSaveContext {
 template <typename UpdateKeyFn> void SaveDynamicSectionItem(void* context, std::string_view suffix, const void* item) {
     auto& saveContext = *reinterpret_cast<DynamicSectionSaveContext<UpdateKeyFn>*>(context);
     const void* compareItem = saveContext.compareConfig != nullptr
-                                  ? saveContext.section->dynamic.find(*saveContext.compareConfig, suffix)
-                                  : nullptr;
-    SaveSectionDifferences(*saveContext.section,
+        ? saveContext.section->dynamic.find(*saveContext.compareConfig, suffix)
+        : nullptr;
+    SaveSectionDifferences(
+        *saveContext.section,
         item,
         compareItem,
         RuntimeDynamicSectionName(*saveContext.section, suffix),
@@ -154,7 +161,8 @@ void SaveKnownSectionDifferences(const AppConfig& config, const AppConfig* compa
     }
 }
 
-void ReplaceOrAppendKey(std::vector<std::string>& lines,
+void ReplaceOrAppendKey(
+    std::vector<std::string>& lines,
     size_t sectionStart,
     size_t sectionEnd,
     const std::string& key,
@@ -180,7 +188,8 @@ void ReplaceOrAppendKey(std::vector<std::string>& lines,
         while (appendIndex > sectionStart + 1 && Trim(lines[appendIndex - 1]).empty()) {
             --appendIndex;
         }
-        lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(appendIndex),
+        lines.insert(
+            lines.begin() + static_cast<std::ptrdiff_t>(appendIndex),
             FormatText("%s = %s", key.c_str(), value.c_str()));
     }
 }
@@ -312,12 +321,12 @@ std::string BuildSavedConfigText(
 
     const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
-        size_t sectionStart = sectionName == "[gpu]"       ? ensureSectionAfter(sectionName, "[display]")
-                              : sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]")
-                              : sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
-                              : sectionName == "[board]"   ? ensureSectionAfter(sectionName, "[storage]")
-                              : sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]")
-                                                           : ensureSection(sectionName);
+        size_t sectionStart = sectionName == "[gpu]" ? ensureSectionAfter(sectionName, "[display]")
+            : sectionName == "[network]"             ? ensureSectionAfter(sectionName, "[gpu]")
+            : sectionName == "[storage]"             ? ensureSectionAfter(sectionName, "[network]")
+            : sectionName == "[board]"               ? ensureSectionAfter(sectionName, "[storage]")
+            : sectionName == "[metrics]"             ? ensureSectionAfter(sectionName, "[board]")
+                                                     : ensureSection(sectionName);
         if (sectionStart >= lines.size()) {
             return;
         }

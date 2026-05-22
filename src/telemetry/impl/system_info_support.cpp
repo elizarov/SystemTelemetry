@@ -51,9 +51,10 @@ std::string ResolveMappedBoardSensorName(
 
 void AppendRequestedBoardMetricIndex(
     BoardMetricIndexBySourceName& indexBySourceName, std::string sourceName, size_t index) {
-    auto entry = std::find_if(indexBySourceName.begin(),
-        indexBySourceName.end(),
-        [&](const BoardMetricSourceIndexes& candidate) { return candidate.sourceName == sourceName; });
+    auto entry = std::find_if(
+        indexBySourceName.begin(), indexBySourceName.end(), [&](const BoardMetricSourceIndexes& candidate) {
+            return candidate.sourceName == sourceName;
+        });
     if (entry == indexBySourceName.end()) {
         indexBySourceName.push_back(BoardMetricSourceIndexes{std::move(sourceName), {index}});
         return;
@@ -70,13 +71,15 @@ void ResetBoardMetricValues(std::vector<NamedScalarMetric>& metrics) {
     }
 }
 
-void ApplyBoardSensorReadingsToMetrics(const std::vector<BoardSensorReading>& readings,
+void ApplyBoardSensorReadingsToMetrics(
+    const std::vector<BoardSensorReading>& readings,
     const BoardMetricIndexBySourceName& indexBySourceName,
     std::vector<NamedScalarMetric>& metrics) {
     for (const auto& reading : readings) {
-        const auto it = std::find_if(indexBySourceName.begin(),
-            indexBySourceName.end(),
-            [&](const BoardMetricSourceIndexes& candidate) { return candidate.sourceName == reading.title; });
+        const auto it = std::find_if(
+            indexBySourceName.begin(), indexBySourceName.end(), [&](const BoardMetricSourceIndexes& candidate) {
+                return candidate.sourceName == reading.title;
+            });
         if (it == indexBySourceName.end()) {
             continue;
         }

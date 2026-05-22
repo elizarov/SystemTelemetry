@@ -34,13 +34,15 @@ TEST(ConfigResolution, CollectsUniqueBoardBindingsFromNestedCardLayouts) {
     LayoutConfig layout;
     LayoutCardConfig card;
     card.id = "cpu";
-    card.layout = MakeContainerNode("rows",
+    card.layout = MakeContainerNode(
+        "rows",
         {MakeWidgetNode("metric_list", "board.temp.cpu, gpu.load, board.fan.system"),
-            MakeContainerNode("columns",
-                {MakeWidgetNode("gauge", "board.temp.cpu"),
-                    MakeWidgetNode("text", "board.fan.system"),
-                    MakeWidgetNode("text", "board.temp.vrm"),
-                    MakeWidgetNode("metric_list", "board.temp.cpu=CPU Legacy")})});
+         MakeContainerNode(
+             "columns",
+             {MakeWidgetNode("gauge", "board.temp.cpu"),
+              MakeWidgetNode("text", "board.fan.system"),
+              MakeWidgetNode("text", "board.temp.vrm"),
+              MakeWidgetNode("metric_list", "board.temp.cpu=CPU Legacy")})});
     layout.cards.push_back(card);
 
     const LayoutBindingSelection selection = CollectLayoutBindings(layout);
@@ -56,7 +58,8 @@ TEST(ConfigResolution, CollectsGpuFanFallbackBoardBindingFromGpuFanMetric) {
     LayoutConfig layout;
     LayoutCardConfig card;
     card.id = "gpu";
-    card.layout = MakeContainerNode("rows",
+    card.layout = MakeContainerNode(
+        "rows",
         {MakeWidgetNode("metric_list", "gpu.vram, gpu.fan"), MakeWidgetNode("metric_list", "board.fan.cpu, gpu.fan")});
     layout.cards.push_back(card);
 
@@ -71,7 +74,8 @@ TEST(ConfigResolution, CollectsCpuTemperatureFallbackBoardBindingFromGpuTemperat
     LayoutConfig layout;
     LayoutCardConfig card;
     card.id = "gpu";
-    card.layout = MakeContainerNode("rows",
+    card.layout = MakeContainerNode(
+        "rows",
         {MakeWidgetNode("metric_list", "gpu.temp, gpu.clock"), MakeWidgetNode("metric_list", "board.temp.vrm")});
     layout.cards.push_back(card);
 

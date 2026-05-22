@@ -246,7 +246,8 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
 
-    hwnd_ = CreateWindowExA(WS_EX_TOOLWINDOW,
+    hwnd_ = CreateWindowExA(
+        WS_EX_TOOLWINDOW,
         wc.lpszClassName,
         kAppTitle,
         WS_POPUP,
@@ -294,7 +295,7 @@ void DashboardApp::ApplyConfigPlacement() {
     }
 
     if ((CurrentWindowDpi() != targetDpi || currentDpi_ != targetDpi ||
-            !AreScalesEqual(CurrentRenderScale(), targetScale)) &&
+         !AreScalesEqual(CurrentRenderScale(), targetScale)) &&
         !ApplyWindowDpi(targetDpi)) {
         return;
     }
@@ -495,11 +496,11 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
 
     if (suggestedRect != nullptr) {
         const int width = HasExplicitDisplayScale(controller_.State().config.display.scale)
-                              ? WindowWidth()
-                              : suggestedRect->right - suggestedRect->left;
+            ? WindowWidth()
+            : suggestedRect->right - suggestedRect->left;
         const int height = HasExplicitDisplayScale(controller_.State().config.display.scale)
-                               ? WindowHeight()
-                               : suggestedRect->bottom - suggestedRect->top;
+            ? WindowHeight()
+            : suggestedRect->bottom - suggestedRect->top;
         SetDashboardWindowGeometry(
             suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE, "dpi_change");
     }
@@ -525,7 +526,8 @@ void DashboardApp::BringOnTop() {
     SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
     const BOOL foregroundSet = SetForegroundWindow(hwnd_);
     SetActiveWindow(hwnd_);
-    trace_.WriteFmt(TracePrefix::Diagnostics,
+    trace_.WriteFmt(
+        TracePrefix::Diagnostics,
         "bring_to_front hwnd=0x%p visible=%d iconic=%d foreground_set=%d",
         reinterpret_cast<void*>(hwnd_),
         IsWindowVisible(hwnd_) != FALSE,
@@ -584,7 +586,8 @@ bool DashboardApp::ApplyLayoutEditValue(LayoutEditParameter parameter, double va
     return applied;
 }
 
-std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
+std::optional<int> DashboardApp::EvaluateLayoutWidgetExtentForWeights(
+    const LayoutEditLayoutTarget& target,
     const std::vector<int>& weights,
     const LayoutEditWidgetIdentity& widget,
     LayoutGuideAxis axis) {
@@ -680,7 +683,8 @@ void DashboardApp::SyncDashboardMoveOverlayState() {
 
     overlayState.visible = true;
     overlayState.monitorName = movePlacementInfo_.monitorName;
-    overlayState.relativePosition = RenderPoint{static_cast<int>(movePlacementInfo_.relativePosition.x),
+    overlayState.relativePosition = RenderPoint{
+        static_cast<int>(movePlacementInfo_.relativePosition.x),
         static_cast<int>(movePlacementInfo_.relativePosition.y)};
     overlayState.monitorScale = ScaleFromDpi(movePlacementInfo_.dpi);
 }
@@ -756,7 +760,8 @@ void DashboardApp::ShowError(std::string_view message) const {
 }
 
 bool DashboardApp::CreateLayoutEditTooltip() {
-    layoutEditTooltipHwnd_ = CreateWindowExA(WS_EX_TOPMOST,
+    layoutEditTooltipHwnd_ = CreateWindowExA(
+        WS_EX_TOPMOST,
         TOOLTIPS_CLASSA,
         nullptr,
         WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
@@ -836,23 +841,24 @@ std::string DashboardApp::BuildLayoutEditUiTraceState() const {
     const auto& state = controller_.State();
     const HWND capture = GetCapture();
     const char* captureText = capture == nullptr ? "none" : (capture == hwnd_ ? "dashboard" : "other");
-    std::string trace =
-        FormatText("layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
-                   "tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",
-            state.config.display.layout.c_str(),
-            Trace::BoolText(state.isEditingLayout),
-            Trace::BoolText(state.isMoving),
-            layoutEditModalUiDepth_,
-            Trace::BoolText(layoutEditTooltipVisible_),
-            Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
-            Trace::BoolText(layoutEditTooltipRectValid_),
-            Trace::BoolText(layoutEditMouseTracking_),
-            Trace::BoolText(layoutEditController_.HasActiveDrag()),
-            captureText);
+    std::string trace = FormatText(
+        "layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
+        "tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",
+        state.config.display.layout.c_str(),
+        Trace::BoolText(state.isEditingLayout),
+        Trace::BoolText(state.isMoving),
+        layoutEditModalUiDepth_,
+        Trace::BoolText(layoutEditTooltipVisible_),
+        Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
+        Trace::BoolText(layoutEditTooltipRectValid_),
+        Trace::BoolText(layoutEditMouseTracking_),
+        Trace::BoolText(layoutEditController_.HasActiveDrag()),
+        captureText);
 
     LayoutEditController::TooltipTarget target;
     if (const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget(target)) {
-        AppendFormat(trace,
+        AppendFormat(
+            trace,
             " target=\"%s\" target_point=\"%d,%d\"",
             LayoutEditTooltipPayloadTraceKind(target.payload),
             target.clientPoint.x,
@@ -1005,7 +1011,8 @@ void DashboardApp::UpdateLayoutEditTooltip() {
 
     if (!wasVisible || previousText != layoutEditTooltipText_ || previousRectValid != layoutEditTooltipRectValid_ ||
         !RectsEqual(previousRect, layoutEditTooltipRect_)) {
-        TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditTooltip,
+        TraceLayoutEditUiEventFmt(
+            TracePrefix::LayoutEditTooltip,
             "show",
             "payload=\"%s\" client_point=\"%d,%d\" text=\"%s\"",
             LayoutEditTooltipPayloadTraceKind(target.payload),
@@ -1394,7 +1401,8 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_CAPTURECHANGED:
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 const bool handled = layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam));
-                TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,
+                TraceLayoutEditUiEventFmt(
+                    TracePrefix::LayoutEditUi,
                     "wm_capturechanged",
                     "new_owner=\"%s\" handled=\"%s\"",
                     reinterpret_cast<HWND>(lParam) == nullptr

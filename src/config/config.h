@@ -102,8 +102,8 @@ struct LayoutGuideSheetConfig {
 // config_meta: static_section [dashboard]
 struct DashboardSectionConfig {
     int outerMargin{};  // config_meta: policy=non_negative_int
-    int rowGap{};       // config_meta: policy=non_negative_int
-    int columnGap{};    // config_meta: policy=non_negative_int
+    int rowGap{};  // config_meta: policy=non_negative_int
+    int columnGap{};  // config_meta: policy=non_negative_int
 
     bool operator==(const DashboardSectionConfig& other) const = default;
 };
@@ -114,10 +114,10 @@ struct CardStyleConfig {
     int cardRadius{};
     int cardBorder{};
     int headerIconSize{};
-    int headerIconGap{};     // config_meta: policy=non_negative_int
+    int headerIconGap{};  // config_meta: policy=non_negative_int
     int headerContentGap{};  // config_meta: policy=non_negative_int
-    int rowGap{};            // config_meta: policy=non_negative_int
-    int columnGap{};         // config_meta: policy=non_negative_int
+    int rowGap{};  // config_meta: policy=non_negative_int
+    int columnGap{};  // config_meta: policy=non_negative_int
 
     bool operator==(const CardStyleConfig& other) const = default;
 };
@@ -150,13 +150,13 @@ struct MetricListWidgetConfig {
 struct DriveUsageListWidgetConfig {
     int labelGap{};  // config_meta: policy=non_negative_int
     int activityWidth{};
-    int rwGap{};       // config_meta: policy=non_negative_int
-    int barGap{};      // config_meta: policy=non_negative_int
+    int rwGap{};  // config_meta: policy=non_negative_int
+    int barGap{};  // config_meta: policy=non_negative_int
     int percentGap{};  // config_meta: policy=non_negative_int
     int freeWidth{};
     int barHeight{};
     int headerGap{};  // config_meta: policy=non_negative_int
-    int rowGap{};     // config_meta: policy=non_negative_int
+    int rowGap{};  // config_meta: policy=non_negative_int
     int activitySegments{};
     int activitySegmentGap{};  // config_meta: policy=non_negative_int
 
@@ -165,7 +165,7 @@ struct DriveUsageListWidgetConfig {
 
 // config_meta: static_section [throughput]
 struct ThroughputWidgetConfig {
-    int headerGap{};    // config_meta: policy=non_negative_int
+    int headerGap{};  // config_meta: policy=non_negative_int
     int axisPadding{};  // config_meta: policy=non_negative_int
     int guideStrokeWidth{};
     int plotStrokeWidth{};

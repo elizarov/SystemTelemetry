@@ -163,11 +163,11 @@ TEST(LayoutEditTooltip, RejectsMetricListOrderTooltipLineWhenRowIndexIsInvalid) 
     config.layout.cards.back().layout.parameter = "cpu.ram,cpu.clock";
 
     EXPECT_FALSE(BuildMetricListOrderTooltipLine(
-        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, -1)
-            .has_value());
+                     config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, -1)
+                     .has_value());
     EXPECT_FALSE(BuildMetricListOrderTooltipLine(
-        config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 2)
-            .has_value());
+                     config, LayoutNodeFieldEditKey{"cpu", {}, WidgetClass::MetricList, LayoutNodeField::Parameter}, 2)
+                     .has_value());
 }
 
 TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
@@ -282,23 +282,32 @@ TEST(LayoutEditParameter, ClampsFullFontWeightThroughMetadata) {
 }
 
 TEST(LayoutEditParameter, PrioritizesSmallHandlesBeforeGuidesAndRingCircles) {
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeSegmentCount),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::GaugeOuterPadding));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::FontLabel),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::FontLabel),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListLabelWidth));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputLeaderDiameter),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputLeaderDiameter),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::ThroughputAxisPadding));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardBorder),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardBorder),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardPadding));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardOuterMargin),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardOuterMargin),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardColumnGap),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardColumnGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::CardRowGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
-    EXPECT_LT(GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardColumnGap),
+    EXPECT_LT(
+        GetLayoutEditParameterHitPriority(LayoutEditParameter::DashboardColumnGap),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListRowGap));
 }
 

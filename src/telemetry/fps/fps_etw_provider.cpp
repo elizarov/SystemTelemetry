@@ -204,7 +204,8 @@ public:
             const std::string dxgiText = FormatWin32Error(dxgiStatus);
             const std::string d3d9Text = FormatWin32Error(d3d9Status);
             const std::string dxgkrnlText = FormatWin32Error(dxgkrnlStatus);
-            trace_.WriteFmt(TracePrefix::FpsEtw,
+            trace_.WriteFmt(
+                TracePrefix::FpsEtw,
                 RES_STR("enable dxgi=%s d3d9=%s dxgkrnl=%s"),
                 dxgiText.c_str(),
                 d3d9Text.c_str(),
@@ -213,7 +214,8 @@ public:
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
-            diagnostics_ = FormatText(RES_STR("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s"),
+            diagnostics_ = FormatText(
+                RES_STR("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s"),
                 FormatWin32Error(dxgiStatus).c_str(),
                 FormatWin32Error(d3d9Status).c_str(),
                 FormatWin32Error(dxgkrnlStatus).c_str());
@@ -246,7 +248,8 @@ public:
         diagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.WriteFmt(TracePrefix::FpsEtw,
+        trace_.WriteFmt(
+            TracePrefix::FpsEtw,
             RES_STR("initialize_done dxgi=%s d3d9=%s dxgkrnl=%s"),
             Trace::BoolText(dxgiEnabled_),
             Trace::BoolText(d3d9Enabled_),
@@ -299,7 +302,8 @@ public:
         sample.available = true;
         sample.fps = fps;
         std::string detail = FormatText(RES_STR(" process=%s"), sample.processName.c_str());
-        AppendFormat(detail,
+        AppendFormat(
+            detail,
             RES_STR(" source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f"),
             PresentEventSourceName(bestSelection.source),
             bestSelection.count,
@@ -467,11 +471,14 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        std::string detail = FormatText(RES_STR(" top GPU 3D application has no matching present events. process=%s "
-                                                "selected_process=%s"),
+        std::string detail = FormatText(
+            RES_STR(
+                " top GPU 3D application has no matching present events. process=%s "
+                "selected_process=%s"),
             sample.processName.c_str(),
             ResolveProcessNameLocked(selected.processId).c_str());
-        AppendFormat(detail,
+        AppendFormat(
+            detail,
             RES_STR(" selected_source=%s selected_window_count=%zu"),
             PresentEventSourceName(selected.source),
             selected.count);
@@ -503,8 +510,9 @@ private:
         previous.count = previousCount;
         previous.source = selectedSource_;
         // Preserve the active presenter through short ETW delivery bursts and near-ties between presenting apps.
-        if (candidate.processId == 0 || static_cast<double>(candidate.count) <
-                                            static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio) {
+        if (candidate.processId == 0 ||
+            static_cast<double>(candidate.count) <
+                static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio) {
             return previous;
         }
         return candidate;
@@ -696,12 +704,14 @@ private:
         }
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
-        AssignFormat(gpuUsageDiagnostics_,
+        AssignFormat(
+            gpuUsageDiagnostics_,
             RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process="),
             static_cast<long>(collectStatus),
             static_cast<long>(status));
         AppendFormat(gpuUsageDiagnostics_, RES_STR("%s"), ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
-        AppendFormat(gpuUsageDiagnostics_,
+        AppendFormat(
+            gpuUsageDiagnostics_,
             RES_STR(" top_gpu3d_pid=%lu top_gpu3d=value=%.1f"),
             static_cast<unsigned long>(topGpu3dProcessId_),
             topGpu3dUsage_);
@@ -788,7 +798,8 @@ private:
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
         std::string text = diagnostics_;
-        AppendFormat(text,
+        AppendFormat(
+            text,
             RES_STR(" runtime_events=%llu dxgkrnl_events=%llu"),
             static_cast<unsigned long long>(runtimePresentEvents_),
             static_cast<unsigned long long>(kernelPresentEvents_));
@@ -805,7 +816,7 @@ private:
         const bool isDxgiPresent =
             header.ProviderId == kDxgiProviderGuid && header.EventDescriptor.Id == kDxgiPresentStartEventId;
         const bool isDxgiPresentMpo = header.ProviderId == kDxgiProviderGuid &&
-                                      header.EventDescriptor.Id == kDxgiPresentMultiplaneOverlayStartEventId;
+            header.EventDescriptor.Id == kDxgiPresentMultiplaneOverlayStartEventId;
         const bool isD3d9Present =
             header.ProviderId == kD3d9ProviderGuid && header.EventDescriptor.Id == kD3d9PresentStartEventId;
         const bool isDxgKrnlPresent =
@@ -829,7 +840,8 @@ private:
         uint64_t& sourceCount = source == PresentEventSource::Runtime ? runtimePresentEvents_ : kernelPresentEvents_;
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
-            trace_.WriteFmt(TracePrefix::FpsEtw,
+            trace_.WriteFmt(
+                TracePrefix::FpsEtw,
                 RES_STR("present source=%s pid=%lu event_id=%u source_events=%llu"),
                 PresentEventSourceName(source),
                 static_cast<unsigned long>(header.ProcessId),

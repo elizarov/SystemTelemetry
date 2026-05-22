@@ -6,9 +6,9 @@
 
 namespace {
 
-constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;   // "CDRQ" little-endian.
+constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;  // "CDRQ" little-endian.
 constexpr uint32_t kCashDashServiceResponseMagic = 0x53524443;  // "CDRS" little-endian.
-constexpr uint32_t kFpsServicePayloadMagic = 0x31535046;        // "FPS1" little-endian.
+constexpr uint32_t kFpsServicePayloadMagic = 0x31535046;  // "FPS1" little-endian.
 constexpr uint32_t kFpsServiceProtocolVersion = 1;
 constexpr uint32_t kFpsServiceFlagAvailable = 1u << 0u;
 constexpr uint32_t kFpsServiceFlagPermissionRequired = 1u << 1u;
@@ -152,8 +152,8 @@ std::vector<char> SerializeFpsServiceSample(const FpsTelemetrySample& sample) {
 
     FpsServiceResponseHeader payloadHeader;
     payloadHeader.flags = (sample.available ? kFpsServiceFlagAvailable : 0u) |
-                          (sample.permissionRequired ? kFpsServiceFlagPermissionRequired : 0u) |
-                          (sample.fps.has_value() ? kFpsServiceFlagHasFps : 0u);
+        (sample.permissionRequired ? kFpsServiceFlagPermissionRequired : 0u) |
+        (sample.fps.has_value() ? kFpsServiceFlagHasFps : 0u);
     payloadHeader.fps = sample.fps.value_or(0.0);
     payloadHeader.processId = sample.processId;
     payloadHeader.processNameBytes = processNameBytes;

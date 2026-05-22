@@ -36,9 +36,9 @@ struct NetworkCandidateState {
 
 bool AdapterMatchesRow(const IP_ADAPTER_ADDRESSES& adapter, const MIB_IF_ROW2& row) {
     return adapter.Luid.Value == row.InterfaceLuid.Value || adapter.IfIndex == row.InterfaceIndex ||
-           adapter.Ipv6IfIndex == row.InterfaceIndex ||
-           (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
-           (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
+        adapter.Ipv6IfIndex == row.InterfaceIndex ||
+        (adapter.FriendlyName != nullptr && _wcsicmp(adapter.FriendlyName, row.Alias) == 0) ||
+        (adapter.Description != nullptr && _wcsicmp(adapter.Description, row.Description) == 0);
 }
 
 bool HasUsableGateway(const IP_ADAPTER_ADDRESSES& adapter) {
@@ -99,8 +99,8 @@ int PreferredAdapterMatchRank(
         return 2;
     }
     return ContainsInsensitive(alias, preferredAdapterName) || ContainsInsensitive(description, preferredAdapterName)
-               ? 1
-               : 0;
+        ? 1
+        : 0;
 }
 
 bool IsAutomaticNetworkCandidatePreferred(
@@ -109,19 +109,15 @@ bool IsAutomaticNetworkCandidatePreferred(
         return true;
     }
     return (candidate.info.hasGateway && !selected->info.hasGateway) ||
-           (candidate.info.hasGateway == selected->info.hasGateway && candidate.info.hasIpv4 &&
-               !selected->info.hasIpv4) ||
-           (candidate.info.hasGateway == selected->info.hasGateway &&
-               candidate.info.hasIpv4 == selected->info.hasIpv4 && candidate.hardwareInterface &&
-               !selected->hardwareInterface) ||
-           (candidate.info.hasGateway == selected->info.hasGateway &&
-               candidate.info.hasIpv4 == selected->info.hasIpv4 &&
-               candidate.hardwareInterface == selected->hardwareInterface && candidate.connectorPresent &&
-               !selected->connectorPresent) ||
-           (candidate.info.hasGateway == selected->info.hasGateway &&
-               candidate.info.hasIpv4 == selected->info.hasIpv4 &&
-               candidate.hardwareInterface == selected->hardwareInterface &&
-               candidate.connectorPresent == selected->connectorPresent && candidate.traffic > selected->traffic);
+        (candidate.info.hasGateway == selected->info.hasGateway && candidate.info.hasIpv4 && !selected->info.hasIpv4) ||
+        (candidate.info.hasGateway == selected->info.hasGateway && candidate.info.hasIpv4 == selected->info.hasIpv4 &&
+         candidate.hardwareInterface && !selected->hardwareInterface) ||
+        (candidate.info.hasGateway == selected->info.hasGateway && candidate.info.hasIpv4 == selected->info.hasIpv4 &&
+         candidate.hardwareInterface == selected->hardwareInterface && candidate.connectorPresent &&
+         !selected->connectorPresent) ||
+        (candidate.info.hasGateway == selected->info.hasGateway && candidate.info.hasIpv4 == selected->info.hasIpv4 &&
+         candidate.hardwareInterface == selected->hardwareInterface &&
+         candidate.connectorPresent == selected->connectorPresent && candidate.traffic > selected->traffic);
 }
 
 bool HasPreferredNetworkCandidate(
@@ -153,13 +149,15 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
     PMIB_IF_TABLE2 table = nullptr;
     const DWORD tableStatus = GetIfTable2(&table);
     if (tableStatus != NO_ERROR || table == nullptr) {
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("network_table status=%lu table=%s"),
             static_cast<unsigned long>(tableStatus),
             Trace::BoolText(table != nullptr));
         return;
     }
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("network_table status=%lu entries=%lu"),
         static_cast<unsigned long>(tableStatus),
         static_cast<unsigned long>(table->NumEntries));
@@ -167,7 +165,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
     ULONG addressBufferSize = 0;
     const ULONG addressProbeStatus = GetAdaptersAddresses(
         AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, nullptr, &addressBufferSize);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("network_ip_probe status=%lu size=%lu"),
         static_cast<unsigned long>(addressProbeStatus),
         static_cast<unsigned long>(addressBufferSize));
@@ -181,7 +180,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         addressFetchStatus = GetAdaptersAddresses(
             AF_UNSPEC, GAA_FLAG_SKIP_ANYCAST | GAA_FLAG_SKIP_MULTICAST, nullptr, addresses, &addressBufferSize);
     }
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("network_ip_fetch status=%lu size=%lu"),
         static_cast<unsigned long>(addressFetchStatus),
         static_cast<unsigned long>(addressBufferSize));
@@ -233,10 +233,12 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
             continue;
         }
 
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
-            RES_STR("network_candidate interface=%u alias=\"%s\" description=\"%s\" exact_match=%s partial_match=%s "
-                    "matched=%s "
-                    "has_ipv4=%s has_gateway=%s hardware=%s connector=%s traffic=%llu ip=%s"),
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
+            RES_STR(
+                "network_candidate interface=%u alias=\"%s\" description=\"%s\" exact_match=%s partial_match=%s "
+                "matched=%s "
+                "has_ipv4=%s has_gateway=%s hardware=%s connector=%s traffic=%llu ip=%s"),
             candidateState.interfaceIndex,
             candidateState.alias.c_str(),
             candidateState.description.c_str(),
@@ -270,9 +272,10 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
             if (IsAutomaticNetworkCandidatePreferred(candidateState, selected)) {
                 selectCandidate();
             }
-        } else if (selected == nullptr || configuredExactMatch ||
-                   (candidateState.matchRank == selected->matchRank &&
-                       (candidateState.info.hasGateway || candidateState.info.hasIpv4))) {
+        } else if (
+            selected == nullptr || configuredExactMatch ||
+            (candidateState.matchRank == selected->matchRank &&
+             (candidateState.info.hasGateway || candidateState.info.hasIpv4))) {
             selectCandidate();
             if (configuredExactMatch && (selected->info.hasGateway || selected->info.hasIpv4)) {
                 break;
@@ -281,7 +284,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
     }
 
     if (selected != nullptr) {
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR(
                 "network_selected interface=%u alias=\"%s\" description=\"%s\" has_ipv4=%s has_gateway=%s traffic=%llu "
                 "ip=%s"),
@@ -301,7 +305,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         state.network_.previousOutOctets = selected->outOctets;
         state.network_.previousTick = std::chrono::steady_clock::now();
         if (selected->info.hasIpv4) {
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("network_ip_found interface=%u ip=%s"),
                 selected->interfaceIndex,
                 selected->info.ipAddress.c_str());
@@ -311,8 +316,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         }
     } else {
         state.snapshot_.network.adapterName = state.settings_.selection.preferredAdapterName.empty()
-                                                  ? "Auto"
-                                                  : state.settings_.selection.preferredAdapterName;
+            ? "Auto"
+            : state.settings_.selection.preferredAdapterName;
         state.snapshot_.network.ipAddress = "N/A";
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("network_selected interface=none"));
     }
@@ -335,7 +340,8 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
     selected.InterfaceIndex = state.network_.selectedIndex;
     const DWORD rowStatus = GetIfEntry2(&selected);
     if (rowStatus != NO_ERROR) {
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("network_row status=%lu interface=%lu"),
             static_cast<unsigned long>(rowStatus),
             state.network_.selectedIndex);
@@ -348,25 +354,26 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
             state.snapshot_.network.uploadMbps = 0.0;
             state.snapshot_.network.downloadMbps = 0.0;
         }
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("network_rates skipped=selection_missing interface=%lu"),
             state.network_.selectedIndex);
         return;
     }
 
     state.snapshot_.network.adapterName = state.resolvedSelections_.adapterName.empty()
-                                              ? state.snapshot_.network.adapterName
-                                              : state.resolvedSelections_.adapterName;
+        ? state.snapshot_.network.adapterName
+        : state.resolvedSelections_.adapterName;
     state.snapshot_.network.ipAddress = state.network_.resolvedIpAddress;
     if (!initializeOnly && state.network_.previousTick.time_since_epoch().count() != 0) {
         const double seconds = std::chrono::duration<double>(now - state.network_.previousTick).count();
         if (IsFiniteDouble(seconds) && seconds > 0.0) {
             const uint64_t inDelta = selected.InOctets >= state.network_.previousInOctets
-                                         ? (selected.InOctets - state.network_.previousInOctets)
-                                         : 0;
+                ? (selected.InOctets - state.network_.previousInOctets)
+                : 0;
             const uint64_t outDelta = selected.OutOctets >= state.network_.previousOutOctets
-                                          ? (selected.OutOctets - state.network_.previousOutOctets)
-                                          : 0;
+                ? (selected.OutOctets - state.network_.previousOutOctets)
+                : 0;
             state.snapshot_.network.downloadMbps =
                 FiniteNonNegativeOr((static_cast<double>(inDelta) / seconds) / (1024.0 * 1024.0));
             state.snapshot_.network.uploadMbps =
@@ -375,7 +382,8 @@ void UpdateNetworkMetrics(RealTelemetryCollectorState& state, bool initializeOnl
                 state.snapshot_, RetainedHistoryKey::NetworkUpload, state.snapshot_.network.uploadMbps);
             state.retainedHistoryStore_.PushSample(
                 state.snapshot_, RetainedHistoryKey::NetworkDownload, state.snapshot_.network.downloadMbps);
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR(
                     "network_rates interface=%lu seconds=value=%.3f upload_mbps=value=%.3f download_mbps=value=%.3f"),
                 selected.InterfaceIndex,

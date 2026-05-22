@@ -36,12 +36,14 @@ struct DrawnText {
 class MetricListTestEditArtifacts final : public WidgetEditArtifactRegistrar {
 public:
     void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override {
-        staticAnchors.push_back(LayoutEditAnchorRegion{registration.key,
-            registration.targetRect,
-            registration.anchorRect,
-            registration.anchorRect,
-            0,
-            registration.shape});
+        staticAnchors.push_back(
+            LayoutEditAnchorRegion{
+                registration.key,
+                registration.targetRect,
+                registration.anchorRect,
+                registration.anchorRect,
+                0,
+                registration.shape});
     }
 
     void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration) override {}
@@ -52,7 +54,8 @@ public:
 
     void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey&, const RenderRect&) override {}
 
-    void RegisterStaticTextAnchor(const RenderRect&,
+    void RegisterStaticTextAnchor(
+        const RenderRect&,
         const std::string&,
         TextStyleId,
         const TextLayoutOptions&,
@@ -60,12 +63,14 @@ public:
         std::optional<LayoutEditParameter>,
         LayoutEditTargetOutline) override {}
 
-    void RegisterDynamicTextAnchor(const TextLayoutResult&,
+    void RegisterDynamicTextAnchor(
+        const TextLayoutResult&,
         const LayoutEditAnchorBinding&,
         std::optional<LayoutEditParameter>,
         LayoutEditTargetOutline) override {}
 
-    void RegisterDynamicTextAnchor(const RenderRect&,
+    void RegisterDynamicTextAnchor(
+        const RenderRect&,
         const std::string&,
         TextStyleId,
         const TextLayoutOptions&,
@@ -197,7 +202,8 @@ public:
         return TextLayoutResult{rect};
     }
 
-    void DrawText(const RenderRect& rect,
+    void DrawText(
+        const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
@@ -205,7 +211,8 @@ public:
         drawnTexts.push_back(DrawnText{rect, text, style, color});
     }
 
-    TextLayoutResult DrawTextBlock(const RenderRect& rect,
+    TextLayoutResult DrawTextBlock(
+        const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
@@ -303,7 +310,8 @@ public:
     LayoutEditAnchorBinding MakeMetricTextBinding(
         const WidgetLayout& widget, std::string_view metricId, int anchorId) const override {
         return LayoutEditAnchorBinding{
-            LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            LayoutEditAnchorKey{
+                LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                 LayoutMetricEditKey{std::string(metricId)},
                 anchorId},
             0,
@@ -356,7 +364,8 @@ MetricListWidget BuildGpuFpsMetricListWidget() {
 }
 
 int CountPlusAnchors(const MetricListTestRenderer& renderer) {
-    return static_cast<int>(std::count_if(renderer.editArtifacts.staticAnchors.begin(),
+    return static_cast<int>(std::count_if(
+        renderer.editArtifacts.staticAnchors.begin(),
         renderer.editArtifacts.staticAnchors.end(),
         [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }));
 }
@@ -445,9 +454,10 @@ TEST(MetricListWidget, UsesWarningColorForAdminIndicatorInValueAndAnnotationSlot
     widget.ResolveLayoutState(missingFpsRenderer, layout.rect);
     widget.Draw(missingFpsRenderer, layout, missingFpsSource);
 
-    auto missingFpsIt = std::find_if(missingFpsRenderer.drawnTexts.begin(),
-        missingFpsRenderer.drawnTexts.end(),
-        [](const DrawnText& text) { return text.text == "!admin" && text.style == TextStyleId::Value; });
+    auto missingFpsIt = std::find_if(
+        missingFpsRenderer.drawnTexts.begin(), missingFpsRenderer.drawnTexts.end(), [](const DrawnText& text) {
+            return text.text == "!admin" && text.style == TextStyleId::Value;
+        });
     ASSERT_NE(missingFpsIt, missingFpsRenderer.drawnTexts.end());
     EXPECT_EQ(missingFpsIt->color, RenderColorId::Warning);
 
@@ -459,9 +469,10 @@ TEST(MetricListWidget, UsesWarningColorForAdminIndicatorInValueAndAnnotationSlot
     widget.ResolveLayoutState(missingNameRenderer, layout.rect);
     widget.Draw(missingNameRenderer, layout, missingNameSource);
 
-    auto missingNameIt = std::find_if(missingNameRenderer.drawnTexts.begin(),
-        missingNameRenderer.drawnTexts.end(),
-        [](const DrawnText& text) { return text.text == "!admin" && text.style == TextStyleId::Label; });
+    auto missingNameIt = std::find_if(
+        missingNameRenderer.drawnTexts.begin(), missingNameRenderer.drawnTexts.end(), [](const DrawnText& text) {
+            return text.text == "!admin" && text.style == TextStyleId::Label;
+        });
     ASSERT_NE(missingNameIt, missingNameRenderer.drawnTexts.end());
     EXPECT_EQ(missingNameIt->color, RenderColorId::Warning);
 }

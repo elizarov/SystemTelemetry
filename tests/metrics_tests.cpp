@@ -54,7 +54,8 @@ void AddHistorySeries(SystemSnapshot& snapshot, const std::string& metricRef, st
     snapshot.retainedHistories.push_back(std::move(series));
 }
 
-void AddThroughputHistorySeries(SystemSnapshot& snapshot,
+void AddThroughputHistorySeries(
+    SystemSnapshot& snapshot,
     const std::string& metricRef,
     const std::vector<double>& samples,
     std::initializer_list<double> liveSamples = {},
@@ -67,7 +68,8 @@ void AddThroughputHistorySeries(SystemSnapshot& snapshot,
     snapshot.retainedHistories.push_back(std::move(series));
 }
 
-void AddThroughputHistorySeries(SystemSnapshot& snapshot,
+void AddThroughputHistorySeries(
+    SystemSnapshot& snapshot,
     const std::string& metricRef,
     std::initializer_list<double> samples,
     std::initializer_list<double> liveSamples = {},
@@ -362,7 +364,8 @@ TEST(Metrics, KeepsThroughputGraphScaleStableAsAlternatingSpikeHistoryScrolls) {
 
     for (int scrollStep = 0; scrollStep < 4; ++scrollStep) {
         SystemSnapshot snapshot;
-        AddThroughputHistorySeries(snapshot,
+        AddThroughputHistorySeries(
+            snapshot,
             "network.upload",
             compactSpikeHistory,
             {kSpikeMbps, 0.0, kSpikeMbps, 0.0},
@@ -374,7 +377,8 @@ TEST(Metrics, KeepsThroughputGraphScaleStableAsAlternatingSpikeHistoryScrolls) {
 
         EXPECT_DOUBLE_EQ(upload.history.front(), kAveragedSpikeMbps) << "scroll step " << scrollStep;
         EXPECT_DOUBLE_EQ(upload.maxGraph, kAveragedSpikeMbps) << "scroll step " << scrollStep;
-        EXPECT_DOUBLE_EQ(upload.plotShiftSamples,
+        EXPECT_DOUBLE_EQ(
+            upload.plotShiftSamples,
             static_cast<double>(scrollStep) / static_cast<double>(kThroughputHistorySmoothingSamples))
             << "scroll step " << scrollStep;
     }

@@ -94,7 +94,8 @@ AppConfig BuildEffectiveRuntimeConfig(
 }
 
 std::string FormatMetricDefinitionValue(const MetricDefinitionConfig& definition) {
-    return FormatText("%s,%s,%s",
+    return FormatText(
+        "%s,%s,%s",
         definition.telemetryScale ? "*" : FormatDoubleGeneral(definition.scale).c_str(),
         definition.unit.c_str(),
         definition.label.c_str());

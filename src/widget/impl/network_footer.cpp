@@ -7,7 +7,7 @@ void NetworkFooterWidget::Initialize(const LayoutNodeConfig&) {}
 
 int NetworkFooterWidget::PreferredHeight(const WidgetHost& renderer) const {
     return renderer.Renderer().TextMetrics().footer +
-           (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
+        (std::max)(0, renderer.Renderer().ScaleLogical(renderer.Config().layout.networkFooter.bottomGap));
 }
 
 void NetworkFooterWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widget) const {
@@ -34,12 +34,14 @@ void NetworkFooterWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget,
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(
+        widget.rect,
         text,
         TextStyleId::Footer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
-    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(
+        textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);

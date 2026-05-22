@@ -96,11 +96,13 @@ public:
 private:
     bool PrepareRenderer(
         Renderer& renderer, const DashboardPresentationFrame& frame, DashboardPresentedFrameState& state);
-    bool PresentFrame(Renderer& renderer,
+    bool PresentFrame(
+        Renderer& renderer,
         DashboardAnimationTimeline& timeline,
         DashboardPresentationFrame& frame,
         DashboardPresentedFrameState& presentedState);
-    void DrawFrame(Renderer& renderer,
+    void DrawFrame(
+        Renderer& renderer,
         DashboardAnimationTimeline* timeline,
         const DashboardPresentationFrame& frame,
         DashboardAnimationTimeline::Clock::time_point now) const;
@@ -118,12 +120,14 @@ private:
         std::vector<RenderRect> dirtyRects;
     };
 
-    void DrawFrameDirty(Renderer& renderer,
+    void DrawFrameDirty(
+        Renderer& renderer,
         const DashboardPresentationFrame& frame,
         std::span<const RenderRect> dirtyRects,
         const PreparedDirtyFrame& preparedFrame) const;
 
-    void DrawAnimations(Renderer& renderer,
+    void DrawAnimations(
+        Renderer& renderer,
         DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations,
         int width,
@@ -131,7 +135,8 @@ private:
         std::uint64_t targetVersion) const;
     PreparedDirtyFrame PrepareDirtyFrame(
         DashboardAnimationTimeline* timeline, const DashboardPresentationFrame& frame) const;
-    void AppendPreparedDirtyAnimations(DashboardAnimationTimeline* timeline,
+    void AppendPreparedDirtyAnimations(
+        DashboardAnimationTimeline* timeline,
         const std::vector<DashboardPresentationAnimation>& animations,
         std::uint64_t targetVersion,
         int width,

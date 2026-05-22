@@ -38,7 +38,8 @@ void NormalizeThroughputState(RetainedHistorySeries& history) {
         history.throughputLiveSamples.insert(history.throughputLiveSamples.begin(), 0.0);
     }
     if (history.throughputLiveSamples.size() > kThroughputHistorySmoothingSamples) {
-        history.throughputLiveSamples.erase(history.throughputLiveSamples.begin(),
+        history.throughputLiveSamples.erase(
+            history.throughputLiveSamples.begin(),
             history.throughputLiveSamples.begin() +
                 static_cast<std::ptrdiff_t>(history.throughputLiveSamples.size() - kThroughputHistorySmoothingSamples));
     }

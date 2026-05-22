@@ -96,7 +96,8 @@ std::string BuildLayoutGuideTooltipLine(const AppConfig& config, const LayoutEdi
 
     const LayoutNodeConfig& leftChild = node->children[guide.separatorIndex];
     const LayoutNodeConfig& rightChild = node->children[guide.separatorIndex + 1];
-    return FormatText("[%s] %s = %s(%s:%d, %s:%d)",
+    return FormatText(
+        "[%s] %s = %s(%s:%d, %s:%d)",
         sectionName.c_str(),
         configMember.c_str(),
         node->name.c_str(),
@@ -143,8 +144,8 @@ std::string BuildContainerChildOrderTooltipText(const AppConfig& config, const L
         return {};
     }
     const ResourceStringId descriptionKey = anchor.shape == AnchorShape::HorizontalReorder
-                                                ? RES_STR("layout_edit.container_reorder_horizontal")
-                                                : RES_STR("layout_edit.container_reorder_vertical");
+        ? RES_STR("layout_edit.container_reorder_horizontal")
+        : RES_STR("layout_edit.container_reorder_vertical");
     return TooltipText(*firstLine, FindLocalizedText(descriptionKey));
 }
 
@@ -232,7 +233,7 @@ bool BuildLayoutEditTooltipTextForPayload(
                 }
             }
         } else if (const auto currentColor = FindLayoutEditParameterColorConfigValue(config, *parameter);
-            currentColor.has_value() && *currentColor != nullptr) {
+                   currentColor.has_value() && *currentColor != nullptr) {
             colorExpressionValue = TooltipColorExpression(**currentColor);
         }
     } else if (metricKey.has_value()) {
@@ -273,8 +274,8 @@ bool BuildLayoutEditTooltipTextForPayload(
             return AbortTooltipBuild(errorReason, "missing_node_field");
         }
         const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
-                                           ? FormatText("%s format", EnumToString(nodeFieldKey->widgetClass))
-                                           : std::string(EnumToString(nodeFieldKey->widgetClass));
+            ? FormatText("%s format", EnumToString(nodeFieldKey->widgetClass))
+            : std::string(EnumToString(nodeFieldKey->widgetClass));
         std::string text =
             FormatText("%s = %s", valueLabel.c_str(), ReadLayoutNodeFieldValue(*node, nodeFieldKey->field).c_str());
         AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionResourceKey));

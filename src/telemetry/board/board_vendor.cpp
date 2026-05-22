@@ -29,7 +29,8 @@ public:
         sample_.available = false;
         sample_.diagnostics =
             ResourceStringText(RES_STR("No supported board telemetry provider matches the baseboard manufacturer."));
-        trace_.WriteFmt(TracePrefix::UnsupportedBoard,
+        trace_.WriteFmt(
+            TracePrefix::UnsupportedBoard,
             RES_STR("initialize manufacturer=\"%s\" product=\"%s\""),
             info_.manufacturer.c_str(),
             info_.product.c_str());
@@ -73,7 +74,8 @@ BoardVendorInfo ExtractBoardVendorInfo() {
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
     BoardVendorInfo info = ExtractBoardVendorInfo();
     const BoardVendor vendor = SelectBoardVendor(info);
-    trace.WriteFmt(TracePrefix::BoardVendor,
+    trace.WriteFmt(
+        TracePrefix::BoardVendor,
         RES_STR("create vendor=%s manufacturer=\"%s\" product=\"%s\""),
         BoardVendorName(vendor),
         info.manufacturer.c_str(),

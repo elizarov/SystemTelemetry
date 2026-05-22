@@ -27,7 +27,8 @@ public:
     bool IsLayoutEditModalUiActive() const;
     void ShowContextMenu(
         MenuSource source, POINT screenPoint, const LayoutEditController::TooltipTarget* layoutEditTarget);
-    void InvokeDefaultAction(MenuSource source,
+    void InvokeDefaultAction(
+        MenuSource source,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
     void HandleExitRequest();
@@ -83,7 +84,8 @@ private:
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override;
     bool ApplyColorExpressionPreview(LayoutEditParameter parameter, const std::string& expression) override;
     bool ApplyThemeColorPreview(const ThemeColorEditKey& key, unsigned int value) override;
-    bool ApplyMetricPreview(const LayoutMetricEditKey& key,
+    bool ApplyMetricPreview(
+        const LayoutMetricEditKey& key,
         const std::optional<double>& scale,
         const std::string& unit,
         const std::string& label,
@@ -100,7 +102,8 @@ private:
     void OnLayoutEditDialogCloseRequested() override;
     std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override;
     UINT ResolveDefaultCommand(MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const;
-    void ExecuteCommand(UINT selected,
+    void ExecuteCommand(
+        UINT selected,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
     std::optional<double> PromptCustomScale();

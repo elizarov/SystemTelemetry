@@ -47,7 +47,8 @@ private:
     void DrawGapEditAnchors(const DashboardOverlayState& overlayState, LayoutEditOverlayAffordanceLayer layer) const;
     std::optional<OverlayAffordanceRect> FindHoveredWidgetOutlineRect(const DashboardOverlayState& overlayState) const;
     void DrawDottedHighlightRect(const RenderRect& rect, RenderColorId color, bool active, bool outside = true) const;
-    void DrawDottedAffordanceRect(const DashboardOverlayState& overlayState,
+    void DrawDottedAffordanceRect(
+        const DashboardOverlayState& overlayState,
         LayoutEditOverlayAffordanceLayer layer,
         const RenderRect& rect,
         const std::vector<LayoutEditOverlayOwner>& owners,
@@ -64,10 +65,12 @@ private:
     bool ShouldDrawAffordanceLayer(
         LayoutEditOverlayAffordanceLayer artifactLayer, LayoutEditOverlayAffordanceLayer drawLayer) const;
     bool HasForegroundAffordanceLayer(const DashboardOverlayState& overlayState) const;
-    RenderRect ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+    RenderRect ApplyOverlayDragOffset(
+        const DashboardOverlayState& overlayState,
         const RenderRect& rect,
         const std::vector<LayoutEditOverlayOwner>& owners) const;
-    RenderPoint ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
+    RenderPoint ApplyOverlayDragOffset(
+        const DashboardOverlayState& overlayState,
         RenderPoint point,
         const std::vector<LayoutEditOverlayOwner>& owners) const;
     void ApplyOverlayDragOffset(const DashboardOverlayState& overlayState, LayoutEditAnchorRegion& region) const;

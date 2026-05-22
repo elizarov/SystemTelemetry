@@ -330,7 +330,8 @@ SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
 Handle CreateFpsPipeInstance() {
     LocalMemory securityDescriptor;
     SECURITY_ATTRIBUTES securityAttributes = PipeSecurityAttributes(securityDescriptor);
-    return Handle(CreateNamedPipeA(kFpsServicePipeName,
+    return Handle(CreateNamedPipeA(
+        kFpsServicePipeName,
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
@@ -510,7 +511,8 @@ DWORD InstallOrUpdateFpsService() {
         return GetLastError();
     }
 
-    ServiceHandle service(CreateServiceA(manager.Get(),
+    ServiceHandle service(CreateServiceA(
+        manager.Get(),
         kFpsServiceName,
         kFpsServiceDisplayName,
         kServiceAccess,
@@ -536,7 +538,8 @@ DWORD InstallOrUpdateFpsService() {
         const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
         const bool binaryPathChanged =
             !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
-        if (!ChangeServiceConfigA(service.Get(),
+        if (!ChangeServiceConfigA(
+                service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
                 SERVICE_ERROR_NORMAL,

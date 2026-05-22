@@ -33,7 +33,8 @@ std::string ResolveMappedBoardSensorName(
 void AppendRequestedBoardMetricIndex(
     BoardMetricIndexBySourceName& indexBySourceName, std::string sourceName, size_t index);
 void ResetBoardMetricValues(std::vector<NamedScalarMetric>& metrics);
-void ApplyBoardSensorReadingsToMetrics(const std::vector<BoardSensorReading>& readings,
+void ApplyBoardSensorReadingsToMetrics(
+    const std::vector<BoardSensorReading>& readings,
     const BoardMetricIndexBySourceName& indexBySourceName,
     std::vector<NamedScalarMetric>& metrics);
 std::optional<std::string> ReadRegistryString(HKEY root, const char* subKey, const char* valueName);

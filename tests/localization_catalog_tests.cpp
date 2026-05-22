@@ -8,12 +8,13 @@
 #include "util/localization_catalog.h"
 
 TEST(LocalizationCatalog, ParsesKeyValueLines) {
-    const LocalizationCatalogMap catalog = ParseLocalizationCatalog("# comment\n"
-                                                                    "[config]\n"
-                                                                    "metric_list.label_width = Label width text\n"
-                                                                    "\n"
-                                                                    "[layout_edit]\n"
-                                                                    "section.metrics = Metrics text\n");
+    const LocalizationCatalogMap catalog = ParseLocalizationCatalog(
+        "# comment\n"
+        "[config]\n"
+        "metric_list.label_width = Label width text\n"
+        "\n"
+        "[layout_edit]\n"
+        "section.metrics = Metrics text\n");
 
     ASSERT_EQ(catalog.size(), 2u);
     EXPECT_EQ(catalog.at("config.metric_list.label_width"), "Label width text");
@@ -21,11 +22,11 @@ TEST(LocalizationCatalog, ParsesKeyValueLines) {
 }
 
 TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
-    const LocalizationCatalogMap catalog =
-        ParseLocalizationCatalog("# comment\n"
-                                 "config.metric_list.label_width = Label width text\n"
-                                 "\n"
-                                 "config.gauge.segment_count= Segment count text\n");
+    const LocalizationCatalogMap catalog = ParseLocalizationCatalog(
+        "# comment\n"
+        "config.metric_list.label_width = Label width text\n"
+        "\n"
+        "config.gauge.segment_count= Segment count text\n");
 
     ASSERT_EQ(catalog.size(), 2u);
     EXPECT_EQ(catalog.at("config.metric_list.label_width"), "Label width text");

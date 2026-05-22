@@ -27,7 +27,8 @@ bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const Layou
     if (leftContainer == nullptr || rightContainer == nullptr) {
         return false;
     }
-    return MatchesLayoutContainerEditKey(LayoutContainerEditKey{leftContainer->editCardId, leftContainer->nodePath},
+    return MatchesLayoutContainerEditKey(
+        LayoutContainerEditKey{leftContainer->editCardId, leftContainer->nodePath},
         LayoutContainerEditKey{rightContainer->editCardId, rightContainer->nodePath});
 }
 
@@ -35,7 +36,7 @@ bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const Layou
 
 bool MatchesWidgetIdentity(const LayoutEditWidgetIdentity& left, const LayoutEditWidgetIdentity& right) {
     return left.kind == right.kind && left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
-           left.nodePath == right.nodePath;
+        left.nodePath == right.nodePath;
 }
 
 bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const LayoutEditParameterSubject& right) {
@@ -44,7 +45,7 @@ bool MatchesParameterSubject(const LayoutEditParameterSubject& left, const Layou
 
 bool MatchesLayoutEditGuide(const LayoutEditGuide& left, const LayoutEditGuide& right) {
     return left.axis == right.axis && left.renderCardId == right.renderCardId && left.editCardId == right.editCardId &&
-           left.nodePath == right.nodePath && left.separatorIndex == right.separatorIndex;
+        left.nodePath == right.nodePath && left.separatorIndex == right.separatorIndex;
 }
 
 bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEditGapAnchorKey& right) {
@@ -53,7 +54,7 @@ bool MatchesGapEditAnchorKey(const LayoutEditGapAnchorKey& left, const LayoutEdi
 
 bool MatchesEditableAnchorKey(const LayoutEditAnchorKey& left, const LayoutEditAnchorKey& right) {
     return left.anchorId == right.anchorId && MatchesLayoutEditAnchorSubject(left, right) &&
-           MatchesWidgetIdentity(left.widget, right.widget);
+        MatchesWidgetIdentity(left.widget, right.widget);
 }
 
 bool MatchesWidgetEditGuide(const LayoutEditWidgetGuide& left, const LayoutEditWidgetGuide& right) {
@@ -66,7 +67,7 @@ bool MatchesLayoutContainerEditKey(const LayoutContainerEditKey& left, const Lay
 
 bool MatchesLayoutWeightEditKey(const LayoutWeightEditKey& left, const LayoutWeightEditKey& right) {
     return left.editCardId == right.editCardId && left.nodePath == right.nodePath &&
-           left.separatorIndex == right.separatorIndex;
+        left.separatorIndex == right.separatorIndex;
 }
 
 bool MatchesLayoutMetricEditKey(const LayoutMetricEditKey& left, const LayoutMetricEditKey& right) {
@@ -83,13 +84,13 @@ bool MatchesThemeColorEditKey(const ThemeColorEditKey& left, const ThemeColorEdi
 
 bool MatchesLayoutNodeFieldEditKey(const LayoutNodeFieldEditKey& left, const LayoutNodeFieldEditKey& right) {
     return left.editCardId == right.editCardId && left.nodePath == right.nodePath &&
-           left.widgetClass == right.widgetClass && left.field == right.field;
+        left.widgetClass == right.widgetClass && left.field == right.field;
 }
 
 bool MatchesCardChromeSelectionIdentity(
     const LayoutEditWidgetIdentity& selection, const LayoutEditWidgetIdentity& candidate) {
     return selection.kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
-           candidate.kind == LayoutEditWidgetIdentity::Kind::CardChrome && selection.editCardId == candidate.editCardId;
+        candidate.kind == LayoutEditWidgetIdentity::Kind::CardChrome && selection.editCardId == candidate.editCardId;
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditFocusKey& right) {
@@ -123,13 +124,14 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& left, const LayoutEditF
     const auto* leftContainer = std::get_if<LayoutContainerEditKey>(&left);
     const auto* rightContainer = std::get_if<LayoutContainerEditKey>(&right);
     return leftContainer != nullptr && rightContainer != nullptr &&
-           MatchesLayoutContainerEditKey(*leftContainer, *rightContainer);
+        MatchesLayoutContainerEditKey(*leftContainer, *rightContainer);
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditGuide& guide) {
     const auto* weightKey = std::get_if<LayoutWeightEditKey>(&focusKey);
-    return weightKey != nullptr && MatchesLayoutWeightEditKey(*weightKey,
-                                       LayoutWeightEditKey{guide.editCardId, guide.nodePath, guide.separatorIndex});
+    return weightKey != nullptr &&
+        MatchesLayoutWeightEditKey(
+               *weightKey, LayoutWeightEditKey{guide.editCardId, guide.nodePath, guide.separatorIndex});
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditWidgetGuide& guide) {
@@ -162,7 +164,7 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
     const auto* containerKey = std::get_if<LayoutContainerEditKey>(&focusKey);
     const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
     return containerKey != nullptr && containerOrderKey != nullptr &&
-           MatchesLayoutContainerEditKey(
+        MatchesLayoutContainerEditKey(
                *containerKey, LayoutContainerEditKey{containerOrderKey->editCardId, containerOrderKey->nodePath});
 }
 

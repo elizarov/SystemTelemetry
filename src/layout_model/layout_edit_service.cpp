@@ -84,7 +84,8 @@ bool ApplyGuideAdjacentWeights(
     AppConfig& config, const LayoutEditLayoutTarget& target, size_t separatorIndex, int firstWeight, int secondWeight) {
     bool updated = false;
     if (target.editCardId.empty()) {
-        updated = ApplyAdjacentWeightsToNode(FindLayoutNodeByPath(config.layout.structure.cards, target.nodePath),
+        updated = ApplyAdjacentWeightsToNode(
+            FindLayoutNodeByPath(config.layout.structure.cards, target.nodePath),
             separatorIndex,
             firstWeight,
             secondWeight);

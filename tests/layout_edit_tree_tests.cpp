@@ -124,8 +124,10 @@ AppConfig MakeBaseConfig() {
 TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(MakeBaseConfig(), ReadTemplateText());
 
-    EXPECT_EQ(RootLabels(model),
-        (std::vector<std::string>{"metrics",
+    EXPECT_EQ(
+        RootLabels(model),
+        (std::vector<std::string>{
+            "metrics",
             "colors",
             "fonts",
             "metric_list",
@@ -152,8 +154,10 @@ TEST(LayoutEditTree, PreservesTemplateSectionAndFieldOrderForEditableSections) {
 
     const LayoutEditTreeNode* colors = FindRootNode(model, "colors");
     ASSERT_NE(colors, nullptr);
-    EXPECT_EQ(ChildLabels(*colors),
-        (std::vector<std::string>{"background_color",
+    EXPECT_EQ(
+        ChildLabels(*colors),
+        (std::vector<std::string>{
+            "background_color",
             "foreground_color",
             "icon_color",
             "accent_color",
@@ -261,14 +265,17 @@ TEST(LayoutEditTree, IncludesOnlyReachableCardsInEncounterOrderAndSkipsCycles) {
 TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     AppConfig config;
     config.display.layout = "primary";
-    config.layout.structure.cards = MakeContainerNode("rows",
+    config.layout.structure.cards = MakeContainerNode(
+        "rows",
         {MakeContainerNode("columns", {MakeDashboardCardNode("alpha"), MakeDashboardCardNode("beta")}),
-            MakeDashboardCardNode("gamma")});
-    config.layout.cards.push_back(MakeCard("alpha",
-        MakeContainerNode("rows",
+         MakeDashboardCardNode("gamma")});
+    config.layout.cards.push_back(MakeCard(
+        "alpha",
+        MakeContainerNode(
+            "rows",
             {MakeContainerNode(
                  "columns", {MakeWidgetNode("metric_list"), MakeWidgetNode("gauge"), MakeWidgetNode("text")}),
-                MakeWidgetNode("throughput")})));
+             MakeWidgetNode("throughput")})));
     config.layout.cards.push_back(
         MakeCard("beta", MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})));
     config.layout.cards.push_back(
@@ -283,7 +290,8 @@ TEST(LayoutEditTree, BuildsLayoutAndCardSubtreesFromNestedContainers) {
     ASSERT_TRUE(layoutRoot->children[0].selectionHighlight.has_value());
     ASSERT_TRUE(
         std::holds_alternative<LayoutEditSelectionHighlightSpecial>(*layoutRoot->children[0].selectionHighlight));
-    EXPECT_EQ(std::get<LayoutEditSelectionHighlightSpecial>(*layoutRoot->children[0].selectionHighlight),
+    EXPECT_EQ(
+        std::get<LayoutEditSelectionHighlightSpecial>(*layoutRoot->children[0].selectionHighlight),
         LayoutEditSelectionHighlightSpecial::DashboardBounds);
     EXPECT_EQ(ChildLabels(layoutRoot->children[0]), (std::vector<std::string>{"alpha, beta", "columns, gamma"}));
 
@@ -349,7 +357,8 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     EXPECT_EQ(titleLeaf->memberName, "title");
     EXPECT_EQ(titleLeaf->valueFormat, configschema::ValueFormat::String);
 
-    const LayoutEditTreeLeaf* metricListLeaf = FindLayoutEditTreeLeaf(model,
+    const LayoutEditTreeLeaf* metricListLeaf = FindLayoutEditTreeLeaf(
+        model,
         LayoutEditFocusKey{LayoutNodeFieldEditKey{"alpha", {1}, WidgetClass::MetricList, LayoutNodeField::Parameter}});
     ASSERT_NE(metricListLeaf, nullptr);
     EXPECT_EQ(metricListLeaf->sectionName, "card.alpha");
@@ -365,7 +374,8 @@ TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
 
     const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
 
-    const LayoutEditTreeLeaf* timeFormatLeaf = FindLayoutEditTreeLeaf(model,
+    const LayoutEditTreeLeaf* timeFormatLeaf = FindLayoutEditTreeLeaf(
+        model,
         LayoutEditFocusKey{LayoutNodeFieldEditKey{"time", {0}, WidgetClass::ClockTime, LayoutNodeField::Parameter}});
     ASSERT_NE(timeFormatLeaf, nullptr);
     EXPECT_EQ(timeFormatLeaf->sectionName, "card.time");
@@ -373,7 +383,8 @@ TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
     ASSERT_NE(FindNodeForLeaf(model.roots, timeFormatLeaf), nullptr);
     EXPECT_EQ(FindNodeForLeaf(model.roots, timeFormatLeaf)->label, "clock_time");
 
-    const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(model,
+    const LayoutEditTreeLeaf* dateFormatLeaf = FindLayoutEditTreeLeaf(
+        model,
         LayoutEditFocusKey{LayoutNodeFieldEditKey{"time", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter}});
     ASSERT_NE(dateFormatLeaf, nullptr);
     EXPECT_EQ(dateFormatLeaf->sectionName, "card.time");
@@ -395,7 +406,8 @@ TEST(LayoutEditTree, CollapsesSingleChildContainerPathsInCardTrees) {
     AppConfig config;
     config.display.layout = "primary";
     config.layout.structure.cards = MakeContainerNode("columns", {MakeDashboardCardNode("gpu")});
-    config.layout.cards.push_back(MakeCard("gpu",
+    config.layout.cards.push_back(MakeCard(
+        "gpu",
         MakeContainerNode(
             "rows", {MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeWidgetNode("metric_list")})})));
 

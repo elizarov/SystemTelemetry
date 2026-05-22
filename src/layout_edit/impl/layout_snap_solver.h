@@ -15,7 +15,8 @@ struct SnapCandidate {
 
 using ExtentEvaluator = FunctionRef<bool(int firstWeight, int& extent)>;
 
-bool FindNearestSnapWeight(int currentWeight,
+bool FindNearestSnapWeight(
+    int currentWeight,
     int combinedWeight,
     int threshold,
     const std::vector<SnapCandidate>& candidates,

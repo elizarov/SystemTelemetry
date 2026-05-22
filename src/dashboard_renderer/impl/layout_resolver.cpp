@@ -58,7 +58,8 @@ bool IsContainerChildOrderAnchor(const LayoutEditAnchorRegion& anchor) {
     return std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor.key.subject);
 }
 
-RenderRect ResolveNonOverlappingEdgeAnchorRect(const RenderRect& childRect,
+RenderRect ResolveNonOverlappingEdgeAnchorRect(
+    const RenderRect& childRect,
     const RenderRect& preferredRect,
     bool horizontal,
     int handleInset,
@@ -97,7 +98,7 @@ RenderRect ResolveNonOverlappingEdgeAnchorRect(const RenderRect& childRect,
 
             const int maxCenterY = childRect.bottom - handleHeight / 2 - handleInset;
             for (int laneOffset = collisionStep; preferredCenter.y + laneOffset <= maxCenterY;
-                laneOffset += collisionStep) {
+                 laneOffset += collisionStep) {
                 if (const auto candidate = tryHorizontalLane(preferredCenter.y + laneOffset); candidate.has_value()) {
                     return *candidate;
                 }
@@ -125,7 +126,7 @@ RenderRect ResolveNonOverlappingEdgeAnchorRect(const RenderRect& childRect,
 
             const int minCenterX = childRect.left + handleWidth / 2 + handleInset;
             for (int laneOffset = collisionStep; preferredCenter.x - laneOffset >= minCenterX;
-                laneOffset += collisionStep) {
+                 laneOffset += collisionStep) {
                 if (const auto candidate = tryVerticalLane(preferredCenter.x - laneOffset); candidate.has_value()) {
                     return *candidate;
                 }
@@ -149,7 +150,8 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
         const int outsideTop = std::max(1, renderer.ScaleLogical(1));
         const int insideWidth = std::max(4, renderer.ScaleLogical(5));
         const int insideHeight = std::max(5, renderer.ScaleLogical(6));
-        return RenderRect{textRect.left - outsideLeft,
+        return RenderRect{
+            textRect.left - outsideLeft,
             textRect.top - outsideTop,
             textRect.left + insideWidth,
             textRect.top - outsideTop + insideHeight};
@@ -157,7 +159,8 @@ RenderRect TextAnchorRectForShape(const DashboardRenderer& renderer, const Rende
 
     const int anchorCenterX = textRect.right;
     const int anchorCenterY = textRect.top;
-    return RenderRect{anchorCenterX - anchorHalf,
+    return RenderRect{
+        anchorCenterX - anchorHalf,
         anchorCenterY - anchorHalf,
         anchorCenterX - anchorHalf + anchorSize,
         anchorCenterY - anchorHalf + anchorSize};
@@ -212,7 +215,8 @@ void DashboardLayoutResolver::RegisterEditableAnchorRegion(
     const int anchorHitInset = registration.shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2))
                                                                         : std::max(4, renderer_.ScaleLogical(5));
     region.anchorHitPadding = anchorHitInset;
-    region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
+    region.anchorHitRect = RenderRect{
+        region.anchorRect.left - anchorHitInset,
         region.anchorRect.top - anchorHitInset,
         region.anchorRect.right + anchorHitInset,
         region.anchorRect.bottom + anchorHitInset};
@@ -247,13 +251,15 @@ void DashboardLayoutResolver::RegisterDynamicEditAnchor(LayoutEditAnchorRegistra
 void DashboardLayoutResolver::RegisterStaticCornerEditAnchor(
     const LayoutEditAnchorKey& key, const RenderRect& targetRect) {
     const int anchorSize = std::max(6, renderer_.Renderer().ScaleLogical(8));
-    RegisterStaticEditAnchor(LayoutEditAnchorRegistration{.key = key,
-        .targetRect = targetRect,
-        .anchorRect =
-            RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
-        .shape = AnchorShape::Wedge,
-        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
-        .targetOutline = LayoutEditTargetOutline::Hidden});
+    RegisterStaticEditAnchor(
+        LayoutEditAnchorRegistration{
+            .key = key,
+            .targetRect = targetRect,
+            .anchorRect =
+                RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
+            .shape = AnchorShape::Wedge,
+            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+            .targetOutline = LayoutEditTargetOutline::Hidden});
 }
 
 void DashboardLayoutResolver::RegisterDynamicCornerEditAnchor(
@@ -262,16 +268,19 @@ void DashboardLayoutResolver::RegisterDynamicCornerEditAnchor(
         return;
     }
     const int anchorSize = std::max(6, renderer_.Renderer().ScaleLogical(8));
-    RegisterDynamicEditAnchor(LayoutEditAnchorRegistration{.key = key,
-        .targetRect = targetRect,
-        .anchorRect =
-            RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
-        .shape = AnchorShape::Wedge,
-        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
-        .targetOutline = LayoutEditTargetOutline::Hidden});
+    RegisterDynamicEditAnchor(
+        LayoutEditAnchorRegistration{
+            .key = key,
+            .targetRect = targetRect,
+            .anchorRect =
+                RenderRect{targetRect.left, targetRect.top, targetRect.left + anchorSize, targetRect.top + anchorSize},
+            .shape = AnchorShape::Wedge,
+            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+            .targetOutline = LayoutEditTargetOutline::Hidden});
 }
 
-void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+void DashboardLayoutResolver::RegisterTextAnchor(
+    std::vector<LayoutEditAnchorRegion>& regions,
     const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
@@ -299,7 +308,8 @@ void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorReg
     RegisterEditableAnchorRegion(regions, registration);
 }
 
-void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
+void DashboardLayoutResolver::RegisterTextAnchor(
+    std::vector<LayoutEditAnchorRegion>& regions,
     const TextLayoutResult& layoutResult,
     const LayoutEditAnchorBinding& editable,
     LayoutEditTargetOutline targetOutline) {
@@ -324,7 +334,8 @@ void DashboardLayoutResolver::RegisterTextAnchor(std::vector<LayoutEditAnchorReg
     RegisterEditableAnchorRegion(regions, registration);
 }
 
-void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
+void DashboardLayoutResolver::RegisterStaticTextAnchor(
+    const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
@@ -338,7 +349,8 @@ void DashboardLayoutResolver::RegisterStaticTextAnchor(const RenderRect& rect,
     }
 }
 
-void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
+void DashboardLayoutResolver::RegisterDynamicTextAnchor(
+    const TextLayoutResult& layoutResult,
     const LayoutEditAnchorBinding& editable,
     std::optional<LayoutEditParameter> colorParameter,
     LayoutEditTargetOutline targetOutline) {
@@ -351,7 +363,8 @@ void DashboardLayoutResolver::RegisterDynamicTextAnchor(const TextLayoutResult& 
     }
 }
 
-void DashboardLayoutResolver::RegisterDynamicTextAnchor(const RenderRect& rect,
+void DashboardLayoutResolver::RegisterDynamicTextAnchor(
+    const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     const TextLayoutOptions& options,
@@ -432,7 +445,8 @@ bool DashboardLayoutResolver::OverlayOwnerMatchesActiveDrag(
     const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
     return std::any_of(owners.begin(), owners.end(), [&](const LayoutEditOverlayOwner& owner) {
         return owner.childIndex == drag.currentIndex &&
-               MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
+            MatchesLayoutContainerEditKey(
+                   LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
                    LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
     });
 }
@@ -461,7 +475,8 @@ bool DashboardLayoutResolver::AnchorMatchesActiveContainerChildDrag(
     }
     const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
     return region.key.anchorId == drag.currentIndex &&
-           MatchesLayoutContainerEditKey(LayoutContainerEditKey{orderKey->editCardId, orderKey->nodePath},
+        MatchesLayoutContainerEditKey(
+               LayoutContainerEditKey{orderKey->editCardId, orderKey->nodePath},
                LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
 }
 
@@ -473,8 +488,8 @@ void DashboardLayoutResolver::TagOverlayAffordanceLayers(const DashboardOverlayS
     const auto tagAnchorRegions = [&](std::vector<LayoutEditAnchorRegion>& regions) {
         for (LayoutEditAnchorRegion& region : regions) {
             const bool foreground = AnchorMatchesActiveMetricListDrag(region, overlayState) ||
-                                    AnchorMatchesActiveContainerChildDrag(region, overlayState) ||
-                                    OverlayOwnerMatchesActiveDrag(region.overlayOwners, overlayState);
+                AnchorMatchesActiveContainerChildDrag(region, overlayState) ||
+                OverlayOwnerMatchesActiveDrag(region.overlayOwners, overlayState);
             region.overlayLayer = foreground ? LayoutEditOverlayAffordanceLayer::Foreground
                                              : LayoutEditOverlayAffordanceLayer::Background;
         }
@@ -510,7 +525,8 @@ void DashboardLayoutResolver::RegisterWidgetEditGuide(LayoutEditWidgetGuide guid
     widgetEditGuides_.push_back(std::move(guide));
 }
 
-void DashboardLayoutResolver::ResolveNodeWidgets(DashboardRenderer& renderer,
+void DashboardLayoutResolver::ResolveNodeWidgets(
+    DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     std::vector<WidgetLayout>& widgets,
@@ -567,11 +583,10 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
         const int hitInset = (std::max)(3, renderer.ScaleLogical(4));
         const int handleInset = (std::max)(2, renderer.ScaleLogical(3));
         const int collisionStep = (std::max)(4, renderer.ScaleLogical(4));
-        const LayoutEditWidgetIdentity widgetIdentity =
-            target.editCardId.empty()
-                ? LayoutEditWidgetIdentity{"", "", target.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
-                : LayoutEditWidgetIdentity{
-                      target.renderCardId, target.editCardId, target.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
+        const LayoutEditWidgetIdentity widgetIdentity = target.editCardId.empty()
+            ? LayoutEditWidgetIdentity{"", "", target.nodePath, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+            : LayoutEditWidgetIdentity{
+                  target.renderCardId, target.editCardId, target.nodePath, LayoutEditWidgetIdentity::Kind::Widget};
         std::vector<RenderRect> occupiedAnchorHitRects;
         occupiedAnchorHitRects.reserve(staticEditableAnchorRegions_.size() + target.childRects.size());
         for (const LayoutEditAnchorRegion& region : staticEditableAnchorRegions_) {
@@ -587,7 +602,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 horizontal ? childRect.left + childRect.Width() / 2 : childRect.right - (handleWidth / 2) - handleInset;
             const int centerY =
                 horizontal ? childRect.top + (handleHeight / 2) + handleInset : childRect.top + childRect.Height() / 2;
-            const RenderRect anchorRect = ResolveNonOverlappingEdgeAnchorRect(childRect,
+            const RenderRect anchorRect = ResolveNonOverlappingEdgeAnchorRect(
+                childRect,
                 MakeCenteredRect(centerX, centerY, handleWidth, handleHeight),
                 horizontal,
                 handleInset,
@@ -598,9 +614,12 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
                 LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath}, static_cast<int>(i)};
             const size_t anchorIndex = staticEditableAnchorRegions_.size();
             RegisterStaticEditAnchor(
-                LayoutEditAnchorRegistration{.key = LayoutEditAnchorKey{widgetIdentity,
-                                                 LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
-                                                 static_cast<int>(i)},
+                LayoutEditAnchorRegistration{
+                    .key =
+                        LayoutEditAnchorKey{
+                            widgetIdentity,
+                            LayoutContainerChildOrderEditKey{target.editCardId, target.nodePath},
+                            static_cast<int>(i)},
                     .targetRect = childRect,
                     .anchorRect = anchorRect,
                     .shape = horizontal ? AnchorShape::HorizontalReorder : AnchorShape::VerticalReorder,
@@ -620,7 +639,8 @@ void DashboardLayoutResolver::BuildStaticEditableAnchors(DashboardRenderer& rend
     }
 }
 
-void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
+void DashboardLayoutResolver::AddLayoutEditGuide(
+    DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     const std::vector<RenderRect>& childRects,
@@ -636,20 +656,19 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     const bool horizontal = node.name == "columns";
     containerChildReorderTargets_.push_back(
         ContainerChildReorderTarget{renderCardId, editCardId, nodePath, horizontal, childRects});
-    const LayoutEditWidgetIdentity gapWidgetIdentity =
-        renderCardId.empty()
-            ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
-            : LayoutEditWidgetIdentity{renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
-    const DashboardRenderer::LayoutEditParameter gapParameter =
-        renderCardId.empty() ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
-                                           : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
-                             : (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap
-                                           : DashboardRenderer::LayoutEditParameter::CardRowGap);
+    const LayoutEditWidgetIdentity gapWidgetIdentity = renderCardId.empty()
+        ? LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome}
+        : LayoutEditWidgetIdentity{renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
+    const DashboardRenderer::LayoutEditParameter gapParameter = renderCardId.empty()
+        ? (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap
+                      : DashboardRenderer::LayoutEditParameter::DashboardRowGap)
+        : (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap
+                      : DashboardRenderer::LayoutEditParameter::CardRowGap);
     const bool gapAnchorAlreadyRegistered =
         std::any_of(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const auto& anchor) {
             return anchor.key.parameter == gapParameter && anchor.key.widget.kind == gapWidgetIdentity.kind &&
-                   anchor.key.widget.renderCardId == gapWidgetIdentity.renderCardId &&
-                   anchor.key.widget.editCardId == gapWidgetIdentity.editCardId;
+                anchor.key.widget.renderCardId == gapWidgetIdentity.renderCardId &&
+                anchor.key.widget.editCardId == gapWidgetIdentity.editCardId;
         });
     if (!gapAnchorAlreadyRegistered) {
         LayoutEditGapAnchor anchor;
@@ -687,10 +706,11 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     childFixedExtents.reserve(node.children.size());
     for (const auto& child : node.children) {
         const DashboardLayoutResolver::ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(renderer, child);
-        childFixedExtents.push_back(!horizontal && childWidget != nullptr &&
-                                            (childWidget->fixedPreferredHeightInRows || childWidget->verticalSpring)
-                                        ? 1u
-                                        : 0u);
+        childFixedExtents.push_back(
+            !horizontal && childWidget != nullptr &&
+                    (childWidget->fixedPreferredHeightInRows || childWidget->verticalSpring)
+                ? 1u
+                : 0u);
     }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
         if (!horizontal && (childFixedExtents[i] || childFixedExtents[i + 1])) {
@@ -794,7 +814,8 @@ const DashboardLayoutResolver::ParsedWidgetInfo* DashboardLayoutResolver::FindPa
     return &parsedWidgetInfoCache_.back().second;
 }
 
-WidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const DashboardRenderer& renderer,
+WidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(
+    const DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     bool instantiateWidget) const {
@@ -813,7 +834,8 @@ WidgetLayout DashboardLayoutResolver::ResolveWidgetLayout(const DashboardRendere
     return widget;
 }
 
-void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
+void DashboardLayoutResolver::ResolveNodeWidgetsInternal(
+    DashboardRenderer& renderer,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     std::vector<WidgetLayout>& widgets,
@@ -825,7 +847,8 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     bool instantiateWidgets) {
     const bool writeTrace = renderer.ShouldWriteRendererTrace();
     if (writeTrace) {
-        renderer.WriteTraceFmt(RES_STR("layout_resolve_node name=\"%s\" weight=%d rect=(%d,%d,%d,%d) children=%zu"),
+        renderer.WriteTraceFmt(
+            RES_STR("layout_resolve_node name=\"%s\" weight=%d rect=(%d,%d,%d,%d) children=%zu"),
             node.name.c_str(),
             node.weight,
             rect.left,
@@ -849,7 +872,8 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
             return;
         }
         if (writeTrace) {
-            renderer.WriteTraceFmt(RES_STR("layout_card_ref id=\"%s\" rect=(%d,%d,%d,%d)"),
+            renderer.WriteTraceFmt(
+                RES_STR("layout_card_ref id=\"%s\" rect=(%d,%d,%d,%d)"),
                 node.name.c_str(),
                 rect.left,
                 rect.top,
@@ -857,7 +881,8 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
                 rect.bottom);
         }
         cardReferenceStack.push_back(node.name);
-        ResolveNodeWidgetsInternal(renderer,
+        ResolveNodeWidgetsInternal(
+            renderer,
             referencedCard->layout,
             rect,
             widgets,
@@ -879,17 +904,19 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         widget.overlayLayer = currentOverlayAffordanceLayer_;
         if (writeTrace) {
             const std::string widgetTypeName = widget.widgetClass != WidgetClass::Unknown
-                                                   ? std::string(EnumToString(widget.widgetClass))
-                                                   : std::string();
+                ? std::string(EnumToString(widget.widgetClass))
+                : std::string();
             if (widgetTypeName.empty()) {
-                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d)"),
+                renderer.WriteTraceFmt(
+                    RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d)"),
                     node.name.c_str(),
                     widget.rect.left,
                     widget.rect.top,
                     widget.rect.right,
                     widget.rect.bottom);
             } else {
-                renderer.WriteTraceFmt(RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d) type=\"%s\""),
+                renderer.WriteTraceFmt(
+                    RES_STR("layout_widget_resolved kind=\"%s\" rect=(%d,%d,%d,%d) type=\"%s\""),
                     node.name.c_str(),
                     widget.rect.left,
                     widget.rect.top,
@@ -907,7 +934,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
                                : renderer.ScaleLogical(renderer.config_.layout.cardStyle.rowGap);
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-                               gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
+        gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
     int reservedPreferred = 0;
     int totalWeight = 0;
     int springWeight = 0;
@@ -1000,7 +1027,8 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
         childPath.push_back(i);
         overlayOwners.push_back(
             LayoutEditOverlayOwner{LayoutContainerChildOrderEditKey{editCardId, nodePath}, static_cast<int>(i)});
-        ResolveNodeWidgetsInternal(renderer,
+        ResolveNodeWidgetsInternal(
+            renderer,
             child,
             childRect,
             widgets,
@@ -1041,7 +1069,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     resolvedLayout_.windowWidth = renderer.WindowWidth();
     resolvedLayout_.windowHeight = renderer.WindowHeight();
 
-    const RenderRect dashboardRect{renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
+    const RenderRect dashboardRect{
+        renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.WindowWidth() - renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin),
         renderer.WindowHeight() - renderer.ScaleLogical(renderer.config_.layout.dashboard.outerMargin)};
@@ -1053,7 +1082,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
     }
 
     if (writeTrace) {
-        renderer.WriteTraceFmt(RES_STR("layout_begin window=%dx%d rect=(%d,%d,%d,%d) cards_root=\"%s\""),
+        renderer.WriteTraceFmt(
+            RES_STR("layout_begin window=%dx%d rect=(%d,%d,%d,%d) cards_root=\"%s\""),
             resolvedLayout_.windowWidth,
             resolvedLayout_.windowHeight,
             dashboardRect.left,
@@ -1083,9 +1113,10 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                                  const RenderRect& rect,
                                  const std::vector<size_t>& nodePath,
                                  std::vector<LayoutEditOverlayOwner>& overlayOwners) {
-        const auto cardIt = std::find_if(renderer.config_.layout.cards.begin(),
-            renderer.config_.layout.cards.end(),
-            [&](const auto& card) { return card.id == node.name; });
+        const auto cardIt = std::find_if(
+            renderer.config_.layout.cards.begin(), renderer.config_.layout.cards.end(), [&](const auto& card) {
+                return card.id == node.name;
+            });
         if (cardIt == renderer.config_.layout.cards.end()) {
             return;
         }
@@ -1105,8 +1136,10 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
 
         if (writeTrace) {
-            renderer.WriteTraceFmt(RES_STR("layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "
-                                           "icon=rect=(%d,%d,%d,%d) content=rect=(%d,%d,%d,%d)"),
+            renderer.WriteTraceFmt(
+                RES_STR(
+                    "layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "
+                    "icon=rect=(%d,%d,%d,%d) content=rect=(%d,%d,%d,%d)"),
                 card.id.c_str(),
                 card.rect.left,
                 card.rect.top,
@@ -1126,7 +1159,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
                 card.chromeLayout.contentRect.bottom);
         }
         std::vector<std::string> cardReferenceStack;
-        ResolveNodeWidgetsInternal(renderer,
+        ResolveNodeWidgetsInternal(
+            renderer,
             cardIt->layout,
             card.chromeLayout.contentRect,
             card.widgets,
@@ -1161,7 +1195,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         }
 
         const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
-                                   gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
+            gap * static_cast<int>((std::max)(static_cast<size_t>(0), node.children.size() - 1));
         int remainingAvailable = totalAvailable;
         int cursor = horizontal ? rect.left : rect.top;
         int remainingWeight = totalWeight;
@@ -1172,8 +1206,8 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             const auto& child = node.children[i];
             const int childWeight = (std::max)(1, child.weight);
             const int size = (i + 1 == node.children.size())
-                                 ? ((horizontal ? rect.right : rect.bottom) - cursor)
-                                 : (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
+                ? ((horizontal ? rect.right : rect.bottom) - cursor)
+                : (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
 
             RenderRect childRect = rect;
             if (horizontal) {
@@ -1185,8 +1219,10 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
             }
 
             if (writeTrace) {
-                renderer.WriteTraceFmt(RES_STR("layout_dashboard_child parent=\"%s\" child=\"%s\" weight=%d gap=%d "
-                                               "size=%d rect=(%d,%d,%d,%d)"),
+                renderer.WriteTraceFmt(
+                    RES_STR(
+                        "layout_dashboard_child parent=\"%s\" child=\"%s\" weight=%d gap=%d "
+                        "size=%d rect=(%d,%d,%d,%d)"),
                     node.name.c_str(),
                     child.name.c_str(),
                     childWeight,

@@ -8,10 +8,10 @@ bool DashboardOverlayState::ShouldDrawLayoutEditAffordances() const {
         return true;
     }
     return activeLayoutEditGuide.has_value() || hoveredLayoutEditGuide.has_value() || hoveredLayoutCard.has_value() ||
-           hoveredEditableCard.has_value() || hoveredEditableWidget.has_value() || activeWidgetEditGuide.has_value() ||
-           hoveredGapEditAnchor.has_value() || activeGapEditAnchor.has_value() || hoveredEditableAnchor.has_value() ||
-           activeEditableAnchor.has_value() || activeMetricListReorderDrag.has_value() ||
-           activeContainerChildReorderDrag.has_value() || selectedTreeHighlight.has_value();
+        hoveredEditableCard.has_value() || hoveredEditableWidget.has_value() || activeWidgetEditGuide.has_value() ||
+        hoveredGapEditAnchor.has_value() || activeGapEditAnchor.has_value() || hoveredEditableAnchor.has_value() ||
+        activeEditableAnchor.has_value() || activeMetricListReorderDrag.has_value() ||
+        activeContainerChildReorderDrag.has_value() || selectedTreeHighlight.has_value();
 }
 
 bool DashboardOverlayState::IsContainerGuideDragActive() const {
@@ -28,8 +28,8 @@ bool DashboardOverlayState::ShouldRegisterDynamicEditArtifacts() const {
 
 bool DashboardOverlayState::ShouldDrawOverlayLayer() const {
     return moveOverlay.visible || activeMetricListReorderDrag.has_value() ||
-           activeContainerChildReorderDrag.has_value() || ShouldDrawLayoutEditAffordances() ||
-           ShouldDrawSelectedTreeHighlight();
+        activeContainerChildReorderDrag.has_value() || ShouldDrawLayoutEditAffordances() ||
+        ShouldDrawSelectedTreeHighlight();
 }
 
 void DashboardOverlayState::SetPreviewWidget(const LayoutEditWidgetIdentity& widget) {

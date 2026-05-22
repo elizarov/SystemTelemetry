@@ -69,7 +69,8 @@ void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
     };
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;
-    std::string summary = FormatText("end kind=\"%s\" detail=\"%s\" reason=\"%s\" elapsed_ms=%s",
+    std::string summary = FormatText(
+        "end kind=\"%s\" detail=\"%s\" reason=\"%s\" elapsed_ms=%s",
         kind_.c_str(),
         detail_.c_str(),
         reason,

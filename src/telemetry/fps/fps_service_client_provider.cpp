@@ -159,8 +159,9 @@ public:
             unavailable.processId = cachedSample_->processId;
             unavailable.processName = cachedSample_->processName;
         }
-        trace_.WriteLazy(TracePrefix::FpsServiceClient,
-            [&] { return FormatText("sample_failed diagnostics=\"%s\"", unavailable.diagnostics.c_str()); });
+        trace_.WriteLazy(TracePrefix::FpsServiceClient, [&] {
+            return FormatText("sample_failed diagnostics=\"%s\"", unavailable.diagnostics.c_str());
+        });
         return unavailable;
     }
 

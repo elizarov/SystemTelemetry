@@ -37,8 +37,8 @@ bool DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(
     DashboardRenderer& renderer, DashboardPresentationFrame frame) {
     renderer.lastError_.clear();
     const bool published = renderer.presentationHwnd_ == nullptr
-                               ? renderer.presentation_->PresentFrameSynchronously(std::move(frame))
-                               : renderer.presentation_->PublishFrame(std::move(frame));
+        ? renderer.presentation_->PresentFrameSynchronously(std::move(frame))
+        : renderer.presentation_->PublishFrame(std::move(frame));
     if (!published) {
         renderer.lastError_ = renderer.presentation_->LastError();
     }

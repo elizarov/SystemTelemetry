@@ -110,7 +110,8 @@ struct LayoutNodeFieldEditKey {
     LayoutNodeField field = LayoutNodeField::Parameter;
 };
 
-LayoutNodeFieldEditKey MakeLayoutNodeFieldEditKey(const LayoutEditWidgetIdentity& widget,
+LayoutNodeFieldEditKey MakeLayoutNodeFieldEditKey(
+    const LayoutEditWidgetIdentity& widget,
     WidgetClass widgetClass,
     LayoutNodeField field = LayoutNodeField::Parameter);
 
@@ -170,7 +171,8 @@ struct LayoutEditGuide {
 
 struct LayoutEditAnchorKey {
     LayoutEditWidgetIdentity widget;
-    std::variant<LayoutEditParameter,
+    std::variant<
+        LayoutEditParameter,
         LayoutMetricEditKey,
         LayoutCardTitleEditKey,
         LayoutNodeFieldEditKey,
@@ -179,7 +181,8 @@ struct LayoutEditAnchorKey {
     int anchorId = 0;
 };
 
-LayoutEditAnchorKey MakeLayoutNodeFieldEditAnchorKey(const WidgetLayout& widget,
+LayoutEditAnchorKey MakeLayoutNodeFieldEditAnchorKey(
+    const WidgetLayout& widget,
     WidgetClass widgetClass,
     int anchorId = 0,
     LayoutNodeField field = LayoutNodeField::Parameter);
@@ -287,14 +290,16 @@ using LayoutEditValue = std::variant<std::string, std::vector<std::string>>;
 using TooltipPayload = std::
     variant<LayoutEditGuide, LayoutEditWidgetGuide, LayoutEditGapAnchor, LayoutEditAnchorRegion, LayoutEditColorRegion>;
 
-using LayoutEditFocusKey = std::variant<LayoutEditParameter,
+using LayoutEditFocusKey = std::variant<
+    LayoutEditParameter,
     LayoutWeightEditKey,
     LayoutMetricEditKey,
     LayoutCardTitleEditKey,
     ThemeColorEditKey,
     LayoutNodeFieldEditKey,
     LayoutContainerEditKey>;
-using LayoutEditSelectionHighlight = std::variant<LayoutEditFocusKey,
+using LayoutEditSelectionHighlight = std::variant<
+    LayoutEditFocusKey,
     WidgetClass,
     LayoutContainerEditKey,
     LayoutEditWidgetIdentity,

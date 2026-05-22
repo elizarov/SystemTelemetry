@@ -17,12 +17,14 @@ void ClockTimeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, con
     }
 
     const std::string text = !format_.empty() ? metrics.ResolveClockTime(format_) : std::string();
-    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(
+        widget.rect,
         text,
         TextStyleId::ClockTime,
         RenderColorId::Foreground,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(
+        textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontClockTime, 0, renderer.Config().layout.fonts.clockTime.size),
         WidgetHost::LayoutEditParameter::ColorForeground);

@@ -70,17 +70,17 @@ ConfigParseContext TestConfigParseContext() {
 
 bool IsAnchorHandleKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticEditAnchorHandle ||
-           kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
+        kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
 }
 
 bool IsAnchorTargetKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticEditAnchorTarget ||
-           kind == LayoutEditActiveRegionKind::DynamicEditAnchorTarget;
+        kind == LayoutEditActiveRegionKind::DynamicEditAnchorTarget;
 }
 
 bool IsColorTargetKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticColorTarget ||
-           kind == LayoutEditActiveRegionKind::DynamicColorTarget;
+        kind == LayoutEditActiveRegionKind::DynamicColorTarget;
 }
 
 bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
@@ -89,14 +89,14 @@ bool RectsOverlap(const RenderRect& lhs, const RenderRect& rhs) {
 
 bool MatchesCardRegion(const LayoutEditHoverResolution& hover, const LayoutEditCardRegion& card) {
     return hover.hoveredLayoutCard.has_value() &&
-           hover.hoveredLayoutCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
-           hover.hoveredLayoutCard->editCardId == card.id;
+        hover.hoveredLayoutCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
+        hover.hoveredLayoutCard->editCardId == card.id;
 }
 
 bool MatchesCardHeaderRegion(const LayoutEditHoverResolution& hover, const LayoutEditCardRegion& card) {
     return hover.hoveredEditableCard.has_value() &&
-           hover.hoveredEditableCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
-           hover.hoveredEditableCard->editCardId == card.id;
+        hover.hoveredEditableCard->kind == LayoutEditWidgetIdentity::Kind::CardChrome &&
+        hover.hoveredEditableCard->editCardId == card.id;
 }
 
 bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditActiveRegion& region, RenderPoint point) {
@@ -116,7 +116,7 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
         case LayoutEditActiveRegionKind::WidgetHover:
             if (const auto* widget = LayoutEditActiveRegionPayloadAs<LayoutEditWidgetRegion>(region)) {
                 return hover.hoveredEditableWidget.has_value() &&
-                       MatchesWidgetIdentity(*hover.hoveredEditableWidget, widget->widget);
+                    MatchesWidgetIdentity(*hover.hoveredEditableWidget, widget->widget);
             }
             return false;
         case LayoutEditActiveRegionKind::LayoutWeightGuide:
@@ -128,8 +128,8 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
         case LayoutEditActiveRegionKind::ContainerChildReorderTarget: {
             const auto* target = LayoutEditActiveRegionPayloadAs<LayoutEditContainerChildReorderRegion>(region);
             return target != nullptr && target->childRect.left == region.box.left &&
-                   target->childRect.top == region.box.top && target->childRect.right == region.box.right &&
-                   target->childRect.bottom == region.box.bottom && target->childRect.Contains(point);
+                target->childRect.top == region.box.top && target->childRect.right == region.box.right &&
+                target->childRect.bottom == region.box.bottom && target->childRect.Contains(point);
         }
         case LayoutEditActiveRegionKind::GapHandle:
             if (const LayoutEditGapAnchor* gap = HitTestGapEditAnchor(regions, point); gap != nullptr) {
@@ -201,9 +201,9 @@ std::vector<int> CandidateStarts(int begin, int end) {
 bool HasFourByFourHitBlock(const LayoutEditActiveRegions& regions, const LayoutEditActiveRegion& region) {
     const auto cornersHit = [&](int x, int y) {
         return MatchesRegionHit(regions, region, RenderPoint{x, y}) &&
-               MatchesRegionHit(regions, region, RenderPoint{x + 3, y}) &&
-               MatchesRegionHit(regions, region, RenderPoint{x, y + 3}) &&
-               MatchesRegionHit(regions, region, RenderPoint{x + 3, y + 3});
+            MatchesRegionHit(regions, region, RenderPoint{x + 3, y}) &&
+            MatchesRegionHit(regions, region, RenderPoint{x, y + 3}) &&
+            MatchesRegionHit(regions, region, RenderPoint{x + 3, y + 3});
     };
 
     for (int y : CandidateStarts(region.box.top, region.box.bottom)) {
@@ -396,9 +396,10 @@ TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOver
 
     ASSERT_TRUE(clockRowAnchor.has_value());
     const LayoutEditAnchorRegion& clockRowAnchorValue = *clockRowAnchor;
-    const auto containerAnchor = std::find_if(containerAnchors.begin(),
-        containerAnchors.end(),
-        [&](const auto& anchor) { return anchor.targetRect.Contains(clockRowAnchorValue.anchorRect.Center()); });
+    const auto containerAnchor =
+        std::find_if(containerAnchors.begin(), containerAnchors.end(), [&](const auto& anchor) {
+            return anchor.targetRect.Contains(clockRowAnchorValue.anchorRect.Center());
+        });
     ASSERT_NE(containerAnchor, containerAnchors.end());
 
     EXPECT_FALSE(RectsOverlap(clockRowAnchorValue.anchorRect, containerAnchor->anchorRect));

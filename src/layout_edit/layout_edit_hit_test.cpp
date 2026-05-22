@@ -13,17 +13,17 @@ namespace {
 
 bool IsAnchorHandleKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticEditAnchorHandle ||
-           kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
+        kind == LayoutEditActiveRegionKind::DynamicEditAnchorHandle;
 }
 
 bool IsAnchorTargetKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticEditAnchorTarget ||
-           kind == LayoutEditActiveRegionKind::DynamicEditAnchorTarget;
+        kind == LayoutEditActiveRegionKind::DynamicEditAnchorTarget;
 }
 
 bool IsColorTargetKind(LayoutEditActiveRegionKind kind) {
     return kind == LayoutEditActiveRegionKind::StaticColorTarget ||
-           kind == LayoutEditActiveRegionKind::DynamicColorTarget;
+        kind == LayoutEditActiveRegionKind::DynamicColorTarget;
 }
 
 bool LayoutGuideSnapCandidateLess(const LayoutGuideSnapCandidate& left, const LayoutGuideSnapCandidate& right) {
@@ -92,10 +92,11 @@ bool IsWidgetAffectedByGuide(const LayoutEditWidgetRegion& widget, const LayoutE
         return false;
     }
     return widget.rect.left >= guide.containerRect.left && widget.rect.top >= guide.containerRect.top &&
-           widget.rect.right <= guide.containerRect.right && widget.rect.bottom <= guide.containerRect.bottom;
+        widget.rect.right <= guide.containerRect.right && widget.rect.bottom <= guide.containerRect.bottom;
 }
 
-bool MatchesSimilarityRepresentative(const LayoutEditWidgetRegion& candidate,
+bool MatchesSimilarityRepresentative(
+    const LayoutEditWidgetRegion& candidate,
     LayoutGuideAxis axis,
     const std::string& cardId,
     WidgetClass widgetClass,
@@ -112,7 +113,8 @@ bool MatchesSimilarityRepresentative(const LayoutEditWidgetRegion& candidate,
     return candidate.rect.top == edgeStart && candidate.rect.bottom == edgeEnd;
 }
 
-bool HasPriorTargetType(const std::vector<LayoutEditWidgetRegion>& widgets,
+bool HasPriorTargetType(
+    const std::vector<LayoutEditWidgetRegion>& widgets,
     size_t targetIndex,
     const LayoutEditWidgetIdentity& affectedWidget,
     WidgetClass widgetClass,
@@ -474,13 +476,14 @@ std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
             if (HasPriorTargetType(allWidgets, i, affected.widget, target.widgetClass, guide.axis, targetExtent)) {
                 continue;
             }
-            candidates.push_back(LayoutGuideSnapCandidate{
-                affected.widget,
-                targetExtent,
-                startExtent,
-                std::abs(targetExtent - startExtent),
-                i,
-            });
+            candidates.push_back(
+                LayoutGuideSnapCandidate{
+                    affected.widget,
+                    targetExtent,
+                    startExtent,
+                    std::abs(targetExtent - startExtent),
+                    i,
+                });
         }
     }
 

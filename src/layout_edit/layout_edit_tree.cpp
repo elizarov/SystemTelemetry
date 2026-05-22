@@ -87,7 +87,8 @@ std::string SectionLocationText(std::string_view sectionName) {
 }
 
 std::string MemberLocationText(std::string_view sectionName, std::string_view memberName) {
-    return FormatText("[%.*s] %.*s",
+    return FormatText(
+        "[%.*s] %.*s",
         static_cast<int>(sectionName.size()),
         sectionName.data(),
         static_cast<int>(memberName.size()),
@@ -96,7 +97,8 @@ std::string MemberLocationText(std::string_view sectionName, std::string_view me
 
 std::string ContainerLocationText(
     std::string_view sectionName, std::string_view memberName, std::string_view containerName) {
-    return FormatText("[%.*s] %.*s %.*s(...)",
+    return FormatText(
+        "[%.*s] %.*s %.*s(...)",
         static_cast<int>(sectionName.size()),
         sectionName.data(),
         static_cast<int>(memberName.size()),
@@ -149,7 +151,7 @@ std::string ContainerDescriptionKey(std::string_view containerName) {
 
 bool IsFixedHeightRowChild(const LayoutNodeConfig& node) {
     return node.name == "text" || node.name == "network_footer" || node.name == "vertical_spacer" ||
-           node.name == "clock_time" || node.name == "clock_date";
+        node.name == "clock_time" || node.name == "clock_date";
 }
 
 bool IsVerticalSpringRowChild(const LayoutNodeConfig& node) {
@@ -164,9 +166,9 @@ bool SeparatorIsEditable(const LayoutNodeConfig& node, size_t separatorIndex) {
         return true;
     }
     return !IsFixedHeightRowChild(node.children[separatorIndex]) &&
-           !IsVerticalSpringRowChild(node.children[separatorIndex]) &&
-           !IsFixedHeightRowChild(node.children[separatorIndex + 1]) &&
-           !IsVerticalSpringRowChild(node.children[separatorIndex + 1]);
+        !IsVerticalSpringRowChild(node.children[separatorIndex]) &&
+        !IsFixedHeightRowChild(node.children[separatorIndex + 1]) &&
+        !IsVerticalSpringRowChild(node.children[separatorIndex + 1]);
 }
 
 const LayoutCardConfig* FindCardConfig(const LayoutConfig& layout, std::string_view cardId) {
@@ -187,12 +189,14 @@ bool ContainsString(const std::vector<std::string>& values, const std::string& v
     return false;
 }
 
-void CollectReachableCardLayoutCards(const LayoutConfig& layout,
+void CollectReachableCardLayoutCards(
+    const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
     std::vector<std::string>& recursionStack);
 
-void CollectReachableCardById(const LayoutConfig& layout,
+void CollectReachableCardById(
+    const LayoutConfig& layout,
     const std::string& cardId,
     std::vector<std::string>& orderedCards,
     std::vector<std::string>& recursionStack) {
@@ -213,7 +217,8 @@ void CollectReachableCardById(const LayoutConfig& layout,
     recursionStack.pop_back();
 }
 
-void CollectReachableDashboardCards(const LayoutConfig& layout,
+void CollectReachableDashboardCards(
+    const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
     std::vector<std::string>& recursionStack) {
@@ -229,7 +234,8 @@ void CollectReachableDashboardCards(const LayoutConfig& layout,
     }
 }
 
-void CollectReachableCardLayoutCards(const LayoutConfig& layout,
+void CollectReachableCardLayoutCards(
+    const LayoutConfig& layout,
     const LayoutNodeConfig& node,
     std::vector<std::string>& orderedCards,
     std::vector<std::string>& recursionStack) {
@@ -286,7 +292,8 @@ void MoveLayoutEditTreeNode(LayoutEditTreeNode& target, LayoutEditTreeNode&& sou
     target.children = std::move(source.children);
 }
 
-bool BuildNodeFieldLeaf(const std::string& sectionName,
+bool BuildNodeFieldLeaf(
+    const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const std::vector<size_t>& nodePath,
@@ -305,18 +312,20 @@ bool BuildNodeFieldLeaf(const std::string& sectionName,
     leafNode.label = std::string(descriptor->label);
     leafNode.locationText = MemberLocationText(sectionName, memberName);
     leafNode.descriptionKey = std::string(descriptor->descriptionKey);
-    leafNode.leaf.emplace(LayoutEditTreeLeaf{
-        *key,
-        sectionName,
-        memberName,
-        leafNode.descriptionKey,
-        descriptor->valueFormat,
-    });
+    leafNode.leaf.emplace(
+        LayoutEditTreeLeaf{
+            *key,
+            sectionName,
+            memberName,
+            leafNode.descriptionKey,
+            descriptor->valueFormat,
+        });
     leafNode.selectionHighlight.emplace(leafNode.leaf->focusKey);
     return true;
 }
 
-bool BuildContainerNode(const std::string& sectionName,
+bool BuildContainerNode(
+    const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const LayoutNodeConfig& node,
@@ -364,16 +373,17 @@ bool BuildContainerNode(const std::string& sectionName,
                 "%s, %s", ChildDisplayName(node.children[i]).c_str(), ChildDisplayName(node.children[i + 1]).c_str());
             leafNode.locationText = MemberLocationText(sectionName, memberName);
             leafNode.descriptionKey = "layout_edit.layout_guide";
-            leafNode.leaf.emplace(LayoutEditTreeLeaf{
-                LayoutWeightEditKey{editCardId, nodePath, i},
-                sectionName,
-                memberName,
-                leafNode.descriptionKey,
-                configschema::ValueFormat::Integer,
-                node.name == "columns" ? LayoutGuideAxis::Vertical : LayoutGuideAxis::Horizontal,
-                ChildDisplayName(node.children[i]),
-                ChildDisplayName(node.children[i + 1]),
-            });
+            leafNode.leaf.emplace(
+                LayoutEditTreeLeaf{
+                    LayoutWeightEditKey{editCardId, nodePath, i},
+                    sectionName,
+                    memberName,
+                    leafNode.descriptionKey,
+                    configschema::ValueFormat::Integer,
+                    node.name == "columns" ? LayoutGuideAxis::Vertical : LayoutGuideAxis::Horizontal,
+                    ChildDisplayName(node.children[i]),
+                    ChildDisplayName(node.children[i + 1]),
+                });
             leafNode.selectionHighlight.emplace(leafNode.leaf->focusKey);
             treeNode.children.push_back(std::move(leafNode));
         }
@@ -389,7 +399,8 @@ bool BuildContainerNode(const std::string& sectionName,
     return true;
 }
 
-bool BuildStructureGroup(const std::string& sectionName,
+bool BuildStructureGroup(
+    const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
     const std::optional<LayoutEditSelectionHighlight>& selectionHighlight,
@@ -444,13 +455,14 @@ bool BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& 
             leafNode.label = metricId;
             leafNode.locationText = MemberLocationText(slot.sectionName, metricId);
             leafNode.descriptionKey = "layout_edit.metric_definition";
-            leafNode.leaf.emplace(LayoutEditTreeLeaf{
-                LayoutMetricEditKey{metricId},
-                slot.sectionName,
-                metricId,
-                leafNode.descriptionKey,
-                configschema::ValueFormat::FloatingPoint,
-            });
+            leafNode.leaf.emplace(
+                LayoutEditTreeLeaf{
+                    LayoutMetricEditKey{metricId},
+                    slot.sectionName,
+                    metricId,
+                    leafNode.descriptionKey,
+                    configschema::ValueFormat::FloatingPoint,
+                });
             leafNode.selectionHighlight.emplace(leafNode.leaf->focusKey);
             sectionNode.children.push_back(std::move(leafNode));
         }
@@ -480,13 +492,14 @@ bool BuildStaticSectionNode(const AppConfig& config, const TemplateSectionSlot& 
         leafNode.label = key;
         leafNode.locationText = MemberLocationText(descriptor->sectionName, descriptor->memberName);
         leafNode.descriptionKey = descriptor->configKey;
-        leafNode.leaf.emplace(LayoutEditTreeLeaf{
-            *parameter,
-            descriptor->sectionName,
-            descriptor->memberName,
-            descriptor->configKey,
-            descriptor->valueFormat,
-        });
+        leafNode.leaf.emplace(
+            LayoutEditTreeLeaf{
+                *parameter,
+                descriptor->sectionName,
+                descriptor->memberName,
+                descriptor->configKey,
+                descriptor->valueFormat,
+            });
         leafNode.selectionHighlight.emplace(leafNode.leaf->focusKey);
         sectionNode.children.push_back(std::move(leafNode));
     }
@@ -541,13 +554,14 @@ bool BuildActiveThemeSectionNode(const AppConfig& config, LayoutEditTreeNode& se
         leafNode.label = token;
         leafNode.locationText = MemberLocationText(sectionNode.label, token);
         leafNode.descriptionKey = FormatText("config.theme.%s", token.c_str());
-        leafNode.leaf.emplace(LayoutEditTreeLeaf{
-            ThemeColorEditKey{theme->name, token},
-            sectionNode.label,
-            token,
-            leafNode.descriptionKey,
-            configschema::ValueFormat::ColorHex,
-        });
+        leafNode.leaf.emplace(
+            LayoutEditTreeLeaf{
+                ThemeColorEditKey{theme->name, token},
+                sectionNode.label,
+                token,
+                leafNode.descriptionKey,
+                configschema::ValueFormat::ColorHex,
+            });
         sectionNode.children.push_back(std::move(leafNode));
     }
 
@@ -568,13 +582,14 @@ bool BuildCardSectionNode(const LayoutCardConfig& card, bool includeTitleLeaf, L
         titleLeaf.label = "title";
         titleLeaf.locationText = MemberLocationText(sectionNode.label, "title");
         titleLeaf.descriptionKey = CardMemberDescriptionKey("title");
-        titleLeaf.leaf.emplace(LayoutEditTreeLeaf{
-            LayoutCardTitleEditKey{card.id},
-            sectionNode.label,
-            "title",
-            titleLeaf.descriptionKey,
-            configschema::ValueFormat::String,
-        });
+        titleLeaf.leaf.emplace(
+            LayoutEditTreeLeaf{
+                LayoutCardTitleEditKey{card.id},
+                sectionNode.label,
+                "title",
+                titleLeaf.descriptionKey,
+                configschema::ValueFormat::String,
+            });
         titleLeaf.selectionHighlight.emplace(titleLeaf.leaf->focusKey);
         sectionNode.children.push_back(std::move(titleLeaf));
     }

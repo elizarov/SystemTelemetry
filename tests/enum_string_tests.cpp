@@ -2,9 +2,9 @@
 
 #include "util/enum_string.h"
 
-#define CASEDASH_TEST_ENUM_ITEMS(X)                                                                                    \
-    X(Zero, "zero")                                                                                                    \
-    X(One, "one")                                                                                                      \
+#define CASEDASH_TEST_ENUM_ITEMS(X) \
+    X(Zero, "zero") \
+    X(One, "one") \
     X(Two, "two")
 
 ENUM_STRING_DECLARE(TestEnumStringValue, CASEDASH_TEST_ENUM_ITEMS);

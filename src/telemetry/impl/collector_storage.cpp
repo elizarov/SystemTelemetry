@@ -90,7 +90,8 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         ULARGE_INTEGER totalBytes{};
         const BOOL diskOk = GetDiskFreeSpaceExA(root.c_str(), &freeBytes, &totalBytes, nullptr);
         if (!diskOk || totalBytes.QuadPart == 0) {
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("drive_space label=%s ok=%s total_bytes=%llu"),
                 drive.label.c_str(),
                 Trace::BoolText(diskOk != FALSE),
@@ -121,9 +122,11 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
                 drive.writeMbps = FiniteNonNegativeOr(value.doubleValue / (1024.0 * 1024.0));
             }
         }
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
-            RES_STR("drive_space label=%s total_bytes=%llu free_bytes=%llu used_percent=value=%.1f free_gb=value=%.1f "
-                    "read_status=%ld write_status=%ld read_mbps=value=%.3f write_mbps=value=%.3f"),
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
+            RES_STR(
+                "drive_space label=%s total_bytes=%llu free_bytes=%llu used_percent=value=%.1f free_gb=value=%.1f "
+                "read_status=%ld write_status=%ld read_mbps=value=%.3f write_mbps=value=%.3f"),
             drive.label.c_str(),
             static_cast<unsigned long long>(totalBytes.QuadPart),
             static_cast<unsigned long long>(freeBytes.QuadPart),
@@ -179,7 +182,8 @@ void UpdateStorageThroughput(RealTelemetryCollectorState& state, bool initialize
             state.snapshot_, RetainedHistoryKey::StorageWrite, state.snapshot_.storage.writeMbps);
     }
 
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("storage_rates read_status=%ld write_status=%ld read_mbps=value=%.3f write_mbps=value=%.3f"),
         static_cast<long>(readStatus),
         static_cast<long>(writeStatus),
@@ -195,12 +199,14 @@ void InitializeStorageCollector(RealTelemetryCollectorState& state) {
         TracePrefix::Telemetry, RES_STR("pdh_open storage_query status=%ld"), static_cast<long>(queryStatus));
     const PDH_STATUS readStatus = AddCounterCompat(
         state.storage_.query, "\\PhysicalDisk(_Total)\\Disk Read Bytes/sec", &state.storage_.readCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_add storage_read path=\"\\\\PhysicalDisk(_Total)\\\\Disk Read Bytes/sec\" status=%ld"),
         static_cast<long>(readStatus));
     const PDH_STATUS writeStatus = AddCounterCompat(
         state.storage_.query, "\\PhysicalDisk(_Total)\\Disk Write Bytes/sec", &state.storage_.writeCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
+    state.trace_.WriteFmt(
+        TracePrefix::Telemetry,
         RES_STR("pdh_add storage_write path=\"\\\\PhysicalDisk(_Total)\\\\Disk Write Bytes/sec\" status=%ld"),
         static_cast<long>(writeStatus));
     const PDH_STATUS collectStatus = PdhCollectQueryData(state.storage_.query);
@@ -232,12 +238,14 @@ void ResolveStorageSelection(RealTelemetryCollectorState& state) {
             const std::string writePath = FormatText("\\LogicalDisk(%s)\\Disk Write Bytes/sec", label.c_str());
             const PDH_STATUS readStatus = AddCounterCompat(state.storage_.query, readPath, &counters.readCounter);
             const PDH_STATUS writeStatus = AddCounterCompat(state.storage_.query, writePath, &counters.writeCounter);
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("pdh_add drive_read label=%s path=\"%s\" status=%ld"),
                 label.c_str(),
                 readPath.c_str(),
                 static_cast<long>(readStatus));
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("pdh_add drive_write label=%s path=\"%s\" status=%ld"),
                 label.c_str(),
                 writePath.c_str(),

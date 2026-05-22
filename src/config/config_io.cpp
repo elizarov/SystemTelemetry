@@ -20,7 +20,8 @@ AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParse
 
 bool CanWriteRuntimeConfig(const FilePath& path) {
     if (FileExists(path)) {
-        HANDLE file = CreateFileA(path.string().c_str(),
+        HANDLE file = CreateFileA(
+            path.string().c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             nullptr,
@@ -38,7 +39,8 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     const std::string probeName = FormatText(
         ".config-write-test-%lu-%llu.tmp", GetCurrentProcessId(), static_cast<unsigned long long>(GetTickCount64()));
     const FilePath probePath = parent / probeName;
-    HANDLE probe = CreateFileA(probePath.string().c_str(),
+    HANDLE probe = CreateFileA(
+        probePath.string().c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,

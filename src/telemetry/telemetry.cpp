@@ -226,7 +226,8 @@ bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key) {
     }
 }
 
-std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
+std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
+    const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,

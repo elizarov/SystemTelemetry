@@ -17,12 +17,12 @@ bool IsSeparator(char ch) {
 
 bool IsDrivePrefix(std::string_view path) {
     return path.size() >= 2 && path[1] == ':' &&
-           ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+        ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
 }
 
 bool IsAbsolutePath(std::string_view path) {
     return path.size() >= 2 && IsSeparator(path[0]) && IsSeparator(path[1]) ||
-           path.size() >= 3 && IsDrivePrefix(path) && IsSeparator(path[2]) || !path.empty() && IsSeparator(path[0]);
+        path.size() >= 3 && IsDrivePrefix(path) && IsSeparator(path[2]) || !path.empty() && IsSeparator(path[0]);
 }
 
 std::string QuoteCommandArgument(std::string_view value) {
@@ -505,7 +505,8 @@ std::vector<std::string> ConfigStrings(const JsonValue& config, std::string_view
     return strings;
 }
 
-std::set<std::string> RequireSuffixGroup(const std::map<std::string, std::set<std::string>>& suffixGroups,
+std::set<std::string> RequireSuffixGroup(
+    const std::map<std::string, std::set<std::string>>& suffixGroups,
     std::string_view configPath,
     std::string_view groupName) {
     const auto found = suffixGroups.find(std::string(groupName));

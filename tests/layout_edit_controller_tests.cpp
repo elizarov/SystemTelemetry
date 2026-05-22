@@ -17,7 +17,8 @@ class TestLayoutEditHost : public LayoutEditHost {
 public:
     TestLayoutEditHost() {
         config_.layout.structure.cards.name = "rows";
-        config_.layout.structure.cards.children = {LayoutNodeConfig{.name = "card", .cardReference = true},
+        config_.layout.structure.cards.children = {
+            LayoutNodeConfig{.name = "card", .cardReference = true},
             LayoutNodeConfig{.name = "card", .cardReference = true}};
     }
 
@@ -60,7 +61,8 @@ public:
         return true;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget&,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
+        const LayoutEditLayoutTarget&,
         const std::vector<int>&,
         const LayoutEditWidgetIdentity&,
         LayoutGuideAxis) override {
@@ -83,10 +85,10 @@ public:
 
     void AddContainerChildReorderAnchor(int index, RenderRect childRect, RenderRect anchorRect) {
         LayoutEditAnchorRegion region;
-        region.key =
-            LayoutEditAnchorKey{LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome},
-                LayoutContainerChildOrderEditKey{"", {}},
-                index};
+        region.key = LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome},
+            LayoutContainerChildOrderEditKey{"", {}},
+            index};
         region.targetRect = childRect;
         region.anchorRect = anchorRect;
         region.anchorHitPadding = 4;

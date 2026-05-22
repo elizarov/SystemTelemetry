@@ -19,7 +19,7 @@ COLORREF ColorConfigToColorRef(const ColorConfig& color) {
 
 uint32_t ColorRefToDibPixel(COLORREF color) {
     return static_cast<uint32_t>(GetBValue(color)) | (static_cast<uint32_t>(GetGValue(color)) << 8u) |
-           (static_cast<uint32_t>(GetRValue(color)) << 16u);
+        (static_cast<uint32_t>(GetRValue(color)) << 16u);
 }
 
 struct ThemeTriangleGeometry {
@@ -45,7 +45,7 @@ struct ThemePreviewPixelCacheKey {
 
     bool operator==(const ThemePreviewPixelCacheKey& other) const {
         return width == other.width && height == other.height && dpi == other.dpi && systemFace == other.systemFace &&
-               background == other.background && foreground == other.foreground && accent == other.accent;
+            background == other.background && foreground == other.foreground && accent == other.accent;
     }
 };
 
@@ -96,7 +96,7 @@ void FillThemePreviewPixels(
     const OklabColor foregroundLab = OklabFromColorBytes(ColorBytesFromRgba(theme.foreground.ToRgba()));
     const OklabColor accentLab = OklabFromColorBytes(ColorBytesFromRgba(theme.accent.ToRgba()));
     const double denom = (geometry.topY - geometry.bottomY) * (geometry.leftX - geometry.bottomX) +
-                         (geometry.bottomX - geometry.rightX) * (geometry.topY - geometry.bottomY);
+        (geometry.bottomX - geometry.rightX) * (geometry.topY - geometry.bottomY);
     if (std::abs(denom) < 0.0001) {
         return;
     }
@@ -110,11 +110,11 @@ void FillThemePreviewPixels(
             const double sampleX = x + 0.5;
             const double sampleY = y + 0.5;
             const double backgroundWeight = ((geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-                                                (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)) /
-                                            denom;
+                                             (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)) /
+                denom;
             const double foregroundWeight = ((geometry.bottomY - geometry.topY) * (sampleX - geometry.bottomX) +
-                                                (geometry.leftX - geometry.bottomX) * (sampleY - geometry.bottomY)) /
-                                            denom;
+                                             (geometry.leftX - geometry.bottomX) * (sampleY - geometry.bottomY)) /
+                denom;
             const double accentWeight = 1.0 - backgroundWeight - foregroundWeight;
             if (backgroundWeight < -0.001 || foregroundWeight < -0.001 || accentWeight < -0.001) {
                 continue;
@@ -195,7 +195,8 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     bitmapInfo.bmiHeader.biPlanes = 1;
     bitmapInfo.bmiHeader.biBitCount = 32;
     bitmapInfo.bmiHeader.biCompression = BI_RGB;
-    SetDIBitsToDevice(dc,
+    SetDIBitsToDevice(
+        dc,
         rect.left,
         rect.top,
         static_cast<DWORD>(width),
@@ -213,19 +214,22 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     HPEN guidePen = CreatePen(PS_SOLID, 1, ColorConfigToColorRef(theme.guide));
     HGDIOBJ oldPen = SelectObject(dc, outlinePen);
     HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
-    POINT points[] = {{rect.left + static_cast<LONG>(std::lround(geometry.leftX)),
-                          rect.top + static_cast<LONG>(std::lround(geometry.topY))},
+    POINT points[] = {
+        {rect.left + static_cast<LONG>(std::lround(geometry.leftX)),
+         rect.top + static_cast<LONG>(std::lround(geometry.topY))},
         {rect.left + static_cast<LONG>(std::lround(geometry.rightX)),
-            rect.top + static_cast<LONG>(std::lround(geometry.topY))},
+         rect.top + static_cast<LONG>(std::lround(geometry.topY))},
         {rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),
-            rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
+         rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
     Polygon(dc, points, 3);
     SelectObject(dc, guidePen);
-    MoveToEx(dc,
+    MoveToEx(
+        dc,
         rect.left + static_cast<int>(std::lround(geometry.bottomX)),
         rect.top + static_cast<int>(std::lround(geometry.topY)),
         nullptr);
-    LineTo(dc,
+    LineTo(
+        dc,
         rect.left + static_cast<int>(std::lround(geometry.bottomX)),
         rect.top + static_cast<int>(std::lround(geometry.bottomY)));
     SelectObject(dc, oldBrush);
@@ -238,15 +242,18 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     HFONT oldFont = reinterpret_cast<HFONT>(SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT)));
     const int labelInset = ScaledPreviewPixels(dpi, 2);
     const int labelHeight = std::max(1, geometry.topLabelBand - (labelInset * 2));
-    const RECT topLeftLabel{rect.left,
+    const RECT topLeftLabel{
+        rect.left,
         rect.top + labelInset,
         rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) - 4,
         rect.top + labelInset + labelHeight};
-    const RECT topRightLabel{rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4,
+    const RECT topRightLabel{
+        rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4,
         rect.top + labelInset,
         rect.right,
         rect.top + labelInset + labelHeight};
-    const RECT bottomLabel{rect.left,
+    const RECT bottomLabel{
+        rect.left,
         rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + labelInset,
         rect.right,
         rect.bottom - labelInset};

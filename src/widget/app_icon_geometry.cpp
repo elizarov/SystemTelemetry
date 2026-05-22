@@ -223,9 +223,9 @@ AppIconBitmap RenderAppIconBitmap(const AppConfig& config, int size) {
             for (int sy = 0; sy < kSupersample; ++sy) {
                 for (int sx = 0; sx < kSupersample; ++sx) {
                     const double sampleX = (static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample) *
-                                           256.0 / static_cast<double>(iconSize);
+                        256.0 / static_cast<double>(iconSize);
                     const double sampleY = (static_cast<double>(y) + (static_cast<double>(sy) + 0.5) / kSupersample) *
-                                           256.0 / static_cast<double>(iconSize);
+                        256.0 / static_cast<double>(iconSize);
                     const IconColor sample = RenderSample(sampleX, sampleY, palette);
                     premultipliedR += sample.r * sample.a * kSampleWeight;
                     premultipliedG += sample.g * sample.a * kSampleWeight;

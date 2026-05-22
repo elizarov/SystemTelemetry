@@ -19,7 +19,8 @@ double Milliseconds(std::chrono::nanoseconds elapsed) {
     return std::chrono::duration<double, std::milli>(elapsed).count();
 }
 
-void RecordStats(std::chrono::nanoseconds LayoutGuideSheetPipelineStats::* field,
+void RecordStats(
+    std::chrono::nanoseconds LayoutGuideSheetPipelineStats::* field,
     Clock::time_point start,
     LayoutGuideSheetPipelineStats* stats) {
     if (stats != nullptr) {
@@ -27,7 +28,8 @@ void RecordStats(std::chrono::nanoseconds LayoutGuideSheetPipelineStats::* field
     }
 }
 
-bool BuildLayoutGuideSheetPipelineInputs(DashboardRenderer& renderer,
+bool BuildLayoutGuideSheetPipelineInputs(
+    DashboardRenderer& renderer,
     const SystemSnapshot& snapshot,
     std::vector<LayoutGuideSheetCalloutRequest>& callouts,
     std::vector<std::string>& selectedCardIds,
@@ -82,9 +84,11 @@ void WritePipelineStatsTrace(Trace& trace, const LayoutGuideSheetPipelineStats& 
     const std::string measureText = FormatDoubleFixed(Milliseconds(stats.measure), 3);
     const std::string placementText = FormatDoubleFixed(Milliseconds(stats.placement), 3);
     const std::string drawText = FormatDoubleFixed(Milliseconds(stats.draw), 3);
-    trace.WriteFmt(TracePrefix::Diagnostics,
-        RES_STR("layout_guide_sheet stats selected_cards=%zu callouts=%zu active_regions_ms=%s sheet_plan_ms=%s "
-                "sheet_measure_ms=%s sheet_place_ms=%s sheet_draw_ms=%s"),
+    trace.WriteFmt(
+        TracePrefix::Diagnostics,
+        RES_STR(
+            "layout_guide_sheet stats selected_cards=%zu callouts=%zu active_regions_ms=%s sheet_plan_ms=%s "
+            "sheet_measure_ms=%s sheet_place_ms=%s sheet_draw_ms=%s"),
         stats.selectedCards,
         stats.callouts,
         activeRegionsText.c_str(),
@@ -96,7 +100,8 @@ void WritePipelineStatsTrace(Trace& trace, const LayoutGuideSheetPipelineStats& 
 
 }  // namespace
 
-bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
+bool SaveLayoutGuideSheetPng(
+    const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -107,7 +112,8 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     LayoutGuideSheetPipelineStats* outputStats = stats != nullptr ? stats : &collectedStats;
     *outputStats = {};
     const std::string imagePathText = imagePath.string();
-    trace.WriteFmt(TracePrefix::Diagnostics,
+    trace.WriteFmt(
+        TracePrefix::Diagnostics,
         RES_STR("layout_guide_sheet start path=\"%s\" layout=\"%s\""),
         imagePathText.c_str(),
         config.display.layout.c_str());
@@ -158,7 +164,8 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     return true;
 }
 
-bool RenderLayoutGuideSheetOffscreen(DashboardRenderer& renderer,
+bool RenderLayoutGuideSheetOffscreen(
+    DashboardRenderer& renderer,
     const SystemSnapshot& snapshot,
     std::string* errorText,
     LayoutGuideSheetPipelineStats* stats) {

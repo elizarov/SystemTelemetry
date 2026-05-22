@@ -190,8 +190,8 @@ void ResolveConfiguredColors(AppConfig& config) {
     const RuntimeConfigSectionDescriptor& colorsSection = RequiredSection("colors");
     ResolveColorFieldsInPlace(RuntimeConfigFields(colorsSection), &config.layout.colors, themeLookup);
 
-    const auto guideSheetLookup = [&config, activeTheme, &colorsSection](
-                                      std::string_view name) -> std::optional<ColorConfig> {
+    const auto guideSheetLookup =
+        [&config, activeTheme, &colorsSection](std::string_view name) -> std::optional<ColorConfig> {
         if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
             return themeColor;
         }

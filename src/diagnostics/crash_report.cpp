@@ -26,7 +26,8 @@ constexpr char kWriteBinaryMode[] = "wb";
 std::string CrashReportFileName() {
     SYSTEMTIME time{};
     GetLocalTime(&time);
-    return FormatText("casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
+    return FormatText(
+        "casedash_crash_%04u%02u%02u_%02u%02u%02u_%03u_%lu",
         time.wYear,
         time.wMonth,
         time.wDay,
@@ -60,14 +61,16 @@ std::string ExceptionCodeText(DWORD code) {
 }
 
 std::string PointerText(const void* address) {
-    return FormatText("0x%0*llX",
+    return FormatText(
+        "0x%0*llX",
         static_cast<int>(sizeof(void*) * 2),
         static_cast<unsigned long long>(reinterpret_cast<std::uintptr_t>(address)));
 }
 
 std::string ModulePathForAddress(void* address) {
     HMODULE module = nullptr;
-    if (!GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+    if (!GetModuleHandleExA(
+            GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
             reinterpret_cast<LPCSTR>(address),
             &module)) {
         return {};
@@ -128,7 +131,8 @@ bool WriteMinidump(const FilePath& dumpPath, EXCEPTION_POINTERS* exceptionPointe
     exceptionInfo.ExceptionPointers = exceptionPointers;
     exceptionInfo.ClientPointers = FALSE;
 
-    const BOOL written = MiniDumpWriteDump(GetCurrentProcess(),
+    const BOOL written = MiniDumpWriteDump(
+        GetCurrentProcess(),
         GetCurrentProcessId(),
         dumpFile,
         MiniDumpWithDataSegs,
@@ -157,7 +161,8 @@ void AppendCrashTrace(const FilePath& reportPath, const FilePath& dumpPath, EXCE
     const std::string reportText = reportPath.string();
     const std::string dumpText = dumpPath.string();
     Trace trace(traceFile);
-    trace.WriteFmt(TracePrefix::Crash,
+    trace.WriteFmt(
+        TracePrefix::Crash,
         RES_STR("unhandled_exception code=\"%s\" address=\"%s\" report=\"%s\" minidump=\"%s\""),
         code.c_str(),
         address.c_str(),
