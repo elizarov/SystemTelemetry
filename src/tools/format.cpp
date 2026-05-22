@@ -558,9 +558,38 @@ private:
             ++index;
             ++newlineCount;
         }
+        if (ShouldForwardOriginalBlankSeparatorToPending(newlineCount)) {
+            pendingTokens_.push_back({TokenKind::Newline, "\n"});
+            pendingTokens_.push_back({TokenKind::Newline, "\n"});
+            return;
+        }
         if (ShouldPreserveOriginalBlankSeparator(tokens, index, newlineCount)) {
             EmitOriginalBlankSeparator();
         }
+    }
+
+    bool ShouldForwardOriginalBlankSeparatorToPending(size_t newlineCount) const {
+        if (newlineCount <= 1 || pendingTokens_.empty()) {
+            return false;
+        }
+        return IsInsidePendingLambdaBody();
+    }
+
+    bool IsInsidePendingLambdaBody() const {
+        std::vector<size_t> openGroups;
+        for (size_t index = 0; index < pendingTokens_.size(); ++index) {
+            const Token& token = pendingTokens_[index];
+            if (IsGroupOpen(token.text)) {
+                openGroups.push_back(index);
+            } else if (token.text == ")" || token.text == "]" || token.text == "}") {
+                if (!openGroups.empty()) {
+                    openGroups.pop_back();
+                }
+            }
+        }
+        return std::any_of(openGroups.begin(), openGroups.end(), [this](size_t index) {
+            return pendingTokens_[index].text == "{" && IsLambdaBodyOpenToken(pendingTokens_, index);
+        });
     }
 
     bool ShouldPreserveOriginalBlankSeparator(
@@ -1288,7 +1317,7 @@ private:
         }
         std::string inlineText = prefix + FormatInline(tokens);
         AppendSuffix(inlineText, suffix);
-        if (!ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
+        if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
         }
         if (std::optional<size_t> assignment = FindTopLevelAssignment(tokens)) {
@@ -2084,6 +2113,15 @@ private:
             return false;
         }
         return FindFirstWrappableGroupPair(tokens).has_value() || CanSplitOperatorChain(tokens);
+    }
+
+    bool HasOriginalBlankSeparator(const std::vector<Token>& tokens) const {
+        for (size_t index = 1; index < tokens.size(); ++index) {
+            if (tokens[index - 1].kind == TokenKind::Newline && tokens[index].kind == TokenKind::Newline) {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool HasLineComment(const std::vector<Token>& tokens) const {

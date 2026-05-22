@@ -39,7 +39,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Separate namespace opening lines and namespace closing braces from neighboring declarations with one empty line.
 - Remove trailing whitespace from every line, including comment-only and trailing-comment lines.
 - Preserve the source token sequence except for include sorting. Outside include sorting, the formatter only changes spaces and line breaks, and never adds or removes braces by itself.
-- Preserve one source blank line when it separates already closed declarations or statements at the same structural level. Multiple source blank lines collapse to one. Blank lines at the beginning of a block, class, struct, enum, namespace, or immediately before its closing brace are not preserved.
+- Preserve one source blank line when it separates already closed declarations or statements at the same structural level, including inside function, method, and lambda bodies. Multiple source blank lines collapse to one. Blank lines at the beginning of a block, class, struct, enum, namespace, or immediately before its closing brace are not preserved.
 - Never vertically align tokens, comments, assignments, parameters, ternary arms, or consecutive declarations.
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
 - Do not break string literals, character literals, numeric constants, or comments only to satisfy the line width.

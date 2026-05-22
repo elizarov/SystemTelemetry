@@ -182,9 +182,17 @@ Use(logicalName,sensorName);
 }
 
 const auto noLookup=[](std::string_view)->std::optional<ColorConfig>{return std::nullopt; };
+const auto preserveLambdaSeparator=[](){FirstStep();
+
+
+SecondStep();};
 
 const auto findSectionIndex=[&lines](const std::string& sectionName)->size_t{for(size_t i=0;i<lines.size();++i){if(Trim(lines[i])==sectionName){return i;}}return lines.size();};
 const auto ensureSection=[&lines,&findSectionIndex,shape](const std::string& sectionName)->size_t{const size_t existingIndex=findSectionIndex(sectionName);if(existingIndex<lines.size()){return existingIndex;}return lines.size();};
+const auto ensureSectionAfter=[&lines,&findSectionIndex,shape](const std::string& sectionName,const std::string& afterSectionName)->size_t{const size_t existingIndex=findSectionIndex(sectionName);if(existingIndex<lines.size()){return existingIndex;}
+
+
+const size_t afterIndex=findSectionIndex(afterSectionName);return afterIndex;};
 
 const auto guideSheetLookup=[
 &config,
