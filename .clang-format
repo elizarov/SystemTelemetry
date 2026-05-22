@@ -9,6 +9,7 @@ ContinuationIndentWidth: 4
 
 ColumnLimit: 120
 BreakBeforeBraces: Attach
+BreakBeforeTernaryOperators: false
 NamespaceIndentation: None
 IndentCaseLabels: true
 IndentAccessModifiers: false
@@ -17,7 +18,7 @@ AccessModifierOffset: -4
 PointerAlignment: Left
 ReferenceAlignment: Left
 SpaceBeforeParens: ControlStatements
-AlignAfterOpenBracket: AlwaysBreak
+AlignAfterOpenBracket: DontAlign
 AlignArrayOfStructures: None
 AlignConsecutiveAssignments: None
 AlignConsecutiveBitFields: None
@@ -34,6 +35,9 @@ AlignTrailingComments:
   OverEmptyLines: 0
 BinPackArguments: false
 BinPackParameters: false
+BreakConstructorInitializers: AfterColon
+PackConstructorInitializers: Never
+PenaltyIndentedWhitespace: 100
 PenaltyReturnTypeOnItsOwnLine: 1000000
 
 AllowShortBlocksOnASingleLine: Never

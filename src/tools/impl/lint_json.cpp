@@ -10,7 +10,8 @@ namespace {
 
 class JsonParser {
 public:
-    explicit JsonParser(std::string_view text) : text_(text) {}
+    explicit JsonParser(std::string_view text) :
+        text_(text) {}
 
     JsonValue Parse() {
         SkipWhitespace();
@@ -255,15 +256,25 @@ private:
 
 JsonValue::JsonValue() = default;
 
-JsonValue::JsonValue(bool value) : type_(Type::Bool), boolValue_(value) {}
+JsonValue::JsonValue(bool value) :
+    type_(Type::Bool),
+    boolValue_(value) {}
 
-JsonValue::JsonValue(double value) : type_(Type::Number), numberValue_(value) {}
+JsonValue::JsonValue(double value) :
+    type_(Type::Number),
+    numberValue_(value) {}
 
-JsonValue::JsonValue(std::string value) : type_(Type::String), stringValue_(std::move(value)) {}
+JsonValue::JsonValue(std::string value) :
+    type_(Type::String),
+    stringValue_(std::move(value)) {}
 
-JsonValue::JsonValue(Array value) : type_(Type::Array), arrayValue_(std::move(value)) {}
+JsonValue::JsonValue(Array value) :
+    type_(Type::Array),
+    arrayValue_(std::move(value)) {}
 
-JsonValue::JsonValue(Object value) : type_(Type::Object), objectValue_(std::move(value)) {}
+JsonValue::JsonValue(Object value) :
+    type_(Type::Object),
+    objectValue_(std::move(value)) {}
 
 JsonValue::Type JsonValue::type() const {
     return type_;

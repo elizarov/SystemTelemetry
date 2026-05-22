@@ -114,8 +114,7 @@ std::map<std::string, std::set<std::string>> ParseSuffixGroups(const JsonValue& 
     return groups;
 }
 
-void RequireSingleSuffixGroup(
-    const std::map<std::string, std::set<std::string>>& suffixGroups,
+void RequireSingleSuffixGroup(const std::map<std::string, std::set<std::string>>& suffixGroups,
     std::string_view configPath,
     std::string_view groupName) {
     const std::set<std::string> values = RequireSuffixGroup(suffixGroups, configPath, groupName);
@@ -126,22 +125,18 @@ void RequireSingleSuffixGroup(
 
 void ValidateConfig(const JsonValue& config, const std::map<std::string, std::set<std::string>>& suffixGroups) {
     RequireSuffixGroup(suffixGroups, "scan.suffix_group", config.At("scan").At("suffix_group").AsString());
-    RequireSingleSuffixGroup(
-        suffixGroups,
+    RequireSingleSuffixGroup(suffixGroups,
         "architecture.header_suffix_group",
         config.At("architecture").At("header_suffix_group").AsString());
-    RequireSingleSuffixGroup(
-        suffixGroups,
+    RequireSingleSuffixGroup(suffixGroups,
         "architecture.implementation_suffix_group",
         config.At("architecture").At("implementation_suffix_group").AsString());
     RequireSuffixGroup(
         suffixGroups, "include_style.suffix_group", config.At("include_style").At("suffix_group").AsString());
-    RequireSuffixGroup(
-        suffixGroups,
+    RequireSuffixGroup(suffixGroups,
         "source_dependencies.suffix_group",
         config.At("source_dependencies").At("suffix_group").AsString());
-    RequireSuffixGroup(
-        suffixGroups,
+    RequireSuffixGroup(suffixGroups,
         "source_dependencies.header_suffix_group",
         config.At("source_dependencies").At("header_suffix_group").AsString());
     RequireSuffixGroup(
@@ -274,8 +269,7 @@ std::string TruncateProgressLine(const std::string& prefix, const std::string& r
     return prefix + "..." + relative.substr(relative.size() - (pathBudget - 3));
 }
 
-std::vector<FileRecord> ScanLintInputs(
-    const std::vector<FileEntry>& entries,
+std::vector<FileRecord> ScanLintInputs(const std::vector<FileEntry>& entries,
     const std::string& projectRoot,
     const ScanSettings& settings,
     std::vector<std::unique_ptr<Checker>>& checkers,
@@ -469,8 +463,9 @@ int RunLintCheck(int argc, char** argv) {
         return 2;
     }
 
-    const bool failed =
-        std::any_of(results.begin(), results.end(), [](const CheckResult& result) { return result.Failed(); });
+    const bool failed = std::any_of(results.begin(), results.end(), [](const CheckResult& result) {
+        return result.Failed();
+    });
     const std::vector<Diagnostic> diagnostics = CollectDiagnostics(results);
 
     if (args.reportJson.has_value()) {

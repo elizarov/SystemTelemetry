@@ -8,6 +8,10 @@ param(
     [ValidateSet('all', 'changed', 'staged')]
     [string]$Scope = 'all',
 
+    [string]$TargetFile,
+
+    [switch]$Stdout,
+
     [switch]$Restage
 )
 
@@ -55,11 +59,17 @@ function Resolve-ClangFormatPath {
         return $command.Source
     }
 
-    $devenvCmd = Join-Path $RepoRoot 'devenv.cmd'
-    if ($env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $devenvCmd)) {
-        $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-format.exe" 2>$null | Select-Object -First 1
-        if ($LASTEXITCODE -eq 0 -and $probe) {
-            return $probe.Trim()
+    $scriptRepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    $candidateRoots = @($RepoRoot, $scriptRepoRoot) | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } | Select-Object -Unique
+    foreach ($candidateRoot in $candidateRoots) {
+        $devenvCmd = Join-Path $candidateRoot 'devenv.cmd'
+        if ($env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $devenvCmd)) {
+            $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-format.exe" 2>$null | Select-Object -First 1
+            if ($LASTEXITCODE -eq 0 -and $probe) {
+                return $probe.Trim()
+            }
         }
     }
 
@@ -106,8 +116,7 @@ function Test-EligibleCppPath {
         return $false
     }
     $fileName = [System.IO.Path]::GetFileName($normalizedPath)
-    if ($fileName -eq 'board_gigabyte_siv_bridge.cpp' -or $fileName -eq 'board_msi_center_bridge.cpp' -or
-        $fileName -eq 'board_lenovo_vantage_bridge.cpp') {
+    if ($fileName -eq 'board_gigabyte_siv_bridge.cpp' -or $fileName -eq 'board_msi_center_bridge.cpp') {
         return $false
     }
 
@@ -196,14 +205,208 @@ function Get-StagedCppFiles {
     }
 }
 
+function Get-TargetCppFile {
+    param(
+        [string]$RepoRoot,
+        [string]$RelativePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+        throw '--file requires a non-empty path.'
+    }
+    if ([System.IO.Path]::IsPathRooted($RelativePath)) {
+        throw '--file expects a path relative to --root.'
+    }
+
+    $rootPrefix = [System.IO.Path]::GetFullPath($RepoRoot.TrimEnd('\') + '\')
+    $fullPath = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $RelativePath))
+    if (-not $fullPath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw '--file must stay inside --root.'
+    }
+    if (-not (Test-EligibleCppPath -RepoRoot $RepoRoot -FullPath $fullPath)) {
+        throw ("--file target is not an eligible formatter input: {0}" -f $RelativePath)
+    }
+
+    Get-Item -LiteralPath $fullPath
+}
+
+function Normalize-LineEndings {
+    param(
+        [string]$Text
+    )
+
+    return $Text.Replace("`r`n", "`n").Replace("`r", "`n")
+}
+
+function Convert-ToFileLineEndings {
+    param(
+        [string]$Text
+    )
+
+    return (Normalize-LineEndings -Text $Text).Replace("`n", "`r`n")
+}
+
+function Write-TextFileWithRetry {
+    param(
+        [string]$Path,
+        [string]$Text
+    )
+
+    for ($attempt = 0; $attempt -lt 5; ++$attempt) {
+        try {
+            [System.IO.File]::WriteAllText($Path, $Text, [System.Text.UTF8Encoding]::new($false))
+            return
+        } catch {
+            if ($attempt -eq 4) {
+                throw
+            }
+            Start-Sleep -Milliseconds 100
+        }
+    }
+}
+
+function Get-LeadingSpaceCount {
+    param(
+        [string]$Line
+    )
+
+    $match = [regex]::Match($Line, '^( *)')
+    return $match.Groups[1].Value.Length
+}
+
+function Get-NormalizedIndentLength {
+    param(
+        [int]$Length
+    )
+
+    if (($Length % 4) -eq 0) {
+        return $Length
+    }
+    return [Math]::Max(0, [Math]::Floor(($Length + 2) / 4) * 4)
+}
+
+function Normalize-LeadingIndent {
+    param(
+        [string]$Line
+    )
+
+    if ($Line -notmatch '^( +)\S') {
+        return $Line
+    }
+
+    $leadingSpaceCount = $matches[1].Length
+    $normalizedSpaceCount = Get-NormalizedIndentLength -Length $leadingSpaceCount
+    if ($normalizedSpaceCount -eq $leadingSpaceCount) {
+        return $Line
+    }
+    return (' ' * $normalizedSpaceCount) + $Line.TrimStart()
+}
+
+function Format-ProjectText {
+    param(
+        [string]$Text
+    )
+
+    $normalizedText = Normalize-LineEndings -Text $Text
+    $lines = $normalizedText -split "`n", -1
+    $contentLineCount = $lines.Count
+    $hasTrailingNewline = $false
+    if ($contentLineCount -gt 0 -and $lines[$contentLineCount - 1] -eq '') {
+        $hasTrailingNewline = $true
+        --$contentLineCount
+    }
+
+    $formattedLines = [System.Collections.Generic.List[string]]::new()
+    $pendingTernaryValueIndent = $null
+    for ($i = 0; $i -lt $contentLineCount; ++$i) {
+        $line = $lines[$i]
+        $line = [regex]::Replace($line, '(\S) {2,}\?', '$1 ?')
+        $line = Normalize-LeadingIndent -Line $line
+        $ternaryMatch = [regex]::Match($line, '^(\s*)(.+?)\s+\?\s+(.+?)\s+:\s*$')
+        if ($ternaryMatch.Success -and -not $line.TrimStart().StartsWith('//')) {
+            $indent = $ternaryMatch.Groups[1].Value
+            $condition = $ternaryMatch.Groups[2].Value.TrimEnd()
+            $value = $ternaryMatch.Groups[3].Value.Trim()
+            $valueIndentLength = $indent.Length + 4
+            if ($null -ne $pendingTernaryValueIndent -and $indent.Length -eq $pendingTernaryValueIndent) {
+                $valueIndentLength = $indent.Length
+            }
+            $formattedLines.Add($indent + $condition + ' ?')
+            $formattedLines.Add((' ' * $valueIndentLength) + $value + ' :')
+            $pendingTernaryValueIndent = $valueIndentLength
+            continue
+        }
+
+        if ($null -ne $pendingTernaryValueIndent -and $line.Trim().Length -gt 0) {
+            $leadingSpaceCount = Get-LeadingSpaceCount -Line $line
+            if ($leadingSpaceCount -gt $pendingTernaryValueIndent) {
+                $line = (' ' * $pendingTernaryValueIndent) + $line.TrimStart()
+            }
+            $pendingTernaryValueIndent = $null
+        }
+
+        $formattedLines.Add($line)
+        if ($line.TrimEnd().EndsWith(':') -and $line.Contains('?')) {
+            $pendingTernaryValueIndent = Get-LeadingSpaceCount -Line $line
+        }
+    }
+
+    $result = [string]::Join("`n", $formattedLines)
+    if ($hasTrailingNewline) {
+        $result += "`n"
+    }
+    return $result
+}
+
+function Invoke-ClangFormatText {
+    param(
+        [string]$ClangFormatPath,
+        [System.IO.FileInfo]$File
+    )
+
+    $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+    $startInfo.FileName = $ClangFormatPath
+    $startInfo.Arguments = '"' + $File.FullName.Replace('"', '\"') + '"'
+    $startInfo.RedirectStandardOutput = $true
+    $startInfo.RedirectStandardError = $true
+    $startInfo.UseShellExecute = $false
+    $startInfo.StandardOutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    $startInfo.StandardErrorEncoding = [System.Text.UTF8Encoding]::new($false)
+
+    $process = [System.Diagnostics.Process]::new()
+    $process.StartInfo = $startInfo
+    [void]$process.Start()
+    $stdout = $process.StandardOutput.ReadToEnd()
+    $stderr = $process.StandardError.ReadToEnd()
+    $process.WaitForExit()
+
+    return [pscustomobject]@{
+        ExitCode = $process.ExitCode
+        Stdout = Format-ProjectText -Text $stdout
+        Stderr = $stderr
+    }
+}
+
 function Invoke-FormatFile {
     param(
         [string]$ClangFormatPath,
         [System.IO.FileInfo]$File
     )
 
-    & $ClangFormatPath -i $File.FullName
-    return ($LASTEXITCODE -eq 0)
+    $result = Invoke-ClangFormatText -ClangFormatPath $ClangFormatPath -File $File
+    if ($result.ExitCode -ne 0) {
+        if (-not [string]::IsNullOrWhiteSpace($result.Stderr)) {
+            Write-Error $result.Stderr
+        }
+        return $false
+    }
+
+    $originalText = [System.IO.File]::ReadAllText($File.FullName)
+    $formattedText = Convert-ToFileLineEndings -Text $result.Stdout
+    if ($originalText -ne $formattedText) {
+        Write-TextFileWithRetry -Path $File.FullName -Text $formattedText
+    }
+    return $true
 }
 
 $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
@@ -212,11 +415,22 @@ if (-not $clangFormat) {
     Write-Error 'clang-format.exe was not found. Install the Visual Studio LLVM tools or add clang-format to PATH.'
 }
 
-$files = switch ($Scope) {
-    'all' { @(Get-AllCppFiles -RepoRoot $resolvedRoot) }
-    'changed' { @(Get-ChangedCppFiles -RepoRoot $resolvedRoot) }
-    'staged' { @(Get-StagedCppFiles -RepoRoot $resolvedRoot) }
-    default { throw "Unsupported scope '$Scope'." }
+if ($Stdout -and [string]::IsNullOrWhiteSpace($TargetFile)) {
+    throw '--stdout requires --file.'
+}
+if (-not [string]::IsNullOrWhiteSpace($TargetFile) -and $Scope -eq 'changed') {
+    throw '--file is incompatible with changed scope.'
+}
+
+$files = if (-not [string]::IsNullOrWhiteSpace($TargetFile)) {
+    @(Get-TargetCppFile -RepoRoot $resolvedRoot -RelativePath $TargetFile)
+} else {
+    switch ($Scope) {
+        'all' { @(Get-AllCppFiles -RepoRoot $resolvedRoot) }
+        'changed' { @(Get-ChangedCppFiles -RepoRoot $resolvedRoot) }
+        'staged' { @(Get-StagedCppFiles -RepoRoot $resolvedRoot) }
+        default { throw "Unsupported scope '$Scope'." }
+    }
 }
 
 if ($files.Count -eq 0) {
@@ -226,6 +440,19 @@ if ($files.Count -eq 0) {
     }
 
     Write-Host ("No eligible {0} C++ source files were found." -f $Scope)
+    exit 0
+}
+
+if ($Stdout) {
+    $result = Invoke-ClangFormatText -ClangFormatPath $clangFormat -File $files[0]
+    if ($result.ExitCode -ne 0) {
+        if (-not [string]::IsNullOrWhiteSpace($result.Stderr)) {
+            Write-Error $result.Stderr
+        }
+        exit $result.ExitCode
+    }
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    [Console]::Write($result.Stdout)
     exit 0
 }
 
@@ -245,8 +472,16 @@ foreach ($file in $files) {
             }
         }
     } else {
-        & $clangFormat --dry-run --Werror $file.FullName
-        if ($LASTEXITCODE -ne 0) {
+        $result = Invoke-ClangFormatText -ClangFormatPath $clangFormat -File $file
+        if ($result.ExitCode -ne 0) {
+            if (-not [string]::IsNullOrWhiteSpace($result.Stderr)) {
+                Write-Error $result.Stderr
+            }
+            $failed = $true
+            continue
+        }
+        $originalText = [System.IO.File]::ReadAllText($file.FullName)
+        if ((Normalize-LineEndings -Text $originalText) -ne $result.Stdout) {
             $failed = $true
         }
     }

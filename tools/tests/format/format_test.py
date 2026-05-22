@@ -19,9 +19,10 @@ FORMAT_OPTION_COVERAGE = {
     "UseTab": "bad fixture uses tab indentation and golden output uses spaces",
     "IndentWidth": "namespace, class, control, and block bodies use four-space indentation",
     "TabWidth": "tab-indented bad fixture normalizes to the same four-space grid",
-    "ContinuationIndentWidth": "wrapped parameters and arguments use continuation indentation",
+    "ContinuationIndentWidth": "wrapped parameters, arguments, and conditions use four-space continuation indentation",
     "ColumnLimit": "long declarations, calls, and comments exercise wrapping decisions",
     "BreakBeforeBraces": "namespace, class, function, loop, and switch braces attach",
+    "BreakBeforeTernaryOperators": "long and nested ternary expressions break without padded operator columns",
     "NamespaceIndentation": "namespace contents are not indented",
     "IndentCaseLabels": "switch case labels are indented inside the switch block",
     "IndentAccessModifiers": "class access labels stay outdented from members",
@@ -29,7 +30,7 @@ FORMAT_OPTION_COVERAGE = {
     "PointerAlignment": "pointer declarations and parameters bind the star to the type",
     "ReferenceAlignment": "reference declarations and parameters bind the ampersand to the type",
     "SpaceBeforeParens": "control statements gain a space and function declarations do not",
-    "AlignAfterOpenBracket": "wrapped braced lists, parameters, and arguments start on following lines",
+    "AlignAfterOpenBracket": "wrapped braced lists, parameters, and arguments use continuation indentation instead of column alignment",
     "AlignArrayOfStructures": "table rows are not column-aligned",
     "AlignConsecutiveAssignments": "consecutive assignments keep ordinary spacing",
     "AlignConsecutiveBitFields": "bitfield colons are not column-aligned",
@@ -41,6 +42,9 @@ FORMAT_OPTION_COVERAGE = {
     "AlignTrailingComments": "trailing comments are not column-aligned",
     "BinPackArguments": "long call arguments wrap onto separate continuation lines",
     "BinPackParameters": "long function parameters wrap onto separate continuation lines",
+    "BreakConstructorInitializers": "constructor initializer lists break after the colon",
+    "PackConstructorInitializers": "constructor initializer lists keep one initializer per continuation line",
+    "PenaltyIndentedWhitespace": "long ternary expressions prefer shallow continuation breaks over horizontal alignment",
     "AllowShortBlocksOnASingleLine": "short loop blocks expand across multiple lines",
     "AllowShortCaseLabelsOnASingleLine": "short case labels expand across multiple lines",
     "AllowShortFunctionsOnASingleLine": "non-empty short functions expand and empty functions stay single-line",
@@ -117,6 +121,15 @@ class FormatCommandTests(unittest.TestCase):
             check_result.returncode,
             msg=f"stdout:\n{check_result.stdout}\n\nstderr:\n{check_result.stderr}",
         )
+
+    def test_golden_fixture_uses_project_indentation_constraints(self) -> None:
+        golden_text = read_fixture(GOLDEN_FIXTURE)
+
+        self.assertNotRegex(golden_text, r"\S {2,}\?")
+        for line_number, line in enumerate(golden_text.splitlines(), start=1):
+            match = re.match(r"^( +)\S", line)
+            if match:
+                self.assertEqual(0, len(match.group(1)) % 4, msg=f"line {line_number}: {line}")
 
     def test_bad_fixture_is_rejected_by_check_mode(self) -> None:
         result = run_format("--file", str(BAD_FIXTURE))
