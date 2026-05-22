@@ -278,7 +278,46 @@ __declspec(noinline) bool DashboardController::FinishConfigMutation(
 }
 
 bool DashboardController::ApplyConfiguredWallpaper(Trace& trace) {
-    return ::ApplyConfiguredWallpaper(state_.config, trace);
+    const bool applied = ::ApplyConfiguredWallpaper(NormalizeCommittedDisplayWallpaperConfig(state_.config), trace);
+    if (applied) {
+        RefreshCommittedWallpaperOwner(state_.config);
+    }
+    return applied;
+}
+
+void DashboardController::RefreshCommittedWallpaperOwner(const AppConfig& config) {
+    if (ResolveCommittedDisplayWallpaperOwner(config).has_value()) {
+        state_.committedWallpaperOwnerConfig = config;
+    } else {
+        state_.committedWallpaperOwnerConfig.reset();
+    }
+}
+
+std::optional<AppConfig> DashboardController::CommittedWallpaperConfigToClear(const AppConfig& nextConfig) const {
+    if (!state_.committedWallpaperOwnerConfig.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<DisplayWallpaperOwner> previousOwner =
+        ResolveCommittedDisplayWallpaperOwner(*state_.committedWallpaperOwnerConfig);
+    const std::optional<DisplayWallpaperOwner> nextOwner = ResolveCommittedDisplayWallpaperOwner(nextConfig);
+    if (!ShouldClearCommittedDisplayWallpaper(previousOwner, nextOwner)) {
+        return std::nullopt;
+    }
+    return state_.committedWallpaperOwnerConfig;
+}
+
+bool DashboardController::CommitDisplayWallpaperTransition(
+    const AppConfig& nextConfig, Trace& trace, bool applyNextWallpaper) {
+    const std::optional<AppConfig> previousWallpaperConfig = CommittedWallpaperConfigToClear(nextConfig);
+    const bool nextApplied = !applyNextWallpaper || ::ApplyConfiguredWallpaper(nextConfig, trace);
+    const bool previousCleared = nextApplied && (!previousWallpaperConfig.has_value() ||
+                                                    ClearConfiguredWallpaper(*previousWallpaperConfig, trace));
+    if (!previousCleared) {
+        return false;
+    }
+    RefreshCommittedWallpaperOwner(nextConfig);
+    return true;
 }
 
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
@@ -384,7 +423,9 @@ bool DashboardController::ReloadConfigFromDisk(
         }
         return false;
     }
-    ApplyConfiguredWallpaper(shell.TraceLog());
+    if (!CommitDisplayWallpaperTransition(state_.config, shell.TraceLog(), true)) {
+        return false;
+    }
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
@@ -481,7 +522,7 @@ void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     if (!path.has_value()) {
         return;
     }
-    if (!SaveFullConfig(*path, BuildCurrentConfigForSaving())) {
+    if (!SaveFullConfig(*path, NormalizeCommittedDisplayWallpaperConfig(BuildCurrentConfigForSaving()))) {
         const std::string pathText = path->string();
         shell.ShowError(FormatText("Failed to save full config file:\n%s", pathText.c_str()));
     }
@@ -504,15 +545,14 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
     }
 
     const AppConfig previousConfig = state_.config;
-    const std::optional<TargetMonitorInfo> previousMonitor = FindTargetMonitor(previousConfig.display.monitorName);
     AppConfig updatedConfig = BuildConfiguredDisplayConfig(state_.config, option);
     ApplyResolvedTelemetrySelections(updatedConfig, state_.telemetryUpdate.resolvedSelections);
-    const bool clearPreviousWallpaper = ShouldClearPreviousDisplayWallpaper(previousConfig, previousMonitor, option);
+    const std::optional<AppConfig> previousWallpaperConfig = CommittedWallpaperConfigToClear(updatedConfig);
     if (!::ConfigureDisplay(updatedConfig,
             state_.telemetryUpdate.dump,
             option.targetScale,
             option.writesWallpaper,
-            clearPreviousWallpaper ? &previousConfig : nullptr,
+            previousWallpaperConfig.has_value() ? &*previousWallpaperConfig : nullptr,
             shell.TraceLog(),
             shell.WindowHandle())) {
         shell.ShowError("Failed to configure the selected display.");
@@ -521,6 +561,7 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 
     TraceDisplayPositionUpdate(shell.TraceLog(), "configure_display", previousConfig.display, updatedConfig.display);
     state_.config = std::move(updatedConfig);
+    RefreshCommittedWallpaperOwner(state_.config);
     SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
@@ -894,9 +935,13 @@ void DashboardController::UpdateConfigFromResizePlacement(DashboardShellHost& sh
 
 bool DashboardController::SaveCurrentConfig(DashboardShellHost& shell) {
     const FilePath configPath = GetRuntimeConfigPath();
-    AppConfig config = BuildCurrentConfigForSaving();
+    AppConfig config = NormalizeCommittedDisplayWallpaperConfig(BuildCurrentConfigForSaving());
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
         shell.ShowError(FormatText("Failed to save %s.", configPath.string().c_str()));
+        return false;
+    }
+    if (!CommitDisplayWallpaperTransition(config, shell.TraceLog(), true)) {
+        shell.ShowError("Failed to commit display wallpaper changes.");
         return false;
     }
     state_.config = std::move(config);

@@ -43,8 +43,9 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | explicit scale override | A configured render scale that replaces monitor DPI-derived scale. |
 | target monitor | The configured display selected by `[display] monitor_name`. |
 | placement | The dashboard window position relative to the target monitor. |
-| fullscreen display placement | A `Configure Display` choice that fits the layout to the whole selected display and owns the CaseDash blank wallpaper for that monitor. |
+| fullscreen display placement | A `Configure Display` choice that fits the layout to the whole selected display and commits CaseDash blank wallpaper ownership for that monitor. |
 | edge display placement | A `Configure Display` top, bottom, left, or right choice that fits the layout to one screen edge without owning a wallpaper. |
+| committed wallpaper ownership | The last successful runtime display commit whose non-empty `display.wallpaper` fills a resolved monitor at `(0,0)`; it drives later Windows wallpaper cleanup even if manual move or resize changes the live placement before the next commit. |
 | `Start with Windows` | The user-visible command that manages machine-wide logon startup and the `CashDashService` service. |
 | `Configure Display` | The command that chooses a fullscreen or edge display placement, computes explicit scale and position, and applies CaseDash wallpaper only for fullscreen placements. |
 | `Bring to Front` | The command that raises the dashboard. |

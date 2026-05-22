@@ -62,6 +62,12 @@ struct DisplayPlacementSchematicGeometry {
     bool hasDivider = false;
 };
 
+struct DisplayWallpaperOwner {
+    std::string monitorName;
+    std::string wallpaper;
+    RECT monitorRect{};
+};
+
 bool RectsEqual(const RECT& lhs, const RECT& rhs);
 UINT GetMonitorDpi(HMONITOR monitor);
 double ResolveDisplayScale(const AppConfig& config, UINT dpi);
@@ -85,6 +91,14 @@ AppConfig BuildConfiguredDisplayConfig(const AppConfig& config, const DisplayMen
 bool ShouldClearPreviousDisplayWallpaper(const AppConfig& previousConfig,
     const std::optional<TargetMonitorInfo>& previousMonitor,
     const DisplayMenuOption& option);
+std::optional<DisplayWallpaperOwner> ResolveCommittedDisplayWallpaperOwner(
+    const AppConfig& config, const std::optional<TargetMonitorInfo>& monitor);
+std::optional<DisplayWallpaperOwner> ResolveCommittedDisplayWallpaperOwner(const AppConfig& config);
+AppConfig NormalizeCommittedDisplayWallpaperConfig(
+    const AppConfig& config, const std::optional<TargetMonitorInfo>& monitor);
+AppConfig NormalizeCommittedDisplayWallpaperConfig(const AppConfig& config);
+bool ShouldClearCommittedDisplayWallpaper(
+    const std::optional<DisplayWallpaperOwner>& previousOwner, const std::optional<DisplayWallpaperOwner>& nextOwner);
 size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* options, size_t capacity);
 std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedName);
 MonitorPlacementInfo GetMonitorPlacementForRect(const RECT& screenRect, double configuredScale = 0.0);

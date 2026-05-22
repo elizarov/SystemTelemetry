@@ -18,6 +18,7 @@ struct DashboardSessionState {
     TelemetryUpdate telemetryUpdate;
     std::unique_ptr<DiagnosticsSession> diagnostics;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput{};
+    std::optional<AppConfig> committedWallpaperOwnerConfig;
     UINT currentDpi = kDefaultDpi;
     bool placementWatchActive = false;
     bool isMoving = false;
@@ -123,6 +124,7 @@ public:
     void UpdateConfigFromMovePlacement(DashboardShellHost& shell);
     void UpdateConfigFromResizePlacement(DashboardShellHost& shell);
     bool SaveCurrentConfig(DashboardShellHost& shell);
+    bool ApplyConfiguredWallpaper(Trace& trace);
 
 private:
     void BeginLayoutEditSessionTracking();
@@ -131,7 +133,9 @@ private:
     void MarkLayoutEditSessionSaved();
     void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides, bool refreshThemedIcons = true);
     __declspec(noinline) bool FinishConfigMutation(DashboardShellHost& shell, bool refreshThemedIcons = true);
-    bool ApplyConfiguredWallpaper(Trace& trace);
+    void RefreshCommittedWallpaperOwner(const AppConfig& config);
+    std::optional<AppConfig> CommittedWallpaperConfigToClear(const AppConfig& nextConfig) const;
+    bool CommitDisplayWallpaperTransition(const AppConfig& nextConfig, Trace& trace, bool applyNextWallpaper);
 
     DashboardSessionState state_{};
 };

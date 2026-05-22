@@ -154,7 +154,7 @@ bool SetConfiguredMonitorWallpaper(const AppConfig& config,
 }  // namespace
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
-    if (config.display.wallpaper.empty()) {
+    if (!ResolveCommittedDisplayWallpaperOwner(config).has_value()) {
         return true;
     }
 

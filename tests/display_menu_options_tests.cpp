@@ -21,12 +21,31 @@ RECT MakeRect(int width, int height) {
     return RECT{0, 0, width, height};
 }
 
+RECT MakeRectAt(int left, int top, int width, int height) {
+    return RECT{left, top, left + width, top + height};
+}
+
 DisplayMenuMonitorInfo MakeMonitor(int width, int height) {
     return DisplayMenuMonitorInfo{"Panel", "Panel", MakeRect(width, height), USER_DEFAULT_SCREEN_DPI};
 }
 
 TargetMonitorInfo MakeTargetMonitor(int width, int height) {
     return TargetMonitorInfo{MakeRect(width, height), USER_DEFAULT_SCREEN_DPI};
+}
+
+TargetMonitorInfo MakeTargetMonitorAt(int left, int top, int width, int height) {
+    return TargetMonitorInfo{MakeRectAt(left, top, width, height), USER_DEFAULT_SCREEN_DPI};
+}
+
+AppConfig MakeFullscreenWallpaperConfig(
+    const std::string& monitorName, int layoutWidth, int layoutHeight, const TargetMonitorInfo& monitor) {
+    AppConfig config = MakeDisplayConfig(layoutWidth, layoutHeight);
+    config.display.monitorName = monitorName;
+    config.display.wallpaper = kDefaultBlankWallpaperFileName;
+    config.display.position = LogicalPointConfig{};
+    config.display.scale = ComputeMonitorFittedScale(
+        config, monitor.rect.right - monitor.rect.left, monitor.rect.bottom - monitor.rect.top);
+    return config;
 }
 
 DisplayMenuOption MakeSchematicOption(
@@ -287,19 +306,96 @@ TEST(DisplayConfiguration, EdgeConfigClearsWallpaperValue) {
 }
 
 TEST(DisplayConfiguration, PreviousWallpaperClearRequestsFollowPlacementAndMonitor) {
-    AppConfig previous = MakeDisplayConfig(1600, 900);
-    previous.display.wallpaper = kDefaultBlankWallpaperFileName;
+    const TargetMonitorInfo previousMonitor = MakeTargetMonitor(1920, 1080);
+    AppConfig previous = MakeFullscreenWallpaperConfig("Panel", 1600, 900, previousMonitor);
 
     DisplayMenuOption fullscreenOption;
     fullscreenOption.writesWallpaper = true;
     fullscreenOption.monitorRect = MakeRect(1920, 1080);
-    EXPECT_FALSE(ShouldClearPreviousDisplayWallpaper(previous, MakeTargetMonitor(1920, 1080), fullscreenOption));
-    EXPECT_TRUE(ShouldClearPreviousDisplayWallpaper(previous, MakeTargetMonitor(1200, 1000), fullscreenOption));
+    EXPECT_FALSE(ShouldClearPreviousDisplayWallpaper(previous, previousMonitor, fullscreenOption));
+    EXPECT_TRUE(
+        ShouldClearPreviousDisplayWallpaper(previous, MakeTargetMonitorAt(1920, 0, 1920, 1080), fullscreenOption));
 
     DisplayMenuOption edgeOption = fullscreenOption;
     edgeOption.writesWallpaper = false;
-    EXPECT_TRUE(ShouldClearPreviousDisplayWallpaper(previous, MakeTargetMonitor(1920, 1080), edgeOption));
+    EXPECT_TRUE(ShouldClearPreviousDisplayWallpaper(previous, previousMonitor, edgeOption));
 
     previous.display.wallpaper.clear();
-    EXPECT_FALSE(ShouldClearPreviousDisplayWallpaper(previous, MakeTargetMonitor(1200, 1000), fullscreenOption));
+    EXPECT_FALSE(ShouldClearPreviousDisplayWallpaper(previous, previousMonitor, fullscreenOption));
+}
+
+TEST(DisplayWallpaperOwnership, FullscreenConfigResolvesAsOwner) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1920, 1080);
+    const AppConfig config = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+
+    const std::optional<DisplayWallpaperOwner> owner = ResolveCommittedDisplayWallpaperOwner(config, monitor);
+
+    ASSERT_TRUE(owner.has_value());
+    EXPECT_EQ(owner->monitorName, "Panel");
+    EXPECT_EQ(owner->wallpaper, kDefaultBlankWallpaperFileName);
+    EXPECT_TRUE(RectsEqual(owner->monitorRect, monitor.rect));
+}
+
+TEST(DisplayWallpaperOwnership, MovedOrResizedWallpaperConfigIsNotOwner) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1920, 1080);
+    AppConfig moved = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+    moved.display.position = LogicalPointConfig{1, 0};
+
+    AppConfig resized = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+    resized.display.scale = 1.0;
+
+    EXPECT_FALSE(ResolveCommittedDisplayWallpaperOwner(moved, monitor).has_value());
+    EXPECT_TRUE(NormalizeCommittedDisplayWallpaperConfig(moved, monitor).display.wallpaper.empty());
+    EXPECT_FALSE(ResolveCommittedDisplayWallpaperOwner(resized, monitor).has_value());
+    EXPECT_TRUE(NormalizeCommittedDisplayWallpaperConfig(resized, monitor).display.wallpaper.empty());
+}
+
+TEST(DisplayWallpaperOwnership, SameMonitorFullscreenTransitionDoesNotClear) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1920, 1080);
+    const AppConfig previous = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+    const AppConfig next = MakeFullscreenWallpaperConfig("Panel", 1600, 900, monitor);
+
+    EXPECT_FALSE(ShouldClearCommittedDisplayWallpaper(ResolveCommittedDisplayWallpaperOwner(previous, monitor),
+        ResolveCommittedDisplayWallpaperOwner(next, monitor)));
+}
+
+TEST(DisplayWallpaperOwnership, FullscreenMonitorTransitionClearsPreviousAndOwnsNext) {
+    const TargetMonitorInfo monitorA = MakeTargetMonitor(1920, 1080);
+    const TargetMonitorInfo monitorB = MakeTargetMonitorAt(1920, 0, 1920, 1080);
+    const AppConfig previous = MakeFullscreenWallpaperConfig("Panel A", 1600, 900, monitorA);
+    const AppConfig next = MakeFullscreenWallpaperConfig("Panel B", 1600, 900, monitorB);
+
+    const std::optional<DisplayWallpaperOwner> nextOwner = ResolveCommittedDisplayWallpaperOwner(next, monitorB);
+
+    ASSERT_TRUE(nextOwner.has_value());
+    EXPECT_TRUE(
+        ShouldClearCommittedDisplayWallpaper(ResolveCommittedDisplayWallpaperOwner(previous, monitorA), nextOwner));
+}
+
+TEST(DisplayWallpaperOwnership, FullscreenToEdgeClearsPreviousAndSavesEmptyWallpaper) {
+    const TargetMonitorInfo monitor = MakeTargetMonitor(1200, 1000);
+    const AppConfig previous = MakeFullscreenWallpaperConfig("Panel", 1200, 1000, monitor);
+    AppConfig edge = previous;
+    edge.display.position = LogicalPointConfig{0, 100};
+
+    const AppConfig normalized = NormalizeCommittedDisplayWallpaperConfig(edge, monitor);
+
+    EXPECT_TRUE(normalized.display.wallpaper.empty());
+    EXPECT_TRUE(ShouldClearCommittedDisplayWallpaper(ResolveCommittedDisplayWallpaperOwner(previous, monitor),
+        ResolveCommittedDisplayWallpaperOwner(normalized, monitor)));
+}
+
+TEST(DisplayWallpaperOwnership, CommittedOwnerDrivesClearAfterManualMove) {
+    const TargetMonitorInfo monitorA = MakeTargetMonitor(1920, 1080);
+    const TargetMonitorInfo monitorB = MakeTargetMonitorAt(1920, 0, 1920, 1080);
+    const AppConfig committedOwnerConfig = MakeFullscreenWallpaperConfig("Panel A", 1600, 900, monitorA);
+    AppConfig manuallyMoved = committedOwnerConfig;
+    manuallyMoved.display.monitorName = "Panel B";
+    manuallyMoved.display.position = LogicalPointConfig{10, 10};
+    const AppConfig configuredB = MakeFullscreenWallpaperConfig("Panel B", 1600, 900, monitorB);
+
+    EXPECT_FALSE(ResolveCommittedDisplayWallpaperOwner(manuallyMoved, monitorB).has_value());
+    EXPECT_TRUE(
+        ShouldClearCommittedDisplayWallpaper(ResolveCommittedDisplayWallpaperOwner(committedOwnerConfig, monitorA),
+            ResolveCommittedDisplayWallpaperOwner(configuredB, monitorB)));
 }

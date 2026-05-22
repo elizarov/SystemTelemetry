@@ -1704,7 +1704,7 @@ void DashboardApp::ScheduleBringToFrontRetries() {
 }
 
 bool DashboardApp::ApplyConfiguredWallpaper() {
-    return ::ApplyConfiguredWallpaper(controller_.State().config, trace_);
+    return controller_.ApplyConfiguredWallpaper(trace_);
 }
 
 bool DashboardApp::ApplyLayoutGuideWeights(const LayoutEditLayoutTarget& target, const std::vector<int>& weights) {

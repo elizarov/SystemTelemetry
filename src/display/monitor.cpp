@@ -333,13 +333,57 @@ AppConfig BuildConfiguredDisplayConfig(const AppConfig& config, const DisplayMen
 bool ShouldClearPreviousDisplayWallpaper(const AppConfig& previousConfig,
     const std::optional<TargetMonitorInfo>& previousMonitor,
     const DisplayMenuOption& option) {
-    if (previousConfig.display.wallpaper.empty()) {
+    const std::optional<DisplayWallpaperOwner> previousOwner =
+        ResolveCommittedDisplayWallpaperOwner(previousConfig, previousMonitor);
+    const std::optional<DisplayWallpaperOwner> nextOwner =
+        option.writesWallpaper ? std::optional<DisplayWallpaperOwner>{DisplayWallpaperOwner{
+                                     option.configMonitorName, kDefaultBlankWallpaperFileName, option.monitorRect}}
+                               : std::nullopt;
+    return ShouldClearCommittedDisplayWallpaper(previousOwner, nextOwner);
+}
+
+std::optional<DisplayWallpaperOwner> ResolveCommittedDisplayWallpaperOwner(
+    const AppConfig& config, const std::optional<TargetMonitorInfo>& monitor) {
+    if (config.display.wallpaper.empty() || !monitor.has_value() || config.display.position != LogicalPointConfig{}) {
+        return std::nullopt;
+    }
+
+    const double targetScale = ResolveDisplayScale(config.display.scale, monitor->dpi);
+    if (!std::isfinite(targetScale) || targetScale <= 0.0) {
+        return std::nullopt;
+    }
+
+    const SIZE targetSize = ComputeWindowSizeForScale(config, targetScale);
+    if (targetSize.cx != RectWidth(monitor->rect) || targetSize.cy != RectHeight(monitor->rect)) {
+        return std::nullopt;
+    }
+
+    return DisplayWallpaperOwner{config.display.monitorName, config.display.wallpaper, monitor->rect};
+}
+
+std::optional<DisplayWallpaperOwner> ResolveCommittedDisplayWallpaperOwner(const AppConfig& config) {
+    return ResolveCommittedDisplayWallpaperOwner(config, FindTargetMonitor(config.display.monitorName));
+}
+
+AppConfig NormalizeCommittedDisplayWallpaperConfig(
+    const AppConfig& config, const std::optional<TargetMonitorInfo>& monitor) {
+    AppConfig normalized = config;
+    if (!ResolveCommittedDisplayWallpaperOwner(normalized, monitor).has_value()) {
+        normalized.display.wallpaper.clear();
+    }
+    return normalized;
+}
+
+AppConfig NormalizeCommittedDisplayWallpaperConfig(const AppConfig& config) {
+    return NormalizeCommittedDisplayWallpaperConfig(config, FindTargetMonitor(config.display.monitorName));
+}
+
+bool ShouldClearCommittedDisplayWallpaper(
+    const std::optional<DisplayWallpaperOwner>& previousOwner, const std::optional<DisplayWallpaperOwner>& nextOwner) {
+    if (!previousOwner.has_value()) {
         return false;
     }
-    if (!option.writesWallpaper) {
-        return true;
-    }
-    return !previousMonitor.has_value() || !RectsEqual(previousMonitor->rect, option.monitorRect);
+    return !nextOwner.has_value() || !RectsEqual(previousOwner->monitorRect, nextOwner->monitorRect);
 }
 
 std::string SimplifyDeviceName(const std::string& deviceName) {
