@@ -137,6 +137,16 @@ private:
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
+    void SyncAutohideState();
+    void OpenAutohideDrawerAfterDisplayConfiguration();
+    void StartAutohideTimer();
+    void StopAutohideTimer();
+    void UpdateAutohideFromCursor();
+    void SetAutohideTopmost(bool topmost);
+    void ShowAutohideDrawer(bool forceAnimation);
+    void HideAutohideDrawer();
+    bool AutohideCursorInTriggerBand(POINT screenPoint) const;
+    bool AutohideCursorInDashboard(POINT screenPoint) const;
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
     RECT DashboardClientScreenRect() const;
     DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMarginsForDpi(
@@ -254,6 +264,16 @@ private:
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
     bool stopMoveModeWhenLeftButtonReleased_ = false;
     bool nativeTitlebarDragMoveActive_ = false;
+    bool autohideEligible_ = false;
+    bool autohideHidden_ = false;
+    bool autohideTimerActive_ = false;
+    bool autohideClosePending_ = false;
+    bool autohideTopmost_ = false;
+    bool autohideAnimating_ = false;
+    ULONGLONG autohideCloseDeadlineMs_ = 0;
+    DisplayPlacementMode autohideMode_ = DisplayPlacementMode::FullScreen;
+    RECT autohideMonitorRect_{};
+    RECT autohideTargetClientRect_{};
     HWND titlebarHoverProbeHwnd_ = nullptr;
     HWND titlebarLayoutComboHwnd_ = nullptr;
     HWND titlebarThemeComboHwnd_ = nullptr;

@@ -584,6 +584,7 @@ bool DashboardShellUi::HandleConfigureDisplay(const DisplayMenuOption& option) {
     if (!app_.controller_.ConfigureDisplay(app_, option)) {
         return false;
     }
+    app_.OpenAutohideDrawerAfterDisplayConfiguration();
     if (wasEditingLayout) {
         app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         app_.HideLayoutEditTooltip();

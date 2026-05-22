@@ -66,6 +66,38 @@ bool IsRectUsable(const RECT& rect) {
     return RectWidth(rect) > 0 && RectHeight(rect) > 0;
 }
 
+DWORD AutohideOpenAnimationDirection(DisplayPlacementMode mode) {
+    switch (mode) {
+        case DisplayPlacementMode::Top:
+            return AW_VER_POSITIVE;
+        case DisplayPlacementMode::Bottom:
+            return AW_VER_NEGATIVE;
+        case DisplayPlacementMode::Left:
+            return AW_HOR_POSITIVE;
+        case DisplayPlacementMode::Right:
+            return AW_HOR_NEGATIVE;
+        case DisplayPlacementMode::FullScreen:
+            break;
+    }
+    return 0;
+}
+
+DWORD AutohideCloseAnimationDirection(DisplayPlacementMode mode) {
+    switch (mode) {
+        case DisplayPlacementMode::Top:
+            return AW_VER_NEGATIVE;
+        case DisplayPlacementMode::Bottom:
+            return AW_VER_POSITIVE;
+        case DisplayPlacementMode::Left:
+            return AW_HOR_NEGATIVE;
+        case DisplayPlacementMode::Right:
+            return AW_HOR_POSITIVE;
+        case DisplayPlacementMode::FullScreen:
+            break;
+    }
+    return 0;
+}
+
 bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
 }
@@ -417,6 +449,7 @@ void DashboardApp::ApplyConfigPlacement() {
     }
     SetDashboardWindowGeometry(
         left, top, targetSize.cx, targetSize.cy, SWP_NOACTIVATE | SWP_NOZORDER, "config_placement");
+    SyncAutohideState();
 }
 
 void DashboardApp::SetDashboardWindowGeometry(
@@ -478,6 +511,7 @@ bool DashboardApp::HandleRenderEnvironmentChange(const char* reason) {
     }
     movePlacementInfo_ =
         GetMonitorPlacementForRect(DashboardClientScreenRect(), controller_.State().config.display.scale);
+    SyncAutohideState();
     UpdateNativeTitlebarHoverFromCursor();
     InvalidateRect(hwnd_, nullptr, FALSE);
     return true;
@@ -527,6 +561,194 @@ void DashboardApp::RetryConfigPlacementIfPending() {
         InvalidateRect(hwnd_, nullptr, FALSE);
         StopPlacementWatch();
     }
+}
+
+void DashboardApp::SyncAutohideState() {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+
+    const std::optional<DisplayPlacementTarget> target =
+        ResolveConfiguredAutohidePlacementTarget(controller_.State().config);
+    const bool eligible = target.has_value() && DisplayPlacementTargetMatchesRect(*target, DashboardClientScreenRect());
+    if (!eligible) {
+        StopAutohideTimer();
+        autohideEligible_ = false;
+        autohideClosePending_ = false;
+        autohideCloseDeadlineMs_ = 0;
+        if (autohideHidden_) {
+            ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+            autohideHidden_ = false;
+        }
+        SetAutohideTopmost(false);
+        return;
+    }
+
+    autohideEligible_ = true;
+    autohideMode_ = target->placementMode;
+    autohideMonitorRect_ = target->monitorRect;
+    autohideTargetClientRect_ = target->targetClientRect;
+    HideNativeTitlebar();
+    SetAutohideTopmost(true);
+    StartAutohideTimer();
+}
+
+void DashboardApp::OpenAutohideDrawerAfterDisplayConfiguration() {
+    SyncAutohideState();
+    if (!autohideEligible_) {
+        return;
+    }
+    ShowAutohideDrawer(true);
+    StartAutohideTimer();
+}
+
+void DashboardApp::StartAutohideTimer() {
+    if (hwnd_ == nullptr || autohideTimerActive_) {
+        return;
+    }
+    SetTimer(hwnd_, kAutohideTimerId, kAutohideTimerMs, nullptr);
+    autohideTimerActive_ = true;
+}
+
+void DashboardApp::StopAutohideTimer() {
+    if (hwnd_ != nullptr) {
+        KillTimer(hwnd_, kAutohideTimerId);
+    }
+    autohideTimerActive_ = false;
+}
+
+void DashboardApp::UpdateAutohideFromCursor() {
+    if (!autohideEligible_ || hwnd_ == nullptr) {
+        StopAutohideTimer();
+        return;
+    }
+    if (controller_.State().isMoving || layoutEditModalUiDepth_ > 0 || autohideAnimating_) {
+        autohideClosePending_ = false;
+        autohideCloseDeadlineMs_ = 0;
+        StartAutohideTimer();
+        return;
+    }
+
+    POINT cursor{};
+    if (!GetCursorPos(&cursor)) {
+        StartAutohideTimer();
+        return;
+    }
+
+    if (autohideHidden_) {
+        if (AutohideCursorInTriggerBand(cursor)) {
+            ShowAutohideDrawer(false);
+        }
+        StartAutohideTimer();
+        return;
+    }
+
+    if (AutohideCursorInDashboard(cursor)) {
+        autohideClosePending_ = false;
+        autohideCloseDeadlineMs_ = 0;
+        StartAutohideTimer();
+        return;
+    }
+
+    const ULONGLONG now = GetTickCount64();
+    if (!autohideClosePending_) {
+        autohideClosePending_ = true;
+        autohideCloseDeadlineMs_ = now + kAutohideCloseDelayMs;
+        StartAutohideTimer();
+        return;
+    }
+    if (now >= autohideCloseDeadlineMs_) {
+        HideAutohideDrawer();
+    }
+    StartAutohideTimer();
+}
+
+void DashboardApp::SetAutohideTopmost(bool topmost) {
+    if (hwnd_ == nullptr || autohideTopmost_ == topmost) {
+        return;
+    }
+    SetWindowPos(hwnd_, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
+    autohideTopmost_ = topmost;
+}
+
+void DashboardApp::ShowAutohideDrawer(bool forceAnimation) {
+    if (hwnd_ == nullptr || !autohideEligible_) {
+        return;
+    }
+
+    HideNativeTitlebar();
+    SetAutohideTopmost(true);
+    if (forceAnimation && !autohideHidden_) {
+        ShowWindow(hwnd_, SW_HIDE);
+        autohideHidden_ = true;
+    }
+    if (autohideHidden_) {
+        autohideAnimating_ = true;
+        const DWORD direction = AutohideOpenAnimationDirection(autohideMode_);
+        const BOOL animated = AnimateWindow(hwnd_, kAutohideAnimationDurationMs, AW_SLIDE | direction);
+        autohideAnimating_ = false;
+        if (animated == FALSE) {
+            ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+        }
+        autohideHidden_ = false;
+    } else if (!IsWindowVisible(hwnd_)) {
+        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    }
+    autohideClosePending_ = false;
+    autohideCloseDeadlineMs_ = 0;
+    InvalidateRect(hwnd_, nullptr, FALSE);
+}
+
+void DashboardApp::HideAutohideDrawer() {
+    if (hwnd_ == nullptr || !autohideEligible_ || autohideHidden_) {
+        return;
+    }
+
+    HideNativeTitlebar();
+    SetAutohideTopmost(true);
+    autohideAnimating_ = true;
+    const DWORD direction = AutohideCloseAnimationDirection(autohideMode_);
+    const BOOL animated = AnimateWindow(hwnd_, kAutohideAnimationDurationMs, AW_HIDE | AW_SLIDE | direction);
+    autohideAnimating_ = false;
+    if (animated == FALSE) {
+        ShowWindow(hwnd_, SW_HIDE);
+    }
+    autohideHidden_ = true;
+    autohideClosePending_ = false;
+    autohideCloseDeadlineMs_ = 0;
+}
+
+bool DashboardApp::AutohideCursorInTriggerBand(POINT screenPoint) const {
+    if (!autohideEligible_ || !IsRectUsable(autohideMonitorRect_)) {
+        return false;
+    }
+
+    RECT band = autohideMonitorRect_;
+    switch (autohideMode_) {
+        case DisplayPlacementMode::Top:
+            band.bottom = band.top + kAutohideTriggerBandPx;
+            break;
+        case DisplayPlacementMode::Bottom:
+            band.top = band.bottom - kAutohideTriggerBandPx;
+            break;
+        case DisplayPlacementMode::Left:
+            band.right = band.left + kAutohideTriggerBandPx;
+            break;
+        case DisplayPlacementMode::Right:
+            band.left = band.right - kAutohideTriggerBandPx;
+            break;
+        case DisplayPlacementMode::FullScreen:
+            return false;
+    }
+    return PtInRect(&band, screenPoint) != FALSE;
+}
+
+bool DashboardApp::AutohideCursorInDashboard(POINT screenPoint) const {
+    if (!autohideEligible_) {
+        return false;
+    }
+    const RECT dashboardRect = DashboardClientScreenRect();
+    return PtInRect(&dashboardRect, screenPoint) != FALSE;
 }
 
 bool DashboardApp::InitializeFonts() {
@@ -1599,6 +1821,12 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     const bool resizeActive =
         controller_.State().isMoving && placementInteractionMode_ == PlacementInteractionMode::Resize;
     const bool placementKeepsTitlebarVisible = controller_.State().isMoving && nativeTitlebarVisible_;
+    if (autohideEligible_ || autohideAnimating_) {
+        HideTitlebarTooltip("autohide_active");
+        HideNativeTitlebar();
+        StopNativeTitlebarHoverTimer();
+        return;
+    }
     if (hwnd_ == nullptr || !IsWindowVisible(hwnd_) ||
         (controller_.State().isMoving && !resizeActive && !placementKeepsTitlebarVisible) ||
         layoutEditModalUiDepth_ > 0) {
@@ -1697,9 +1925,15 @@ void DashboardApp::BringOnTop() {
         return;
     }
 
-    ShowWindow(hwnd_, SW_SHOWNORMAL);
-    SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
-    SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    if (autohideEligible_) {
+        ShowAutohideDrawer(false);
+        SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        autohideTopmost_ = true;
+    } else {
+        ShowWindow(hwnd_, SW_SHOWNORMAL);
+        SetWindowPos(hwnd_, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+        SetWindowPos(hwnd_, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_SHOWWINDOW);
+    }
     const BOOL foregroundSet = SetForegroundWindow(hwnd_);
     SetActiveWindow(hwnd_);
     trace_.WriteFmt(TracePrefix::Diagnostics,
@@ -1908,6 +2142,7 @@ void DashboardApp::StopMoveMode() {
     }
     HideLayoutEditTooltip();
     SyncDashboardMoveOverlayState();
+    SyncAutohideState();
     InvalidateRect(hwnd_, nullptr, FALSE);
     UpdateNativeTitlebarHoverFromCursor();
 }
@@ -2387,6 +2622,7 @@ int DashboardApp::Run() {
     } else {
         ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     }
+    SyncAutohideState();
     UpdateWindow(hwnd_);
     UpdateNativeTitlebarProbe();
 
@@ -2600,6 +2836,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             if (wParam == kTitlebarHoverTimerId) {
                 UpdateNativeTitlebarHoverFromCursor();
+                return 0;
+            }
+            if (wParam == kAutohideTimerId) {
+                UpdateAutohideFromCursor();
                 return 0;
             }
             return 0;
@@ -2917,6 +3157,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 movePlacementInfo_ =
                     GetMonitorPlacementForRect(DashboardClientScreenRect(), controller_.State().config.display.scale);
             }
+            SyncAutohideState();
             InvalidateRect(hwnd_, nullptr, FALSE);
             return 0;
         case WM_DISPLAYCHANGE:
@@ -2963,7 +3204,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             KillTimer(hwnd_, kAnimationFrameTimerId);
             KillTimer(hwnd_, kBringToFrontRetryTimerId);
             KillTimer(hwnd_, kTitlebarHoverTimerId);
+            KillTimer(hwnd_, kAutohideTimerId);
             nativeTitlebarHoverTimerActive_ = false;
+            autohideTimerActive_ = false;
             if (state.telemetry != nullptr) {
                 state.telemetry->Shutdown();
             }

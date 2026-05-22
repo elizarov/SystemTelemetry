@@ -174,6 +174,14 @@ TEST(DisplayMenuCheckmark, FullscreenCommittedConfigRequiresExpectedWallpaper) {
     ASSERT_EQ(count, 1u);
     EXPECT_TRUE(options[0].matchesCommittedConfig);
 
+    committed.display.autohide = "top";
+    count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1920, 1080), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 1u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+
+    committed.display.autohide.clear();
     committed.display.wallpaper = "other.png";
     count = BuildDisplayMenuOptionsForMonitor(
         liveConfig, MakeMonitor(1920, 1080), &committed.display, monitor, false, options, 3);
@@ -189,6 +197,7 @@ TEST(DisplayMenuCheckmark, EdgeCommittedConfigRequiresEmptyWallpaper) {
     committed.display.monitorName = "Panel";
     committed.display.scale = 0.75;
     committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+    committed.display.autohide = "bottom";
     committed.display.wallpaper.clear();
     DisplayMenuOption options[3]{};
 
@@ -199,6 +208,25 @@ TEST(DisplayMenuCheckmark, EdgeCommittedConfigRequiresEmptyWallpaper) {
     EXPECT_FALSE(options[0].matchesCommittedConfig);
     EXPECT_TRUE(options[1].matchesCommittedConfig);
 
+    committed.display.autohide = "top";
+    committed.display.position = LogicalPointConfig{};
+    count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 2u);
+    EXPECT_TRUE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+
+    committed.display.autohide.clear();
+    count = BuildDisplayMenuOptionsForMonitor(
+        liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
+
+    ASSERT_EQ(count, 2u);
+    EXPECT_FALSE(options[0].matchesCommittedConfig);
+    EXPECT_FALSE(options[1].matchesCommittedConfig);
+
+    committed.display.autohide = "bottom";
+    committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
     committed.display.wallpaper = kDefaultBlankWallpaperFileName;
     count = BuildDisplayMenuOptionsForMonitor(
         liveConfig, MakeMonitor(1200, 1000), &committed.display, monitor, false, options, 3);
@@ -218,6 +246,7 @@ TEST(DisplayMenuCheckmark, LivePlacementDoesNotMoveCommittedCheckmark) {
     committed.display.monitorName = "Panel";
     committed.display.scale = 0.75;
     committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+    committed.display.autohide = "bottom";
     DisplayMenuOption options[3]{};
 
     const size_t count = BuildDisplayMenuOptionsForMonitor(
@@ -235,6 +264,7 @@ TEST(DisplayMenuCheckmark, InconsistentCommittedPlacementChecksNothing) {
     committed.display.monitorName = "Panel";
     committed.display.scale = 0.75;
     committed.display.position = LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)};
+    committed.display.autohide = "bottom";
     DisplayMenuOption options[3]{};
 
     AppConfig wrongScale = committed;
@@ -446,9 +476,10 @@ TEST(DisplayConfiguration, FullscreenConfigWritesWallpaper) {
     EXPECT_EQ(updated.display.position, LogicalPointConfig{});
     EXPECT_NEAR(updated.display.scale, 1.2, 0.000001);
     EXPECT_EQ(updated.display.wallpaper, kDefaultBlankWallpaperFileName);
+    EXPECT_TRUE(updated.display.autohide.empty());
 }
 
-TEST(DisplayConfiguration, EdgeConfigClearsWallpaperValue) {
+TEST(DisplayConfiguration, EdgeConfigClearsWallpaperValueAndSetsAutohideSide) {
     const AppConfig config = MakeDisplayConfig(1600, 900);
     DisplayMenuOption options[2]{};
     ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1200, 1000), std::nullopt, false, options, 2), 2u);
@@ -459,6 +490,33 @@ TEST(DisplayConfiguration, EdgeConfigClearsWallpaperValue) {
     EXPECT_EQ(updated.display.position, (LogicalPointConfig{0, ScalePhysicalToLogical(325, 0.75)}));
     EXPECT_NEAR(updated.display.scale, 0.75, 0.000001);
     EXPECT_TRUE(updated.display.wallpaper.empty());
+    EXPECT_EQ(updated.display.autohide, "bottom");
+}
+
+TEST(DisplayAutohidePlacement, ResolvesConfiguredTargetAndRequiresExactClientRect) {
+    AppConfig config = MakeDisplayConfig(1600, 900);
+    DisplayMenuOption options[2]{};
+    ASSERT_EQ(BuildDisplayMenuOptionsForMonitor(config, MakeMonitor(1200, 1000), std::nullopt, false, options, 2), 2u);
+    config = BuildConfiguredDisplayConfig(config, options[1]);
+
+    const DisplayMenuMonitorInfo monitor{"Panel", "Panel", MakeRect(1200, 1000), USER_DEFAULT_SCREEN_DPI};
+    const std::optional<DisplayPlacementTarget> target =
+        ComputeDisplayPlacementTarget(config, monitor, DisplayPlacementMode::Bottom);
+
+    ASSERT_TRUE(target.has_value());
+    EXPECT_EQ(target->autohide, "bottom");
+    EXPECT_TRUE(DisplayPlacementTargetMatchesRect(*target, target->targetClientRect));
+    RECT moved = target->targetClientRect;
+    ++moved.left;
+    ++moved.right;
+    EXPECT_FALSE(DisplayPlacementTargetMatchesRect(*target, moved));
+}
+
+TEST(DisplayAutohidePlacement, IgnoresInvalidAutohideValue) {
+    AppConfig config = MakeDisplayConfig(1600, 900);
+    config.display.autohide = "middle";
+
+    EXPECT_FALSE(DisplayPlacementModeFromAutohideValue(config.display.autohide).has_value());
 }
 
 TEST(DisplayConfiguration, PreviousWallpaperClearRequestsFollowPlacementAndMonitor) {

@@ -4,6 +4,7 @@
 
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "config/config_primitives.h"
 #include "util/scale.h"
@@ -52,7 +53,21 @@ struct DisplayMenuOption {
     LogicalPointConfig position{};
     double targetScale = 0.0;
     bool writesWallpaper = false;
+    std::string autohide;
+    RECT targetClientRect{};
     bool matchesCommittedConfig = false;
+};
+
+struct DisplayPlacementTarget {
+    DisplayPlacementMode placementMode = DisplayPlacementMode::FullScreen;
+    RECT monitorRect{};
+    UINT dpi = USER_DEFAULT_SCREEN_DPI;
+    SIZE targetSize{};
+    LogicalPointConfig position{};
+    double targetScale = 0.0;
+    bool writesWallpaper = false;
+    std::string autohide;
+    RECT targetClientRect{};
 };
 
 struct DisplayPlacementSchematicGeometry {
@@ -77,6 +92,13 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
 double ComputeAspectResizeScale(SIZE layoutLogicalSize, POINT physicalExtent);
 DisplayConfig BuildResizePlacementDisplayConfig(
     const DisplayConfig& display, const MonitorPlacementInfo& placement, double targetScale);
+const char* DisplayPlacementModeAutohideValue(DisplayPlacementMode mode);
+std::optional<DisplayPlacementMode> DisplayPlacementModeFromAutohideValue(std::string_view value);
+bool IsEdgeDisplayPlacementMode(DisplayPlacementMode mode);
+std::optional<DisplayPlacementTarget> ComputeDisplayPlacementTarget(
+    const AppConfig& config, const DisplayMenuMonitorInfo& monitor, DisplayPlacementMode mode);
+std::optional<DisplayPlacementTarget> ResolveConfiguredAutohidePlacementTarget(const AppConfig& config);
+bool DisplayPlacementTargetMatchesRect(const DisplayPlacementTarget& target, const RECT& rect);
 DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(
     const DisplayMenuOption& option, const RECT& bounds);
 std::string SimplifyDeviceName(const std::string& deviceName);
