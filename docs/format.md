@@ -59,7 +59,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Treat empty delimiter pairs as atomic text. The formatter never breaks inside empty `()`, empty `{}`, or empty `<>`; it breaks an owning expression or chain instead.
 - Do not force a line break after an initializer-list opening brace unless the initializer list itself wraps.
 - Format enum bodies as structural comma lists with one top-level enumerator per line. The closing brace stays on its own line, and a source trailing comma remains attached to the final enumerator.
-- Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, and do-while `while` stay on the same line as the closing brace.
+- Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, and only the `while` that closes a do-while statement stay on the same line as the closing brace. A separate `while` statement after an `if` block starts on its own line.
 - Line break after each statement-terminating semicolon.
 - Keep preprocessor directives at column zero. Macro continuation backslashes, spaces before continuation backslashes, and continuation newlines are formatter-owned layout. For multi-line macro definitions, normalize the replacement list as code, collapse it onto one indented continuation line when it fits, and insert continuation backslashes only on emitted macro lines that continue onto another emitted macro line.
 - Put one empty line after `#pragma once` before the next include, preprocessor directive, comment, or declaration.

@@ -175,7 +175,8 @@ bool IsSpaceButNotNewline(char ch) {
 bool IsAtPreprocessorStart(std::string_view text, size_t index) {
     if (index > text.size() || index != 0 && text[index - 1] != '\n') {
         return false;
-    } while (index < text.size() && IsSpaceButNotNewline(text[index])) {
+    }
+    while (index < text.size() && IsSpaceButNotNewline(text[index])) {
         ++index;
     }
     return index < text.size() && text[index] == '#';
@@ -533,6 +534,7 @@ private:
         Other,
         CaseScope,
         SwitchStatement,
+        DoStatement,
         NamespaceDeclaration,
         EnumDeclaration,
         TypeDeclaration,
@@ -808,7 +810,11 @@ private:
         if (
             next < tokens.size() &&
             tokens[next].kind == TokenKind::Word &&
-            (tokens[next].text == "else" || tokens[next].text == "catch" || tokens[next].text == "while")
+            (
+                tokens[next].text == "else" ||
+                    tokens[next].text == "catch" ||
+                    (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+            )
         ) {
             pendingPrefix_ = "} ";
             return;
@@ -2092,7 +2098,8 @@ private:
         start = UnwrapTemplateTypeNameStart(tokens, *start);
         if (!start) {
             return std::nullopt;
-        } while (*start > 1) {
+        }
+        while (*start > 1) {
             const std::optional<size_t> before = PreviousNonNewlineIndex(tokens, *start);
             if (!before || tokens[*before].text != "::") {
                 break;
@@ -2659,6 +2666,9 @@ private:
         if (!tokens.empty() && tokens.front().text == "switch") {
             return BlockKind::SwitchStatement;
         }
+        if (!tokens.empty() && tokens.front().text == "do") {
+            return BlockKind::DoStatement;
+        }
         if (ContainsWord(tokens, "enum")) {
             return BlockKind::EnumDeclaration;
         }
@@ -2677,6 +2687,7 @@ private:
                 return DeclarationKind::NamespaceDeclaration;
             case BlockKind::CaseScope:
             case BlockKind::SwitchStatement:
+            case BlockKind::DoStatement:
                 return DeclarationKind::None;
             case BlockKind::EnumDeclaration:
             case BlockKind::TypeDeclaration:

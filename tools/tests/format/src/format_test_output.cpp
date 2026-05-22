@@ -500,6 +500,13 @@ void ControlFlowVariety(int* values, int count) {
         values[0] += 1;
     } else values[0] = 0;
 
+    if (values != nullptr) {
+        values[0] = count;
+    }
+    while (count > 0) {
+        --count;
+    }
+
     for (int outer = 0; outer < count; ++outer) {
         if (values[outer] % 2 == 0) values[outer] += outer;
         else {
