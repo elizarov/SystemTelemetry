@@ -127,7 +127,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Treat `&&` as a logical binary operator with spaces when it follows an expression, including qualified enum values: `field.kind == ValueKind::HexColor && IsNamedColor(name)`.
 - Do not treat a preceding parenthesized or bracketed expression as a type for pointer or reference spacing. Multiplication and bitwise-and after such expressions keep binary-operator spaces: `(to.l - from.l) * amount` and `values[index] & mask`.
 - Put spaces around ternary `?` and `:`.
-- Put spaces around the range-for colon and the constructor-initializer colon: `for (const auto& item : items)` and `Widget() : member(value) {}`.
+- Put spaces around the range-for colon and the constructor-initializer colon, including braced range expressions: `for (const auto& item : items)`, `for (double candidate : {a, b})`, and `Widget() : member(value) {}`.
 - Put no space before access-specifier, label, or `case` colons: `public:`, `label:`, and `case Value:`.
 - Put no spaces around namespace, member-access, and pointer-member-access operators: `Namespace::Type`, `object.field`, `pointer->field`, `object.*member`, and `pointer->*member`.
 - Put one space between `template` and its parameter list: `template <typename T>`.

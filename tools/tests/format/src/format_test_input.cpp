@@ -213,6 +213,13 @@ Use(logicalName,sensorName);
 }
 }
 
+double NormalizeAngleCandidate(double angleDegrees){
+for(double candidate :{angleDegrees - 360.0,angleDegrees + 360.0}){
+Use(candidate);
+}
+return angleDegrees;
+}
+
 const auto noLookup=[](std::string_view)->std::optional<ColorConfig>{return std::nullopt; };
 const auto preserveLambdaSeparator=[](){FirstStep();
 

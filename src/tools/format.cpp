@@ -2066,6 +2066,9 @@ private:
         if (current == "{" && IsAssignmentOperator(prev)) {
             return true;
         }
+        if (current == "{" && prev == ":") {
+            return true;
+        }
         if (IsLambdaReturnArrowToken(tokens, index) || IsLambdaReturnArrowToken(tokens, prevIndex)) {
             return true;
         }
