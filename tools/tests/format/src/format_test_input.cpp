@@ -104,6 +104,7 @@ std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors(
 
 struct ColorConfig{};
 template <typename UpdateKeyFn> void SaveBoardSectionDifferences(const BoardConfig& board,const BoardConfig* compareBoard,const std::string& sectionName,UpdateKeyFn& updateKey){
+DynamicSectionSaveContext<UpdateKeyFn> context{ &board,compareBoard,&updateKey};
 updateKey(board,compareBoard,sectionName);
 }
 

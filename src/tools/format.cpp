@@ -430,7 +430,14 @@ bool IsNoSpaceBefore(std::string_view text) {
 }
 
 bool IsNoSpaceAfter(std::string_view text) {
-    return text == "(" || text == "[" || text == "." || text == "->" || text == "::" || text == "~" || text == "!";
+    return text == "(" ||
+        text == "[" ||
+        text == "{" ||
+        text == "." ||
+        text == "->" ||
+        text == "::" ||
+        text == "~" ||
+        text == "!";
 }
 
 std::string TrimRight(std::string value) {

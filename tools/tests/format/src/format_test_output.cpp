@@ -133,6 +133,7 @@ void SaveBoardSectionDifferences(
     const std::string& sectionName,
     UpdateKeyFn& updateKey
 ) {
+    DynamicSectionSaveContext<UpdateKeyFn> context{&board, compareBoard, &updateKey};
     updateKey(board, compareBoard, sectionName);
 }
 
