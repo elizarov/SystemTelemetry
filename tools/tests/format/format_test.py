@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import re
+import shutil
 import subprocess
+import tempfile
+import textwrap
 import unittest
 from pathlib import Path
 
@@ -9,7 +12,9 @@ from pathlib import Path
 TEST_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TEST_ROOT.parents[2]
 FORMAT_CMD = REPO_ROOT / "format.cmd"
+TOOLS_EXE = REPO_ROOT / "build" / "CaseDashTools.exe"
 CLANG_FORMAT_CONFIG = REPO_ROOT / ".clang-format"
+NATIVE_FORMAT_CONFIG = REPO_ROOT / "tools" / "format_config.json"
 BAD_FIXTURE = Path("src") / "format_options.cpp"
 GOLDEN_FIXTURE = Path("src") / "format_options.golden.cpp"
 
@@ -66,6 +71,16 @@ def run_format(*args: str) -> subprocess.CompletedProcess[str]:
     command = subprocess.list2cmdline([str(FORMAT_CMD), "--root", str(TEST_ROOT), *args])
     return subprocess.run(
         ["cmd.exe", "/d", "/c", command],
+        cwd=REPO_ROOT,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+
+def run_native_format(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [str(TOOLS_EXE), "format", "--root", str(root), *args],
         cwd=REPO_ROOT,
         check=False,
         capture_output=True,
@@ -158,6 +173,68 @@ class FormatCommandTests(unittest.TestCase):
 
     def test_fixture_covers_configured_clang_format_options(self) -> None:
         self.assertSetEqual(set(FORMAT_OPTION_COVERAGE), configured_format_options())
+
+    def test_native_formatter_uses_greedy_wrapping_and_comment_forced_splits(self) -> None:
+        with tempfile.TemporaryDirectory(dir=REPO_ROOT / "build") as temp_dir:
+            root = Path(temp_dir)
+            (root / "src").mkdir()
+            (root / "tools").mkdir()
+            shutil.copy2(NATIVE_FORMAT_CONFIG, root / "tools" / "format_config.json")
+            source = root / "src" / "sample.cpp"
+            source.write_text(
+                textwrap.dedent(
+                    """
+                    #include <vector>
+                    #include "zeta.h"
+                    #include <windows.h>
+                    #include "sample.h"
+                    #include <winsock2.h>
+
+                    void f(){auto value=buildValue(firstValueWithQuiteLongName,transform(secondValueWithQuiteLongNameA,secondValueWithQuiteLongNameB),thirdValueWithQuiteLongName); update(firstValue,secondValue, // note
+                    thirdValue); int sum=firstValue+secondValue+ // keep
+                    thirdValue;}
+                    """
+                ).lstrip(),
+                encoding="utf-8",
+            )
+
+            result = run_native_format(root, "--file", "src/sample.cpp", "--stdout")
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            textwrap.dedent(
+                """
+                #include "sample.h"
+
+                #include <winsock2.h>
+
+                #include <windows.h>
+
+                #include <vector>
+
+                #include "zeta.h"
+
+                void f() {
+                    auto value =
+                        buildValue(
+                            firstValueWithQuiteLongName,
+                            transform(secondValueWithQuiteLongNameA, secondValueWithQuiteLongNameB),
+                            thirdValueWithQuiteLongName
+                        );
+                    update(
+                        firstValue,
+                        secondValue,  // note
+                        thirdValue
+                    );
+                    int sum =
+                        firstValue +
+                        secondValue +  // keep
+                        thirdValue;
+                }
+                """
+            ).lstrip(),
+            result.stdout,
+        )
 
 
 if __name__ == "__main__":
