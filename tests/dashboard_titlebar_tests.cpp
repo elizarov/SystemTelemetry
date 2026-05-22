@@ -3,6 +3,7 @@
 
 #include "dashboard/dashboard_titlebar.h"
 #include "dashboard/dashboard_window_chrome.h"
+#include "dashboard/native_theme_colors.h"
 
 namespace {
 
@@ -153,6 +154,7 @@ TEST(DashboardTitlebarPalette, DerivesButtonColorsFromBaseColors) {
     EXPECT_EQ(palette.buttonGlyph, RGB(40, 40, 40));
     EXPECT_EQ(palette.buttonHover, RGB(228, 228, 228));
     EXPECT_EQ(palette.buttonPressed, RGB(216, 216, 216));
+    EXPECT_EQ(palette.buttonSelected, ResolveNativeThemeSelectedBackground(RGB(240, 240, 240), RGB(40, 40, 40)));
 }
 
 TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
@@ -164,6 +166,15 @@ TEST(DashboardTitlebarPalette, DerivesDarkButtonColorsFromBaseColors) {
     EXPECT_EQ(palette.buttonGlyph, RGB(255, 255, 255));
     EXPECT_EQ(palette.buttonHover, RGB(45, 45, 45));
     EXPECT_EQ(palette.buttonPressed, RGB(58, 58, 58));
+    EXPECT_EQ(palette.buttonSelected, ResolveNativeThemeSelectedBackground(RGB(32, 32, 32), RGB(255, 255, 255)));
+}
+
+TEST(DashboardTitlebarPalette, AcceptsNativeSelectedBackgroundSharedWithMenuIcons) {
+    const COLORREF selectedBackground = ResolveNativeThemeSelectedBackground(RGB(11, 22, 33), RGB(204, 51, 17));
+    const DashboardTitlebarPalette palette =
+        ResolveDashboardTitlebarPaletteFromBaseColors(RGB(240, 240, 240), RGB(40, 40, 40), selectedBackground);
+
+    EXPECT_EQ(palette.buttonSelected, selectedBackground);
 }
 
 TEST(DashboardTitlebarChrome, ScalesTopCornerRadiusWithDpi) {

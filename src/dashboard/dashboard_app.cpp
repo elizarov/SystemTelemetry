@@ -1353,17 +1353,14 @@ void DashboardApp::PaintNativeTitlebarButton(
     } else if (pressed) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonPressed);
     } else if (editLayoutActive) {
-        FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonPressed);
+        FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonSelected);
     } else if (hovered) {
         FillRectWithColor(hdc, buttonRect, nativeTitlebarPalette_.buttonHover);
     }
 
     HGDIOBJ oldFont = SelectObject(hdc, GetStockObject(DEFAULT_GUI_FONT));
     const int oldBkMode = SetBkMode(hdc, TRANSPARENT);
-    const COLORREF glyphColor = closeButtonActive ? closeButtonColors.glyph
-                                : editLayoutActive
-                                    ? ColorConfigToColorRef(controller_.State().config.layout.colors.activeEditColor)
-                                    : nativeTitlebarPalette_.buttonGlyph;
+    const COLORREF glyphColor = closeButtonActive ? closeButtonColors.glyph : nativeTitlebarPalette_.buttonGlyph;
     const COLORREF oldTextColor = SetTextColor(hdc, glyphColor);
 
     if (button == NativeTitlebarButton::AppMenu) {

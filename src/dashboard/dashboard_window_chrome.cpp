@@ -5,6 +5,8 @@
 #include <uxtheme.h>
 #include <vssym32.h>
 
+#include "dashboard/native_theme_colors.h"
+
 namespace {
 
 constexpr DWORD kDwmUseImmersiveDarkModeAttribute = 20;
@@ -78,8 +80,11 @@ template <typename Value> HRESULT SetDwmAttribute(HWND hwnd, DWORD attribute, co
 }  // namespace
 
 DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND) {
+    const COLORREF selectedBackground =
+        ResolveNativeThemeSelectedBackground(GetSysColor(COLOR_MENU), GetSysColor(COLOR_HIGHLIGHT));
     if (HighContrastEnabled()) {
-        return ResolveDashboardTitlebarPaletteFromBaseColors(GetSysColor(COLOR_WINDOW), GetSysColor(COLOR_WINDOWTEXT));
+        return ResolveDashboardTitlebarPaletteFromBaseColors(
+            GetSysColor(COLOR_WINDOW), GetSysColor(COLOR_WINDOWTEXT), selectedBackground);
     }
 
     // UxTheme's WINDOW caption fill hint can still report legacy accent colors on Windows 11, while DWM renders the
@@ -87,15 +92,23 @@ DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND) {
     const bool lightTheme = SystemAppsUseLightTheme();
     return ResolveDashboardTitlebarPaletteFromBaseColors(
         lightTheme ? kModernLightCaptionBackground : kModernDarkCaptionBackground,
-        lightTheme ? kModernLightCaptionText : kModernDarkCaptionText);
+        lightTheme ? kModernLightCaptionText : kModernDarkCaptionText,
+        selectedBackground);
 }
 
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF background, COLORREF text) {
+    return ResolveDashboardTitlebarPaletteFromBaseColors(
+        background, text, ResolveNativeThemeSelectedBackground(background, text));
+}
+
+DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(
+    COLORREF background, COLORREF text, COLORREF selectedBackground) {
     DashboardTitlebarPalette palette;
     palette.background = background;
     palette.text = text;
     palette.buttonHover = BlendColor(background, text, kTitlebarButtonHoverBlendPercent);
     palette.buttonPressed = BlendColor(background, text, kTitlebarButtonPressedBlendPercent);
+    palette.buttonSelected = selectedBackground;
     palette.buttonGlyph = text;
     return palette;
 }

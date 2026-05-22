@@ -7,6 +7,7 @@
 
 #include "config/config.h"
 #include "dashboard/display_placement_menu_bitmap.h"
+#include "dashboard/native_theme_colors.h"
 #include "display/constants.h"
 #include "display/monitor.h"
 #include "util/scale.h"
@@ -72,10 +73,9 @@ std::vector<DisplayPlacementMenuBitmapPixel> PaintMenuBitmapForTest(DisplayMenuO
     constexpr COLORREF kMenuColor = RGB(11, 22, 33);
     constexpr COLORREF kMenuTextColor = RGB(101, 111, 121);
     constexpr COLORREF kHighlightColor = RGB(204, 51, 17);
-    constexpr COLORREF kHighlightTextColor = RGB(33, 222, 88);
     std::vector<DisplayPlacementMenuBitmapPixel> pixels(kBitmapSize * kBitmapSize);
     PaintDisplayPlacementMenuBitmapPixels(
-        pixels.data(), kBitmapSize, option, kMenuColor, kMenuTextColor, kHighlightColor, kHighlightTextColor);
+        pixels.data(), kBitmapSize, option, kMenuColor, kMenuTextColor, kHighlightColor);
     return pixels;
 }
 
@@ -345,42 +345,43 @@ TEST(DisplayPlacementSchematic, LeftAndRightUseFittedLayoutWidthRatio) {
     ExpectRect(rightGeometry.dividerRect, 64, 0, 65, 100);
 }
 
-TEST(DisplayPlacementMenuBitmap, InactiveOptionDoesNotDrawActiveBadgePixels) {
+TEST(DisplayPlacementMenuBitmap, InactiveOptionUsesMenuBackground) {
     DisplayMenuOption option = MakeSchematicOption(DisplayPlacementMode::FullScreen, 1200, 1000, 1200, 1000);
     option.matchesCommittedConfig = false;
 
     const std::vector<DisplayPlacementMenuBitmapPixel> pixels = PaintMenuBitmapForTest(option);
 
-    const auto badgeFill = OpaqueDisplayPlacementMenuBitmapPixel(
-        BlendDisplayPlacementMenuBitmapColor(RGB(204, 51, 17), RGB(11, 22, 33), 88));
-    const auto checkColor = OpaqueDisplayPlacementMenuBitmapPixel(RGB(33, 222, 88));
-    EXPECT_EQ(CountPixels(pixels, badgeFill), 0);
-    EXPECT_EQ(CountPixels(pixels, checkColor), 0);
+    const auto menuBackground = OpaqueDisplayPlacementMenuBitmapPixel(RGB(11, 22, 33));
+    const auto activeBackground =
+        OpaqueDisplayPlacementMenuBitmapPixel(ResolveNativeThemeSelectedBackground(RGB(11, 22, 33), RGB(204, 51, 17)));
+    EXPECT_GT(CountPixels(pixels, menuBackground), 0);
+    EXPECT_EQ(CountPixels(pixels, activeBackground), 0);
 }
 
-TEST(DisplayPlacementMenuBitmap, ActiveOptionDrawsBadgeAndPreservesPlacementSchematic) {
+TEST(DisplayPlacementMenuBitmap, ActiveOptionUsesTintedBackgroundAndPreservesPlacementSchematic) {
     DisplayMenuOption option = MakeSchematicOption(DisplayPlacementMode::Right, 1200, 1000, 563, 1000);
     option.matchesCommittedConfig = true;
 
     const std::vector<DisplayPlacementMenuBitmapPixel> pixels = PaintMenuBitmapForTest(option);
 
-    const auto placementFill = OpaqueDisplayPlacementMenuBitmapPixel(
-        BlendDisplayPlacementMenuBitmapColor(RGB(204, 51, 17), RGB(11, 22, 33), 32));
-    const auto badgeFill = OpaqueDisplayPlacementMenuBitmapPixel(
-        BlendDisplayPlacementMenuBitmapColor(RGB(204, 51, 17), RGB(11, 22, 33), 88));
-    const auto checkColor = OpaqueDisplayPlacementMenuBitmapPixel(RGB(33, 222, 88));
+    const COLORREF activeBackgroundColor = ResolveNativeThemeSelectedBackground(RGB(11, 22, 33), RGB(204, 51, 17));
+    const auto activeBackground = OpaqueDisplayPlacementMenuBitmapPixel(activeBackgroundColor);
+    const auto placementFill =
+        OpaqueDisplayPlacementMenuBitmapPixel(BlendNativeThemeColor(RGB(204, 51, 17), activeBackgroundColor, 32));
+    EXPECT_GT(CountPixels(pixels, activeBackground), 0);
     EXPECT_GT(CountPixels(pixels, placementFill), 0);
-    EXPECT_GT(CountPixels(pixels, badgeFill), 0);
-    EXPECT_GT(CountPixels(pixels, checkColor), 0);
+    EXPECT_EQ(CountPixels(pixels, OpaqueDisplayPlacementMenuBitmapPixel(RGB(11, 22, 33))), 0);
 }
 
-TEST(DisplayPlacementMenuBitmap, ActiveBadgeUsesProvidedMenuAndHighlightPalette) {
+TEST(DisplayPlacementMenuBitmap, ActiveBackgroundUsesProvidedMenuAndHighlightPalette) {
     DisplayMenuOption option = MakeSchematicOption(DisplayPlacementMode::FullScreen, 1200, 1000, 1200, 1000);
     option.matchesCommittedConfig = true;
 
     const std::vector<DisplayPlacementMenuBitmapPixel> pixels = PaintMenuBitmapForTest(option);
 
-    EXPECT_GT(CountPixels(pixels, OpaqueDisplayPlacementMenuBitmapPixel(RGB(33, 222, 88))), 0);
+    const auto activeBackground =
+        OpaqueDisplayPlacementMenuBitmapPixel(ResolveNativeThemeSelectedBackground(RGB(11, 22, 33), RGB(204, 51, 17)));
+    EXPECT_GT(CountPixels(pixels, activeBackground), 0);
     EXPECT_EQ(CountPixels(pixels, OpaqueDisplayPlacementMenuBitmapPixel(RGB(0, 0, 0))), 0);
     EXPECT_EQ(CountPixels(pixels, OpaqueDisplayPlacementMenuBitmapPixel(RGB(255, 255, 255))), 0);
 }

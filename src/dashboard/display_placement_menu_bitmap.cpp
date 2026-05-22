@@ -1,8 +1,8 @@
 #include "dashboard/display_placement_menu_bitmap.h"
 
 #include <algorithm>
-#include <cmath>
 
+#include "dashboard/native_theme_colors.h"
 #include "util/scale.h"
 
 namespace {
@@ -97,69 +97,11 @@ void PaintBitmapRectOutline(
     PaintBitmapRect(pixels, width, height, RECT{rect.right - lineThickness, rect.top, rect.right, rect.bottom}, color);
 }
 
-void PaintBitmapLine(DisplayPlacementMenuBitmapPixel* pixels,
-    int width,
-    int height,
-    POINT from,
-    POINT to,
-    int thickness,
-    COLORREF color) {
-    const int dx = to.x - from.x;
-    const int dy = to.y - from.y;
-    const int steps = std::max(std::abs(dx), std::abs(dy));
-    if (steps <= 0) {
-        PaintBitmapRect(pixels, width, height, RECT{from.x, from.y, from.x + 1, from.y + 1}, color);
-        return;
-    }
-
-    const int radius = std::max(0, thickness / 2);
-    for (int i = 0; i <= steps; ++i) {
-        const double t = static_cast<double>(i) / static_cast<double>(steps);
-        const int x = static_cast<int>(std::lround(static_cast<double>(from.x) + static_cast<double>(dx) * t));
-        const int y = static_cast<int>(std::lround(static_cast<double>(from.y) + static_cast<double>(dy) * t));
-        PaintBitmapRect(pixels, width, height, RECT{x - radius, y - radius, x + radius + 1, y + radius + 1}, color);
-    }
-}
-
-void PaintActiveBadge(DisplayPlacementMenuBitmapPixel* pixels,
-    int bitmapSize,
-    COLORREF menuColor,
-    COLORREF menuTextColor,
-    COLORREF highlightColor,
-    COLORREF highlightTextColor) {
-    const int badgeSize = std::clamp(bitmapSize / 2, 7, 12);
-    const int inset = std::max(1, bitmapSize / 16);
-    const RECT badge{inset, inset, inset + badgeSize, inset + badgeSize};
-    const COLORREF fillColor = BlendDisplayPlacementMenuBitmapColor(highlightColor, menuColor, 88);
-    const COLORREF borderColor = BlendDisplayPlacementMenuBitmapColor(menuTextColor, fillColor, 40);
-    PaintBitmapRect(pixels, bitmapSize, bitmapSize, badge, fillColor);
-    PaintBitmapRectOutline(pixels, bitmapSize, bitmapSize, badge, 1, borderColor);
-
-    const int left = badge.left + std::max(2, badgeSize / 5);
-    const int middleX = badge.left + std::max(3, (badgeSize * 2) / 5);
-    const int right = badge.right - std::max(2, badgeSize / 5);
-    const int middleY = badge.bottom - std::max(3, badgeSize / 3);
-    const int leftY = badge.top + std::max(3, badgeSize / 2);
-    const int rightY = badge.top + std::max(2, badgeSize / 4);
-    const int thickness = std::max(1, badgeSize / 5);
-    PaintBitmapLine(
-        pixels, bitmapSize, bitmapSize, POINT{left, leftY}, POINT{middleX, middleY}, thickness, highlightTextColor);
-    PaintBitmapLine(
-        pixels, bitmapSize, bitmapSize, POINT{middleX, middleY}, POINT{right, rightY}, thickness, highlightTextColor);
+COLORREF ResolveDisplayPlacementMenuBitmapBackground(COLORREF menuColor, COLORREF highlightColor, bool active) {
+    return active ? ResolveNativeThemeSelectedBackground(menuColor, highlightColor) : menuColor;
 }
 
 }  // namespace
-
-COLORREF BlendDisplayPlacementMenuBitmapColor(COLORREF foreground, COLORREF background, int foregroundPercent) {
-    const int clampedPercent = std::clamp(foregroundPercent, 0, 100);
-    const int backgroundPercent = 100 - clampedPercent;
-    const auto blendChannel = [&](int foregroundChannel, int backgroundChannel) {
-        return static_cast<BYTE>((foregroundChannel * clampedPercent + backgroundChannel * backgroundPercent) / 100);
-    };
-    return RGB(blendChannel(GetRValue(foreground), GetRValue(background)),
-        blendChannel(GetGValue(foreground), GetGValue(background)),
-        blendChannel(GetBValue(foreground), GetBValue(background)));
-}
 
 DisplayPlacementMenuBitmapPixel OpaqueDisplayPlacementMenuBitmapPixel(COLORREF color) {
     return DisplayPlacementMenuBitmapPixel{GetBValue(color), GetGValue(color), GetRValue(color), 255};
@@ -179,13 +121,14 @@ void PaintDisplayPlacementMenuBitmapPixels(DisplayPlacementMenuBitmapPixel* pixe
     const DisplayMenuOption& option,
     COLORREF menuColor,
     COLORREF menuTextColor,
-    COLORREF highlightColor,
-    COLORREF highlightTextColor) {
+    COLORREF highlightColor) {
     if (pixels == nullptr || bitmapSize <= 0) {
         return;
     }
 
-    std::fill(pixels, pixels + bitmapSize * bitmapSize, OpaqueDisplayPlacementMenuBitmapPixel(menuColor));
+    const COLORREF backgroundColor =
+        ResolveDisplayPlacementMenuBitmapBackground(menuColor, highlightColor, option.matchesCommittedConfig);
+    std::fill(pixels, pixels + bitmapSize * bitmapSize, OpaqueDisplayPlacementMenuBitmapPixel(backgroundColor));
 
     const int padding = std::max(1, bitmapSize / 8);
     const RECT bounds{padding, padding, bitmapSize - padding, bitmapSize - padding};
@@ -195,18 +138,15 @@ void PaintDisplayPlacementMenuBitmapPixels(DisplayPlacementMenuBitmapPixel* pixe
         return;
     }
 
-    const COLORREF fillColor = BlendDisplayPlacementMenuBitmapColor(highlightColor, menuColor, 32);
-    const COLORREF outlineColor = BlendDisplayPlacementMenuBitmapColor(menuTextColor, menuColor, 75);
-    const COLORREF dividerColor = BlendDisplayPlacementMenuBitmapColor(menuTextColor, menuColor, 82);
+    const COLORREF fillColor = BlendNativeThemeColor(highlightColor, backgroundColor, 32);
+    const COLORREF outlineColor = BlendNativeThemeColor(menuTextColor, backgroundColor, 75);
+    const COLORREF dividerColor = BlendNativeThemeColor(menuTextColor, backgroundColor, 82);
     PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.caseDashRect, fillColor);
     if (geometry.hasDivider) {
         PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.dividerRect, dividerColor);
     }
     PaintBitmapRectOutline(
         pixels, bitmapSize, bitmapSize, geometry.displayRect, std::max(1, bitmapSize / 14), outlineColor);
-    if (option.matchesCommittedConfig) {
-        PaintActiveBadge(pixels, bitmapSize, menuColor, menuTextColor, highlightColor, highlightTextColor);
-    }
 }
 
 HBITMAP CreateDisplayPlacementMenuBitmap(const DisplayMenuOption& option, UINT dpi) {
@@ -230,12 +170,7 @@ HBITMAP CreateDisplayPlacementMenuBitmap(const DisplayMenuOption& option, UINT d
     }
 
     auto* pixels = static_cast<DisplayPlacementMenuBitmapPixel*>(bits);
-    PaintDisplayPlacementMenuBitmapPixels(pixels,
-        bitmapSize,
-        option,
-        GetSysColor(COLOR_MENU),
-        GetSysColor(COLOR_MENUTEXT),
-        GetSysColor(COLOR_HIGHLIGHT),
-        GetSysColor(COLOR_HIGHLIGHTTEXT));
+    PaintDisplayPlacementMenuBitmapPixels(
+        pixels, bitmapSize, option, GetSysColor(COLOR_MENU), GetSysColor(COLOR_MENUTEXT), GetSysColor(COLOR_HIGHLIGHT));
     return bitmap;
 }

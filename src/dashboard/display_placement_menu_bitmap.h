@@ -13,7 +13,6 @@ struct DisplayPlacementMenuBitmapPixel {
     bool operator==(const DisplayPlacementMenuBitmapPixel& other) const = default;
 };
 
-COLORREF BlendDisplayPlacementMenuBitmapColor(COLORREF foreground, COLORREF background, int foregroundPercent);
 DisplayPlacementMenuBitmapPixel OpaqueDisplayPlacementMenuBitmapPixel(COLORREF color);
 int ResolveNativeMenuBitmapSize(UINT dpi);
 void PaintDisplayPlacementMenuBitmapPixels(DisplayPlacementMenuBitmapPixel* pixels,
@@ -21,6 +20,5 @@ void PaintDisplayPlacementMenuBitmapPixels(DisplayPlacementMenuBitmapPixel* pixe
     const DisplayMenuOption& option,
     COLORREF menuColor,
     COLORREF menuTextColor,
-    COLORREF highlightColor,
-    COLORREF highlightTextColor);
+    COLORREF highlightColor);
 HBITMAP CreateDisplayPlacementMenuBitmap(const DisplayMenuOption& option, UINT dpi);

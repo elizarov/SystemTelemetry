@@ -7,6 +7,7 @@ struct DashboardTitlebarPalette {
     COLORREF text = RGB(0, 0, 0);
     COLORREF buttonHover = RGB(228, 228, 228);
     COLORREF buttonPressed = RGB(213, 213, 213);
+    COLORREF buttonSelected = RGB(224, 233, 244);
     COLORREF buttonGlyph = RGB(0, 0, 0);
 };
 
@@ -25,6 +26,8 @@ struct DashboardCloseButtonColors {
 
 DashboardTitlebarPalette ResolveDashboardTitlebarPalette(HWND hwnd);
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF background, COLORREF text);
+DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(
+    COLORREF background, COLORREF text, COLORREF selectedBackground);
 int ResolveDashboardTitlebarCornerRadius(UINT dpi);
 DashboardCloseButtonColors ResolveDashboardCloseButtonColors(HWND hwnd, bool pressed);
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible);
