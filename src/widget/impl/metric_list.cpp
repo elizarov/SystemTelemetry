@@ -5,6 +5,7 @@
 #include <string>
 #include <string_view>
 
+#include "config/config_telemetry.h"
 #include "telemetry/metrics.h"
 #include "util/strings.h"
 #include "util/text_format.h"

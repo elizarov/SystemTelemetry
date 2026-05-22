@@ -18,7 +18,6 @@
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -64,8 +63,8 @@ constexpr int kZesTemperatureGpuBoard = 6;
 constexpr int kZesTemperatureGpuBoardMin = 7;
 constexpr int kD3DkmtQueryNodePerfData = 61;
 constexpr int kMaximumD3DkmtNodeOrdinal = 32;
-constexpr wchar_t kLevelZeroLibraryName[] = L"ze_loader.dll";  // LoadLibraryW requires a UTF-16 DLL name.
-constexpr wchar_t kGdi32LibraryName[] = L"gdi32.dll";          // Win32 module loading requires a UTF-16 DLL name.
+constexpr char kLevelZeroLibraryName[] = "ze_loader.dll";
+constexpr char kGdi32LibraryName[] = "gdi32.dll";
 
 struct ZeDeviceUuid {
     std::uint8_t id[16] = {};
@@ -304,7 +303,7 @@ std::string KnownAnsiString(const char* text) {
     if (text == nullptr || text[0] == '\0') {
         return {};
     }
-    std::string value = Utf8FromAnsi(text);
+    std::string value = text;
     return value.empty() || EqualsInsensitive(value, "unknown") ? std::string{} : value;
 }
 
@@ -404,7 +403,7 @@ public:
     }
 
     bool Load(std::string& diagnostics) {
-        module_ = LoadLibraryW(kLevelZeroLibraryName);
+        module_ = LoadLibraryA(kLevelZeroLibraryName);
         if (module_ == nullptr) {
             diagnostics = ResourceStringText(RES_STR("Level Zero loader not found."));
             return false;
@@ -686,7 +685,7 @@ public:
             return false;
         }
 
-        module_ = LoadLibraryW(kGdi32LibraryName);
+        module_ = LoadLibraryA(kGdi32LibraryName);
         if (module_ == nullptr) {
             trace.Write(
                 TracePrefix::IntelLevelZero, RES_STR("wddm_clock_init available=no reason=\"gdi32 load failed\""));

@@ -9,18 +9,17 @@
 #include "layout_model/layout_edit_helpers.h"
 #include "resource.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
 void InsertLayoutEditTreeNodes(
     LayoutEditDialogState* state, HWND tree, const std::vector<LayoutEditTreeNode>& nodes, HTREEITEM parent) {
     for (const auto& node : nodes) {
-        TVINSERTSTRUCTW insert{};
+        TVINSERTSTRUCTA insert{};
         insert.hParent = parent;
         insert.hInsertAfter = TVI_LAST;
         insert.item.mask = TVIF_TEXT | TVIF_PARAM;
-        std::wstring label = WideFromUtf8(node.label);
+        std::string label = node.label;
         insert.item.pszText = label.data();
         insert.item.lParam = reinterpret_cast<LPARAM>(&node);
         HTREEITEM item = TreeView_InsertItem(tree, &insert);
@@ -37,7 +36,7 @@ const LayoutEditTreeNode* TreeNodeFromItem(HWND tree, HTREEITEM item) {
         return nullptr;
     }
 
-    TVITEMW treeItem{};
+    TVITEMA treeItem{};
     treeItem.mask = TVIF_PARAM;
     treeItem.hItem = item;
     if (!TreeView_GetItem(tree, &treeItem)) {

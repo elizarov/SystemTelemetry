@@ -16,8 +16,8 @@ jobs:
     timeout-minutes: 240
 
     env:
-      CASEDASH_TIDY_TIMEOUT_SECONDS: 1800
-      CASEDASH_TIDY_MAX_PARALLEL: 4
+      CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS: 1800
+      CASEDASH_INCLUDE_LINT_MAX_PARALLEL: 4
       CASEDASH_CACHE_ROOT: ${{ github.workspace }}\.github-cache\CaseDash
 
     steps:
@@ -53,9 +53,9 @@ jobs:
         shell: cmd
         run: package.cmd
 
-      - name: Run lint tidy
+      - name: Run unused include lint
         shell: cmd
-        run: lint.cmd tidy
+        run: lint.cmd includes
 
       - name: Upload CaseDash executable
         uses: actions/upload-artifact@v7
@@ -73,12 +73,12 @@ jobs:
             build/CaseDash-*.msi.sha256
           if-no-files-found: error
 
-      - name: Upload clang-tidy report
+      - name: Upload clang include-cleaner report
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: clang-tidy-report
-          path: build/clang_tidy_report.txt
+          name: clang-include-cleaner-report
+          path: build/clang_include_cleaner_report.txt
           if-no-files-found: ignore
 
       - name: Save vcpkg caches

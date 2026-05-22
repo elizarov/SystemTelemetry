@@ -4,7 +4,7 @@
 #include <string_view>
 #include <vcclr.h>
 
-#include "util/utf8.h"
+#include "util/text_encoding.h"
 
 #using < mscorlib.dll>
 #using < System.dll>
@@ -30,12 +30,12 @@ constexpr int kLoadModulesTimeoutMs = 10000;
 constexpr int kExecutionTimeoutMs = 20000;
 
 String ^ ManagedStringFromUtf8(std::string_view text) {
-    const std::wstring wide = WideFromUtf8(text);
+    const std::wstring wide = WideFromText(text);
     return gcnew String(wide.c_str());
 }
 
 void SetDiagnosticsUtf8(LenovoHardwareScanCaptureSink& sink, std::string_view text) {
-    const std::wstring wide = WideFromUtf8(text);
+    const std::wstring wide = WideFromText(text);
     sink.SetDiagnostics(wide.c_str());
 }
 

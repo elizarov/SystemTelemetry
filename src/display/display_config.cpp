@@ -7,19 +7,21 @@
 #include "config/config_parser.h"
 #include "config/config_writer.h"
 #include "diagnostics/diagnostics.h"
+#include "diagnostics/snapshot_dump.h"
 #include "display/constants.h"
 #include "display/monitor.h"
 #include "telemetry/metrics.h"
 #include "util/command_line.h"
 #include "util/elevated_process.h"
 #include "util/paths.h"
+#include "util/scale.h"
 #include "util/temp_file.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
 
-constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened dump path.
+constexpr char kWriteBinaryMode[] = "wb";
 
 std::string ReadBinaryFile(const FilePath& path) {
     return ReadFileBinary(path).value_or(std::string{});
@@ -94,7 +96,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
             const HRESULT rectStatus = desktopWallpaper->GetMonitorRECT(monitorId, &monitorRect);
             if (SUCCEEDED(rectStatus) && RectsEqual(monitorRect, targetMonitor->rect)) {
                 targetFound = true;
-                const std::wstring wideWallpaperPath = wallpaperPath.Wide();
+                const std::wstring wideWallpaperPath = wallpaperPath.WideForNativeApi();
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
                 const std::string pathText = wallpaperPath.string();
@@ -158,8 +160,7 @@ bool ConfigureDisplay(
     bool prepared = SaveConfig(tempConfigPath, config, ConfigParseContext{TelemetryMetricCatalog()});
     if (prepared) {
         std::FILE* output = nullptr;
-        const std::wstring wideTempDumpPath = tempDumpPath.Wide();
-        prepared = _wfopen_s(&output, wideTempDumpPath.c_str(), kWriteBinaryMode) == 0 && output != nullptr;
+        prepared = fopen_s(&output, tempDumpPath.string().c_str(), kWriteBinaryMode) == 0 && output != nullptr;
         if (prepared) {
             prepared = WriteTelemetryDump(output, dump);
             fclose(output);

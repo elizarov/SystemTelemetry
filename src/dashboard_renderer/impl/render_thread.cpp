@@ -118,9 +118,9 @@ void DashboardLayerBitmapPool::Clear() {
 }
 
 DashboardRenderThread::DashboardRenderThread()
-    : wakeEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
-      framePresentedEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)),
-      discardCompletedEvent_(CreateEventW(nullptr, TRUE, FALSE, nullptr)) {}
+    : wakeEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
+      framePresentedEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
+      discardCompletedEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
 
 DashboardRenderThread::~DashboardRenderThread() {
     Shutdown();

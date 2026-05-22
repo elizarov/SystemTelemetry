@@ -8,7 +8,7 @@
 #include <vector>
 
 #include "config/color_math.h"
-#include "util/utf8.h"
+#include "config/config.h"
 
 namespace {
 
@@ -78,9 +78,8 @@ ThemeTriangleGeometry BuildThemeTriangleGeometry(const RECT& rect, int dpi) {
 }
 
 void DrawThemePreviewLabel(HDC dc, std::string_view text, const RECT& rect, UINT format) {
-    const std::wstring wideText = WideFromUtf8(text);
     RECT labelRect = rect;
-    DrawTextW(dc, wideText.data(), static_cast<int>(wideText.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
+    DrawTextA(dc, text.data(), static_cast<int>(text.size()), &labelRect, format | DT_SINGLELINE | DT_NOPREFIX);
 }
 
 int DeviceDpiY(HDC dc) {

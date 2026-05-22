@@ -7,9 +7,11 @@
 #include "config/color_resolver.h"
 #include "config/config_io.h"
 #include "config/config_resolution.h"
+#include "config/config_telemetry.h"
 #include "config/config_writer.h"
 #include "dashboard/autostart.h"
 #include "diagnostics/constants.h"
+#include "diagnostics/snapshot_dump.h"
 #include "display/constants.h"
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
@@ -18,6 +20,7 @@
 #include "telemetry/metrics.h"
 #include "util/command_line.h"
 #include "util/elevated_process.h"
+#include "util/scale.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
 #include "util/text_format.h"
@@ -28,7 +31,7 @@ namespace {
 constexpr char kTelemetryDumpFilter[] = "Telemetry dump (*.txt)\0*.txt\0All files (*.*)\0*.*\0";
 constexpr char kPngFilter[] = "PNG image (*.png)\0*.png\0All files (*.*)\0*.*\0";
 constexpr char kIniFilter[] = "INI config (*.ini)\0*.ini\0All files (*.*)\0*.*\0";
-constexpr wchar_t kWriteBinaryMode[] = L"wb";  // _wfopen_s mode string follows the widened export path.
+constexpr char kWriteBinaryMode[] = "wb";
 
 template <size_t Size> constexpr std::string_view StringViewWithTerminator(const char (&text)[Size]) {
     return std::string_view(text, Size);
@@ -113,7 +116,7 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
 
-void AssignCommonFontFamily(UiFontSetConfig& fonts, const std::string& family) {
+void AssignCommonFontFamily(FontsConfig& fonts, const std::string& family) {
     fonts.title.face = family;
     fonts.big.face = family;
     fonts.value.face = family;
@@ -359,8 +362,7 @@ void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
         return;
     }
     std::FILE* output = nullptr;
-    const std::wstring widePath = path->Wide();
-    if (_wfopen_s(&output, widePath.c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
+    if (fopen_s(&output, path->string().c_str(), kWriteBinaryMode) != 0 || output == nullptr) {
         const std::string pathText = path->string();
         shell.ShowError(FormatText("Failed to open dump file:\n%s", pathText.c_str()));
         return;
@@ -723,7 +725,7 @@ bool DashboardController::ApplyLayoutEditFontFamily(DashboardShellHost& shell, c
     return FinishConfigMutation(shell, false);
 }
 
-bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const UiFontSetConfig& fonts) {
+bool DashboardController::ApplyLayoutEditFontSet(DashboardShellHost& shell, const FontsConfig& fonts) {
     state_.config.layout.fonts = fonts;
     return FinishConfigMutation(shell, false);
 }

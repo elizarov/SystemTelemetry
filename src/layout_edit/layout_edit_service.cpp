@@ -55,12 +55,12 @@ bool ApplyLayoutNodeMutation(
     AppConfig& config, const std::string& editCardId, const std::vector<size_t>& nodePath, Mutate&& mutate) {
     bool updated = false;
     if (editCardId.empty()) {
-        updated = mutate(FindLayoutNodeByPath(config.layout.structure.cardsLayout, nodePath));
+        updated = mutate(FindLayoutNodeByPath(config.layout.structure.cards, nodePath));
         if (!updated) {
             return false;
         }
         if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            mutate(FindLayoutNodeByPath(namedLayout->cardsLayout, nodePath));
+            mutate(FindLayoutNodeByPath(namedLayout->cards, nodePath));
         }
     } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, editCardId)) {
         updated = mutate(FindLayoutNodeByPath(card->layout, nodePath));
@@ -77,7 +77,7 @@ std::string JoinMetricRefs(const std::vector<std::string>& metricRefs) {
 
 const LayoutNodeConfig* FindGuideNode(const AppConfig& config, const LayoutEditLayoutTarget& target) {
     if (target.editCardId.empty()) {
-        return FindLayoutNodeByPath(config.layout.structure.cardsLayout, target.nodePath);
+        return FindLayoutNodeByPath(config.layout.structure.cards, target.nodePath);
     }
     for (const LayoutCardConfig& card : config.layout.cards) {
         if (card.id == target.editCardId) {
@@ -227,12 +227,12 @@ bool ApplyContainerChildOrder(
 
     bool updated = false;
     if (key.editCardId.empty()) {
-        updated = applyOrder(FindLayoutNodeByPath(config.layout.structure.cardsLayout, key.nodePath));
+        updated = applyOrder(FindLayoutNodeByPath(config.layout.structure.cards, key.nodePath));
         if (!updated) {
             return false;
         }
         if (LayoutSectionConfig* namedLayout = FindNamedLayoutByName(config, config.display.layout)) {
-            applyOrder(FindLayoutNodeByPath(namedLayout->cardsLayout, key.nodePath));
+            applyOrder(FindLayoutNodeByPath(namedLayout->cards, key.nodePath));
         }
     } else if (LayoutCardConfig* card = FindCardLayoutById(config.layout, key.editCardId)) {
         updated = applyOrder(FindLayoutNodeByPath(card->layout, key.nodePath));

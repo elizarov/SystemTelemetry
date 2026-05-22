@@ -10,7 +10,12 @@ if /I "%GITHUB_ACTIONS%"=="true" (
 if errorlevel 1 exit /b %errorlevel%
 
 ctest --test-dir "%REPO_ROOT%\build\cmake" -C Release --verbose --output-on-failure
-exit /b %errorlevel%
+set "RESULT=%errorlevel%"
+
+python "%REPO_ROOT%\tools\tests\lint\lint_test.py"
+if errorlevel 1 if "%RESULT%"=="0" set "RESULT=%errorlevel%"
+
+exit /b %RESULT%
 
 :github_devenv
 if defined VSCMD_ARG_TGT_ARCH exit /b 0

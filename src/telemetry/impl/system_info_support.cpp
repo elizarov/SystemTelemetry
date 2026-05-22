@@ -3,8 +3,6 @@
 #include <algorithm>
 #include <utility>
 
-#include "util/utf8.h"
-
 std::vector<NamedScalarMetric> CreateRequestedBoardMetrics(
     const std::vector<std::string>& names, ScalarMetricUnit unit) {
     std::vector<NamedScalarMetric> metrics;
@@ -88,35 +86,22 @@ void ApplyBoardSensorReadingsToMetrics(const std::vector<BoardSensorReading>& re
     }
 }
 
-std::optional<std::wstring> ReadRegistryWideString(HKEY root, const char* subKey, const char* valueName) {
-    const std::wstring wideSubKey = WideFromUtf8(subKey != nullptr ? std::string_view(subKey) : std::string_view());
-    const std::wstring wideValueName =
-        WideFromUtf8(valueName != nullptr ? std::string_view(valueName) : std::string_view());
-    const wchar_t* subKeyText = subKey != nullptr ? wideSubKey.c_str() : nullptr;
-    const wchar_t* valueNameText = valueName != nullptr ? wideValueName.c_str() : nullptr;
+std::optional<std::string> ReadRegistryString(HKEY root, const char* subKey, const char* valueName) {
     DWORD type = 0;
     DWORD bytes = 0;
-    const LONG probe = RegGetValueW(root, subKeyText, valueNameText, RRF_RT_REG_SZ, &type, nullptr, &bytes);
-    if (probe != ERROR_SUCCESS || bytes < sizeof(wchar_t)) {
+    const LONG probe = RegGetValueA(root, subKey, valueName, RRF_RT_REG_SZ, &type, nullptr, &bytes);
+    if (probe != ERROR_SUCCESS || bytes == 0) {
         return std::nullopt;
     }
 
-    std::wstring value(bytes / sizeof(wchar_t), wchar_t{});
-    const LONG status = RegGetValueW(root, subKeyText, valueNameText, RRF_RT_REG_SZ, &type, value.data(), &bytes);
+    std::string value(bytes, '\0');
+    const LONG status = RegGetValueA(root, subKey, valueName, RRF_RT_REG_SZ, &type, value.data(), &bytes);
     if (status != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
-    while (!value.empty() && value.back() == wchar_t{}) {
+    while (!value.empty() && value.back() == '\0') {
         value.pop_back();
     }
     return value;
-}
-
-std::optional<std::string> ReadRegistryString(HKEY root, const char* subKey, const char* valueName) {
-    const auto value = ReadRegistryWideString(root, subKey, valueName);
-    if (!value.has_value()) {
-        return std::nullopt;
-    }
-    return Utf8FromWide(*value);
 }

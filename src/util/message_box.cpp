@@ -5,14 +5,12 @@
 #include <string>
 
 #include "util/app_strings.h"
-#include "util/utf8.h"
 
-int MessageBoxUtf8(HWND owner, std::string_view text, UINT type) {
-    const std::wstring wideText = WideFromUtf8(text);
-    const std::wstring caption = WideFromUtf8(kAppTitleUtf8);
-    return MessageBoxW(owner, wideText.c_str(), caption.c_str(), type);
+int ShowAppMessageBox(HWND owner, std::string_view text, UINT type) {
+    const std::string message(text);
+    return MessageBoxA(owner, message.c_str(), kAppTitle, type);
 }
 
-int MessageBoxUtf8(std::string_view text, UINT type) {
-    return MessageBoxUtf8(nullptr, text, type);
+int ShowAppMessageBox(std::string_view text, UINT type) {
+    return ShowAppMessageBox(nullptr, text, type);
 }

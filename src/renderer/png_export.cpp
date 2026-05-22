@@ -137,7 +137,7 @@ bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     if (FAILED(hr) || stream == nullptr) {
         return SetPrefixedHresultError(errorText, errorPrefix, RES_STR("_stream_failed"), hr);
     }
-    const std::wstring wideImagePath = imagePath.Wide();
+    const std::wstring wideImagePath = imagePath.WideForNativeApi();
     hr = stream->InitializeFromFilename(wideImagePath.c_str(), GENERIC_WRITE);
     if (FAILED(hr)) {
         return SetPrefixedHresultPathError(errorText, errorPrefix, RES_STR("_stream_open_failed"), hr, imagePath);

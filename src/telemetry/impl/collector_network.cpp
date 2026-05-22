@@ -1,5 +1,7 @@
 #include "telemetry/impl/collector_network.h"
 
+#include <ws2tcpip.h>
+
 #include <cstring>
 #include <string>
 #include <utility>
@@ -8,7 +10,7 @@
 #include "telemetry/impl/collector_state.h"
 #include "util/numeric_safety.h"
 #include "util/strings.h"
-#include "util/utf8.h"
+#include "util/text_encoding.h"
 
 namespace {
 
@@ -75,15 +77,11 @@ AdapterSelectionInfo BuildAdapterSelectionInfo(const MIB_IF_ROW2& row, const IP_
                 continue;
             }
 
-            wchar_t address[128];
-            DWORD length = ARRAYSIZE(address);
-            if (WSAAddressToStringW(unicast->Address.lpSockaddr,
-                    static_cast<DWORD>(unicast->Address.iSockaddrLength),
-                    nullptr,
-                    address,
-                    &length) == 0) {
+            const auto* ipv4 = reinterpret_cast<const sockaddr_in*>(unicast->Address.lpSockaddr);
+            char address[INET_ADDRSTRLEN] = {};
+            if (InetNtopA(AF_INET, const_cast<IN_ADDR*>(&ipv4->sin_addr), address, ARRAYSIZE(address)) != nullptr) {
                 info.hasIpv4 = true;
-                info.ipAddress = Utf8FromWide(address);
+                info.ipAddress = address;
                 break;
             }
         }
@@ -141,7 +139,7 @@ bool HasPreferredNetworkCandidate(
         if (!info.hasIpv4) {
             continue;
         }
-        if (PreferredAdapterMatchRank(Utf8FromWide(row.Alias), Utf8FromWide(row.Description), preferredAdapterName) >
+        if (PreferredAdapterMatchRank(TextFromWide(row.Alias), TextFromWide(row.Description), preferredAdapterName) >
             0) {
             return true;
         }
@@ -220,8 +218,8 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
         NetworkCandidateState candidateState;
         candidateState.interfaceIndex = row.InterfaceIndex;
         candidateState.info = info;
-        candidateState.alias = Utf8FromWide(row.Alias);
-        candidateState.description = Utf8FromWide(row.Description);
+        candidateState.alias = TextFromWide(row.Alias);
+        candidateState.description = TextFromWide(row.Description);
         candidateState.inOctets = row.InOctets;
         candidateState.outOctets = row.OutOctets;
         candidateState.traffic = candidateState.inOctets + candidateState.outOctets;

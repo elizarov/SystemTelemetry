@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
 - `.clang-format` is the single maintained source of truth for C++ formatting policy. `format.cmd` owns narrow exclusions for mixed-mode C++/CLI bridge `.cpp` files that clang-format versions do not format consistently.
-- `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and tidy automation.
+- `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
 
@@ -43,10 +43,10 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
-- Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and tidy checks on the Windows runner before merge.
+- Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and unused-include checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
 - Keep project-authored quoted includes rooted at the configured `src` and `resources` include directories.
-- Keep local `NOLINT` suppressions out of source files; maintained clang-tidy false positives live in the lint tool allowlist.
+- Keep local `NOLINT` suppressions out of source files; fix include-cleaner findings through direct includes and narrow header ownership instead of local suppressions.
 - Keep C++ includes ordered by `format.cmd`: matching `.cpp` header first, then sorted angle/system includes, quoted `vendor/` includes, and sorted quoted project includes; WinSock and `windows.h` stay ahead of dependent Win32 headers.
 - Keep Win32 hygiene macros such as `NOMINMAX` and `WIN32_LEAN_AND_MEAN` in target compile definitions instead of local include preambles.
 - Keep each project `.cpp` paired with a matching header that owns its out-of-line declarations; `src/main/main.cpp` is the only headerless translation unit.
@@ -58,11 +58,11 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep committed resource payloads as the source of truth; CMake generates the compressed embedded config/localization text atlas under `build\cmake\generated\`, while `resources/CaseDash.rc` keeps the directly embedded app icon and panel-icon mask atlas explicit.
 - Keep `VERSION` as the single maintained base product version; generated headers, manifests, and version resources derive their build metadata from it plus Git state.
 - Do not add C++-side synthesized fallback layout, card, widget, font, color, or styling defaults that duplicate the embedded template.
-- Keep runtime text internally as UTF-8 `std::string` and convert to UTF-16 only at Windows API boundaries.
-- Keep source string constants as narrow UTF-8 literals by default. `lint.cmd` blocks undocumented wide literals in maintained source and test files; only `const` or `constexpr wchar_t` string constants with an end-of-line reason comment are allowed for fixed Win32 or managed interop boundary text.
+- Keep runtime text internally as UTF-8 `std::string`. The executable manifest declares UTF-8 as the process code page, and maintained native code calls Win32 A APIs by default.
+- Keep source string constants as narrow UTF-8 literals by default. `lint.cmd` blocks undocumented wide literals in maintained source and test files; only `const` or `constexpr wchar_t` string constants with an end-of-line reason comment are allowed for wide-native boundaries with no A-style API.
 - Keep shared string formatting on trace formatting APIs, `src/util/text_format.*`, and domain-owned utility helpers instead of repeating local `std::to_string` concatenation or append-builder chains.
 - Keep config-file I/O on standard C++ streams and preserve strict UTF-8 handling without ANSI code-page fallback.
-- Keep project filesystem operations on `src/util/file_path.*` helpers instead of `std::filesystem`; paths are stored as UTF-8 and widened only at filesystem API calls. `lint.cmd` enforces this source-policy rule for maintained source and test files.
+- Keep project filesystem operations on `src/util/file_path.*` helpers instead of `std::filesystem`; paths are stored as UTF-8 and use Win32 A APIs by default. `WideForNativeApi` is reserved for wide-native interfaces such as WIC filename methods and Desktop Wallpaper COM. `lint.cmd` enforces this source-policy rule for maintained source and test files.
 - Keep native app and benchmark targets built without native C++ exception handling; the C++/CLI bridge owns the managed exception boundary separately.
 - Keep native app, test, and benchmark targets compiled with `_USE_STD_VECTOR_ALGORITHMS=0` so MSVC's vectorized STL algorithm dispatch tables stay out of the single-file binaries.
 - Keep `resources/localization.ini` as the embedded key-value catalog for localizable runtime strings. Static source lookups can use `RES_STR("localization.key")` ids, but user-visible English copy belongs in the localization catalog rather than directly in the generated `RES_STR` string catalog.
@@ -87,19 +87,20 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - The executable-side `config.ini` overlays the embedded `resources/config.ini` template, and `Save Config` preserves that live file.
 - Embedded `config.ini` and `localization.ini` edits flow through the generated BOM-free UTF-8 text-resource atlas; app icon and panel-icon edits depend on explicit `resources/CaseDash.rc` CMake dependencies so incremental builds rebuild the resource object.
 - The generated compressed-resource RC object depends explicitly on `text_atlas.cdlz`; keep that dependency when changing generated text-resource outputs because RC compilation does not otherwise track RCDATA payload changes.
-- `RES_STR` ids are generated as collision-checked hashes; keep the generated header catalog-sized-literal-free so heavy trace sources do not pay a compile-time linear string lookup.
+- `RES_STR` ids are collision-checked hashes; keep the generated resource-string header limited to the active hash seed so heavy trace sources do not pay a compile-time linear string lookup.
 - Restored saved placement across monitors with different DPI scales lets `WM_DPICHANGED` apply the monitor transition before destination window size scaling.
 - Mouse-driven visual feedback cannot rely only on `WM_TIMER` or queued `WM_PAINT`; continuous pointer input can starve low-priority messages, so move mode and active drags update or redraw from processed pointer messages.
 - Login startup and monitor hotplug can race monitor enumeration; `display.monitor_name` placement keeps watching until the target display becomes enumerable.
 - Provider assembly loading restores the original launch working directory after any provider-specific current-directory change.
-- Auto-start service changes wait for the SCM running, stopped, or deletion state instead of trusting asynchronous `StartServiceW`, `ControlService`, or `DeleteService` return values; missing and deletion-pending services count as disabled while SCM finishes cleanup. Enable failures after service mutation must roll back the machine Run entry and service so a partial Start with Windows attempt does not leave background startup pieces behind.
+- Auto-start service changes wait for the SCM running, stopped, or deletion state instead of trusting asynchronous `StartServiceA`, `ControlService`, or `DeleteService` return values; missing and deletion-pending services count as disabled while SCM finishes cleanup. Enable failures after service mutation must roll back the machine Run entry and service so a partial Start with Windows attempt does not leave background startup pieces behind.
 - Repeated unattended profiling runs use `profile_benchmark.cmd /daemon-start` once, then ordinary benchmark invocations queue through the elevated daemon.
 - Failed or regressed benchmark optimization experiments are recorded in `docs/profile_benchmark.md`; machine-specific benchmark range updates are recorded in `docs/performance/<machine>.md`; size-specific lessons stay grouped in `docs/optimize_size.md`.
 - If `devenv.cmd` changes Visual Studio toolchains, delete `build\cmake` before the next `build.cmd` run.
 - Formatter and hook discovery starts from broad `*.cpp` and `*.h` pathspecs, then applies the repo eligibility filter because Git pathspecs such as `tests/**/*.cpp` do not cover top-level files.
-- Clang-tidy include-cleaner false-positive filters stay narrow so Win32 umbrella headers and project macro-provider headers do not hide real unused includes.
-- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_TIDY_TIMEOUT_SECONDS` for the tidy sweep.
+- Clangd include-cleaner line filters stay mechanical and include every eligible `#include` directive so stale project headers do not hide behind maintained suppressions.
+- GitHub Actions does not call machine-local `devenv.cmd`; CI resolves Visual Studio through the runner environment and sets `CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS` and `CASEDASH_INCLUDE_LINT_MAX_PARALLEL` for include checks.
 - `for /f` commands invoke `vswhere.exe` through `call "%VSWHERE%" ...` so `cmd` does not try to execute `C:\Program`.
-- Config-schema reflection descriptors stay type-derived and default-initialized because the GitHub Visual Studio runner can lag the local MSVC toolset.
+- Config metadata is generated into table descriptors from `src/config/config.h` and custom-section annotations in `src/config/config_primitives.h`; keep parser, writer, color, and layout-edit metadata consumers on the non-template runtime table APIs.
+- Font config keeps the C++ member `smallText` and maps it to the persisted `small` key with `config_meta: rename=small`, so Win32 RPC `small` macro handling stays outside the config schema.
 - The repo uses CRLF text checkouts; `.githooks/pre-commit` stays a minimal CRLF-tolerant shell launcher, and multi-line hook logic lives in PowerShell.
 - The installer completion launch stays directory-sourced instead of `FileRef`-sourced so the Finish button does not depend on File table action state and surface MSI error 2753.

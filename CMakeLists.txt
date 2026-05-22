@@ -113,9 +113,44 @@ add_custom_target(CaseDashGeneratedResources DEPENDS
     "${CASEDASH_RESOURCE_STRING_HEADER}"
 )
 
+set(CASEDASH_CONFIG_META_DIR "${CASEDASH_GENERATED_DIR}/config")
+set(CASEDASH_CONFIG_META_CPP "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.cpp")
+set(CASEDASH_CONFIG_META_JSON "${CASEDASH_CONFIG_META_DIR}/config_meta.generated.json")
+set(CASEDASH_LAYOUT_EDIT_META_CPP "${CASEDASH_GENERATED_DIR}/layout_model/layout_edit_parameter_metadata.generated.cpp")
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_CONFIG_META_CPP}"
+        "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+        "${CASEDASH_CONFIG_META_JSON}"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
+        --descriptor "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        --primitives "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
+        --layout-edit-parameters "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
+        --resource-config "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        --output-cpp "${CASEDASH_CONFIG_META_CPP}"
+        --output-layout-edit-cpp "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+        --output-json "${CASEDASH_CONFIG_META_JSON}"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/config_meta_gen.py"
+        "${CMAKE_SOURCE_DIR}/src/config/config.h"
+        "${CMAKE_SOURCE_DIR}/src/config/config_primitives.h"
+        "${CMAKE_SOURCE_DIR}/src/widget/layout_edit_parameter_id.h"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+    VERBATIM
+)
+add_custom_target(CaseDashGeneratedConfigMeta DEPENDS
+    "${CASEDASH_CONFIG_META_CPP}"
+    "${CASEDASH_LAYOUT_EDIT_META_CPP}"
+    "${CASEDASH_CONFIG_META_JSON}"
+)
+
 add_executable(CaseDash WIN32
     resources/CaseDash.rc
     ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_VERSION_RC}
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
@@ -175,7 +210,8 @@ add_executable(CaseDash WIN32
     src/layout_edit/layout_edit_service.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -208,6 +244,7 @@ add_executable(CaseDash WIN32
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -260,7 +297,7 @@ add_executable(CaseDash WIN32
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -276,7 +313,8 @@ set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION
 )
 
 set(casedash_release_speed_sources
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/config_resolution.cpp
     src/config/metric_catalog.cpp
     src/dashboard/dashboard_app.cpp
@@ -331,6 +369,7 @@ set(casedash_release_speed_sources
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -437,16 +476,12 @@ target_include_directories(CaseDashLenovo PRIVATE
 )
 
 target_compile_definitions(CaseDashGigabyte PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
 )
 
 target_compile_definitions(CaseDashMsi PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
@@ -499,11 +534,9 @@ target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDash CaseDashGeneratedResources)
+add_dependencies(CaseDash CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 
 target_compile_definitions(CaseDash PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
@@ -565,6 +598,44 @@ set_target_properties(CaseDash PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
+add_executable(CaseDashTools
+    src/tools/tools_main.cpp
+    src/tools/lint_check.cpp
+    src/tools/impl/lint_checkers.cpp
+    src/tools/impl/lint_common.cpp
+    src/tools/impl/lint_json.cpp
+)
+target_include_directories(CaseDashTools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_compile_definitions(CaseDashTools PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+    _USE_STD_VECTOR_ALGORITHMS=0
+)
+target_compile_options(CaseDashTools PRIVATE
+    /EHsc
+    /W4
+    /permissive-
+    /GR-
+    /w14505
+    /we4505
+    /Zi
+    $<$<CONFIG:Release>:/O2>
+)
+target_link_options(CaseDashTools PRIVATE
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+)
+set_target_properties(CaseDashTools PROPERTIES
+    OUTPUT_NAME "CaseDashTools"
+    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+
 enable_testing()
 
 set(casedash_vcpkg_triplet "x64-windows")
@@ -589,6 +660,8 @@ endif()
 find_package(GTest CONFIG REQUIRED)
 
 add_executable(CaseDashTests
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     tests/app_icon_renderer_tests.cpp
     tests/enum_string_tests.cpp
     tests/metrics_tests.cpp
@@ -608,6 +681,7 @@ add_executable(CaseDashTests
     tests/layout_edit_tooltip_tests.cpp
     tests/layout_guide_sheet_planner_tests.cpp
     tests/localization_catalog_tests.cpp
+    tests/config_meta_tests.cpp
     tests/config_parser_tests.cpp
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
@@ -619,7 +693,8 @@ add_executable(CaseDashTests
     tests/animation_timeline_tests.cpp
     tests/throughput_chart_widget_tests.cpp
     tests/render_thread_tests.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -710,7 +785,7 @@ add_executable(CaseDashTests
     src/telemetry/impl/collector_storage_selection.cpp
     src/telemetry/impl/retained_history.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/telemetry/fps_service_protocol.cpp
@@ -720,10 +795,8 @@ target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/resources"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDashTests CaseDashGeneratedResources)
+add_dependencies(CaseDashTests CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashTests PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
@@ -770,6 +843,8 @@ add_test(NAME CaseDashTests COMMAND CaseDashTests)
 add_executable(CaseDashBenchmarks
     resources/CaseDash.rc
     ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_BENCHMARKS_VERSION_RC}
     tests/benchmarks.cpp
     src/util/strings.cpp
@@ -779,7 +854,8 @@ add_executable(CaseDashBenchmarks
     src/util/elevated_process.cpp
     src/util/paths.cpp
     src/util/scale.cpp
-    src/config/config.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
     src/config/color_format.cpp
     src/config/color_expression.cpp
     src/config/color_math.cpp
@@ -807,6 +883,7 @@ add_executable(CaseDashBenchmarks
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -886,7 +963,7 @@ add_executable(CaseDashBenchmarks
     src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
     src/util/high_precision_timer.cpp
-    src/util/utf8.cpp
+    src/util/text_encoding.cpp
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
@@ -915,10 +992,8 @@ target_include_directories(CaseDashBenchmarks PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources)
+add_dependencies(CaseDashBenchmarks CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
 target_compile_definitions(CaseDashBenchmarks PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0

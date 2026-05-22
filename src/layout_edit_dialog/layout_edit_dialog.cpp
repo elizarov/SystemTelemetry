@@ -37,7 +37,7 @@ const LayoutEditDialogHost& LayoutEditDialog::Host() const {
 }
 
 bool LayoutEditDialog::HandleDialogMessage(MSG* msg) const {
-    return msg != nullptr && hwnd_ != nullptr && IsWindow(hwnd_) && IsDialogMessageW(hwnd_, msg) != FALSE;
+    return msg != nullptr && hwnd_ != nullptr && IsWindow(hwnd_) && IsDialogMessageA(hwnd_, msg) != FALSE;
 }
 
 bool LayoutEditDialog::IsForegroundWindow() const {
@@ -75,7 +75,7 @@ bool TryGetMonitorWorkAreaForRect(const RECT& rect, RECT* workArea) {
     MONITORINFO monitorInfo{};
     monitorInfo.cbSize = sizeof(monitorInfo);
     const HMONITOR monitor = MonitorFromRect(&rect, MONITOR_DEFAULTTONEAREST);
-    return monitor != nullptr && GetMonitorInfoW(monitor, &monitorInfo) != FALSE &&
+    return monitor != nullptr && GetMonitorInfoA(monitor, &monitorInfo) != FALSE &&
            (*workArea = monitorInfo.rcWork, true);
 }
 
@@ -255,8 +255,8 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
     }
     host_.TraceLayoutEditDialogEvent("open", FormatText("initial_focus=%s", QuoteTraceText(initialFocusTrace).c_str()));
 
-    HWND dialog = CreateDialogParamW(host_.LayoutEditDialogInstance(),
-        MAKEINTRESOURCEW(IDD_LAYOUT_EDIT_CONFIGURATION),
+    HWND dialog = CreateDialogParamA(host_.LayoutEditDialogInstance(),
+        MAKEINTRESOURCEA(IDD_LAYOUT_EDIT_CONFIGURATION),
         nullptr,
         LayoutEditDialog::DialogProc,
         reinterpret_cast<LPARAM>(state_.get()));
@@ -368,9 +368,9 @@ bool LayoutEditDialog::ShouldDashboardIgnoreMouse(POINT screenPoint) const {
 INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_INITDIALOG) {
         auto* state = reinterpret_cast<LayoutEditDialogState*>(lParam);
-        SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
-        SetWindowTextUtf8(hwnd, "Edit Configuration");
-        SetWindowLongPtrW(hwnd, GWL_EXSTYLE, GetWindowLongPtrW(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
+        SetWindowLongPtrA(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+        SetWindowTextValue(hwnd, "Edit Configuration");
+        SetWindowLongPtrA(hwnd, GWL_EXSTYLE, GetWindowLongPtrA(hwnd, GWL_EXSTYLE) | WS_EX_COMPOSITED);
         state->dialog->UpdateSelectionHighlight(std::nullopt);
         state->dialog->Host().ApplyLayoutEditDialogIcons(hwnd);
         EnsureLayoutEditDialogControls(hwnd);
@@ -380,7 +380,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
         if (HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE); tree != nullptr) {
             TreeView_SetExtendedStyle(tree, TVS_EX_DOUBLEBUFFER, TVS_EX_DOUBLEBUFFER);
         }
-        SendDlgItemMessageW(
+        SendDlgItemMessageA(
             hwnd, IDC_LAYOUT_EDIT_FILTER_EDIT, EM_SETCUEBANNER, FALSE, reinterpret_cast<LPARAM>(kFilterCueText));
         RebuildLayoutEditTree(state, hwnd, state->initialFocus);
         state->dialog->PositionWindow(hwnd);
@@ -392,7 +392,7 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
     if (message == WM_NCDESTROY) {
         if (auto* state = DialogStateFromWindow(hwnd); state != nullptr) {
             state->dialog->Host().TraceLayoutEditDialogEvent("close");
-            SetWindowLongPtrW(hwnd, DWLP_USER, 0);
+            SetWindowLongPtrA(hwnd, DWLP_USER, 0);
             state->dialog->HandleDestroyed(hwnd);
         }
         return FALSE;

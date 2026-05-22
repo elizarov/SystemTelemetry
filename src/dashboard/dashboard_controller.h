@@ -11,6 +11,7 @@
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "util/file_path.h"
+#include "util/scale.h"
 
 struct DashboardSessionState {
     AppConfig config;
@@ -103,7 +104,7 @@ public:
     bool ApplyLayoutEditFont(
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, const UiFontConfig& value);
     bool ApplyLayoutEditFontFamily(DashboardShellHost& shell, const std::string& family);
-    bool ApplyLayoutEditFontSet(DashboardShellHost& shell, const UiFontSetConfig& fonts);
+    bool ApplyLayoutEditFontSet(DashboardShellHost& shell, const FontsConfig& fonts);
     bool ApplyLayoutEditColor(
         DashboardShellHost& shell, DashboardRenderer::LayoutEditParameter parameter, unsigned int value);
     bool ApplyLayoutEditColorExpression(

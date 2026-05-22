@@ -1,5 +1,5 @@
 #pragma once
 
-#include "config/config.h"
+struct AppConfig;
 
 void ResolveConfiguredColors(AppConfig& config);

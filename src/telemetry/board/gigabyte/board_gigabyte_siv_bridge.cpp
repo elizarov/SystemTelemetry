@@ -3,7 +3,7 @@
 #include <msclr\gcroot.h>
 #include <vcclr.h>
 
-#include "util/utf8.h"
+#include "util/text_encoding.h"
 
 #using < mscorlib.dll>
 #using < System.dll>
@@ -18,18 +18,18 @@ namespace {
 constexpr char kEngineEnvironmentControlDll[] = "Gigabyte.Engine.EnvironmentControl.dll";
 constexpr char kEnvironmentControlCommonDll[] = "Gigabyte.EnvironmentControl.Common.dll";
 
-String ^ ManagedStringFromUtf8(std::string_view text) {
-    const std::wstring wide = WideFromUtf8(text);
+String ^ ManagedStringFromText(std::string_view text) {
+    const std::wstring wide = WideFromText(text);
     return gcnew String(wide.c_str());
 }
 
-void SetDiagnosticsUtf8(GigabyteSivCaptureSink& sink, std::string_view text) {
-    const std::wstring wide = WideFromUtf8(text);
+void SetDiagnostics(GigabyteSivCaptureSink& sink, std::string_view text) {
+    const std::wstring wide = WideFromText(text);
     sink.SetDiagnostics(wide.c_str());
 }
 
 String ^ CombinePath(String ^ directory, const char* fileName) {
-    return Path::Combine(directory, ManagedStringFromUtf8(fileName));
+    return Path::Combine(directory, ManagedStringFromText(fileName));
 }
 
 ref class GigabyteAssemblyResolver abstract sealed {
@@ -88,21 +88,21 @@ public:
 };
 
 bool InitializeGigabyteRuntime(
-    GigabyteRuntimeContext ^ context, const wchar_t* sivDirectory, GigabyteSivCaptureSink& sink) {
+    GigabyteRuntimeContext ^ context, const char* sivDirectory, GigabyteSivCaptureSink& sink) {
     if (context->loaded) {
         return true;
     }
 
-    context->sivDirectory = gcnew String(sivDirectory);
+    context->sivDirectory = ManagedStringFromText(sivDirectory != nullptr ? sivDirectory : "");
     context->engineAssemblyPath = CombinePath(context->sivDirectory, kEngineEnvironmentControlDll);
     context->commonAssemblyPath = CombinePath(context->sivDirectory, kEnvironmentControlCommonDll);
 
     if (!File::Exists(context->engineAssemblyPath)) {
-        SetDiagnosticsUtf8(sink, "Gigabyte.Engine.EnvironmentControl.dll was not found.");
+        SetDiagnostics(sink, "Gigabyte.Engine.EnvironmentControl.dll was not found.");
         return false;
     }
     if (!File::Exists(context->commonAssemblyPath)) {
-        SetDiagnosticsUtf8(sink, "Gigabyte.EnvironmentControl.Common.dll was not found.");
+        SetDiagnostics(sink, "Gigabyte.EnvironmentControl.Common.dll was not found.");
         return false;
     }
 
@@ -143,7 +143,7 @@ bool InitializeGigabyteRuntime(
 
             if (context->initializeMethod == nullptr || context->getCurrentMethod == nullptr ||
                 context->titleProperty == nullptr || context->valueProperty == nullptr) {
-                SetDiagnosticsUtf8(sink, "Gigabyte hardware-monitor reflection members were not found.");
+                SetDiagnostics(sink, "Gigabyte hardware-monitor reflection members were not found.");
                 return false;
             }
 
@@ -159,7 +159,7 @@ bool InitializeGigabyteRuntime(
             context->initializeMethod->Invoke(context->monitor, gcnew array<Object ^>{context->sourceHwRegister});
             sink.TraceInitializeSuccess();
             context->loaded = true;
-            SetDiagnosticsUtf8(sink, "Gigabyte SIV hardware-monitor runtime initialized.");
+            SetDiagnostics(sink, "Gigabyte SIV hardware-monitor runtime initialized.");
             return true;
         } finally {
             Environment::CurrentDirectory = originalDirectory;
@@ -201,7 +201,7 @@ void CollectManagedSensors(
 }
 
 bool CaptureGigabyteSnapshot(
-    GigabyteRuntimeContext ^ context, const wchar_t* sivDirectory, GigabyteSivCaptureSink& sink) {
+    GigabyteRuntimeContext ^ context, const char* sivDirectory, GigabyteSivCaptureSink& sink) {
     if (!InitializeGigabyteRuntime(context, sivDirectory, sink)) {
         return false;
     }
@@ -232,6 +232,6 @@ GigabyteSivRuntime::GigabyteSivRuntime() : impl_(std::make_unique<Impl>()) {}
 
 GigabyteSivRuntime::~GigabyteSivRuntime() = default;
 
-bool GigabyteSivRuntime::Capture(const wchar_t* sivDirectory, GigabyteSivCaptureSink& sink) {
+bool GigabyteSivRuntime::Capture(const char* sivDirectory, GigabyteSivCaptureSink& sink) {
     return CaptureGigabyteSnapshot(impl_->context, sivDirectory, sink);
 }

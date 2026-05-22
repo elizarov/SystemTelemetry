@@ -1,5 +1,7 @@
 #include "config/config_io.h"
 
+#include <windows.h>
+
 #include <string>
 
 #include "config/config_parser.h"
@@ -18,8 +20,7 @@ AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParse
 
 bool CanWriteRuntimeConfig(const FilePath& path) {
     if (FileExists(path)) {
-        const std::wstring widePath = path.Wide();
-        HANDLE file = CreateFileW(widePath.c_str(),
+        HANDLE file = CreateFileA(path.string().c_str(),
             GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
             nullptr,
@@ -37,8 +38,7 @@ bool CanWriteRuntimeConfig(const FilePath& path) {
     const std::string probeName = FormatText(
         ".config-write-test-%lu-%llu.tmp", GetCurrentProcessId(), static_cast<unsigned long long>(GetTickCount64()));
     const FilePath probePath = parent / probeName;
-    const std::wstring wideProbePath = probePath.Wide();
-    HANDLE probe = CreateFileW(wideProbePath.c_str(),
+    HANDLE probe = CreateFileA(probePath.string().c_str(),
         GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
         nullptr,

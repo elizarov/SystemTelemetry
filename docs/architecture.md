@@ -25,10 +25,10 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `tools/` contains shared formatting, lint, tidy, profiling, generated asset, and source dependency graph helper scripts.
+- `src/tools/` contains native repository tools built into `build\CaseDashTools.exe`, including the maintained combined lint scanner behind `lint.cmd`. `tools/` contains script entrypoints for formatting, profiling, generated assets, and compatibility helpers, while `tools/lint_config.json` owns the lint policy data.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
-- `.github/workflows/` contains runner-hosted build, test, format, lint, tidy, package, release, and website deployment automation.
+- `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, package, release, and website deployment automation.
 
 ## Layered Core
 
@@ -39,7 +39,7 @@ Other top-level areas:
 - Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
 - Public cross-thread contracts document thread affinity, callback thread, blocking behavior, and ownership or lifetime guarantees in the declaring header before the relevant method or callback.
 - Maintained source and tests do not use conditional-compilation guards. Code must always compile for every native target; target-specific benchmark or diagnostics helpers stay ordinary functions and rely on the linker to remove unused code from targets that do not reference them.
-- `lint.cmd` enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, source-policy bans, and the renderer-only Direct2D boundary before reporting success.
+- `lint.cmd` runs the combined lint scanner and enforces package dependencies, package-private implementation boundaries, header-body rules, include-path rules, local `NOLINT` policy, source-policy bans, and the renderer-only Direct2D boundary before reporting success.
 
 ## Package Dependency Rules
 
@@ -64,13 +64,11 @@ Other top-level areas:
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.
 - The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
-- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the optional tidy sweep through `lint.cmd tidy` on the Windows runner.
+- `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the unused-include sweep through `lint.cmd includes` on the Windows runner.
 - `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.
 
-## Source Dependency Graph
+## Source Dependency Checks
 
-- `lint.cmd` writes DOT and GraphML views of non-vendored `src` module dependencies under `build\architecture\` before checking graph rules.
 - Each graph node represents a source module, where a matching `.h` and `.cpp` pair share one node named by the extensionless path under `src`.
-- Graph generation records header, implementation, and total LOC, package totals, strongly connected components, lower-level dependencies, and non-vendored files above 1,000 LOC.
+- The native lint tool builds the dependency graph in memory for package dependency rules, package-private boundary checks, DAG topological package order, package LOC summaries, lower-level dependencies, and non-vendored files above the configured LOC threshold.
 - The graph includes a synthetic `d2d` package for Direct2D, DirectWrite, WIC, and WRL includes so every package except `renderer` rejects accidental graphics-stack coupling.
-- DOT clusters group nodes by containing source directory; GraphML nodes and edges carry labels, directory, LOC, dependency kind, and annotation data.

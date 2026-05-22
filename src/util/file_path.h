@@ -7,11 +7,9 @@
 class FilePath {
 public:
     FilePath() = default;
-    FilePath(const wchar_t* path);
-    FilePath(const char* utf8Path);
-    FilePath(std::wstring path);
+    FilePath(const char* path);
     FilePath(std::string path);
-    FilePath(std::string_view utf8Path);
+    FilePath(std::string_view path);
 
     bool Empty() const;
     bool IsAbsolute() const;
@@ -22,7 +20,7 @@ public:
     bool has_parent_path() const;
     FilePath parent_path() const;
 
-    std::wstring Wide() const;
+    std::wstring WideForNativeApi() const;
     std::string string() const;
 
 private:

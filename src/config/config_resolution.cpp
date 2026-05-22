@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cctype>
 
+#include "config/config.h"
 #include "config/metric_board_binding.h"
 #include "util/strings.h"
 
@@ -106,7 +107,7 @@ bool SelectResolvedLayout(AppConfig& config, const std::string& requestedName) {
 
     config.display.layout = selected->name;
     config.layout.structure.window = selected->window;
-    config.layout.structure.cardsLayout = selected->cardsLayout;
+    config.layout.structure.cards = selected->cards;
     return true;
 }
 
@@ -118,7 +119,7 @@ bool SelectLayout(AppConfig& config, const std::string& name) {
         if (layout.name == name) {
             config.display.layout = layout.name;
             config.layout.structure.window = layout.window;
-            config.layout.structure.cardsLayout = layout.cardsLayout;
+            config.layout.structure.cards = layout.cards;
             return true;
         }
     }

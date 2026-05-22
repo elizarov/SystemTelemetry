@@ -1,6 +1,9 @@
 #include "telemetry/impl/collector_storage.h"
 
 #include <algorithm>
+#include <cctype>
+#include <cstring>
+#include <string>
 #include <vector>
 
 #include "telemetry/impl/collector_state.h"
@@ -8,50 +11,49 @@
 #include "telemetry/impl/collector_support.h"
 #include "util/numeric_safety.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
-std::string ReadVolumeLabel(const std::wstring& root) {
-    wchar_t volumeName[MAX_PATH] = {};
-    if (!GetVolumeInformationW(
+std::string ReadVolumeLabel(const std::string& root) {
+    char volumeName[MAX_PATH] = {};
+    if (!GetVolumeInformationA(
             root.c_str(), volumeName, ARRAYSIZE(volumeName), nullptr, nullptr, nullptr, nullptr, 0)) {
         return {};
     }
-    return Utf8FromWide(volumeName);
+    return volumeName;
 }
 
 std::vector<StorageDriveCandidate> EnumerateStorageDriveCandidates() {
     std::vector<StorageDriveCandidate> candidates;
-    const DWORD bufferLength = GetLogicalDriveStringsW(0, nullptr);
+    const DWORD bufferLength = GetLogicalDriveStringsA(0, nullptr);
     if (bufferLength == 0) {
         return candidates;
     }
 
-    std::vector<wchar_t> buffer(bufferLength + 1, wchar_t{});
-    const DWORD copied = GetLogicalDriveStringsW(static_cast<DWORD>(buffer.size()), buffer.data());
+    std::vector<char> buffer(bufferLength + 1, '\0');
+    const DWORD copied = GetLogicalDriveStringsA(static_cast<DWORD>(buffer.size()), buffer.data());
     if (copied == 0 || copied >= buffer.size()) {
         return {};
     }
 
-    for (const wchar_t* current = buffer.data(); *current != wchar_t{}; current += wcslen(current) + 1) {
-        const std::wstring root(current);
-        if (root.size() < 2 || !iswalpha(root[0])) {
+    for (const char* current = buffer.data(); *current != '\0'; current += std::strlen(current) + 1) {
+        const std::string root(current);
+        if (root.size() < 2 || std::isalpha(static_cast<unsigned char>(root[0])) == 0) {
             continue;
         }
 
-        const UINT driveType = GetDriveTypeW(root.c_str());
+        const UINT driveType = GetDriveTypeA(root.c_str());
         if (!IsSelectableStorageDriveType(driveType)) {
             continue;
         }
 
         ULARGE_INTEGER totalBytes{};
-        if (!GetDiskFreeSpaceExW(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
+        if (!GetDiskFreeSpaceExA(root.c_str(), nullptr, &totalBytes, nullptr) || totalBytes.QuadPart == 0) {
             continue;
         }
 
         StorageDriveCandidate candidate;
-        candidate.letter = std::string(1, static_cast<char>(towupper(root[0])));
+        candidate.letter = std::string(1, static_cast<char>(std::toupper(static_cast<unsigned char>(root[0]))));
         candidate.volumeLabel = ReadVolumeLabel(root);
         candidate.totalGb = totalBytes.QuadPart / (1024.0 * 1024.0 * 1024.0);
         candidate.driveType = driveType;
@@ -75,9 +77,8 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
         auto& drive = state.snapshot_.drives[i];
         DriveCounterState* counters =
             i < state.storage_.driveCounters.size() ? &state.storage_.driveCounters[i] : nullptr;
-        const std::wstring root =
-            WideFromUtf8(counters != nullptr ? counters->rootPath : FormatText("%s\\", drive.label.c_str()));
-        const UINT driveType = GetDriveTypeW(root.c_str());
+        const std::string root = counters != nullptr ? counters->rootPath : FormatText("%s\\", drive.label.c_str());
+        const UINT driveType = GetDriveTypeA(root.c_str());
         drive.driveType = driveType;
         if (!IsSelectableStorageDriveType(driveType)) {
             state.trace_.WriteFmt(
@@ -87,7 +88,7 @@ void RefreshDriveUsage(RealTelemetryCollectorState& state) {
 
         ULARGE_INTEGER freeBytes{};
         ULARGE_INTEGER totalBytes{};
-        const BOOL diskOk = GetDiskFreeSpaceExW(root.c_str(), &freeBytes, &totalBytes, nullptr);
+        const BOOL diskOk = GetDiskFreeSpaceExA(root.c_str(), &freeBytes, &totalBytes, nullptr);
         if (!diskOk || totalBytes.QuadPart == 0) {
             state.trace_.WriteFmt(TracePrefix::Telemetry,
                 RES_STR("drive_space label=%s ok=%s total_bytes=%llu"),
@@ -189,7 +190,7 @@ void UpdateStorageThroughput(RealTelemetryCollectorState& state, bool initialize
 }  // namespace
 
 void InitializeStorageCollector(RealTelemetryCollectorState& state) {
-    const PDH_STATUS queryStatus = PdhOpenQueryW(nullptr, 0, &state.storage_.query);
+    const PDH_STATUS queryStatus = PdhOpenQueryA(nullptr, 0, &state.storage_.query);
     state.trace_.WriteFmt(
         TracePrefix::Telemetry, RES_STR("pdh_open storage_query status=%ld"), static_cast<long>(queryStatus));
     const PDH_STATUS readStatus = AddCounterCompat(

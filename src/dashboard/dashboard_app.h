@@ -11,12 +11,12 @@
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
-#include "display/constants.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_trace_session.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
+#include "util/scale.h"
 #include "util/trace.h"
 
 class DashboardShellUi;
@@ -136,7 +136,7 @@ private:
     DashboardRenderer renderer_;
     DashboardOverlayState rendererDashboardOverlayState_{};
     DashboardController controller_{};
-    NOTIFYICONDATAW trayIcon_{};
+    NOTIFYICONDATAA trayIcon_{};
     MonitorPlacementInfo movePlacementInfo_{};
     HICON appIconLarge_ = nullptr;
     HICON appIconSmall_ = nullptr;
@@ -148,7 +148,6 @@ private:
     std::unique_ptr<DashboardShellUi> shellUi_;
     HWND layoutEditTooltipHwnd_ = nullptr;
     std::string layoutEditTooltipText_;
-    std::wstring layoutEditTooltipWideText_;
     std::string lastError_;
     bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;

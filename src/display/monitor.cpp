@@ -3,9 +3,11 @@
 #include <cmath>
 #include <vector>
 
+#include "config/config.h"
+#include "util/scale.h"
 #include "util/strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -15,7 +17,7 @@ struct MonitorIdentity {
 };
 
 constexpr double kMonitorFitEpsilon = 0.0001;
-constexpr wchar_t kShcoreDllName[] = L"Shcore.dll";  // LoadLibraryW requires a fixed UTF-16 DLL name.
+constexpr char kShcoreDllName[] = "Shcore.dll";
 
 }  // namespace
 
@@ -31,7 +33,7 @@ UINT GetMonitorDpi(HMONITOR monitor) {
     }
 
     static GetDpiForMonitorFn getDpiForMonitor = []() -> GetDpiForMonitorFn {
-        HMODULE module = LoadLibraryW(kShcoreDllName);
+        HMODULE module = LoadLibraryA(kShcoreDllName);
         if (module == nullptr) {
             return nullptr;
         }
@@ -117,7 +119,7 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
             continue;
         }
 
-        const std::wstring wideDeviceName = WideFromUtf8(deviceName);
+        const std::wstring wideDeviceName = WideFromText(deviceName);
         if (_wcsicmp(sourceName.viewGdiDeviceName, wideDeviceName.c_str()) != 0) {
             continue;
         }
@@ -131,8 +133,8 @@ MonitorIdentity GetMonitorIdentity(const std::string& deviceName) {
             continue;
         }
 
-        const std::string friendlyName = Utf8FromWide(targetName.monitorFriendlyDeviceName);
-        const std::string monitorPath = Utf8FromWide(targetName.monitorDevicePath);
+        const std::string friendlyName = TextFromWide(targetName.monitorFriendlyDeviceName);
+        const std::string monitorPath = TextFromWide(targetName.monitorDevicePath);
         if (IsUsefulFriendlyName(friendlyName)) {
             identity.displayName = FormatText("%s (%s)", friendlyName.c_str(), SimplifyDeviceName(deviceName).c_str());
             identity.configName = friendlyName;
@@ -169,16 +171,16 @@ size_t EnumerateDisplayMenuOptions(const AppConfig& config, DisplayMenuOption* o
         nullptr,
         [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
             auto* context = reinterpret_cast<SearchContext*>(data);
-            MONITORINFOEXW info{};
+            MONITORINFOEXA info{};
             info.cbSize = sizeof(info);
-            if (!GetMonitorInfoW(monitor, &info)) {
+            if (!GetMonitorInfoA(monitor, &info)) {
                 return TRUE;
             }
             if (context->count >= context->capacity) {
                 return FALSE;
             }
 
-            const std::string deviceName = Utf8FromWide(info.szDevice);
+            const std::string deviceName = info.szDevice;
             const MonitorIdentity identity = GetMonitorIdentity(deviceName);
             const LONG monitorWidth = info.rcMonitor.right - info.rcMonitor.left;
             const LONG monitorHeight = info.rcMonitor.bottom - info.rcMonitor.top;
@@ -217,13 +219,13 @@ std::optional<TargetMonitorInfo> FindTargetMonitor(const std::string& requestedN
         nullptr,
         [](HMONITOR monitor, HDC, LPRECT, LPARAM data) -> BOOL {
             auto* context = reinterpret_cast<SearchContext*>(data);
-            MONITORINFOEXW info{};
+            MONITORINFOEXA info{};
             info.cbSize = sizeof(info);
-            if (!GetMonitorInfoW(monitor, &info)) {
+            if (!GetMonitorInfoA(monitor, &info)) {
                 return TRUE;
             }
 
-            const std::string deviceName = Utf8FromWide(info.szDevice);
+            const std::string deviceName = info.szDevice;
             const MonitorIdentity identity = GetMonitorIdentity(deviceName);
             if (ContainsInsensitive(identity.displayName, context->requestedName) ||
                 ContainsInsensitive(identity.configName, context->requestedName) ||
@@ -244,10 +246,10 @@ MonitorPlacementInfo GetMonitorPlacementForWindow(HWND hwnd, double configuredSc
     GetWindowRect(hwnd, &windowRect);
 
     HMONITOR monitor = MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST);
-    MONITORINFOEXW monitorInfo{};
+    MONITORINFOEXA monitorInfo{};
     monitorInfo.cbSize = sizeof(monitorInfo);
-    if (GetMonitorInfoW(monitor, &monitorInfo)) {
-        info.deviceName = Utf8FromWide(monitorInfo.szDevice);
+    if (GetMonitorInfoA(monitor, &monitorInfo)) {
+        info.deviceName = monitorInfo.szDevice;
         const MonitorIdentity identity = GetMonitorIdentity(info.deviceName);
         info.monitorName = identity.displayName;
         info.configMonitorName = identity.configName;

@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include "layout_edit/layout_edit_parameter_edit.h"
+#include "layout_model/layout_edit_parameter_metadata.h"
 
 TEST(LayoutEditParameterApply, ClampsGaugeDegreeFieldsToZeroTo360) {
     AppConfig config;
@@ -122,7 +123,7 @@ TEST(LayoutEditParameterApply, UpdatesCardStyleFieldsThroughCommands) {
     ASSERT_TRUE(ApplyLayoutEditParameterValue(config, LayoutEditParameter::CardHeaderContentGap, 5.4));
 
     EXPECT_EQ(config.layout.cardStyle.cardRadius, 14);
-    EXPECT_EQ(config.layout.cardStyle.cardBorderWidth, 3);
+    EXPECT_EQ(config.layout.cardStyle.cardBorder, 3);
     EXPECT_EQ(config.layout.cardStyle.headerIconSize, 20);
     EXPECT_EQ(config.layout.cardStyle.cardPadding, 12);
     EXPECT_EQ(config.layout.cardStyle.headerIconGap, 7);

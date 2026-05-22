@@ -4,8 +4,10 @@
 #include <cstdint>
 #include <d2d1.h>
 
-#include "config/config.h"
 #include "renderer/render_types.h"
+
+struct ColorsConfig;
+struct LayoutGuideSheetConfig;
 
 struct RenderColor {
     std::uint8_t r = 0;

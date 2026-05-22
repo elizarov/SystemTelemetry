@@ -6,6 +6,7 @@
 #include <commdlg.h>
 
 #include "build_version.h"
+#include "config/config_telemetry.h"
 #include "config/metric_board_binding.h"
 #include "dashboard/constants.h"
 #include "dashboard/dashboard_app.h"
@@ -27,9 +28,9 @@
 #include "util/message_box.h"
 #include "util/numeric_format.h"
 #include "util/paths.h"
+#include "util/scale.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -53,13 +54,13 @@ class DialogRedrawScope {
 public:
     explicit DialogRedrawScope(HWND hwnd) : hwnd_(hwnd) {
         if (hwnd_ != nullptr) {
-            SendMessageW(hwnd_, WM_SETREDRAW, FALSE, 0);
+            SendMessageA(hwnd_, WM_SETREDRAW, FALSE, 0);
         }
     }
 
     ~DialogRedrawScope() {
         if (hwnd_ != nullptr) {
-            SendMessageW(hwnd_, WM_SETREDRAW, TRUE, 0);
+            SendMessageA(hwnd_, WM_SETREDRAW, TRUE, 0);
             RedrawWindow(hwnd_, nullptr, nullptr, RDW_ERASE | RDW_FRAME | RDW_INVALIDATE | RDW_ALLCHILDREN);
         }
     }
@@ -88,9 +89,8 @@ struct AboutDialogState {
     HICON icon = nullptr;
 };
 
-BOOL AppendMenuUtf8(HMENU menu, UINT flags, UINT_PTR id, std::string_view text) {
-    const std::wstring wideText = WideFromUtf8(text);
-    return AppendMenuW(menu, flags, id, wideText.c_str());
+BOOL AppendMenuText(HMENU menu, UINT flags, UINT_PTR id, std::string_view text) {
+    return AppendMenuA(menu, flags, id, std::string(text).c_str());
 }
 
 int MakeAboutIconSlotSquare(HWND hwnd) {
@@ -131,18 +131,16 @@ bool AreScalesEqual(double left, double right) {
 }
 
 INT_PTR CALLBACK UnsavedLayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto* state = reinterpret_cast<UnsavedLayoutEditDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    auto* state = reinterpret_cast<UnsavedLayoutEditDialogState*>(GetWindowLongPtrA(hwnd, DWLP_USER));
     switch (message) {
         case WM_INITDIALOG: {
             state = reinterpret_cast<UnsavedLayoutEditDialogState*>(lParam);
-            SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            SetWindowLongPtrA(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             if (state->app != nullptr) {
                 state->app->ApplyThemedIconsToWindow(hwnd);
             }
-            const std::wstring mainInstruction = WideFromUtf8(state->mainInstruction);
-            const std::wstring content = WideFromUtf8(state->content);
-            SetDlgItemTextW(hwnd, IDC_UNSAVED_LAYOUT_EDIT_MAIN, mainInstruction.c_str());
-            SetDlgItemTextW(hwnd, IDC_UNSAVED_LAYOUT_EDIT_CONTENT, content.c_str());
+            SetDlgItemTextA(hwnd, IDC_UNSAVED_LAYOUT_EDIT_MAIN, state->mainInstruction);
+            SetDlgItemTextA(hwnd, IDC_UNSAVED_LAYOUT_EDIT_CONTENT, state->content);
             return TRUE;
         }
         case WM_COMMAND:
@@ -172,22 +170,21 @@ INT_PTR CALLBACK UnsavedLayoutEditDialogProc(HWND hwnd, UINT message, WPARAM wPa
 }
 
 INT_PTR CALLBACK AboutDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto* state = reinterpret_cast<AboutDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    auto* state = reinterpret_cast<AboutDialogState*>(GetWindowLongPtrA(hwnd, DWLP_USER));
     switch (message) {
         case WM_INITDIALOG: {
             state = reinterpret_cast<AboutDialogState*>(lParam);
-            SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            SetWindowLongPtrA(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             if (state != nullptr && state->app != nullptr) {
                 state->app->ApplyThemedIconsToWindow(hwnd);
             }
-            const std::wstring wideText = WideFromUtf8(state != nullptr ? state->text : std::string{});
-            SetDlgItemTextW(hwnd, IDC_ABOUT_TEXT, wideText.c_str());
+            SetDlgItemTextA(hwnd, IDC_ABOUT_TEXT, state != nullptr ? state->text.c_str() : "");
             if (state != nullptr && state->app != nullptr) {
                 const int iconSize = MakeAboutIconSlotSquare(hwnd);
                 state->icon = state->app->CreateThemedAppIconForSize(iconSize);
             }
             if (state != nullptr && state->icon != nullptr) {
-                SendDlgItemMessageW(
+                SendDlgItemMessageA(
                     hwnd, IDC_ABOUT_ICON, STM_SETIMAGE, IMAGE_ICON, reinterpret_cast<LPARAM>(state->icon));
             }
             return TRUE;
@@ -253,11 +250,11 @@ size_t BuildScaleMenuEntries(double currentScale, double* entries, size_t capaci
 }
 
 void SetMenuItemRadioStyle(HMENU menu, UINT commandId) {
-    MENUITEMINFOW info{};
+    MENUITEMINFOA info{};
     info.cbSize = sizeof(info);
     info.fMask = MIIM_FTYPE;
     info.fType = MFT_RADIOCHECK;
-    SetMenuItemInfoW(menu, commandId, FALSE, &info);
+    SetMenuItemInfoA(menu, commandId, FALSE, &info);
 }
 
 std::string BuildLayoutEditMenuLabel(std::string_view subject) {
@@ -320,30 +317,30 @@ struct LayoutEditTreeItemBinding {
 };
 
 INT_PTR CALLBACK CustomScaleDialogProc(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto* state = reinterpret_cast<CustomScaleDialogState*>(GetWindowLongPtrW(hwnd, DWLP_USER));
+    auto* state = reinterpret_cast<CustomScaleDialogState*>(GetWindowLongPtrA(hwnd, DWLP_USER));
     switch (message) {
         case WM_INITDIALOG: {
             state = reinterpret_cast<CustomScaleDialogState*>(lParam);
-            SetWindowLongPtrW(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
+            SetWindowLongPtrA(hwnd, DWLP_USER, reinterpret_cast<LONG_PTR>(state));
             if (state->app != nullptr) {
                 state->app->ApplyThemedIconsToWindow(hwnd);
             }
-            const std::wstring initialText = WideFromUtf8(FormatScalePercentageValue(state->initialScale));
-            SetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, initialText.c_str());
-            SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
+            const std::string initialText = FormatScalePercentageValue(state->initialScale);
+            SetDlgItemTextA(hwnd, IDC_CUSTOM_SCALE_EDIT, initialText.c_str());
+            SendDlgItemMessageA(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
             return TRUE;
         }
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
                 case IDOK: {
-                    wchar_t buffer[64] = {};
-                    GetDlgItemTextW(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
-                    const std::optional<double> percentage = TryParseScaleValue(Utf8FromWide(buffer));
+                    char buffer[64] = {};
+                    GetDlgItemTextA(hwnd, IDC_CUSTOM_SCALE_EDIT, buffer, ARRAYSIZE(buffer));
+                    const std::optional<double> percentage = TryParseScaleValue(buffer);
                     if (!percentage.has_value()) {
-                        MessageBoxUtf8(
+                        ShowAppMessageBox(
                             hwnd, FindLocalizedText(RES_STR("dashboard.message.scale_positive_percent")), MB_ICONERROR);
                         SetFocus(GetDlgItem(hwnd, IDC_CUSTOM_SCALE_EDIT));
-                        SendDlgItemMessageW(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
+                        SendDlgItemMessageA(hwnd, IDC_CUSTOM_SCALE_EDIT, EM_SETSEL, 0, -1);
                         return TRUE;
                     }
                     state->result = *percentage / 100.0;
@@ -420,7 +417,7 @@ void DashboardShellUi::RefreshLayoutEditDialogSelection() {
 void DashboardShellUi::SyncLayoutEditDialogSelection(
     const LayoutEditController::TooltipTarget* target, bool bringToFront) {
     if (layoutEditDialog_ != nullptr && !layoutEditDialog_->SyncSelection(target, bringToFront)) {
-        MessageBoxUtf8(
+        ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
     }
 }
@@ -449,8 +446,8 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
             break;
     }
 
-    DialogBoxParamW(app_.instance_,
-        MAKEINTRESOURCEW(IDD_UNSAVED_LAYOUT_EDIT),
+    DialogBoxParamA(app_.instance_,
+        MAKEINTRESOURCEA(IDD_UNSAVED_LAYOUT_EDIT),
         app_.hwnd_,
         UnsavedLayoutEditDialogProc,
         reinterpret_cast<LPARAM>(&state));
@@ -482,7 +479,7 @@ bool DashboardShellUi::StopLayoutEditSession(UnsavedLayoutEditPrompt prompt) {
                 return false;
             }
         } else if (!app_.controller_.RestoreLayoutEditSessionSavedLayout(app_)) {
-            MessageBoxUtf8(
+            ShowAppMessageBox(
                 app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_restore_failed")), MB_ICONERROR);
             return false;
         }
@@ -510,7 +507,7 @@ bool DashboardShellUi::HandleRunAsAdministrator() {
     }
 
     if (!RunElevatedSelf(app_.hwnd_, BuildElevatedRestartParameters(), GetWorkingDirectory(), SW_SHOWNORMAL)) {
-        MessageBoxUtf8(
+        ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.run_as_administrator_failed")), MB_ICONERROR);
         return false;
     }
@@ -530,7 +527,7 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(
+        ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
@@ -549,7 +546,8 @@ bool DashboardShellUi::HandleReloadConfig() {
     }
 
     if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
-        MessageBoxUtf8(app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), MB_ICONERROR);
+        ShowAppMessageBox(
+            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), MB_ICONERROR);
         return false;
     }
     RefreshLayoutEditDialog();
@@ -605,8 +603,8 @@ void DashboardShellUi::ShowAboutDialog() const {
     AboutDialogState state;
     state.app = &app_;
     state.text = BuildAboutText();
-    DialogBoxParamW(
-        app_.instance_, MAKEINTRESOURCEW(IDD_ABOUT), app_.hwnd_, AboutDialogProc, reinterpret_cast<LPARAM>(&state));
+    DialogBoxParamA(
+        app_.instance_, MAKEINTRESOURCEA(IDD_ABOUT), app_.hwnd_, AboutDialogProc, reinterpret_cast<LPARAM>(&state));
     if (state.icon != nullptr) {
         DestroyIcon(state.icon);
     }
@@ -621,7 +619,7 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     }
     app_.HideLayoutEditTooltip();
     app_.layoutEditMouseTracking_ = false;
-    SetCursor(LoadCursorW(nullptr, IDC_ARROW));
+    SetCursor(LoadCursorA(nullptr, IDC_ARROW));
     app_.TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }
@@ -713,7 +711,7 @@ bool DashboardShellUi::ApplyFontFamilyPreview(const std::string& family) {
     return app_.controller_.ApplyLayoutEditFontFamily(app_, family);
 }
 
-bool DashboardShellUi::ApplyFontSetPreview(const UiFontSetConfig& fonts) {
+bool DashboardShellUi::ApplyFontSetPreview(const FontsConfig& fonts) {
     return app_.controller_.ApplyLayoutEditFontSet(app_, fonts);
 }
 
@@ -858,12 +856,12 @@ bool DashboardShellUi::PromptAndApplyLayoutEditTarget(const LayoutEditController
         if (startedLayoutEdit) {
             app_.controller_.StopLayoutEditMode(app_, app_.layoutEditController_, app_.diagnosticsOptions_.editLayout);
         }
-        MessageBoxUtf8(
+        ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
     if (IsMetricListAddRowTarget(target) && !ApplyMetricListAddRowPreview(target)) {
-        MessageBoxUtf8(
+        ShowAppMessageBox(
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.metric_list_add_row_failed")), MB_ICONERROR);
         return false;
     }
@@ -877,8 +875,8 @@ std::optional<double> DashboardShellUi::PromptCustomScale() {
                              ? app_.controller_.State().config.display.scale
                              : app_.ResolveCurrentDisplayScale(app_.CurrentWindowDpi());
     DashboardShellUiModalScope scopedModalUi(*this);
-    if (DialogBoxParamW(app_.instance_,
-            MAKEINTRESOURCEW(IDD_CUSTOM_SCALE),
+    if (DialogBoxParamA(app_.instance_,
+            MAKEINTRESOURCEA(IDD_CUSTOM_SCALE),
             app_.hwnd_,
             CustomScaleDialogProc,
             reinterpret_cast<LPARAM>(&state)) == IDOK) {
@@ -985,7 +983,7 @@ void DashboardShellUi::ExecuteCommand(
                         }
                         app_.TraceLayoutEditUiEventFmt(
                             TracePrefix::LayoutSwitch, "menu_failed", "selected_layout=\"%s\"", layoutName.c_str());
-                        MessageBoxUtf8(app_.hwnd_,
+                        ShowAppMessageBox(app_.hwnd_,
                             FindLocalizedText(RES_STR("dashboard.message.switch_layout_failed")),
                             MB_ICONERROR);
                     } else {
@@ -1020,7 +1018,7 @@ void DashboardShellUi::ExecuteCommand(
                 if (index < state.config.layout.themes.size()) {
                     if (!app_.controller_.SwitchTheme(
                             app_, state.config.layout.themes[index].name, app_.diagnosticsOptions_.editLayout)) {
-                        MessageBoxUtf8(app_.hwnd_,
+                        ShowAppMessageBox(app_.hwnd_,
                             FindLocalizedText(RES_STR("dashboard.message.switch_theme_failed")),
                             MB_ICONERROR);
                     } else {
@@ -1084,7 +1082,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU advancedMenu = showAdvancedMenu ? CreatePopupMenu() : nullptr;
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     if (state.config.layout.layouts.empty()) {
-        AppendMenuUtf8(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, "No layouts found");
+        AppendMenuText(layoutMenu, MF_STRING | MF_GRAYED, kCommandLayoutBase, "No layouts found");
     } else {
         for (size_t i = 0; i < state.config.layout.layouts.size() && (kCommandLayoutBase + i) <= kCommandLayoutMax;
             ++i) {
@@ -1092,36 +1090,36 @@ void DashboardShellUi::ShowContextMenu(
             const UINT commandId = kCommandLayoutBase + static_cast<UINT>(i);
             const std::string label = FormatNamedMenuLabel(layout.name, layout.description);
             const UINT flags = MF_STRING | (state.config.display.layout == layout.name ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuUtf8(layoutMenu, flags, commandId, label);
+            AppendMenuText(layoutMenu, flags, commandId, label);
             SetMenuItemRadioStyle(layoutMenu, commandId);
         }
     }
     if (state.config.layout.themes.empty()) {
-        AppendMenuUtf8(themeMenu, MF_STRING | MF_GRAYED, kCommandThemeBase, "No themes found");
+        AppendMenuText(themeMenu, MF_STRING | MF_GRAYED, kCommandThemeBase, "No themes found");
     } else {
         for (size_t i = 0; i < state.config.layout.themes.size() && (kCommandThemeBase + i) <= kCommandThemeMax; ++i) {
             const ThemeConfig& theme = state.config.layout.themes[i];
             const UINT commandId = kCommandThemeBase + static_cast<UINT>(i);
             const UINT flags = MF_STRING | (theme.name == state.config.display.theme ? MF_CHECKED : MF_UNCHECKED);
             const std::string label = FormatNamedMenuLabel(theme.name, theme.description);
-            AppendMenuUtf8(themeMenu, flags, commandId, label);
+            AppendMenuText(themeMenu, flags, commandId, label);
             SetMenuItemRadioStyle(themeMenu, commandId);
         }
     }
     const auto& gpuCandidates = state.telemetryUpdate.gpuAdapterCandidates;
     if (gpuCandidates.empty()) {
-        AppendMenuUtf8(gpuMenu, MF_STRING | MF_GRAYED, kCommandGpuAdapterBase, "No adapters found");
+        AppendMenuText(gpuMenu, MF_STRING | MF_GRAYED, kCommandGpuAdapterBase, "No adapters found");
     } else {
         for (size_t i = 0; i < gpuCandidates.size() && (kCommandGpuAdapterBase + i) <= kCommandGpuAdapterMax; ++i) {
             const UINT commandId = kCommandGpuAdapterBase + static_cast<UINT>(i);
             const UINT flags = MF_STRING | (gpuCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuUtf8(gpuMenu, flags, commandId, gpuCandidates[i].adapterName);
+            AppendMenuText(gpuMenu, flags, commandId, gpuCandidates[i].adapterName);
             SetMenuItemRadioStyle(gpuMenu, commandId);
         }
     }
     const auto& networkCandidates = state.telemetryUpdate.networkAdapterCandidates;
     if (networkCandidates.empty()) {
-        AppendMenuUtf8(networkMenu, MF_STRING | MF_GRAYED, kCommandNetworkAdapterBase, "No adapters found");
+        AppendMenuText(networkMenu, MF_STRING | MF_GRAYED, kCommandNetworkAdapterBase, "No adapters found");
     } else {
         for (size_t i = 0;
             i < networkCandidates.size() && (kCommandNetworkAdapterBase + i) <= kCommandNetworkAdapterMax;
@@ -1130,13 +1128,13 @@ void DashboardShellUi::ShowContextMenu(
             const std::string label =
                 FormatNetworkMenuText(networkCandidates[i].adapterName, networkCandidates[i].ipAddress);
             const UINT flags = MF_STRING | (networkCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuUtf8(networkMenu, flags, commandId, label);
+            AppendMenuText(networkMenu, flags, commandId, label);
             SetMenuItemRadioStyle(networkMenu, commandId);
         }
     }
     const auto& storageDriveCandidates = state.telemetryUpdate.storageDriveCandidates;
     if (storageDriveCandidates.empty()) {
-        AppendMenuUtf8(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, "No drives found");
+        AppendMenuText(storageDrivesMenu, MF_STRING | MF_GRAYED, kCommandStorageDriveBase, "No drives found");
     } else {
         for (size_t i = 0;
             i < storageDriveCandidates.size() && (kCommandStorageDriveBase + i) <= kCommandStorageDriveMax;
@@ -1146,13 +1144,13 @@ void DashboardShellUi::ShowContextMenu(
                 storageDriveCandidates[i].volumeLabel,
                 storageDriveCandidates[i].totalGb);
             const UINT flags = MF_STRING | (storageDriveCandidates[i].selected ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuUtf8(storageDrivesMenu, flags, commandId, label);
+            AppendMenuText(storageDrivesMenu, flags, commandId, label);
         }
     }
     double scaleEntries[std::size(kPredefinedDisplayScales) + 1] = {};
     const size_t scaleEntryCount =
         BuildScaleMenuEntries(state.config.display.scale, scaleEntries, std::size(scaleEntries));
-    AppendMenuUtf8(scaleMenu,
+    AppendMenuText(scaleMenu,
         MF_STRING | (!HasExplicitDisplayScale(state.config.display.scale) ? MF_CHECKED : MF_UNCHECKED),
         kCommandScaleBase,
         "Default");
@@ -1164,16 +1162,16 @@ void DashboardShellUi::ShowContextMenu(
                                                ? MF_CHECKED
                                                : MF_UNCHECKED);
         const std::string label = FormatScaleLabel(scaleEntries[i]);
-        AppendMenuUtf8(scaleMenu, flags, commandId, label);
+        AppendMenuText(scaleMenu, flags, commandId, label);
         SetMenuItemRadioStyle(scaleMenu, commandId);
     }
-    AppendMenuW(scaleMenu, MF_SEPARATOR, 0, nullptr);
-    AppendMenuUtf8(scaleMenu, MF_STRING, kCommandCustomScale, "Custom...");
+    AppendMenuA(scaleMenu, MF_SEPARATOR, 0, nullptr);
+    AppendMenuText(scaleMenu, MF_STRING, kCommandCustomScale, "Custom...");
     DisplayMenuOption configDisplayOptions[kConfigureDisplayMenuCapacity];
     const size_t configDisplayOptionCount =
         EnumerateDisplayMenuOptions(state.config, configDisplayOptions, kConfigureDisplayMenuCapacity);
     if (configDisplayOptionCount == 0) {
-        AppendMenuUtf8(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
+        AppendMenuText(configureDisplayMenu, MF_STRING | MF_GRAYED, kCommandConfigureDisplayBase, "No displays found");
     } else {
         for (size_t i = 0; i < configDisplayOptionCount; ++i) {
             const DisplayMenuOption& option = configDisplayOptions[i];
@@ -1181,31 +1179,31 @@ void DashboardShellUi::ShowContextMenu(
             const std::string& label = option.displayName;
             const UINT flags = MF_STRING | (option.layoutFits ? MF_ENABLED : MF_GRAYED) |
                                (option.matchesCurrentConfig ? MF_CHECKED : MF_UNCHECKED);
-            AppendMenuUtf8(configureDisplayMenu, flags, commandId, label);
+            AppendMenuText(configureDisplayMenu, flags, commandId, label);
         }
     }
-    AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
-    AppendMenuUtf8(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
-    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");
-    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), "Network");
-    AppendMenuUtf8(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), "Storage Drives");
-    AppendMenuUtf8(editLayoutMenu,
+    AppendMenuText(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(configureDisplayMenu), "Configure Display");
+    AppendMenuText(displayMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(scaleMenu), "Scale");
+    AppendMenuText(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(gpuMenu), "GPU");
+    AppendMenuText(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(networkMenu), "Network");
+    AppendMenuText(devicesMenu, MF_POPUP, reinterpret_cast<UINT_PTR>(storageDrivesMenu), "Storage Drives");
+    AppendMenuText(editLayoutMenu,
         MF_STRING | (state.isEditingLayout ? MF_CHECKED : MF_UNCHECKED),
         kCommandEditLayout,
         "Edit Layout");
-    AppendMenuUtf8(editLayoutMenu, MF_STRING, kCommandEditLayoutDialog, "Layout Editor...");
-    AppendMenuUtf8(editLayoutMenu, MF_STRING, kCommandSaveConfig, "Save Config");
+    AppendMenuText(editLayoutMenu, MF_STRING, kCommandEditLayoutDialog, "Layout Editor...");
+    AppendMenuText(editLayoutMenu, MF_STRING, kCommandSaveConfig, "Save Config");
     if (advancedMenu != nullptr) {
         const UINT runAsAdministratorFlags =
             MF_STRING | (IsCurrentProcessElevated() ? (MF_CHECKED | MF_GRAYED) : MF_UNCHECKED);
-        AppendMenuUtf8(advancedMenu, runAsAdministratorFlags, kCommandRunAsAdministrator, "Run as administrator");
-        AppendMenuW(advancedMenu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandReloadConfig, "Reload Config");
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveConfig, "Save Config");
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveDumpAs, "Export Snapshot Dump...");
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, "Save Screenshot...");
-        AppendMenuUtf8(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, "Save Layout Guide Sheet...");
+        AppendMenuText(advancedMenu, runAsAdministratorFlags, kCommandRunAsAdministrator, "Run as administrator");
+        AppendMenuA(advancedMenu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuText(advancedMenu, MF_STRING, kCommandReloadConfig, "Reload Config");
+        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveConfig, "Save Config");
+        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");
+        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveDumpAs, "Export Snapshot Dump...");
+        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, "Save Screenshot...");
+        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, "Save Layout Guide Sheet...");
     }
     if (layoutEditTarget != nullptr) {
         std::string label;
@@ -1240,22 +1238,22 @@ void DashboardShellUi::ShowContextMenu(
                 }
             }
         }
-        AppendMenuUtf8(menu, MF_STRING, kCommandEditLayoutTarget, label);
-        AppendMenuW(menu, MF_SEPARATOR, 0, nullptr);
+        AppendMenuText(menu, MF_STRING, kCommandEditLayoutTarget, label);
+        AppendMenuA(menu, MF_SEPARATOR, 0, nullptr);
     }
-    AppendMenuUtf8(menu, MF_STRING, kCommandMove, "Move");
-    AppendMenuUtf8(menu, MF_STRING, kCommandBringOnTop, "Bring to Front");
-    AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), "Layout");
-    AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), "Theme");
-    AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(displayMenu), "Display");
-    AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(devicesMenu), "Devices");
-    AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(editLayoutMenu), "Edit Layout");
-    AppendMenuUtf8(menu, autoStartFlags, kCommandAutoStart, "Start with Windows");
+    AppendMenuText(menu, MF_STRING, kCommandMove, "Move");
+    AppendMenuText(menu, MF_STRING, kCommandBringOnTop, "Bring to Front");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(layoutMenu), "Layout");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(themeMenu), "Theme");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(displayMenu), "Display");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(devicesMenu), "Devices");
+    AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(editLayoutMenu), "Edit Layout");
+    AppendMenuText(menu, autoStartFlags, kCommandAutoStart, "Start with Windows");
     if (advancedMenu != nullptr) {
-        AppendMenuUtf8(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(advancedMenu), "Advanced");
+        AppendMenuText(menu, MF_POPUP, reinterpret_cast<UINT_PTR>(advancedMenu), "Advanced");
     }
-    AppendMenuUtf8(menu, MF_STRING, kCommandAbout, "About CaseDash");
-    AppendMenuUtf8(menu, MF_STRING, kCommandExit, "Exit");
+    AppendMenuText(menu, MF_STRING, kCommandAbout, "About CaseDash");
+    AppendMenuText(menu, MF_STRING, kCommandExit, "Exit");
     const UINT defaultCommand = ResolveDefaultCommand(source, layoutEditTarget);
     SetMenuDefaultItem(menu, defaultCommand, FALSE);
     SetForegroundWindow(app_.hwnd_);

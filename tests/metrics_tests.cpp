@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 
+#include "config/config_telemetry.h"
 #include "telemetry/metrics.h"
 
 namespace {

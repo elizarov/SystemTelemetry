@@ -2,9 +2,9 @@
 
 #include <string_view>
 
-#include "config/config.h"
 #include "renderer/render_types.h"
 
+struct LayoutCardConfig;
 class WidgetHost;
 
 struct CardChromeLayoutMetrics {

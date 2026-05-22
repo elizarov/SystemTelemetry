@@ -13,8 +13,8 @@
 #include "resource.h"
 #include "util/lightweight_mutex.h"
 #include "util/resource_strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
-#include "util/utf8.h"
 #include "util/win32_format.h"
 
 namespace {
@@ -50,7 +50,7 @@ DWRITE_PARAGRAPH_ALIGNMENT DWriteParagraphAlignment(const TextLayoutOptions& opt
 constexpr int kPanelIconAtlasCellSize = 64;
 constexpr UINT kDxgiSwapChainBufferCount = 2;
 constexpr char kLocaleName[] = "en-us";
-constexpr wchar_t kPngResourceType[] = L"PNG";   // FindResourceW requires a UTF-16 resource type.
+constexpr char kPngResourceType[] = "PNG";
 constexpr wchar_t kTextMeasureSample[] = L"Ag";  // DWrite text layout measures UTF-16 sample text.
 
 const void* D2DRenderBitmapResourceTypeToken() {
@@ -264,7 +264,7 @@ int GetPanelIconAtlasSlot(std::string_view iconName) {
     return -1;
 }
 
-UiFontConfig FontConfigForStyle(const UiFontSetConfig& fonts, TextStyleId style) {
+UiFontConfig FontConfigForStyle(const FontsConfig& fonts, TextStyleId style) {
     switch (style) {
         case TextStyleId::Title:
             return fonts.title;
@@ -294,12 +294,12 @@ Microsoft::WRL::ComPtr<IWICBitmapSource> LoadPngResourceMask(IWICImagingFactory*
         return bitmapSource;
     }
 
-    HMODULE module = GetModuleHandleW(nullptr);
+    HMODULE module = GetModuleHandleA(nullptr);
     if (module == nullptr) {
         return bitmapSource;
     }
 
-    HRSRC resource = FindResourceW(module, MAKEINTRESOURCEW(resourceId), kPngResourceType);
+    HRSRC resource = FindResourceA(module, MAKEINTRESOURCEA(resourceId), kPngResourceType);
     if (resource == nullptr) {
         return bitmapSource;
     }
@@ -692,7 +692,7 @@ bool D2DRenderer::SavePng(const FilePath& imagePath, int width, int height, cons
 
 TextLayoutResult D2DRenderer::MeasureTextBlock(
     const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options) const {
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring wideText = WideFromText(text);
     if (wideText.empty()) {
         return TextLayoutResult{rect};
     }
@@ -705,7 +705,7 @@ TextLayoutResult D2DRenderer::DrawTextBlock(const RenderRect& rect,
     RenderColorId color,
     const TextLayoutOptions& options) {
     TextLayoutResult result{rect};
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring wideText = WideFromText(text);
     if (wideText.empty()) {
         return result;
     }
@@ -734,7 +734,7 @@ void D2DRenderer::DrawText(const RenderRect& rect,
     TextStyleId style,
     RenderColorId color,
     const TextLayoutOptions& options) const {
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring wideText = WideFromText(text);
     if (wideText.empty()) {
         return;
     }
@@ -772,7 +772,7 @@ int D2DRenderer::MeasureTextWidth(TextStyleId style, std::string_view text) cons
         return 0;
     }
 
-    const std::wstring wideText = WideFromUtf8(text);
+    const std::wstring wideText = WideFromText(text);
     if (wideText.empty()) {
         return 0;
     }
@@ -1654,11 +1654,11 @@ bool D2DRenderer::CreateDWriteTextFormats() {
         return true;
     }
 
-    const std::wstring localeName = WideFromUtf8(kLocaleName);
+    const std::wstring localeName = WideFromText(kLocaleName);
     const auto createFormat = [&](TextStyleId style) {
         UiFontConfig fontConfig = FontConfigForStyle(style_.fonts, style);
         fontConfig.size = ScaleLogical(fontConfig.size);
-        const std::wstring face = WideFromUtf8(fontConfig.face);
+        const std::wstring face = WideFromText(fontConfig.face);
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
         const HRESULT hr = dwriteFactory_->CreateTextFormat(face.c_str(),
             nullptr,

@@ -2,8 +2,9 @@
 
 #include <string>
 
-#include "config/config.h"
 #include "widget/layout_edit_types.h"
+
+struct AppConfig;
 
 const char* LayoutEditTooltipPayloadTraceKind(const TooltipPayload& payload);
 bool BuildLayoutEditTooltipTextForPayload(const AppConfig& config,

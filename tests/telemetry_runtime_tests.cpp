@@ -1,7 +1,7 @@
 #include <chrono>
 #include <gtest/gtest.h>
 
-#include "config/config.h"
+#include "config/config_telemetry.h"
 #include "telemetry/impl/collector.h"
 #include "telemetry/impl/collector_real.h"
 #include "telemetry/telemetry.h"
@@ -72,7 +72,7 @@ protected:
     AppConfig config_{};
     Trace trace_;
     mutable LightweightMutex mutex_;
-    HANDLE callbackEvent_ = CreateEventW(nullptr, TRUE, FALSE, nullptr);
+    HANDLE callbackEvent_ = CreateEventA(nullptr, TRUE, FALSE, nullptr);
     TelemetryUpdate latest_{};
     int callbackCount_ = 0;
 };

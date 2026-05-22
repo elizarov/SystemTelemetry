@@ -10,13 +10,14 @@
 #include <string>
 #include <string_view>
 
-#include "config/config.h"
 #include "config/diagnostics_options.h"
 #include "dashboard_renderer/dashboard_renderer.h"
-#include "diagnostics/snapshot_dump.h"
+#include "telemetry/telemetry.h"
 #include "util/command_line.h"
 #include "util/file_path.h"
 #include "util/trace.h"
+
+struct AppConfig;
 
 bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,

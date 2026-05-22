@@ -67,8 +67,13 @@ const ThemeConfig* FindTheme(const LayoutConfig& layout, std::string_view name) 
     return nullptr;
 }
 
+const RuntimeConfigSectionDescriptor& RequiredSection(std::string_view name) {
+    const RuntimeConfigSectionDescriptor* section = FindRuntimeConfigSection(name);
+    return *section;
+}
+
 std::optional<ColorConfig> FindThemeToken(const ThemeConfig& theme, std::string_view name) {
-    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<ThemeConfig::Section>()) {
+    for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFields(RequiredSection("theme."))) {
         if (field.kind == RuntimeConfigFieldValueKind::HexColor &&
             std::string_view(field.key, field.keyLength) == name) {
             return *reinterpret_cast<const ColorConfig*>(reinterpret_cast<const char*>(&theme) + field.offset);
@@ -150,8 +155,9 @@ void ResolveColorInPlace(ColorConfig& color, const ColorLookup& lookup) {
 
 void ResolveThemeColors(LayoutConfig& layout) {
     const auto noLookup = [](std::string_view) -> std::optional<ColorConfig> { return std::nullopt; };
+    const RuntimeConfigSectionDescriptor& themeSection = RequiredSection("theme.");
     for (ThemeConfig& theme : layout.themes) {
-        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFieldDescriptors<ThemeConfig::Section>()) {
+        for (const RuntimeConfigFieldDescriptor& field : RuntimeConfigFields(themeSection)) {
             if (field.kind == RuntimeConfigFieldValueKind::HexColor) {
                 ResolveColorInPlace(MutableColorField(&theme, field), noLookup);
             }
@@ -181,17 +187,17 @@ void ResolveConfiguredColors(AppConfig& config) {
     }
 
     const auto themeLookup = [activeTheme](std::string_view name) { return FindThemeToken(*activeTheme, name); };
-    ResolveColorFieldsInPlace(
-        RuntimeConfigFieldDescriptors<ColorsConfig::Section>(), &config.layout.colors, themeLookup);
+    const RuntimeConfigSectionDescriptor& colorsSection = RequiredSection("colors");
+    ResolveColorFieldsInPlace(RuntimeConfigFields(colorsSection), &config.layout.colors, themeLookup);
 
-    const auto guideSheetLookup = [&config, activeTheme](std::string_view name) -> std::optional<ColorConfig> {
+    const auto guideSheetLookup = [&config, activeTheme, &colorsSection](
+                                      std::string_view name) -> std::optional<ColorConfig> {
         if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
             return themeColor;
         }
-        return FindColorFieldByKey(RuntimeConfigFieldDescriptors<ColorsConfig::Section>(), &config.layout.colors, name);
+        return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
     };
 
-    ResolveColorFieldsInPlace(RuntimeConfigFieldDescriptors<LayoutGuideSheetConfig::Section>(),
-        &config.layout.layoutGuideSheet,
-        guideSheetLookup);
+    ResolveColorFieldsInPlace(
+        RuntimeConfigFields(RequiredSection("layout_guide_sheet")), &config.layout.layoutGuideSheet, guideSheetLookup);
 }

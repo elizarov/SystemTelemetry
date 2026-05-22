@@ -77,7 +77,7 @@ private:
     bool ApplyParameterPreview(LayoutEditParameter parameter, double value) override;
     bool ApplyFontPreview(LayoutEditParameter parameter, const UiFontConfig& value) override;
     bool ApplyFontFamilyPreview(const std::string& family) override;
-    bool ApplyFontSetPreview(const UiFontSetConfig& fonts) override;
+    bool ApplyFontSetPreview(const FontsConfig& fonts) override;
     bool ApplyLayoutPreview(const std::string& layoutName) override;
     bool ApplyThemePreview(const std::string& themeName) override;
     bool ApplyColorPreview(LayoutEditParameter parameter, unsigned int value) override;

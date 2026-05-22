@@ -14,7 +14,6 @@
 #include "util/strings.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
@@ -23,9 +22,9 @@ using NvmlReturn = int;
 
 constexpr NvmlReturn kNvmlSuccess = 0;
 constexpr unsigned int kNvmlTemperatureGpu = 0;
-constexpr wchar_t kNvidiaMlLibraryName[] = L"nvidia-ml.dll";  // LoadLibraryW requires a UTF-16 DLL name.
-constexpr wchar_t kNvmlLibraryName[] = L"nvml.dll";           // LoadLibraryW requires a UTF-16 DLL name.
-constexpr wchar_t kNvApiLibraryName[] = L"nvapi64.dll";       // LoadLibraryW requires a UTF-16 DLL name.
+constexpr char kNvidiaMlLibraryName[] = "nvidia-ml.dll";
+constexpr char kNvmlLibraryName[] = "nvml.dll";
+constexpr char kNvApiLibraryName[] = "nvapi64.dll";
 
 using NvApiStatus = int;
 using NvApiPhysicalGpuHandle = void*;
@@ -127,9 +126,9 @@ public:
     }
 
     bool Load(std::string& diagnostics) {
-        module_ = LoadLibraryW(kNvmlLibraryName);
+        module_ = LoadLibraryA(kNvmlLibraryName);
         if (module_ == nullptr) {
-            module_ = LoadLibraryW(kNvidiaMlLibraryName);
+            module_ = LoadLibraryA(kNvidiaMlLibraryName);
         }
         if (module_ == nullptr) {
             diagnostics = ResourceStringText(RES_STR("NVML library not found."));
@@ -178,7 +177,7 @@ public:
         if (errorString_ != nullptr) {
             const char* text = errorString_(result);
             if (text != nullptr && text[0] != '\0') {
-                return Utf8FromAnsi(text);
+                return text;
             }
         }
         return FormatText(RES_STR("%d"), result);
@@ -251,7 +250,7 @@ public:
     }
 
     bool Initialize(const std::string& preferredName, Trace& trace, std::string& diagnostics) {
-        module_ = LoadLibraryW(kNvApiLibraryName);
+        module_ = LoadLibraryA(kNvApiLibraryName);
         if (module_ == nullptr) {
             diagnostics = ResourceStringText(RES_STR("NVAPI library not found."));
             return false;
@@ -301,7 +300,7 @@ public:
             }
             char name[kNvApiShortStringSize] = {};
             const NvApiStatus nameStatus = gpuGetFullName_(handles[index], name);
-            const std::string candidateName = nameStatus == kNvApiOk ? Utf8FromAnsi(name) : std::string();
+            const std::string candidateName = nameStatus == kNvApiOk ? std::string(name) : std::string();
             const int rank = !preferredName.empty() && EqualsInsensitive(candidateName, preferredName)
                                  ? 3
                                  : (!preferredName.empty() && (ContainsInsensitive(candidateName, preferredName) ||
@@ -383,7 +382,7 @@ private:
 };
 
 std::string KnownNvmlName(const std::array<char, 128>& name) {
-    return name[0] != '\0' ? Utf8FromAnsi(name.data()) : std::string();
+    return name[0] != '\0' ? std::string(name.data()) : std::string();
 }
 
 bool NvmlPackedDeviceIdMatches(unsigned int pciDeviceId, const GpuAdapterInfo& adapter) {

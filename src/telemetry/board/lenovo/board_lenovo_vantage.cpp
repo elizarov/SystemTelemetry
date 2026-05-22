@@ -25,9 +25,9 @@
 #include "util/file_path.h"
 #include "util/resource_strings.h"
 #include "util/strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 #include "util/win32_format.h"
 
 namespace {
@@ -132,8 +132,8 @@ private:
     BSTR value_ = nullptr;
 };
 
-std::string Utf8FromNullableWide(const wchar_t* text) {
-    return text != nullptr ? Utf8FromWide(text) : std::string();
+std::string TextFromNullableWide(const wchar_t* text) {
+    return text != nullptr ? TextFromWide(text) : std::string();
 }
 
 std::string FormatHresult(HRESULT value) {
@@ -153,7 +153,7 @@ bool HasAvailableFanReading(const LenovoHardwareScanSnapshot& snapshot) {
 }
 
 bool DirectoryExists(const FilePath& path) {
-    const std::wstring wide = path.Wide();
+    const std::wstring wide = path.WideForNativeApi();
     const DWORD attributes = GetFileAttributesW(wide.c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
@@ -164,7 +164,7 @@ std::optional<FilePath> ProgramDataDirectory() {
     if (length == 0 || length >= buffer.size()) {
         return std::nullopt;
     }
-    return FilePath(std::wstring(buffer.data(), length));
+    return FilePath(TextFromWide(std::wstring_view(buffer.data(), length)));
 }
 
 std::vector<int> ParseVersionParts(const std::wstring& text) {
@@ -221,7 +221,7 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
         return std::nullopt;
     }
 
-    const std::wstring pattern = (addinRoot / "*").Wide();
+    const std::wstring pattern = (addinRoot / "*").WideForNativeApi();
     WIN32_FIND_DATAW findData{};
     HANDLE search = FindFirstFileW(pattern.c_str(), &findData);
     if (search == INVALID_HANDLE_VALUE) {
@@ -238,7 +238,7 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
         if (name == L"." || name == L"..") {
             continue;
         }
-        const FilePath candidate = addinRoot / FilePath(name);
+        const FilePath candidate = addinRoot / FilePath(TextFromWide(name));
         if (!IsHardwareScanDirectory(candidate)) {
             continue;
         }
@@ -294,7 +294,7 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
     if (!path.Valid() || !method.Valid()) {
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_method method=\"%s\" status=alloc_failed"),
-            Utf8FromNullableWide(methodName).c_str());
+            TextFromNullableWide(methodName).c_str());
         return std::nullopt;
     }
 
@@ -304,7 +304,7 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
     if (FAILED(hr)) {
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_method method=\"%s\" status=%s"),
-            Utf8FromNullableWide(methodName).c_str(),
+            TextFromNullableWide(methodName).c_str(),
             FormatHresult(hr).c_str());
         return std::nullopt;
     }
@@ -313,13 +313,13 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
     if (!value.has_value()) {
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_method method=\"%s\" status=no_data"),
-            Utf8FromNullableWide(methodName).c_str());
+            TextFromNullableWide(methodName).c_str());
         return std::nullopt;
     }
 
     trace.WriteFmt(TracePrefix::LenovoHardwareScan,
         RES_STR("gamezone_wmi_method method=\"%s\" status=ok data=%lu"),
-        Utf8FromNullableWide(methodName).c_str(),
+        TextFromNullableWide(methodName).c_str(),
         static_cast<unsigned long>(*value));
     return value;
 }
@@ -476,7 +476,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
         ++instanceCount;
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_instance path=\"%s\""),
-            Utf8FromWide(*objectPath).c_str());
+            TextFromWide(*objectPath).c_str());
 
         const std::optional<std::uint32_t> fanCount =
             ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, L"GetFanCount");
@@ -582,7 +582,7 @@ bool HasRequestedHardwareScanModule(const LenovoHardwareScanCaptureOptions& opti
 
 std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& diagnostics) {
     diagnostics.clear();
-    const std::wstring pipeName = WideFromUtf8(kFpsServicePipeName);
+    const std::wstring pipeName = WideFromText(kFpsServicePipeName);
     if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
         diagnostics =
             FormatText(RES_STR("CashDash service pipe is unavailable: %s"), FormatWin32Error(GetLastError()).c_str());
@@ -684,23 +684,23 @@ public:
     explicit LenovoHardwareScanCapture(Trace& trace) : trace_(trace) {}
 
     void AddTemperatureReading(const wchar_t* title, double celsius) override {
-        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromNullableWide(title), celsius});
+        snapshot_.temperatures.push_back(BoardSensorReading{TextFromNullableWide(title), celsius});
     }
 
     void SetDiagnostics(const wchar_t* diagnostics) override {
-        snapshot_.diagnostics = Utf8FromNullableWide(diagnostics);
+        snapshot_.diagnostics = TextFromNullableWide(diagnostics);
     }
 
     void TraceAssemblyLoaded(const wchar_t* path) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string pathText = Utf8FromNullableWide(path);
+            const std::string pathText = TextFromNullableWide(path);
             trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("assembly_loaded path=\"%s\""), pathText.c_str());
         }
     }
 
     void TraceClientStatus(const wchar_t* status) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string statusText = Utf8FromNullableWide(status);
+            const std::string statusText = TextFromNullableWide(status);
             trace_.WriteFmt(
                 TracePrefix::LenovoHardwareScan, RES_STR("client_status status=\"%s\""), statusText.c_str());
         }
@@ -708,7 +708,7 @@ public:
 
     void TraceExecutionResult(const wchar_t* result) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string resultText = Utf8FromNullableWide(result);
+            const std::string resultText = TextFromNullableWide(result);
             trace_.WriteFmt(
                 TracePrefix::LenovoHardwareScan, RES_STR("execution_result result=\"%s\""), resultText.c_str());
         }
@@ -716,7 +716,7 @@ public:
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
             trace_.WriteFmt(
                 TracePrefix::LenovoHardwareScan, RES_STR("initialize_exception %s"), diagnosticsText.c_str());
         }
@@ -724,14 +724,14 @@ public:
 
     void TraceModuleLoadResult(const wchar_t* result) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string resultText = Utf8FromNullableWide(result);
+            const std::string resultText = TextFromNullableWide(result);
             trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("module_load_result %s"), resultText.c_str());
         }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
             trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
         }
     }
@@ -762,7 +762,7 @@ LenovoHardwareScanSnapshot CaptureLenovoHardwareScanSensors(Trace& trace,
     const FilePath& addinDirectory,
     const LenovoHardwareScanCaptureOptions& options) {
     LenovoHardwareScanCapture capture(trace);
-    const std::wstring wideAddinDirectory = addinDirectory.Wide();
+    const std::wstring wideAddinDirectory = addinDirectory.WideForNativeApi();
     const bool captured = runtime.Capture(wideAddinDirectory.c_str(), options, capture);
     return captured ? capture.FinishSuccess() : capture.FinishFailure();
 }

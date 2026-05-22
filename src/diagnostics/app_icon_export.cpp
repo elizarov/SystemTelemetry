@@ -20,8 +20,7 @@ bool SetError(std::string* errorText, std::string text) {
 }
 
 bool DirectoryExists(const FilePath& path) {
-    const std::wstring widePath = path.Wide();
-    const DWORD attributes = GetFileAttributesW(widePath.c_str());
+    const DWORD attributes = GetFileAttributesA(path.string().c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
@@ -35,8 +34,7 @@ bool EnsureDirectoryExists(const FilePath& path, std::string* errorText) {
         return false;
     }
 
-    const std::wstring widePath = path.Wide();
-    if (CreateDirectoryW(widePath.c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
+    if (CreateDirectoryA(path.string().c_str(), nullptr) || GetLastError() == ERROR_ALREADY_EXISTS) {
         return true;
     }
     return SetError(errorText, FormatText("app_icon:create_directory_failed path=%s", path.string().c_str()));

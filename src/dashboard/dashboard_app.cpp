@@ -19,14 +19,14 @@
 #include "util/localization_catalog.h"
 #include "util/message_box.h"
 #include "util/paths.h"
+#include "util/scale.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 #include "widget/app_icon_geometry.h"
 
 namespace {
 
-const UINT kTooltipToolInfoSize = TTTOOLINFOW_V2_SIZE;
+const UINT kTooltipToolInfoSize = TTTOOLINFOA_V2_SIZE;
 constexpr UINT kLayoutEditTooltipFlags = TTF_TRACK | TTF_ABSOLUTE | TTF_TRANSPARENT;
 
 RECT RectFromPoint(RenderPoint point, int radius) {
@@ -210,14 +210,13 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     INITCOMMONCONTROLSEX icc{sizeof(icc), ICC_STANDARD_CLASSES | ICC_WIN95_CLASSES | ICC_TAB_CLASSES};
     InitCommonControlsEx(&icc);
 
-    const std::wstring windowClassName = WideFromUtf8(kWindowClassName);
-    WNDCLASSEXW wc{};
+    WNDCLASSEXA wc{};
     wc.cbSize = sizeof(wc);
     wc.style = CS_DBLCLKS;
     wc.lpfnWndProc = &DashboardApp::WndProcSetup;
     wc.hInstance = instance;
-    wc.lpszClassName = windowClassName.c_str();
-    wc.hCursor = LoadCursorW(nullptr, IDC_ARROW);
+    wc.lpszClassName = kWindowClassName;
+    wc.hCursor = LoadCursorA(nullptr, IDC_ARROW);
     wc.hbrBackground = nullptr;
     if (appIconLarge_ == nullptr) {
         appIconLarge_ = LoadAppIcon(GetSystemMetrics(SM_CXICON), GetSystemMetrics(SM_CYICON));
@@ -227,7 +226,7 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     }
     wc.hIcon = appIconLarge_;
     wc.hIconSm = appIconSmall_;
-    if (!RegisterClassExW(&wc)) {
+    if (!RegisterClassExA(&wc)) {
         return false;
     }
 
@@ -247,10 +246,9 @@ bool DashboardApp::Initialize(HINSTANCE instance) {
     placement.right = placement.left + WindowWidth();
     placement.bottom = placement.top + WindowHeight();
 
-    const std::wstring appTitle = WideFromUtf8(kAppTitleUtf8);
-    hwnd_ = CreateWindowExW(WS_EX_TOOLWINDOW,
+    hwnd_ = CreateWindowExA(WS_EX_TOOLWINDOW,
         wc.lpszClassName,
-        appTitle.c_str(),
+        kAppTitle,
         WS_POPUP,
         placement.left,
         placement.top,
@@ -415,7 +413,7 @@ void DashboardApp::ReleaseFonts() {
 
 HICON DashboardApp::LoadAppIcon(int width, int height) {
     return static_cast<HICON>(
-        LoadImageW(instance_, MAKEINTRESOURCEW(IDI_APP_ICON), IMAGE_ICON, width, height, LR_DEFAULTCOLOR));
+        LoadImageA(instance_, MAKEINTRESOURCEA(IDI_APP_ICON), IMAGE_ICON, width, height, LR_DEFAULTCOLOR));
 }
 
 void DashboardApp::DestroyLoadedIcons(HICON largeIcon, HICON smallIcon) const {
@@ -432,10 +430,10 @@ void DashboardApp::ApplyThemedIconsToWindow(HWND target) const {
         return;
     }
     if (appIconLarge_ != nullptr) {
-        SendMessageW(target, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(appIconLarge_));
+        SendMessageA(target, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(appIconLarge_));
     }
     if (appIconSmall_ != nullptr) {
-        SendMessageW(target, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(appIconSmall_));
+        SendMessageA(target, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(appIconSmall_));
     }
 }
 
@@ -461,7 +459,7 @@ void DashboardApp::RefreshThemedIcons() {
     if (trayIcon_.cbSize != 0) {
         trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
         trayIcon_.hIcon = appIconSmall_;
-        Shell_NotifyIconW(NIM_MODIFY, &trayIcon_);
+        Shell_NotifyIconA(NIM_MODIFY, &trayIcon_);
     }
     if (shellUi_ != nullptr) {
         shellUi_->RefreshDialogIcons();
@@ -600,15 +598,14 @@ bool DashboardApp::CreateTrayIcon() {
     trayIcon_.uID = 1;
     trayIcon_.uFlags = NIF_MESSAGE | NIF_ICON | NIF_TIP;
     trayIcon_.uCallbackMessage = kTrayMessage;
-    trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconW(nullptr, IDI_APPLICATION);
-    const std::wstring appTitle = WideFromUtf8(kAppTitleUtf8);
-    wcscpy_s(trayIcon_.szTip, appTitle.c_str());
-    return Shell_NotifyIconW(NIM_ADD, &trayIcon_) == TRUE;
+    trayIcon_.hIcon = appIconSmall_ != nullptr ? appIconSmall_ : LoadIconA(nullptr, IDI_APPLICATION);
+    strcpy_s(trayIcon_.szTip, kAppTitle);
+    return Shell_NotifyIconA(NIM_ADD, &trayIcon_) == TRUE;
 }
 
 void DashboardApp::RemoveTrayIcon() {
     if (trayIcon_.cbSize != 0) {
-        Shell_NotifyIconW(NIM_DELETE, &trayIcon_);
+        Shell_NotifyIconA(NIM_DELETE, &trayIcon_);
     }
 }
 
@@ -734,7 +731,7 @@ void DashboardApp::EnqueueTelemetryUpdate(const TelemetryUpdate& update) {
         hasPendingTelemetryUpdate_ = true;
     }
     if (hwnd_ != nullptr) {
-        PostMessageW(hwnd_, kTelemetryUpdateMessage, 0, 0);
+        PostMessageA(hwnd_, kTelemetryUpdateMessage, 0, 0);
     }
 }
 
@@ -755,12 +752,12 @@ MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
 }
 
 void DashboardApp::ShowError(std::string_view message) const {
-    MessageBoxUtf8(hwnd_, message, MB_ICONERROR);
+    ShowAppMessageBox(hwnd_, message, MB_ICONERROR);
 }
 
 bool DashboardApp::CreateLayoutEditTooltip() {
-    layoutEditTooltipHwnd_ = CreateWindowExW(WS_EX_TOPMOST,
-        TOOLTIPS_CLASSW,
+    layoutEditTooltipHwnd_ = CreateWindowExA(WS_EX_TOPMOST,
+        TOOLTIPS_CLASSA,
         nullptr,
         WS_POPUP | TTS_NOPREFIX | TTS_ALWAYSTIP,
         CW_USEDEFAULT,
@@ -781,21 +778,21 @@ bool DashboardApp::CreateLayoutEditTooltip() {
     RECT clientRect{};
     GetClientRect(hwnd_, &clientRect);
 
-    TOOLINFOW toolInfo{};
+    TOOLINFOA toolInfo{};
     toolInfo.cbSize = kTooltipToolInfoSize;
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.hwnd = hwnd_;
     toolInfo.uId = 1;
     toolInfo.rect = clientRect;
-    layoutEditTooltipWideText_ = WideFromUtf8("");
-    toolInfo.lpszText = layoutEditTooltipWideText_.data();
+    layoutEditTooltipText_.clear();
+    toolInfo.lpszText = layoutEditTooltipText_.data();
     const LRESULT addToolResult =
-        SendMessageW(layoutEditTooltipHwnd_, TTM_ADDTOOLW, 0, reinterpret_cast<LPARAM>(&toolInfo));
-    const LRESULT activateResult = SendMessageW(layoutEditTooltipHwnd_, TTM_ACTIVATE, TRUE, 0);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_INITIAL, 0);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_RESHOW, 0);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_AUTOPOP, 30000);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
+        SendMessageA(layoutEditTooltipHwnd_, TTM_ADDTOOLA, 0, reinterpret_cast<LPARAM>(&toolInfo));
+    const LRESULT activateResult = SendMessageA(layoutEditTooltipHwnd_, TTM_ACTIVATE, TRUE, 0);
+    SendMessageA(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_INITIAL, 0);
+    SendMessageA(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_RESHOW, 0);
+    SendMessageA(layoutEditTooltipHwnd_, TTM_SETDELAYTIME, TTDT_AUTOPOP, 30000);
+    SendMessageA(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
     (void)addToolResult;
     (void)activateResult;
     return true;
@@ -807,7 +804,6 @@ void DashboardApp::DestroyLayoutEditTooltip() {
         layoutEditTooltipHwnd_ = nullptr;
     }
     layoutEditTooltipText_.clear();
-    layoutEditTooltipWideText_.clear();
     layoutEditTooltipVisible_ = false;
 }
 
@@ -882,12 +878,12 @@ void DashboardApp::HideLayoutEditTooltip() {
         return;
     }
 
-    TOOLINFOW toolInfo{};
+    TOOLINFOA toolInfo{};
     toolInfo.cbSize = kTooltipToolInfoSize;
     toolInfo.hwnd = hwnd_;
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.uId = 1;
-    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, FALSE, reinterpret_cast<LPARAM>(&toolInfo));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, FALSE, reinterpret_cast<LPARAM>(&toolInfo));
     TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, "hide");
     layoutEditTooltipVisible_ = false;
     layoutEditTooltipRectValid_ = false;
@@ -982,29 +978,28 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     layoutEditTooltipRect_ = RectFromPoint(clientPoint, tooltipRadius);
     layoutEditTooltipRectValid_ = true;
 
-    TOOLINFOW toolInfo{};
+    TOOLINFOA toolInfo{};
     toolInfo.cbSize = kTooltipToolInfoSize;
     toolInfo.hwnd = hwnd_;
     toolInfo.uFlags = kLayoutEditTooltipFlags;
     toolInfo.uId = 1;
     toolInfo.rect = layoutEditTooltipRect_;
-    layoutEditTooltipWideText_ = WideFromUtf8(layoutEditTooltipText_);
-    toolInfo.lpszText = layoutEditTooltipWideText_.data();
-    SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
-    SendMessageW(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTW, 0, reinterpret_cast<LPARAM>(&toolInfo));
-    SendMessageW(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
+    toolInfo.lpszText = layoutEditTooltipText_.data();
+    SendMessageA(layoutEditTooltipHwnd_, TTM_UPDATETIPTEXTA, 0, reinterpret_cast<LPARAM>(&toolInfo));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_NEWTOOLRECTA, 0, reinterpret_cast<LPARAM>(&toolInfo));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
     POINT tooltipScreenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
     ClientToScreen(hwnd_, &tooltipScreenPoint);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(tooltipScreenPoint.x, tooltipScreenPoint.y));
-    SendMessageW(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&toolInfo));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_TRACKPOSITION, 0, MAKELPARAM(tooltipScreenPoint.x, tooltipScreenPoint.y));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_TRACKACTIVATE, TRUE, reinterpret_cast<LPARAM>(&toolInfo));
 
     MSG msg{};
     msg.hwnd = hwnd_;
     msg.message = WM_MOUSEMOVE;
     msg.wParam = 0;
     msg.lParam = MAKELPARAM(clientPoint.x, clientPoint.y);
-    SendMessageW(layoutEditTooltipHwnd_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&msg));
-    SendMessageW(layoutEditTooltipHwnd_, TTM_UPDATE, 0, 0);
+    SendMessageA(layoutEditTooltipHwnd_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&msg));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_UPDATE, 0, 0);
     ShowWindow(layoutEditTooltipHwnd_, SW_SHOWNOACTIVATE);
     layoutEditTooltipVisible_ = true;
 
@@ -1115,7 +1110,7 @@ void DashboardApp::RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wPara
     msg.message = message;
     msg.wParam = wParam;
     msg.lParam = lParam;
-    SendMessageW(layoutEditTooltipHwnd_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&msg));
+    SendMessageA(layoutEditTooltipHwnd_, TTM_RELAYEVENT, 0, reinterpret_cast<LPARAM>(&msg));
 }
 
 int DashboardApp::Run() {
@@ -1128,31 +1123,31 @@ int DashboardApp::Run() {
     UpdateWindow(hwnd_);
 
     MSG msg{};
-    while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    while (GetMessageA(&msg, nullptr, 0, 0) > 0) {
         if (shellUi_ != nullptr && shellUi_->HandleDialogMessage(&msg)) {
             continue;
         }
         TranslateMessage(&msg);
-        DispatchMessageW(&msg);
+        DispatchMessageA(&msg);
     }
     return static_cast<int>(msg.wParam);
 }
 
 LRESULT CALLBACK DashboardApp::WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
     if (message == WM_NCCREATE) {
-        auto* create = reinterpret_cast<CREATESTRUCTW*>(lParam);
+        auto* create = reinterpret_cast<CREATESTRUCTA*>(lParam);
         auto* app = static_cast<DashboardApp*>(create->lpCreateParams);
-        SetWindowLongPtrW(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
-        SetWindowLongPtrW(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&DashboardApp::WndProcThunk));
+        SetWindowLongPtrA(hwnd, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(app));
+        SetWindowLongPtrA(hwnd, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(&DashboardApp::WndProcThunk));
         app->hwnd_ = hwnd;
         return app->HandleMessage(message, wParam, lParam);
     }
-    return DefWindowProcW(hwnd, message, wParam, lParam);
+    return DefWindowProcA(hwnd, message, wParam, lParam);
 }
 
 LRESULT CALLBACK DashboardApp::WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam) {
-    auto* app = reinterpret_cast<DashboardApp*>(GetWindowLongPtrW(hwnd, GWLP_USERDATA));
-    return app != nullptr ? app->HandleMessage(message, wParam, lParam) : DefWindowProcW(hwnd, message, wParam, lParam);
+    auto* app = reinterpret_cast<DashboardApp*>(GetWindowLongPtrA(hwnd, GWLP_USERDATA));
+    return app != nullptr ? app->HandleMessage(message, wParam, lParam) : DefWindowProcA(hwnd, message, wParam, lParam);
 }
 
 LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) {
@@ -1447,7 +1442,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 return -1;
             }
             if (layoutEditTooltipHwnd_ != nullptr) {
-                SendMessageW(
+                SendMessageA(
                     layoutEditTooltipHwnd_, TTM_SETMAXTIPWIDTH, 0, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
             }
             UpdateLayoutEditTooltip();
@@ -1513,10 +1508,10 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             PostQuitMessage(0);
             return 0;
         default:
-            return DefWindowProcW(hwnd_, message, wParam, lParam);
+            return DefWindowProcA(hwnd_, message, wParam, lParam);
     }
 
-    return DefWindowProcW(hwnd_, message, wParam, lParam);
+    return DefWindowProcA(hwnd_, message, wParam, lParam);
 }
 
 void DashboardApp::Paint() {

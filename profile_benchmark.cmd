@@ -519,15 +519,25 @@ call :set_benchmark_stem
 if not exist "%DAEMON_ROOT%\adhoc" mkdir "%DAEMON_ROOT%\adhoc"
 del /q "%DAEMON_ROOT%\adhoc\done.env" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\error.txt" >nul 2>nul
+del /q "%DAEMON_ROOT%\adhoc\request.env" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_stdout.txt" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.etl" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr.txt" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_wpr_calltree.html" >nul 2>nul
 del /q "%DAEMON_ROOT%\adhoc\%BENCHMARK_STEM%_benchmark_hotspots.txt" >nul 2>nul
-echo Requesting administrator access for WPR CPU profiling...
+> "%DAEMON_ROOT%\adhoc\request.env" (
+    echo benchmark=%BENCHMARK_NAME%
+    echo profile=%REQUEST_PROFILE%
+    if defined BENCHMARK_EXTRA_ARGS echo extra_args=%BENCHMARK_EXTRA_ARGS%
+)
+if "%REQUEST_PROFILE%"=="0" (
+    echo Requesting administrator access for direct benchmark run...
+) else (
+    echo Requesting administrator access for WPR CPU profiling...
+)
 powershell -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $env:ComSpec -ArgumentList '/c ""%~f0"" %BENCHMARK_NAME% %ITERATIONS% %RENDER_SCALE% /elevated /run-request ""%DAEMON_ROOT%\adhoc""' -WorkingDirectory '%REPO_ROOT%' -Verb RunAs -Wait | Out-Null"
 if errorlevel 1 (
-    echo Administrator approval is required to capture the benchmark CPU profile.
+    echo Administrator approval is required to run the elevated benchmark request.
     exit /b 1
 )
 call :wait_for_request_completion "%DAEMON_ROOT%\adhoc" 10

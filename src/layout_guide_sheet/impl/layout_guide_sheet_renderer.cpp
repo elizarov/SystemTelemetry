@@ -324,7 +324,7 @@ void AppendPackedCards(const LayoutNodeConfig& node,
 }
 
 PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
-    PackedNode root = MeasurePackedNode(renderer.Config().layout.structure.cardsLayout, renderer);
+    PackedNode root = MeasurePackedNode(renderer.Config().layout.structure.cards, renderer);
     const int outerMargin = renderer.ScaleLogical(renderer.Config().layout.dashboard.outerMargin);
     PackedOverview overview;
     overview.rect = RenderRect{0, 0, root.width + outerMargin * 2, root.height + outerMargin * 2};
@@ -344,7 +344,7 @@ PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
             ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1));
     outerMarginAnchor.value = renderer.Config().layout.dashboard.outerMargin;
     overview.gapAnchors.push_back(std::move(outerMarginAnchor));
-    AppendPackedCards(renderer.Config().layout.structure.cardsLayout,
+    AppendPackedCards(renderer.Config().layout.structure.cards,
         renderer,
         RenderRect{outerMargin, outerMargin, outerMargin + root.width, outerMargin + root.height},
         {},

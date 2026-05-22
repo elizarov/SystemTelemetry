@@ -15,16 +15,16 @@
 #include "util/file_path.h"
 #include "util/resource_strings.h"
 #include "util/strings.h"
+#include "util/text_encoding.h"
 #include "util/text_format.h"
 #include "util/trace.h"
-#include "util/utf8.h"
 
 namespace {
 
 constexpr char kMsiUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
-std::string Utf8FromNullableWide(const wchar_t* text) {
-    return text != nullptr ? Utf8FromWide(text) : std::string();
+std::string TextFromNullableWide(const wchar_t* text) {
+    return text != nullptr ? TextFromWide(text) : std::string();
 }
 
 struct MsiCenterSnapshot {
@@ -36,24 +36,23 @@ struct MsiCenterSnapshot {
 
 std::optional<FilePath> FindInstalledMsiCenterDirectory() {
     HKEY uninstallKey = nullptr;
-    const std::wstring uninstallKeyPath = WideFromUtf8(kMsiUninstallKey);
-    if (RegOpenKeyExW(HKEY_LOCAL_MACHINE, uninstallKeyPath.c_str(), 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
+    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, kMsiUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
         return std::nullopt;
     }
 
     DWORD index = 0;
-    wchar_t childName[256];
+    char childName[256];
     DWORD childNameLength = ARRAYSIZE(childName);
-    while (RegEnumKeyExW(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
+    while (RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
            ERROR_SUCCESS) {
         HKEY childKey = nullptr;
-        if (RegOpenKeyExW(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
+        if (RegOpenKeyExA(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
             const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
             const bool isMsiCenterSdk = displayName.has_value() && ContainsInsensitive(*displayName, "MSI Center SDK");
             if (isMsiCenterSdk) {
-                const auto installLocation = ReadRegistryWideString(childKey, nullptr, "InstallLocation");
+                const auto installLocation = ReadRegistryString(childKey, nullptr, "InstallLocation");
                 if (installLocation.has_value() && !installLocation->empty()) {
-                    const DWORD attributes = GetFileAttributesW(installLocation->c_str());
+                    const DWORD attributes = GetFileAttributesA(installLocation->c_str());
                     if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
                         RegCloseKey(childKey);
                         RegCloseKey(uninstallKey);
@@ -76,20 +75,20 @@ public:
     explicit MsiCenterCapture(Trace& trace) : trace_(trace) {}
 
     void AddFanReading(const wchar_t* title, double rpm) override {
-        snapshot_.fans.push_back(BoardSensorReading{Utf8FromNullableWide(title), rpm});
+        snapshot_.fans.push_back(BoardSensorReading{TextFromNullableWide(title), rpm});
     }
 
     void AddTemperatureReading(const wchar_t* title, double celsius) override {
-        snapshot_.temperatures.push_back(BoardSensorReading{Utf8FromNullableWide(title), celsius});
+        snapshot_.temperatures.push_back(BoardSensorReading{TextFromNullableWide(title), celsius});
     }
 
     void SetDiagnostics(const wchar_t* diagnostics) override {
-        snapshot_.diagnostics = Utf8FromNullableWide(diagnostics);
+        snapshot_.diagnostics = TextFromNullableWide(diagnostics);
     }
 
     void TraceAssemblyLoaded(const wchar_t* path) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
-            const std::string pathText = Utf8FromNullableWide(path);
+            const std::string pathText = TextFromNullableWide(path);
             trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("assembly_loaded path=\"%s\""), pathText.c_str());
         }
     }
@@ -101,14 +100,14 @@ public:
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
-            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
             trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("initialize_exception %s"), diagnosticsText.c_str());
         }
     }
 
     void TraceSnapshotException(const wchar_t* diagnostics) override {
         if (trace_.Enabled(TracePrefix::MsiCenter)) {
-            const std::string diagnosticsText = Utf8FromNullableWide(diagnostics);
+            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
             trace_.WriteFmt(TracePrefix::MsiCenter, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
         }
     }
@@ -209,8 +208,7 @@ public:
         }
 
         MsiCenterCapture capture(trace());
-        const std::wstring wideMsiCenterDirectory = msiCenterDirectory->Wide();
-        const bool captured = runtime_.Capture(wideMsiCenterDirectory.c_str(), capture);
+        const bool captured = runtime_.Capture(msiCenterDirectory->string().c_str(), capture);
         MsiCenterSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;

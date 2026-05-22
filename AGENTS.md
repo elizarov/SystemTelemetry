@@ -19,14 +19,15 @@ Use the following maintained references and keep them in sync before finishing w
 
 Keep a single source of truth for terminology, examples, format descriptions, and configuration-language references. Document requirements briefly in the owning spec using present-tense steady-state language. Do not number section headings; use descriptive non-numbered headings so docs stay easier to reorder and maintain.
 
-Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior, structure, validation, or tooling outcomes rather than file-by-file narration. Mention docs only when docs are the explicit task.
+## Commit messages and pull requests
+
+Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior, structure, validation, or tooling outcomes rather than file-by-file narration. Mention docs only when docs are the explicit task. Pull requests must follow the same structure.
 
 ## Build And Validation
 
 - Use `build.cmd` for builds, then run validation commands sequentially against the fresh build.
 - Keep build artifacts and temporary compiler files under `build\`.
 - Use `format.cmd` for C++ formatting checks and fixes.
-- Do not run `lint.cmd tidy` locally unless explicitly requested.
 - Prefer headless verification commands after building; use the smallest `/exit` combination that proves the change.
 - Add `/default-config` when validation is meant to exercise the built-in `resources/config.ini`.
 - Put explicit diagnostics outputs under `build\`.

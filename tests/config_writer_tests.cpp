@@ -7,6 +7,7 @@
 
 #include "config/color_resolver.h"
 #include "config/config_parser.h"
+#include "config/config_telemetry.h"
 #include "config/config_writer.h"
 #include "telemetry/metrics.h"
 
@@ -216,8 +217,7 @@ TEST(ConfigWriter, MinimalSaveDoesNotEmitLeadingEmptyLineForEmptyInitialText) {
 
 TEST(ConfigWriter, LayoutConfigDifferenceCheckUsesMetadataAndSelectedStructure) {
     LayoutConfig saved;
-    saved.structure.cardsLayout = LayoutNodeConfig{.name = "rows"};
-    saved.cardsLayout = saved.structure.cardsLayout;
+    saved.structure.cards = LayoutNodeConfig{.name = "rows"};
 
     LayoutConfig current = saved;
     EXPECT_FALSE(LayoutConfigHasDifferences(current, saved));
@@ -226,7 +226,7 @@ TEST(ConfigWriter, LayoutConfigDifferenceCheckUsesMetadataAndSelectedStructure) 
     EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
 
     current = saved;
-    current.structure.cardsLayout.name = "columns";
+    current.structure.cards.name = "columns";
     EXPECT_TRUE(LayoutConfigHasDifferences(current, saved));
 }
 
@@ -321,7 +321,7 @@ TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("gpu.temp = scalar,100,")));
 }
 
-TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings) {
+TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughGeneratedSectionTable) {
     AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 
@@ -331,10 +331,10 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings
     ASSERT_NE(it, currentConfig.layout.layouts.end());
     it->description = "Portrait Test";
     it->window = {.width = 600, .height = 900};
-    it->cardsLayout.name = "columns";
-    it->cardsLayout.children.clear();
-    it->cardsLayout.children.push_back(LayoutNodeConfig{.name = "cpu"});
-    it->cardsLayout.children.push_back(LayoutNodeConfig{.name = "gpu"});
+    it->cards.name = "columns";
+    it->cards.children.clear();
+    it->cards.children.push_back(LayoutNodeConfig{.name = "cpu"});
+    it->cards.children.push_back(LayoutNodeConfig{.name = "gpu"});
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
@@ -345,7 +345,7 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughReflectedDynamicBindings
                            "cards = columns(cpu,gpu)\r\n"));
 }
 
-TEST(ConfigWriter, SavesNamedThemeSectionChangesThroughReflectedDynamicBindings) {
+TEST(ConfigWriter, SavesNamedThemeSectionChangesThroughGeneratedSectionTable) {
     AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 

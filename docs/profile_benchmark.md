@@ -37,7 +37,7 @@ This file keeps the shared optimization journal useful across test machines. It 
 - Treat direct `build\CaseDashBenchmarks.exe <benchmark> <iterations> 2` runs as the repeatable comparison loop and xperf profiles as hotspot validation.
 - Treat timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline.
 - Daemon-backed and one-shot elevated runs persist benchmark stdout and hotspot summaries in the request directory and replay both in the caller window after the request finishes.
-- Use `profile_benchmark.cmd /direct <benchmark> <iterations> 2 [extra benchmark args]` for a clean elevated daemon run without xperf when provider access requires elevation but repeatable direct-run timing is the target.
+- Use `profile_benchmark.cmd /direct <benchmark> <iterations> 2 [extra benchmark args]` for a clean elevated daemon or one-shot `/elevate` run without xperf when provider access requires elevation but repeatable direct-run timing is the target.
 - Profile captures use a minimal xperf CPU sample trace with process and image-load metadata, profile stack walking, process-filtered stack export for `CaseDashBenchmarks.exe`, a `256 MB` circular ETL cap by default, and a compact hotspot summary generated from the filtered call tree.
 - Override the circular ETL cap with `PROFILE_BENCHMARK_MAX_FILE_MB=<size>` and the call-tree cutoff with `PROFILE_BENCHMARK_STACK_MIN_HITS=<hits>` when a specific investigation needs a different tradeoff.
 

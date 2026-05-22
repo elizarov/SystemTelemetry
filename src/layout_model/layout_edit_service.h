@@ -2,8 +2,9 @@
 
 #include <vector>
 
-#include "config/config.h"
 #include "layout_model/layout_edit_layout_target.h"
+
+struct AppConfig;
 
 bool ApplyGuideWeights(AppConfig& config, const LayoutEditLayoutTarget& target, const std::vector<int>& weights);
 bool ApplyGuideAdjacentWeights(
