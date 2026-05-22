@@ -108,7 +108,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put one space between control keywords and their opening parenthesis: `if (...)`, `for (...)`, `while (...)`, `switch (...)`, and `catch (...)`.
 - Do not put a space between a function, method, constructor, destructor, macro-like call, or declaration name and `(`.
 - Do not put spaces just inside parentheses, brackets, template angle brackets, or one-line initializer braces: `(value)`, `items[index]`, `std::vector<int>`, and `{a, b}`.
-- Treat template and cast angle brackets as delimiter syntax, not comparison operators: `template <typename T>`, `std::vector<int>`, and `static_cast<int>(value)`.
+- Treat template and cast angle brackets as delimiter syntax, not comparison operators: `template <typename T>`, `std::vector<int>`, `std::vector<std::pair<std::string, std::string>>`, and `static_cast<int>(value)`.
 - Keep empty braces as `{}` with no inner space.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.

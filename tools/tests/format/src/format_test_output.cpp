@@ -162,6 +162,7 @@ void SaveBoardSectionDifferences(
 
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
+using DumpValues = std::vector<std::pair<std::string, std::string>>;
 
 using RuntimeConfigForEachDynamicItem = void (*)(
     const AppConfig& config,

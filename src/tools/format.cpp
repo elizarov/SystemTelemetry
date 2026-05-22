@@ -965,7 +965,7 @@ private:
         }
         std::vector<Token> replacementTokens = Tokenize(replacement);
         if (
-            std::vector < std::vector < Token >> statements =
+            std::vector<std::vector<Token>> statements =
                 SplitStatementLikeMacroReplacement(defineLine, replacementTokens); statements.size() > 1
         ) {
             EmitLine(defineLine + " \\");
@@ -1002,9 +1002,7 @@ private:
         pendingPreprocessorBlank_ = true;
     }
 
-    std::vector <
-    std::vector <
-    Token >> SplitStatementLikeMacroReplacement(
+    std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
         std::string_view defineLine,
         const std::vector<Token>& replacementTokens
     ) const {
@@ -1012,7 +1010,7 @@ private:
         if (activeParameters.empty()) {
             return {};
         }
-        std::vector < std::vector < Token >> statements;
+        std::vector<std::vector<Token>> statements;
         size_t index = 0;
         while (index < replacementTokens.size()) {
             while (index < replacementTokens.size() && replacementTokens[index].kind == TokenKind::Newline) {
@@ -1153,7 +1151,7 @@ private:
     }
 
     void EmitEnumEnumerators(const std::vector<Token>& tokens) {
-        std::vector < std::vector < Token >> elements = SplitTopLevel(tokens, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(tokens, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(tokens, ',')) {
             EmitFormatted(tokens, {});
             return;
@@ -1523,7 +1521,7 @@ private:
         std::vector<Token> after(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs) + " {");
-        std::vector < std::vector < Token >> elements = SplitTopLevel(inner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
             if (elements[index].empty()) {
                 continue;
@@ -1591,7 +1589,7 @@ private:
                 if (ContainsTopLevelSeparator(captureInner, ',')) {
                     std::vector<std::string> lines;
                     lines.push_back(Indent(indentLevel) + prefix + "[");
-                    std::vector < std::vector < Token >> captures = SplitTopLevel(captureInner, ',');
+                    std::vector<std::vector<Token>> captures = SplitTopLevel(captureInner, ',');
                     for (size_t index = 0; index < captures.size(); ++index) {
                         std::string line = FormatInline(captures[index]);
                         if (index + 1 < captures.size()) {
@@ -1621,7 +1619,7 @@ private:
             tokens.end()
         );
         std::vector<std::string> lines = FormatConstructorInitializerHeader(header, indentLevel, std::move(prefix));
-        std::vector < std::vector < Token >> elements = SplitTopLevel(initializers, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
         for (size_t index = 0; index < elements.size(); ++index) {
             if (elements[index].empty()) {
@@ -1667,7 +1665,7 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        if (std::optional < std::vector < std::string >> combined = TryFormatCombinedControlNestedCall(
+        if (std::optional<std::vector<std::string>> combined = TryFormatCombinedControlNestedCall(
             tokens,
             group,
             indentLevel,
@@ -1676,7 +1674,7 @@ private:
         )) {
             return *combined;
         }
-        if (std::optional < std::vector < std::string >> combined = TryFormatCombinedSingleNestedGroup(
+        if (std::optional<std::vector<std::string>> combined = TryFormatCombinedSingleNestedGroup(
             tokens,
             group,
             indentLevel,
@@ -1698,7 +1696,7 @@ private:
         const bool splitForHeader = StartsWithControlFor(firstLineTokens);
         const bool indentElementChains = !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
-        std::vector < std::vector < Token >> elements = SplitTopLevel(inner, separator);
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             std::vector<std::string> childLines = FormatRange(inner, indentLevel + 1, {}, {}, indentElementChains);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
@@ -1727,9 +1725,7 @@ private:
         return lines;
     }
 
-    std::optional <
-    std::vector <
-    std::string >> TryFormatCombinedSingleNestedGroup(
+    std::optional<std::vector<std::string>> TryFormatCombinedSingleNestedGroup(
         const std::vector<Token>& tokens,
         GroupPair group,
         int indentLevel,
@@ -1760,7 +1756,7 @@ private:
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + firstLine);
-        std::vector < std::vector < Token >> elements = SplitTopLevel(nestedInner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
@@ -1813,9 +1809,7 @@ private:
         return lines;
     }
 
-    std::optional <
-    std::vector <
-    std::string >> TryFormatCombinedControlNestedCall(
+    std::optional<std::vector<std::string>> TryFormatCombinedControlNestedCall(
         const std::vector<Token>& tokens,
         GroupPair group,
         int indentLevel,
@@ -1854,7 +1848,7 @@ private:
         std::vector<Token> controlSuffix(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + firstLine);
-        std::vector < std::vector < Token >> elements = SplitTopLevel(nestedInner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
@@ -1889,7 +1883,7 @@ private:
         if (chainKind == ChainKind::Ternary) {
             return FormatTernaryChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains);
         }
-        std::vector < std::vector < Token >> parts;
+        std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -1932,7 +1926,7 @@ private:
         std::string suffix,
         bool indentSplitChains
     ) const {
-        std::vector < std::vector < Token >> parts;
+        std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -2053,15 +2047,14 @@ private:
         if (current == "<" && IsTemplateAngleOpen(tokens, index)) {
             return false;
         }
-        if (current == ">" && IsTemplateAngleClose(tokens, index)) {
+        if (IsTemplateAngleCloseToken(tokens, index)) {
             return false;
         }
         if (prev == "<" && IsTemplateAngleOpen(tokens, prevIndex)) {
             return false;
         }
         if (
-            prev == ">" &&
-            IsTemplateAngleClose(tokens, prevIndex) &&
+            IsTemplateAngleCloseToken(tokens, prevIndex) &&
             (current == "(" || current == "*" || current == "&" || current == "&&" || IsNoSpaceBefore(current))
         ) {
             return false;
@@ -2158,7 +2151,7 @@ private:
         if (!previous) {
             return true;
         }
-        if (tokens[*previous].text == ">" && IsTemplateAngleClose(tokens, *previous)) {
+        if (IsTemplateAngleCloseToken(tokens, *previous)) {
             return false;
         }
         const std::string& prev = tokens[*previous].text;
@@ -2234,7 +2227,7 @@ private:
 
     bool IsLikelyTypeNameToken(const std::vector<Token>& tokens, size_t index) const {
         const Token& token = tokens[index];
-        if (token.text == ">" && IsTemplateAngleClose(tokens, index)) {
+        if (IsTemplateAngleCloseToken(tokens, index)) {
             return true;
         }
         if (token.text == ")") {
@@ -2346,7 +2339,7 @@ private:
     }
 
     std::optional<size_t> UnwrapTemplateTypeNameStart(const std::vector<Token>& tokens, size_t index) const {
-        if (tokens[index].text != ">" || !IsTemplateAngleClose(tokens, index)) {
+        if (!IsTemplateAngleCloseToken(tokens, index)) {
             return index;
         }
         const std::optional<size_t> open = FindTemplateAngleOpen(tokens, index);
@@ -2644,8 +2637,8 @@ private:
         return std::nullopt;
     }
 
-    std::vector < std::vector < Token >> SplitTopLevel(const std::vector<Token>& tokens, char separator) const {
-        std::vector < std::vector < Token >> result;
+    std::vector<std::vector<Token>> SplitTopLevel(const std::vector<Token>& tokens, char separator) const {
+        std::vector<std::vector<Token>> result;
         std::vector<Token> current;
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -2867,7 +2860,7 @@ private:
         }
         const Token* next = &tokens[nextIndex];
         const bool beforeDeclaratorName = next->kind == TokenKind::Word;
-        const bool beforeTemplateClose = next->text == ">" && IsTemplateAngleClose(tokens, nextIndex);
+        const bool beforeTemplateClose = IsTemplateAngleCloseToken(tokens, nextIndex);
         const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
         const bool beforeUnnamedDeclaratorEnd = next->text == ")" || next->text == "," || next->text == "=";
         const bool beforeFunctionPointerDeclarator =
@@ -3216,6 +3209,12 @@ private:
         return IsTemplateAngleOpen(tokens, index) || IsTemplateAngleClose(tokens, index);
     }
 
+    bool IsTemplateAngleCloseToken(const std::vector<Token>& tokens, size_t index) const {
+        return index < tokens.size() &&
+            (tokens[index].text == ">" || tokens[index].text == ">>") &&
+            IsTemplateAngleClose(tokens, index);
+    }
+
     bool IsTemplateAngleOpen(const std::vector<Token>& tokens, size_t index) const {
         if (index >= tokens.size() || tokens[index].text != "<") {
             return false;
@@ -3232,35 +3231,36 @@ private:
     }
 
     bool IsTemplateAngleClose(const std::vector<Token>& tokens, size_t index) const {
-        if (index >= tokens.size() || tokens[index].text != ">") {
+        if (index >= tokens.size() || (tokens[index].text != ">" && tokens[index].text != ">>")) {
             return false;
         }
-        int depth = 0;
-        for (size_t current = index; current > 0; --current) {
-            const size_t candidate = current - 1;
-            if (tokens[candidate].text == ">") {
-                ++depth;
-            } else if (tokens[candidate].text == "<" && IsTemplateAngleOpen(tokens, candidate)) {
-                if (depth == 0) {
-                    return true;
-                }
-                --depth;
-            } else if (depth == 0 && IsTemplateScanBoundary(tokens[candidate].text)) {
-                return false;
-            }
+        return FindTemplateAngleOpen(tokens, index).has_value();
+    }
+
+    int TemplateCloseWidth(std::string_view text) const {
+        if (text == ">>") {
+            return 2;
         }
-        return false;
+        if (text == ">") {
+            return 1;
+        }
+        return 0;
     }
 
     std::optional<size_t> FindTemplateAngleOpen(const std::vector<Token>& tokens, size_t close) const {
-        if (close >= tokens.size() || tokens[close].text != ">") {
+        if (close >= tokens.size()) {
             return std::nullopt;
         }
-        int depth = 0;
+        const int closeWidth = TemplateCloseWidth(tokens[close].text);
+        if (closeWidth == 0) {
+            return std::nullopt;
+        }
+        int depth = closeWidth - 1;
         for (size_t current = close; current > 0; --current) {
             const size_t candidate = current - 1;
-            if (tokens[candidate].text == ">") {
-                ++depth;
+            const int candidateCloseWidth = TemplateCloseWidth(tokens[candidate].text);
+            if (candidateCloseWidth > 0) {
+                depth += candidateCloseWidth;
             } else if (tokens[candidate].text == "<" && IsTemplateAngleOpen(tokens, candidate)) {
                 if (depth == 0) {
                     return candidate;
@@ -3284,6 +3284,11 @@ private:
                     return index;
                 }
                 --depth;
+            } else if (text == ">>") {
+                if (depth <= 1) {
+                    return index;
+                }
+                depth -= 2;
             } else if (depth == 0 && IsTemplateScanBoundary(text)) {
                 return std::nullopt;
             }
@@ -3700,7 +3705,7 @@ std::string QuoteCommandArgument(std::string_view value) {
     return quoted;
 }
 
-std::optional < std::vector < std::string >> RunGit(std::string_view root, const std::vector<std::string>& args) {
+std::optional<std::vector<std::string>> RunGit(std::string_view root, const std::vector<std::string>& args) {
     std::string command = "git -C ";
     command += QuoteCommandArgument(root);
     for (const std::string& arg : args) {
@@ -3757,7 +3762,7 @@ bool IsInsideRootOrRoot(const std::string& root, const std::string& path) {
 }
 
 std::vector<std::string> GetAllFiles(const std::string& root) {
-    const std::optional < std::vector < std::string >> files = RunGit(root, {
+    const std::optional<std::vector<std::string>> files = RunGit(root, {
         "-c",
         "core.quotepath=off",
         "-c",
@@ -3783,19 +3788,19 @@ bool GitHeadExists(const std::string& root) {
 std::vector<std::string> GetChangedFiles(const std::string& root) {
     std::vector<std::string> paths;
     if (GitHeadExists(root)) {
-        if (std::optional < std::vector < std::string >> changed = RunGit(
+        if (std::optional<std::vector<std::string>> changed = RunGit(
             root,
             {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--", "*.cpp", "*.h"}
         )) {
             paths.insert(paths.end(), changed->begin(), changed->end());
         }
-    } else if (std::optional < std::vector < std::string >> staged = RunGit(
+    } else if (std::optional<std::vector<std::string>> staged = RunGit(
         root,
         {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "--", "*.cpp", "*.h"}
     )) {
         paths.insert(paths.end(), staged->begin(), staged->end());
     }
-    if (std::optional < std::vector < std::string >> untracked = RunGit(
+    if (std::optional<std::vector<std::string>> untracked = RunGit(
         root,
         {"-c", "core.safecrlf=false", "ls-files", "--others", "--exclude-standard", "--", "*.cpp", "*.h"}
     )) {
@@ -3823,9 +3828,7 @@ std::optional<std::string> ResolveTargetFile(const std::string& root, std::strin
     return fullPath;
 }
 
-std::optional <
-std::vector <
-std::string >> ResolveTargetPathFiles(const std::string& root, std::string_view targetPath) {
+std::optional<std::vector<std::string>> ResolveTargetPathFiles(const std::string& root, std::string_view targetPath) {
     if (targetPath.empty()) {
         return std::nullopt;
     }
@@ -3936,8 +3939,7 @@ int RunFormat(int argc, char * *argv) {
         }
         files.push_back(*target);
     } else if (!options.targetPath.empty()) {
-        std::optional < std::vector < std::string >> targetFiles =
-            ResolveTargetPathFiles(options.root, options.targetPath);
+        std::optional<std::vector<std::string>> targetFiles = ResolveTargetPathFiles(options.root, options.targetPath);
         if (!targetFiles) {
             std::fprintf(stderr, "--path target is not an eligible formatter input: %s\n", options.targetPath.c_str());
             return 2;
