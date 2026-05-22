@@ -492,6 +492,17 @@ bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_vi
     return false;
 }
 
+void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {
+    if (parameter == nullptr) {
+        return;
+    } else if (
+        const auto currentColor = FindLayoutEditParameterColorConfigValue(config, *parameter);
+        currentColor.has_value() && *currentColor != nullptr
+    ) {
+        colorExpressionValue = TooltipColorExpression(**currentColor);
+    }
+}
+
 bool ConfigureDisplayGuard(
     DisplayState& state,
     DisplayOption option,

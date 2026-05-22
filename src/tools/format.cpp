@@ -970,7 +970,8 @@ private:
         std::vector<Token> replacementTokens = Tokenize(replacement);
         if (
             std::vector<std::vector<Token>> statements =
-                SplitStatementLikeMacroReplacement(defineLine, replacementTokens); statements.size() > 1
+                SplitStatementLikeMacroReplacement(defineLine, replacementTokens);
+            statements.size() > 1
         ) {
             EmitLine(defineLine + " \\");
             std::vector<std::string> statementLines;
@@ -1360,8 +1361,8 @@ private:
             return {Indent(indentLevel) + inlineText};
         }
         if (
-            std::optional<size_t> assignment =
-                FindTopLevelAssignment(tokens); assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)
+            std::optional<size_t> assignment = FindTopLevelAssignment(tokens);
+            assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)
         ) {
             if (StartsWithInitializerList(tokens, *assignment + 1)) {
                 return FormatInitializerAssignment(
@@ -1697,7 +1698,8 @@ private:
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(firstLineTokens));
-        const bool splitForHeader = StartsWithControlFor(firstLineTokens);
+        const bool splitForHeader = StartsWithControlFor(firstLineTokens) ||
+            (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
@@ -3395,11 +3397,28 @@ private:
     }
 
     bool StartsWithControlFor(const std::vector<Token>& tokens) const {
-        return !tokens.empty() && tokens.front().text == "for";
+        return FirstControlHeaderToken(tokens) && FirstControlHeaderToken(tokens)->text == "for";
     }
 
     bool StartsWithControlHeader(const std::vector<Token>& tokens) const {
-        return !tokens.empty() && tokens.front().kind == TokenKind::Word && IsControlKeyword(tokens.front().text);
+        return FirstControlHeaderToken(tokens).has_value();
+    }
+
+    std::optional<Token> FirstControlHeaderToken(const std::vector<Token>& tokens) const {
+        if (tokens.empty()) {
+            return std::nullopt;
+        }
+        size_t index = 0;
+        if (tokens[index].text == "else") {
+            index = NextSignificantIndex(tokens, index + 1);
+        }
+        if (index >= tokens.size()) {
+            return std::nullopt;
+        }
+        if (tokens[index].kind == TokenKind::Word && IsControlKeyword(tokens[index].text)) {
+            return tokens[index];
+        }
+        return std::nullopt;
     }
 
     const Token* NextNonNewline(const std::vector<Token>& tokens, size_t index) const {

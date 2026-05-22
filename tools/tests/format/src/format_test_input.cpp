@@ -305,6 +305,10 @@ if(field.kind==RuntimeConfigFieldValueKind::HexColor && std::string_view(field.k
 return false;
 }
 
+void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
+if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
+}
+
 bool ConfigureDisplayGuard(DisplayState& state,DisplayOption option,DashboardShellHost& shell,UpdatedConfig updatedConfig){
 if(!::ConfigureDisplay(updatedConfig,state.telemetryUpdate.dump,option.fittedScale,shell.TraceLog(),shell.WindowHandle())){return true;}
 return false;
