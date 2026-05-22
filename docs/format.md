@@ -17,6 +17,20 @@ The formatter leaves minimal freedom to authors. Line breaks, indentation, wrapp
 - `CaseDashTools.exe format` owns native formatter execution, source discovery, parsing, checking, fixing, and stdout rendering.
 - `src\tools\format.cpp` owns native formatting logic and hardcoded style behavior.
 - `tools\format_config.json` owns project constants and parser support data, including line width, indent width, tab width, macro names accepted by the grammar, and include-sorting group definitions. It does not own style choices such as wrapping shapes or spacing rules.
+- `src\tools\vendor\tree-sitter\` owns the vendored tree-sitter C and C++ grammar inputs plus generated C++ parser sources compiled into `CaseDashTools.exe`.
+- `tools\regenerate_tree_sitter_grammar.py` owns explicit regeneration of vendored tree-sitter C++ grammar outputs from the vendored grammar source and `tools\format_config.json`. Normal builds do not regenerate grammar files.
+
+## Parser Grammar
+
+The native formatter uses tree-sitter core from vcpkg and a vendored C++ grammar under `src\tools\vendor\tree-sitter\tree-sitter-cpp\`. The C grammar under `src\tools\vendor\tree-sitter\tree-sitter-c\` is kept as the C++ grammar dependency for provenance and regeneration.
+
+Regenerate parser outputs only as an explicit maintenance step after editing the vendored grammar source or parser macro categories:
+
+```bat
+python tools\regenerate_tree_sitter_grammar.py
+```
+
+The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, runs the pinned tree-sitter CLI, and updates generated files under `src\tools\vendor\tree-sitter\tree-sitter-cpp\src\`. Pass `--tree-sitter-cli <path>` to use an existing CLI; otherwise the tool downloads the pinned Windows CLI under `build\`.
 
 ## General Rules
 
@@ -30,17 +44,27 @@ The formatter leaves minimal freedom to authors. Line breaks, indentation, wrapp
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
 - Do not break string literals, character literals, numeric constants, or comments only to satisfy the line width.
 - Preserve comments in place. The formatter may change spaces and line breaks around comments, and may trim trailing whitespace from comment lines, but it does not move comments across code tokens or reflow comment text.
+- Keep a `//` comment that starts on the line after a declaration as a standalone comment line. Only a `//` comment that is physically on the same source line as a statement or declaration may become that line's trailing comment.
 - Insert one empty line between top-level logical groups such as classes, free functions, namespace-level declarations, and method implementations.
 - Insert one empty line between neighboring `class`, `struct`, and `enum class` declarations and their sibling declarations. Non-empty function definitions are also separated from neighboring declarations by one empty line.
-- Insert one empty line between neighboring declarations of different kinds. Fields, methods, `class` declarations, `struct` declarations, `enum` declarations, namespace declarations, and macro definitions are separate kinds. Consecutive fields and consecutive macro definitions may stay grouped.
-- Separate fields from neighboring methods by one empty line, including empty inline method definitions and method declarations without bodies.
+- Insert one empty line between neighboring declarations of different kinds. Fields, methods, `class` declarations, `struct` declarations, `enum` declarations, namespace declarations, and macro definitions are separate kinds. Consecutive single-line fields and consecutive macro definitions may stay grouped.
+- Separate a multi-line field declaration from neighboring declarations with one empty line, even when the neighbors are also fields.
+- Separate fields from neighboring methods by one empty line, including empty inline method definitions, defaulted or deleted method declarations, pure virtual declarations, and method declarations without bodies. Trailing comments on fields do not change the separation rule.
+- Apply declaration-separation blank lines only in declaration scopes: top level, namespaces, classes, structs, and enums. Function, method, and lambda bodies are executable scopes and do not get declaration-separation blank lines.
 - Do not insert blank lines inside a group only for visual rhythm. Use comments when a group needs an explicit conceptual split.
 - Put block-opening braces for code blocks at the end of the introducing line, then line break immediately after the brace.
+- Treat a standalone braced statement block as a code block. Its opening brace and closing brace occupy their own structural lines, and the closing brace does not attach to the following statement.
 - Keep empty braces as `{}`.
+- Treat empty delimiter pairs as atomic text. The formatter never breaks inside empty `()`, empty `{}`, or empty `<>`; it breaks an owning expression or chain instead.
 - Do not force a line break after an initializer-list opening brace unless the initializer list itself wraps.
+- Format enum bodies as structural comma lists with one top-level enumerator per line. The closing brace stays on its own line, and a source trailing comma remains attached to the final enumerator.
 - Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, and do-while `while` stay on the same line as the closing brace.
 - Line break after each statement-terminating semicolon.
 - Keep preprocessor directives at column zero. Macro continuation backslashes, spaces before continuation backslashes, and continuation newlines are formatter-owned layout. For multi-line macro definitions, normalize the replacement list as code, collapse it onto one indented continuation line when it fits, and insert continuation backslashes only on emitted macro lines that continue onto another emitted macro line.
+- Put one empty line after `#pragma once` before the next include, preprocessor directive, comment, or declaration.
+- Put one empty line before and after each `#undef` directive. `#undef` directives are cleanup boundaries, not part of consecutive macro-definition groups.
+- Single-line lambda bodies are supported when the complete lambda fits the configured line width. A lambda body that does not fit splits after `{`, formats its body as normal code indented one level deeper, and closes on its own line.
+- When a wrapped lambda is assigned to a variable, keep the assignment prefix and lambda opener on the same line if the complete opener fits. If the opener does not fit but the assignment prefix plus `[` fits, keep `= [` on the assignment line and split the capture list like a multi-line function declaration without adding a second continuation indent.
 
 ## Namespaces
 
@@ -59,6 +83,19 @@ void Helper();
 }
 ```
 
+## Macro Definitions
+
+Macro continuation backslashes are formatter-owned. A multi-line macro definition is parsed as a single replacement list, then emitted with continuation backslashes on every physical macro line except the last replacement line.
+
+When a function-like macro has a parameter listed in `macro_categories.statement_like_parameters` in `tools\format_config.json`, top-level invocations of that parameter inside the replacement list are statement-like macro elements. Each invocation is emitted as its own continuation line, regardless of whether several invocations could fit on one line. The formatter still applies normal spacing inside each invocation.
+
+```cpp
+#define CASEDASH_METRIC_DISPLAY_STYLE_ITEMS(X) \
+    X(Scalar, "scalar") \
+    X(Percent, "percent") \
+    X(Memory, "memory")
+```
+
 ## Spacing Rules
 
 Spacing follows the native formatter policy with the project's explicit no-alignment rules:
@@ -69,13 +106,18 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Treat template and cast angle brackets as delimiter syntax, not comparison operators: `template <typename T>`, `std::vector<int>`, and `static_cast<int>(value)`.
 - Keep empty braces as `{}` with no inner space.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
+- Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
+- Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
 - Do not insert a visual-padding space before braced initializer braces: `Widget widget{config};`.
 - Put one space after commas, and no space before commas.
 - Put one space after semicolons that separate `for` header parts, and no space before semicolons.
 - Put no space before a statement-terminating semicolon.
-- Put spaces around assignment, comparison, arithmetic, bitwise, logical, and compound-assignment binary operators.
-- Do not put spaces between unary operators and their operands: `!ready`, `++index`, `value--`, `*ptr`, and `&value`.
-- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, and `Type&& value`.
+- Put spaces around assignment, comparison, arithmetic, bitwise, logical, and compound-assignment binary operators, including assignment to an empty braced value: `const Context& context = {};`.
+- Treat `operator` plus a following symbolic operator as one composite function name, with no spaces inside the name or before the parameter list: `operator==(...)`, `operator&(...)`, and `operator[](...)`.
+- Do not put spaces between unary operators and their operands: `!ready`, `++index`, `value--`, `*ptr`, `&value`, `-value`, and `+value`.
+- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `Type&& value`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
+- Treat `&&` as a logical binary operator with spaces when it follows an expression, including qualified enum values: `field.kind == ValueKind::HexColor && IsNamedColor(name)`.
+- Do not treat a preceding parenthesized or bracketed expression as a type for pointer or reference spacing. Multiplication and bitwise-and after such expressions keep binary-operator spaces: `(to.l - from.l) * amount` and `values[index] & mask`.
 - Put spaces around ternary `?` and `:`.
 - Put spaces around the range-for colon and the constructor-initializer colon: `for (const auto& item : items)` and `Widget() : member(value) {}`.
 - Put no space before access-specifier, label, or `case` colons: `public:`, `label:`, and `case Value:`.
@@ -160,6 +202,8 @@ The formatter decides wrapping in this order:
 - If the compact form overflows, split the outermost wrappable group that owns the overflowing line.
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
 - Never split a group partially. A comma list, operator chain, declaration parameter list, or control header is either fully compact or fully split.
+- Never choose an empty delimiter pair as a wrapping target. Empty calls, empty braced values, and empty template argument lists stay compact, and the formatter breaks the nearest non-empty owning structure instead.
+- Never split inside a function-pointer declarator group such as `(*)`. If the full function-pointer type does not fit, split the following parameter list instead.
 - Treat an end-of-line comment attached to one element of a list or chain as a forced split for the whole owning list or chain.
 - If a line has no legal wrappable group because the overflow is inside an unbreakable token, string literal, numeric constant, or preserved comment, allow that line to exceed the configured line width.
 
@@ -192,17 +236,19 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. The assignment line splits first; the right-hand expression then stays compact or splits based on the width available at its new indentation.
+Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);
 
-auto value =
-    buildValue(
-        firstValue,
-        transform(secondValueA, secondValueB),
-        thirdValue
-    );
+HBITMAP colorBitmap =
+    CreateDIBSection(nullptr, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
+
+auto value = buildValue(
+    firstValue,
+    transform(secondValueA, secondValueB),
+    thirdValue
+);
 ```
 
 End-of-line comments attached to elements preserve their source position and force the owning chain or list into the split form, even when the compact form would otherwise fit.
@@ -318,10 +364,16 @@ Switch labels are structurally inside the switch block. Statements belonging to 
 switch (value) {
     case 1:
         return one;
+    case 2: {
+        int local = two;
+        return local;
+    }
     default:
         return fallback;
 }
 ```
+
+If a `case` or `default` label opens a braced scope, keep the opening brace on the label line. The scoped statements stay at the same statement indentation as an unbraced case body, and the closing brace aligns with the `case` label.
 
 ## Operators
 
@@ -336,7 +388,7 @@ int longValue =
     longExprC;
 ```
 
-Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped part belongs to the same flat chain.
+Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. If an assignment owns the wrapped ternary chain, break after the assignment operator before formatting the flat chain.
 
 ```cpp
 int value = condition ? one : two;
@@ -345,6 +397,10 @@ int longValue =
     firstCondition ? firstValue :
     secondCondition ? secondValue :
     fallbackValue;
+
+std::string currentValue =
+    currentIt != names.end() && !currentIt->second.empty() ? currentIt->second :
+    logicalName;
 ```
 
 ## Structural Indentation
@@ -353,19 +409,17 @@ Indentation follows syntax nesting, not the visual position of an earlier token.
 
 ```cpp
 bool flag =
-    veryLongCondition ?
-    firstValue :
+    veryLongCondition ? firstValue :
     secondValue;
 
 bool flag = funcCall(
-    veryLongCondition ?
-    firstValue :
+    veryLongCondition ? firstValue :
     secondValue
 );
 ```
 
 ## Configuration
 
-Configuration is limited to project-specific constants and data that let the formatter understand and organize project source without hardcoding project-specific names in the formatter implementation. Line width, indent width, tab width, macro categories, macro names accepted by the grammar, and include-sorting groups belong in `tools\format_config.json`.
+Configuration is limited to project-specific constants and data that let the formatter understand and organize project source without hardcoding project-specific names in the formatter implementation. Line width, indent width, tab width, macro categories, statement-like macro parameter names, macro names accepted by the grammar, and include-sorting groups belong in `tools\format_config.json`.
 
 Configuration does not expose formatting style options. Brace behavior, wrapping behavior, spacing, and alignment behavior are fixed in formatter source so the project has one formatting language instead of a configurable family of dialects.

@@ -9,6 +9,7 @@ pushd "%script_root%" >nul || exit /b 1
 set "mode=check"
 set "scope=all"
 set "target_file="
+set "target_path="
 set "stdout=0"
 
 :parse_args
@@ -37,6 +38,13 @@ if /I "%~1"=="--file" (
     shift
     goto parse_args
 )
+if /I "%~1"=="--path" (
+    if "%~2"=="" goto :usage
+    set "target_path=%~2"
+    shift
+    shift
+    goto parse_args
+)
 if /I "%~1"=="--stdout" (
     set "stdout=1"
     shift
@@ -48,7 +56,10 @@ goto :usage
 
 if "!stdout!"=="1" if not defined target_file goto :usage
 if defined target_file if /I "!scope!"=="changed" goto :usage
+if defined target_path if /I "!scope!"=="changed" goto :usage
+if defined target_file if defined target_path goto :usage
 if "!stdout!"=="1" if /I "!mode!"=="fix" goto :usage
+if "!stdout!"=="1" if defined target_path goto :usage
 
 call :ensure_format_tool
 set "ensure_format_tool_result=!errorlevel!"
@@ -68,6 +79,8 @@ if defined target_file (
     ) else (
         "%script_root%build\CaseDashTools.exe" format !mode_arg! --root "%root_arg%" --file "%target_file%"
     )
+) else if defined target_path (
+    "%script_root%build\CaseDashTools.exe" format !mode_arg! --root "%root_arg%" --path "%target_path%"
 ) else (
     "%script_root%build\CaseDashTools.exe" format !mode_arg! !scope_arg! --root "%root_arg%"
 )
@@ -86,6 +99,7 @@ echo   format
 echo   format fix
 echo   format changed
 echo   format fix changed
+echo   format [fix] --path file-or-directory
 echo   format [--root path] --file path [--stdout]
 popd >nul
 exit /b 2

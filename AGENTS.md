@@ -12,6 +12,7 @@ Use the following maintained references and keep them in sync before finishing w
 - `docs/architecture.md` and `docs/architecture/*.md` - code organization, subsystem boundaries, package notes, and build-graph structure.
 - `docs/project.md` - documentation ownership, repository conventions, engineering constraints, and project pitfall notes.
 - `docs/build.md` - project environment, setup, build commands, validation entrypoints, and tooling constraints.
+- `docs/format.md` - formatter ownership, native formatting ideology, layout rules, spacing rules, wrapping rules, and include sorting behavior.
 - `docs/release.md` and `docs/changelog.md` - release procedure, changelog format, and published release notes.
 - `docs/web.md` - public website behavior, section contract, content, build flow, and generated-asset contracts.
 - `docs/profile_benchmark.md` - benchmark workflow, shared optimization journal, tested hypotheses, and experiment results.
@@ -21,10 +22,7 @@ Keep a single source of truth for terminology, examples, format descriptions, an
 
 ## Commit messages and pull requests
 
-Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior outcomes rather than file-by-file narration. Mention docs or tests only when they were the explicit task.
-
-Pull requests must follow the same structure as commit messages. Do not use `## Summary`, `## Testing`, generated checklists, or template-style section headings in pull request descriptions. Use direct factual bullets instead.
-Don't include any validation or test updates updates, unless they were the explicit reason.
+Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior, structure, validation, or tooling outcomes rather than file-by-file narration. Mention docs only when docs are the explicit task. Pull requests must follow the same structure.
 
 ## Build And Validation
 

@@ -10,6 +10,9 @@
     "calling_convention": [
       "CALLBACK",
       "WINAPI"
+    ],
+    "statement_like_parameters": [
+      "X"
     ]
   },
   "include_sorting": {

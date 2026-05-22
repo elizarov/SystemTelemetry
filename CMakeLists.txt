@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.26)
 
-project(CaseDash LANGUAGES CXX RC)
+project(CaseDash LANGUAGES C CXX RC)
 
 if(NOT MSVC)
     message(FATAL_ERROR "CaseDash currently supports MSVC builds only.")
@@ -834,7 +834,23 @@ set_target_properties(CaseDashHeadless PROPERTIES
 )
 
 find_package(unofficial-tree-sitter CONFIG REQUIRED)
-find_package(unofficial-tree-sitter-cpp CONFIG REQUIRED)
+
+add_library(CaseDashTreeSitterCppGrammar STATIC
+    src/tools/vendor/tree-sitter/tree-sitter-cpp/src/parser.c
+    src/tools/vendor/tree-sitter/tree-sitter-cpp/src/scanner.c
+)
+target_include_directories(CaseDashTreeSitterCppGrammar
+    PRIVATE
+        "${CMAKE_SOURCE_DIR}/src/tools/vendor/tree-sitter/tree-sitter-cpp/src"
+    PUBLIC
+        "${CMAKE_SOURCE_DIR}/src/tools/vendor/tree-sitter/tree-sitter-cpp/include"
+)
+target_link_libraries(CaseDashTreeSitterCppGrammar PUBLIC
+    unofficial::tree-sitter::tree-sitter
+)
+target_compile_options(CaseDashTreeSitterCppGrammar PRIVATE
+    $<$<C_COMPILER_ID:MSVC>:/w>
+)
 
 add_executable(CaseDashTools
     src/tools/tools_main.cpp
@@ -872,7 +888,7 @@ target_link_options(CaseDashTools PRIVATE
 )
 target_link_libraries(CaseDashTools PRIVATE
     unofficial::tree-sitter::tree-sitter
-    unofficial::tree-sitter-cpp::tree-sitter-cpp
+    CaseDashTreeSitterCppGrammar
 )
 set_target_properties(CaseDashTools PROPERTIES
     OUTPUT_NAME "CaseDashTools"
