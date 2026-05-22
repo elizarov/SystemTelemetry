@@ -336,9 +336,17 @@ constexpr FormatTableRow kFormatRows[] = {
         100,
         200,
         kPrimaryFlag | kSecondaryFlag | kTertiaryFlag
-    },
-    {"beta.metric.row.with.extra.detail", 300, 400, kPrimaryFlag | kTertiaryFlag},
-    {"gamma.metric.row", 500, 600, kSecondaryFlag}
+    }, {
+        "beta.metric.row.with.extra.detail",
+        300,
+        400,
+        kPrimaryFlag | kTertiaryFlag
+    }, {
+        "gamma.metric.row",
+        500,
+        600,
+        kSecondaryFlag
+    }
 };
 
 constexpr FormatTableRow kInitializerChainRows[] = {
@@ -350,6 +358,25 @@ constexpr FormatTableRow kInitializerChainRows[] = {
             secondInitializerFlagWithVeryLongName |
             thirdInitializerFlagWithVeryLongName |
             fourthInitializerFlagWithVeryLongName
+    }
+};
+
+static constexpr OutputPath kOutputPaths[] = {
+    {
+        &DiagnosticsOptions::trace,
+        &DiagnosticsOptions::tracePath,
+        &DiagnosticsSession::tracePath_,
+        kDefaultTraceFileName
+    }, {
+        &DiagnosticsOptions::dump,
+        &DiagnosticsOptions::dumpPath,
+        &DiagnosticsSession::dumpPath_,
+        kDefaultDumpFileName
+    }, {
+        &DiagnosticsOptions::screenshot,
+        &DiagnosticsOptions::screenshotPath,
+        &DiagnosticsSession::screenshotPath_,
+        kDefaultScreenshotFileName
     }
 };
 
