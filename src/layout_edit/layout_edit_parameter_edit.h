@@ -2,7 +2,8 @@
 
 #include <optional>
 
-#include "layout_model/layout_edit_parameter_metadata.h"
+#include "config/config.h"
+#include "widget/layout_edit_parameter_id.h"
 
 std::optional<double> FindLayoutEditParameterNumericValue(const AppConfig& config, LayoutEditParameter parameter);
 std::optional<unsigned int> FindLayoutEditParameterColorValue(const AppConfig& config, LayoutEditParameter parameter);

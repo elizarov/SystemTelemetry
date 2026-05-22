@@ -12,6 +12,8 @@
 #include "config/config_writer.h"
 #include "dashboard/autostart.h"
 #include "diagnostics/constants.h"
+#include "diagnostics/snapshot_dump.h"
+#include "display/constants.h"
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"

@@ -249,6 +249,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | overlay layer | The optional transparent live layer containing layout-edit affordances, drag replay, and move overlay content. |
 | live-layer bitmap | A `RenderBitmapStorage::LiveLayer` resource used by live presentation. |
 | animation command list | Immutable widget animation commands collected while drawing snapshot or overlay layers. |
+| animation clip bounds | Optional command-level rectangle that limits an animation primitive to the same clipped area used by its static bitmap pass. |
 | animation data key | The stable logical key that lets animation follow data across layout changes. |
 | animation timeline | Render-thread state that creates transitions, samples active animation, and prunes stale tracks. |
 | render thread | The live presentation thread that owns HWND presentation, retained frame state, and the animation timeline. |

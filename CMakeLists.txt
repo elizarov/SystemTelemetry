@@ -571,6 +571,44 @@ set_target_properties(CaseDash PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
+add_executable(CaseDashTools
+    src/tools/tools_main.cpp
+    src/tools/lint_check.cpp
+    src/tools/impl/lint_checkers.cpp
+    src/tools/impl/lint_common.cpp
+    src/tools/impl/lint_json.cpp
+)
+target_include_directories(CaseDashTools PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+)
+target_compile_definitions(CaseDashTools PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+    _USE_STD_VECTOR_ALGORITHMS=0
+)
+target_compile_options(CaseDashTools PRIVATE
+    /EHsc
+    /W4
+    /permissive-
+    /GR-
+    /w14505
+    /we4505
+    /Zi
+    $<$<CONFIG:Release>:/O2>
+)
+target_link_options(CaseDashTools PRIVATE
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+)
+set_target_properties(CaseDashTools PROPERTIES
+    OUTPUT_NAME "CaseDashTools"
+    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+
 enable_testing()
 
 set(casedash_vcpkg_triplet "x64-windows")
@@ -605,6 +643,7 @@ add_executable(CaseDashTests
     tests/widget_class_tests.cpp
     tests/font_anchor_tests.cpp
     tests/metric_list_widget_tests.cpp
+    tests/drive_usage_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp

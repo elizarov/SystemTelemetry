@@ -6,6 +6,7 @@
 
 #include "config/config.h"
 #include "display/constants.h"
+#include "util/scale.h"
 #include "util/strings.h"
 #include "util/text_encoding.h"
 #include "util/text_format.h"

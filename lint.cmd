@@ -7,7 +7,7 @@ if "%root_arg:~-1%"=="\" set "root_arg=%root_arg:~0,-1%"
 pushd "%root%" >nul || exit /b 1
 
 set "failed=0"
-set "lint_check_args=--check --skip-svg"
+set "lint_check_args=--check"
 set "include_lint=0"
 set "include_scope=all"
 
@@ -40,8 +40,30 @@ goto :usage
 
 :lint_args_done
 
-python tools\lint_check.py !lint_check_args!
-if errorlevel 1 set "failed=1"
+call :ensure_lint_tool
+set "ensure_lint_tool_result=!errorlevel!"
+if not "!ensure_lint_tool_result!"=="0" (
+    popd >nul
+    exit /b !ensure_lint_tool_result!
+)
+
+call :run_lint_check
+set "lint_check_result=!errorlevel!"
+if "!lint_check_result!"=="3" (
+    call :build_lint_tool
+    set "build_lint_tool_result=!errorlevel!"
+    if not "!build_lint_tool_result!"=="0" (
+        popd >nul
+        exit /b !build_lint_tool_result!
+    )
+    call :run_lint_check
+    set "lint_check_result=!errorlevel!"
+)
+if "!lint_check_result!"=="2" (
+    popd >nul
+    exit /b 2
+)
+if not "!lint_check_result!"=="0" set "failed=1"
 
 if "!include_lint!"=="1" (
     if /I "!include_scope!"=="changed" (
@@ -62,7 +84,7 @@ if "%failed%"=="0" (
     exit /b 0
 )
 
-echo Lint failed.
+if "!lint_check_result!"=="0" echo Lint failed.
 popd >nul
 exit /b 1
 
@@ -84,6 +106,19 @@ set "include_lint_ps_args="
 if defined CASEDASH_INCLUDE_LINT_MAX_PARALLEL set "include_lint_ps_args=!include_lint_ps_args! -MaxParallel !CASEDASH_INCLUDE_LINT_MAX_PARALLEL!"
 if defined CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS set "include_lint_ps_args=!include_lint_ps_args! -TimeoutSeconds !CASEDASH_INCLUDE_LINT_TIMEOUT_SECONDS!"
 powershell -NoProfile -ExecutionPolicy Bypass -File "%root%tools\run_clangd_includes.ps1" -Root "%root_arg%" -Scope "%scope%" !include_lint_ps_args!
+exit /b !errorlevel!
+
+:ensure_lint_tool
+if exist "%root%build\CaseDashTools.exe" exit /b 0
+call :build_lint_tool
+exit /b !errorlevel!
+
+:build_lint_tool
+call "%root%build.cmd" /tools
+exit /b !errorlevel!
+
+:run_lint_check
+"%root%build\CaseDashTools.exe" lint_check --config "%root%tools\lint_config.json" !lint_check_args!
 exit /b !errorlevel!
 
 :usage

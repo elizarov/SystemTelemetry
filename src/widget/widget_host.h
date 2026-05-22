@@ -75,5 +75,7 @@ public:
     virtual std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const = 0;
     // Main thread: widgets submit geometry-only draw primitives with already-resolved opaque target state.
-    virtual void AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState);
+    virtual void AddWidgetAnimation(WidgetAnimationPtr animation,
+        WidgetAnimationStatePtr targetState,
+        std::optional<RenderRect> clipRect = std::nullopt);
 };

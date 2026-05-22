@@ -106,7 +106,9 @@ public:
     int ScaleLogical(int value) const;
     std::optional<MetricListReorderOverlayState> ActiveMetricListReorderDrag(
         const LayoutEditWidgetIdentity& widget) const override;
-    void AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState) override;
+    void AddWidgetAnimation(WidgetAnimationPtr animation,
+        WidgetAnimationStatePtr targetState,
+        std::optional<RenderRect> clipRect = std::nullopt) override;
 
 private:
     friend class DashboardLayoutResolver;

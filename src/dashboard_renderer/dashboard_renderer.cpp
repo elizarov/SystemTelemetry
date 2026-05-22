@@ -73,6 +73,14 @@ long long RectArea(const RenderRect& rect) {
     return width * height;
 }
 
+RenderRect OffsetRect(RenderRect rect, RenderPoint offset) {
+    rect.left += offset.x;
+    rect.right += offset.x;
+    rect.top += offset.y;
+    rect.bottom += offset.y;
+    return rect;
+}
+
 class ScopedAnimationPresentationSuspension {
 public:
     ScopedAnimationPresentationSuspension(DashboardRenderThread& presentation, bool active)
@@ -223,17 +231,18 @@ std::optional<MetricListReorderOverlayState> DashboardRenderer::ActiveMetricList
     return drag;
 }
 
-void DashboardRenderer::AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState) {
+void DashboardRenderer::AddWidgetAnimation(
+    WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState, std::optional<RenderRect> clipRect) {
     if (animation == nullptr || targetState == nullptr) {
         return;
     }
     if (!widgetAnimationCollectionActive_) {
-        WidgetHost::AddWidgetAnimation(std::move(animation), std::move(targetState));
+        WidgetHost::AddWidgetAnimation(std::move(animation), std::move(targetState), clipRect);
         return;
     }
     WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
         .push_back(DashboardPresentationAnimation{
-            std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_});
+            std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_, clipRect});
 }
 
 int DashboardRenderer::WindowWidth() const {
@@ -738,12 +747,22 @@ void DashboardRenderer::DrawAnimationTargets(WidgetAnimationLayer layer) {
         if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
+        if (command.clipRect.has_value()) {
+            const RenderRect clipRect = OffsetRect(*command.clipRect, command.translation);
+            if (clipRect.IsEmpty()) {
+                continue;
+            }
+            Renderer().PushClipRect(clipRect);
+        }
         if (command.translation.x != 0 || command.translation.y != 0) {
             Renderer().PushTranslation(command.translation);
         }
         animation->Draw(Renderer(), *command.targetState);
         if (command.translation.x != 0 || command.translation.y != 0) {
             Renderer().PopTranslation();
+        }
+        if (command.clipRect.has_value()) {
+            Renderer().PopClipRect();
         }
     }
     widgetAnimationCollectionActive_ = collectionWasActive;
