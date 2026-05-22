@@ -407,6 +407,8 @@ switch (value) {
 }
 ```
 
+Nested switches restore the enclosing switch's active case indentation after the inner switch closes.
+
 If a `case` or `default` label opens a braced scope, keep the opening brace on the label line. The scoped statements stay at the same statement indentation as an unbraced case body, and the closing brace aligns with the `case` label.
 
 ## Operators

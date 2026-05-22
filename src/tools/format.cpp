@@ -496,7 +496,7 @@ public:
         indentLevel_(initialIndentLevel)
     {
         if (executableBodyContext) {
-            blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false});
+            blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
         }
     }
 
@@ -532,6 +532,7 @@ private:
     enum class BlockKind {
         Other,
         CaseScope,
+        SwitchStatement,
         NamespaceDeclaration,
         EnumDeclaration,
         TypeDeclaration,
@@ -552,6 +553,7 @@ private:
         bool indentsBody = true;
         DeclarationKind previousDeclarationKind = DeclarationKind::None;
         bool previousDeclarationWasMultilineField = false;
+        int previousCaseBodyIndentLevel = -1;
     };
 
     void EmitLine(std::string text) {
@@ -710,7 +712,13 @@ private:
         }
         EmitLine(Indent() + "{");
         blockStack_.push_back(
-            {BlockKind::Other, true, previousDeclarationKind_, previousDeclarationWasMultilineField_}
+            {
+                BlockKind::Other,
+                true,
+                previousDeclarationKind_,
+                previousDeclarationWasMultilineField_,
+                caseBodyIndentLevel_
+            }
         );
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationWasMultilineField_ = false;
@@ -754,8 +762,17 @@ private:
         NoteDeclarationKind(declarationKind);
         const bool indentsBody = blockKind != BlockKind::NamespaceDeclaration;
         blockStack_.push_back(
-            {blockKind, indentsBody, previousDeclarationKind_, previousDeclarationWasMultilineField_}
+            {
+                blockKind,
+                indentsBody,
+                previousDeclarationKind_,
+                previousDeclarationWasMultilineField_,
+                caseBodyIndentLevel_
+            }
         );
+        if (blockKind == BlockKind::SwitchStatement) {
+            caseBodyIndentLevel_ = -1;
+        }
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationWasMultilineField_ = false;
         if (indentsBody) {
@@ -775,6 +792,9 @@ private:
             indentLevel_ = std::max(0, indentLevel_ - 1);
         } else {
             EmitRequiredBlankLine();
+        }
+        if (closedBlock.kind == BlockKind::SwitchStatement) {
+            caseBodyIndentLevel_ = closedBlock.previousCaseBodyIndentLevel;
         }
         const size_t next = NextSignificantIndex(tokens, index + 1);
         if (next < tokens.size() && tokens[next].text == ";") {
@@ -1185,7 +1205,13 @@ private:
             outputLines_.back() = TrimRight(std::move(outputLines_.back())) + " {";
         }
         blockStack_.push_back(
-            {BlockKind::CaseScope, true, previousDeclarationKind_, previousDeclarationWasMultilineField_}
+            {
+                BlockKind::CaseScope,
+                true,
+                previousDeclarationKind_,
+                previousDeclarationWasMultilineField_,
+                caseBodyIndentLevel_
+            }
         );
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationWasMultilineField_ = false;
@@ -2578,6 +2604,9 @@ private:
         if (!tokens.empty() && tokens.front().text == "namespace") {
             return BlockKind::NamespaceDeclaration;
         }
+        if (!tokens.empty() && tokens.front().text == "switch") {
+            return BlockKind::SwitchStatement;
+        }
         if (ContainsWord(tokens, "enum")) {
             return BlockKind::EnumDeclaration;
         }
@@ -2595,6 +2624,7 @@ private:
             case BlockKind::NamespaceDeclaration:
                 return DeclarationKind::NamespaceDeclaration;
             case BlockKind::CaseScope:
+            case BlockKind::SwitchStatement:
                 return DeclarationKind::None;
             case BlockKind::EnumDeclaration:
             case BlockKind::TypeDeclaration:

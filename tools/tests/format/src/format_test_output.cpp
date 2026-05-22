@@ -448,6 +448,22 @@ int ManyParameters(
     );
 }
 
+int NestedSwitchIndent(int message, int wParam) {
+    switch (message) {
+        case WM_WTSSESSION_CHANGE:
+            switch (wParam) {
+                case WTS_SESSION_LOCK:
+                    return 1;
+                default:
+                    return 0;
+            }
+        case WM_ERASEBKGND:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
 void ControlFlowVariety(int* values, int count) {
     if (count > 0) {
         values[0] += 1;
