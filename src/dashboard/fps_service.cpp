@@ -10,8 +10,7 @@
 #include <vector>
 #include <winsvc.h>
 
-#include "telemetry/board/board_vendor.h"
-#include "telemetry/board/lenovo/board_lenovo_vantage.h"
+#include "telemetry/board_service_sample.h"
 #include "telemetry/fps_provider.h"
 #include "telemetry/fps_service_protocol.h"
 #include "util/command_line.h"
@@ -439,8 +438,7 @@ void ServePipeClient(HANDLE pipe, PipeServerState& state) {
         }
         case CashDashServiceRequestId::BoardSensorsSample:
             EnterCriticalSection(&state.boardProviderLock);
-            response = SerializeBoardSensorsServiceSample(
-                CaptureLenovoHardwareScanServiceSample(state.trace, ExtractBoardVendorInfo()));
+            response = SerializeBoardSensorsServiceSample(CaptureBoardSensorsServiceSample(state.trace));
             LeaveCriticalSection(&state.boardProviderLock);
             break;
     }

@@ -243,6 +243,7 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/board_service_sample.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp

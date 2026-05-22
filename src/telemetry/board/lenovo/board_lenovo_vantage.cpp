@@ -9,20 +9,18 @@
 #include <future>
 #include <iterator>
 #include <memory>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <thread>
 #include <utility>
 #include <vector>
 #include <Wbemidl.h>
-#include <wrl/client.h>
 
 #include "telemetry/board/lenovo/board_lenovo_vantage_bridge.h"
 #include "telemetry/fps_service_protocol.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/elevated_process.h"
 #include "util/file_path.h"
+#include "util/lightweight_mutex.h"
 #include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_encoding.h"
@@ -40,8 +38,13 @@ constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kSensorRetrySampleInterval = 10;
 constexpr std::chrono::seconds kDirectSnapshotRefreshInterval{5};
 constexpr DWORD kWmiQueryTimeoutMs = 1500;
-constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";
-constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";
+constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";         // WMI COM namespace uses UTF-16 BSTRs.
+constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";  // WMI COM class uses UTF-16 BSTRs.
+constexpr wchar_t kWmiRelPathProperty[] = L"__RELPATH";              // WMI property names are UTF-16 BSTRs.
+constexpr wchar_t kWmiDataProperty[] = L"Data";                      // WMI property names are UTF-16 BSTRs.
+constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";             // WMI method names are UTF-16 BSTRs.
+constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";           // WMI method names are UTF-16 BSTRs.
+constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";           // WMI method names are UTF-16 BSTRs.
 
 struct LenovoHardwareScanSnapshot {
     bool success = false;
@@ -55,7 +58,7 @@ struct LenovoGameZoneFanValue {
 };
 
 struct LenovoServiceSnapshotState {
-    std::mutex mutex;
+    LightweightMutex mutex;
     bool running = false;
     bool done = false;
     bool hasResponse = false;
@@ -132,6 +135,37 @@ private:
     BSTR value_ = nullptr;
 };
 
+template <typename T> class ComObject {
+public:
+    ComObject() = default;
+
+    ~ComObject() {
+        Reset();
+    }
+
+    ComObject(const ComObject&) = delete;
+    ComObject& operator=(const ComObject&) = delete;
+
+    T* Get() const {
+        return value_;
+    }
+
+    T** Out() {
+        Reset();
+        return &value_;
+    }
+
+    void Reset() {
+        if (value_ != nullptr) {
+            value_->Release();
+            value_ = nullptr;
+        }
+    }
+
+private:
+    T* value_ = nullptr;
+};
+
 std::string TextFromNullableWide(const wchar_t* text) {
     return text != nullptr ? TextFromWide(text) : std::string();
 }
@@ -153,31 +187,30 @@ bool HasAvailableFanReading(const LenovoHardwareScanSnapshot& snapshot) {
 }
 
 bool DirectoryExists(const FilePath& path) {
-    const std::wstring wide = path.WideForNativeApi();
-    const DWORD attributes = GetFileAttributesW(wide.c_str());
+    const DWORD attributes = GetFileAttributesA(path.string().c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
 std::optional<FilePath> ProgramDataDirectory() {
-    std::array<wchar_t, MAX_PATH> buffer{};
-    const DWORD length = GetEnvironmentVariableW(L"ProgramData", buffer.data(), static_cast<DWORD>(buffer.size()));
+    std::array<char, MAX_PATH> buffer{};
+    const DWORD length = GetEnvironmentVariableA("ProgramData", buffer.data(), static_cast<DWORD>(buffer.size()));
     if (length == 0 || length >= buffer.size()) {
         return std::nullopt;
     }
-    return FilePath(TextFromWide(std::wstring_view(buffer.data(), length)));
+    return FilePath(std::string(buffer.data(), length));
 }
 
-std::vector<int> ParseVersionParts(const std::wstring& text) {
+std::vector<int> ParseVersionParts(const std::string& text) {
     std::vector<int> parts;
     int value = 0;
     bool hasDigits = false;
-    for (const wchar_t ch : text) {
-        if (ch >= L'0' && ch <= L'9') {
-            value = value * 10 + static_cast<int>(ch - L'0');
+    for (const char ch : text) {
+        if (ch >= '0' && ch <= '9') {
+            value = value * 10 + static_cast<int>(ch - '0');
             hasDigits = true;
             continue;
         }
-        if (ch == L'.' && hasDigits) {
+        if (ch == '.' && hasDigits) {
             parts.push_back(value);
             value = 0;
             hasDigits = false;
@@ -191,7 +224,7 @@ std::vector<int> ParseVersionParts(const std::wstring& text) {
     return parts;
 }
 
-bool VersionGreater(const std::wstring& left, const std::wstring& right) {
+bool VersionGreater(const std::string& left, const std::string& right) {
     const std::vector<int> leftParts = ParseVersionParts(left);
     const std::vector<int> rightParts = ParseVersionParts(right);
     const size_t count = std::max(leftParts.size(), rightParts.size());
@@ -221,24 +254,24 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
         return std::nullopt;
     }
 
-    const std::wstring pattern = (addinRoot / "*").WideForNativeApi();
-    WIN32_FIND_DATAW findData{};
-    HANDLE search = FindFirstFileW(pattern.c_str(), &findData);
+    const std::string pattern = (addinRoot / "*").string();
+    WIN32_FIND_DATAA findData{};
+    HANDLE search = FindFirstFileA(pattern.c_str(), &findData);
     if (search == INVALID_HANDLE_VALUE) {
         return std::nullopt;
     }
 
     std::optional<FilePath> bestPath;
-    std::wstring bestVersion;
+    std::string bestVersion;
     do {
         if ((findData.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0) {
             continue;
         }
-        const std::wstring name = findData.cFileName;
-        if (name == L"." || name == L"..") {
+        const std::string name = findData.cFileName;
+        if (name == "." || name == "..") {
             continue;
         }
-        const FilePath candidate = addinRoot / FilePath(TextFromWide(name));
+        const FilePath candidate = addinRoot / FilePath(name);
         if (!IsHardwareScanDirectory(candidate)) {
             continue;
         }
@@ -246,7 +279,7 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
             bestPath = candidate;
             bestVersion = name;
         }
-    } while (FindNextFileW(search, &findData));
+    } while (FindNextFileA(search, &findData));
 
     FindClose(search);
     return bestPath;
@@ -298,9 +331,8 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
         return std::nullopt;
     }
 
-    Microsoft::WRL::ComPtr<IWbemClassObject> output;
-    const HRESULT hr =
-        services->ExecMethod(path.Get(), method.Get(), 0, nullptr, nullptr, output.GetAddressOf(), nullptr);
+    ComObject<IWbemClassObject> output;
+    const HRESULT hr = services->ExecMethod(path.Get(), method.Get(), 0, nullptr, nullptr, output.Out(), nullptr);
     if (FAILED(hr)) {
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_method method=\"%s\" status=%s"),
@@ -309,7 +341,7 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
         return std::nullopt;
     }
 
-    const std::optional<std::uint32_t> value = ReadWmiUInt32Property(output.Get(), L"Data");
+    const std::optional<std::uint32_t> value = ReadWmiUInt32Property(output.Get(), kWmiDataProperty);
     if (!value.has_value()) {
         trace.WriteFmt(TracePrefix::LenovoHardwareScan,
             RES_STR("gamezone_wmi_method method=\"%s\" status=no_data"),
@@ -383,9 +415,8 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
         return snapshot;
     }
 
-    Microsoft::WRL::ComPtr<IWbemLocator> locator;
-    HRESULT hr =
-        CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(locator.GetAddressOf()));
+    ComObject<IWbemLocator> locator;
+    HRESULT hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(locator.Out()));
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI locator creation failed: %s"), FormatHresult(hr).c_str());
@@ -402,9 +433,9 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
         return snapshot;
     }
 
-    Microsoft::WRL::ComPtr<IWbemServices> services;
-    hr = locator->ConnectServer(
-        namespacePath.Get(), nullptr, nullptr, nullptr, 0, nullptr, nullptr, services.GetAddressOf());
+    ComObject<IWbemServices> services;
+    hr = locator.Get()->ConnectServer(
+        namespacePath.Get(), nullptr, nullptr, nullptr, 0, nullptr, nullptr, services.Out());
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI connection failed: %s"), FormatHresult(hr).c_str());
@@ -438,9 +469,9 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
         return snapshot;
     }
 
-    Microsoft::WRL::ComPtr<IEnumWbemClassObject> enumerator;
-    hr = services->CreateInstanceEnum(
-        className.Get(), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, enumerator.GetAddressOf());
+    ComObject<IEnumWbemClassObject> enumerator;
+    hr = services.Get()->CreateInstanceEnum(
+        className.Get(), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, enumerator.Out());
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI instance enumeration failed: %s"), FormatHresult(hr).c_str());
@@ -452,9 +483,9 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
 
     int instanceCount = 0;
     for (;;) {
-        Microsoft::WRL::ComPtr<IWbemClassObject> instance;
+        ComObject<IWbemClassObject> instance;
         ULONG returned = 0;
-        hr = enumerator->Next(kWmiQueryTimeoutMs, 1, instance.GetAddressOf(), &returned);
+        hr = enumerator.Get()->Next(kWmiQueryTimeoutMs, 1, instance.Out(), &returned);
         if (hr == WBEM_S_FALSE || returned == 0) {
             break;
         }
@@ -467,7 +498,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
             return snapshot;
         }
 
-        const std::optional<std::wstring> objectPath = ReadWmiStringProperty(instance.Get(), L"__RELPATH");
+        const std::optional<std::wstring> objectPath = ReadWmiStringProperty(instance.Get(), kWmiRelPathProperty);
         if (!objectPath.has_value() || objectPath->empty()) {
             trace.Write(TracePrefix::LenovoHardwareScan, RES_STR("gamezone_wmi_instance status=no_path"));
             continue;
@@ -479,11 +510,11 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
             TextFromWide(*objectPath).c_str());
 
         const std::optional<std::uint32_t> fanCount =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, L"GetFanCount");
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFanCountMethod);
         const std::optional<std::uint32_t> fan1 =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, L"GetFan1Speed");
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan1SpeedMethod);
         const std::optional<std::uint32_t> fan2 =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, L"GetFan2Speed");
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan2SpeedMethod);
         AddLenovoGameZoneFanReadings(snapshot.fans, fanCount, fan1, fan2);
     }
 
@@ -582,15 +613,14 @@ bool HasRequestedHardwareScanModule(const LenovoHardwareScanCaptureOptions& opti
 
 std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& diagnostics) {
     diagnostics.clear();
-    const std::wstring pipeName = WideFromText(kFpsServicePipeName);
-    if (!WaitNamedPipeW(pipeName.c_str(), kPipeConnectTimeoutMs)) {
+    if (!WaitNamedPipeA(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
         diagnostics =
             FormatText(RES_STR("CashDash service pipe is unavailable: %s"), FormatWin32Error(GetLastError()).c_str());
         return std::nullopt;
     }
 
-    Handle pipe(CreateFileW(
-        pipeName.c_str(), GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
+    Handle pipe(CreateFileA(
+        kFpsServicePipeName, GENERIC_READ | GENERIC_WRITE, 0, nullptr, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, nullptr));
     if (pipe.Get() == INVALID_HANDLE_VALUE) {
         diagnostics = FormatText(
             RES_STR("Failed to connect to CashDash service pipe: %s"), FormatWin32Error(GetLastError()).c_str());
@@ -632,6 +662,10 @@ std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& d
     return ParseBoardSensorsServiceResponse(response.data(), response.size(), diagnostics);
 }
 
+struct LenovoServiceSnapshotThreadContext {
+    std::shared_ptr<LenovoServiceSnapshotState> state;
+};
+
 LenovoHardwareScanSnapshot SnapshotFromServiceSample(const BoardVendorTelemetrySample& sample) {
     LenovoHardwareScanSnapshot snapshot;
     snapshot.success = sample.available;
@@ -647,9 +681,34 @@ LenovoHardwareScanSnapshot SnapshotFromServiceSample(const BoardVendorTelemetryS
     return snapshot;
 }
 
+DWORD WINAPI LenovoServiceSnapshotThread(void* contextPtr) {
+    std::unique_ptr<LenovoServiceSnapshotThreadContext> context(
+        static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr));
+    if (context == nullptr || context->state == nullptr) {
+        return 1;
+    }
+
+    std::string diagnostics;
+    std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
+    LenovoHardwareScanSnapshot snapshot;
+    const bool hasResponse = serviceSample.has_value();
+    if (hasResponse) {
+        snapshot = SnapshotFromServiceSample(*serviceSample);
+        diagnostics = snapshot.diagnostics;
+    }
+
+    const LightweightMutexLock lock(context->state->mutex);
+    context->state->snapshot = std::move(snapshot);
+    context->state->diagnostics = std::move(diagnostics);
+    context->state->hasResponse = hasResponse;
+    context->state->done = true;
+    context->state->running = false;
+    return 0;
+}
+
 void StartLenovoServiceSnapshot(std::shared_ptr<LenovoServiceSnapshotState> state) {
     {
-        std::lock_guard lock(state->mutex);
+        const LightweightMutexLock lock(state->mutex);
         if (state->running) {
             return;
         }
@@ -660,23 +719,22 @@ void StartLenovoServiceSnapshot(std::shared_ptr<LenovoServiceSnapshotState> stat
         state->snapshot = {};
     }
 
-    std::thread([state = std::move(state)]() {
-        std::string diagnostics;
-        std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
-        LenovoHardwareScanSnapshot snapshot;
-        const bool hasResponse = serviceSample.has_value();
-        if (hasResponse) {
-            snapshot = SnapshotFromServiceSample(*serviceSample);
-            diagnostics = snapshot.diagnostics;
-        }
+    auto context = std::make_unique<LenovoServiceSnapshotThreadContext>();
+    context->state = std::move(state);
+    HANDLE thread = CreateThread(nullptr, 0, LenovoServiceSnapshotThread, context.get(), 0, nullptr);
+    if (thread != nullptr) {
+        context.release();
+        CloseHandle(thread);
+        return;
+    }
 
-        std::lock_guard lock(state->mutex);
-        state->snapshot = std::move(snapshot);
-        state->diagnostics = std::move(diagnostics);
-        state->hasResponse = hasResponse;
-        state->done = true;
-        state->running = false;
-    }).detach();
+    const DWORD error = GetLastError();
+    const LightweightMutexLock lock(context->state->mutex);
+    context->state->diagnostics = FormatText(
+        RES_STR("Failed to start CashDash service Lenovo Hardware Scan refresh: %s"), FormatWin32Error(error).c_str());
+    context->state->hasResponse = false;
+    context->state->done = true;
+    context->state->running = false;
 }
 
 class LenovoHardwareScanCapture final : public LenovoHardwareScanCaptureSink {
@@ -1010,7 +1068,7 @@ private:
     }
 
     bool IsServiceSnapshotRunning() {
-        std::lock_guard lock(serviceSnapshotState_->mutex);
+        const LightweightMutexLock lock(serviceSnapshotState_->mutex);
         return serviceSnapshotState_->running;
     }
 
@@ -1019,7 +1077,7 @@ private:
         bool done = false;
         bool hasResponse = false;
         {
-            std::lock_guard lock(serviceSnapshotState_->mutex);
+            const LightweightMutexLock lock(serviceSnapshotState_->mutex);
             if (serviceSnapshotState_->running && diagnostics.empty()) {
                 diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan refresh is running."));
             }
@@ -1071,7 +1129,7 @@ private:
 
     void MaybeStartServiceSnapshot(std::string& diagnostics) {
         {
-            std::lock_guard lock(serviceSnapshotState_->mutex);
+            const LightweightMutexLock lock(serviceSnapshotState_->mutex);
             if (serviceSnapshotState_->running) {
                 if (diagnostics.empty()) {
                     diagnostics =

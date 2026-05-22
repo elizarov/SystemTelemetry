@@ -29,18 +29,18 @@ constexpr char kServerExe[] = "LdeApi.Server.exe";
 constexpr int kLoadModulesTimeoutMs = 10000;
 constexpr int kExecutionTimeoutMs = 20000;
 
-String ^ ManagedStringFromUtf8(std::string_view text) {
+String ^ ManagedStringFromText(std::string_view text) {
     const std::wstring wide = WideFromText(text);
     return gcnew String(wide.c_str());
 }
 
-void SetDiagnosticsUtf8(LenovoHardwareScanCaptureSink& sink, std::string_view text) {
+void SetDiagnosticsText(LenovoHardwareScanCaptureSink& sink, std::string_view text) {
     const std::wstring wide = WideFromText(text);
     sink.SetDiagnostics(wide.c_str());
 }
 
 String ^ CombinePath(String ^ directory, const char* fileName) {
-    return Path::Combine(directory, ManagedStringFromUtf8(fileName));
+    return Path::Combine(directory, ManagedStringFromText(fileName));
 }
 
 String ^ ToManagedString(Object ^ value) {
@@ -286,11 +286,11 @@ Object ^ TaskResult(Task ^ task) {
 
 bool WaitTask(Task ^ task, int timeoutMs, LenovoHardwareScanCaptureSink& sink, const char* timeoutText) {
     if (task == nullptr) {
-        SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan returned no task.");
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan returned no task.");
         return false;
     }
     if (!task->Wait(timeoutMs)) {
-        SetDiagnosticsUtf8(sink, timeoutText);
+        SetDiagnosticsText(sink, timeoutText);
         return false;
     }
     if (task->IsFaulted) {
@@ -391,7 +391,7 @@ bool InitializeLenovoRuntime(
         !File::Exists(CombinePath(context->addinDirectory, kCoreDll)) ||
         !File::Exists(CombinePath(context->addinDirectory, kRpcClientDll)) ||
         !File::Exists(CombinePath(context->addinDirectory, kServerExe))) {
-        SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan LdeApi files were not found.");
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan LdeApi files were not found.");
         return false;
     }
 
@@ -415,7 +415,7 @@ bool InitializeLenovoRuntime(
         context->disposeMethod = context->clientType->GetMethod("Dispose", Type::EmptyTypes);
         if (context->loadModulesMethod == nullptr || context->startExecutionMethod == nullptr ||
             context->getStatusMethod == nullptr || context->disposeMethod == nullptr) {
-            SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan reflection members were not found.");
+            SetDiagnosticsText(sink, "Lenovo Hardware Scan reflection members were not found.");
             return false;
         }
 
@@ -431,7 +431,7 @@ bool InitializeLenovoRuntime(
         pin_ptr<const wchar_t> pinnedAssembly = PtrToStringChars(CombinePath(context->addinDirectory, kClientDll));
         sink.TraceAssemblyLoaded(pinnedAssembly);
         context->loaded = true;
-        SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan runtime initialized.");
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan runtime initialized.");
         return true;
     } catch (Exception ^ ex) {
         String ^ exceptionText = ex->ToString();
@@ -448,7 +448,7 @@ bool EnsureModulesLoaded(LenovoRuntimeContext ^ context,
     array<String ^> ^ modules = BuildRequestedModules(options);
     String ^ signature = ModuleSignature(modules);
     if (modules->Length == 0) {
-        SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan has no requested modules.");
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan has no requested modules.");
         return false;
     }
 
@@ -471,7 +471,7 @@ bool EnsureModulesLoaded(LenovoRuntimeContext ^ context,
     pin_ptr<const wchar_t> pinnedLoadSummary = PtrToStringChars(loadSummary);
     sink.TraceModuleLoadResult(pinnedLoadSummary);
     if (EnumerableCount(context->loadedModules) == 0) {
-        SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan loaded no thermal modules.");
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan loaded no thermal modules.");
         return false;
     }
     return true;
@@ -505,7 +505,7 @@ bool CaptureLenovoSnapshot(LenovoRuntimeContext ^ context,
         Object ^ result = TaskResult(task);
         const bool executionStarted = result != nullptr && Convert::ToBoolean(result);
         if (!executionStarted && capture->TemperatureCount == 0) {
-            SetDiagnosticsUtf8(sink, "Lenovo Hardware Scan thermal execution returned no telemetry.");
+            SetDiagnosticsText(sink, "Lenovo Hardware Scan thermal execution returned no telemetry.");
             return false;
         }
         return capture->TemperatureCount > 0;
