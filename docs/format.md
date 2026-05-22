@@ -212,6 +212,7 @@ The formatter decides wrapping in this order:
 - Never split inside a function-pointer declarator group such as `(*)`. If the full function-pointer type does not fit, split the following parameter list instead.
 - Never split inside a parenthesized callee group such as `(std::max)`. If the call does not fit, split the following argument list instead.
 - Never split inside compiler declaration prefix groups such as `__declspec(noinline)`. If the full declaration does not fit, split the following declaration parameter list instead.
+- Never split defaulted, deleted, or pure-virtual method markers away from the method declaration tail. If a declaration ending in `= default`, `= delete`, or `= 0` does not fit, split the method parameter list and keep the marker on the closing-parameter line.
 - Treat an end-of-line comment attached to one element of a list or chain as a forced split for the whole owning list or chain.
 - If a line has no legal wrappable group because the overflow is inside an unbreakable token, string literal, numeric constant, or preserved comment, allow that line to exceed the configured line width.
 

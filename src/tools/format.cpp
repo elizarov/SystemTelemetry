@@ -1354,7 +1354,10 @@ private:
         if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
         }
-        if (std::optional<size_t> assignment = FindTopLevelAssignment(tokens)) {
+        if (
+            std::optional<size_t> assignment =
+                FindTopLevelAssignment(tokens); assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)
+        ) {
             if (StartsWithInitializerList(tokens, *assignment + 1)) {
                 return FormatInitializerAssignment(
                     tokens,
