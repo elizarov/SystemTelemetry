@@ -16,11 +16,15 @@ struct FpsTelemetrySample {
     bool permissionRequired = false;
 };
 
+struct FpsTelemetrySampleOptions {
+    std::string gpuAdapterLuidToken;
+};
+
 class FpsTelemetryProvider {
 public:
     virtual ~FpsTelemetryProvider() = default;
     virtual bool Initialize() = 0;
-    virtual FpsTelemetrySample Sample() = 0;
+    virtual FpsTelemetrySample Sample(const FpsTelemetrySampleOptions& options = FpsTelemetrySampleOptions{}) = 0;
 };
 
 std::unique_ptr<FpsTelemetryProvider> CreateFpsServiceTelemetryProvider(Trace& trace);

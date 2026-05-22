@@ -261,6 +261,7 @@ void WriteNamedScalarMetrics(
         WriteString(output, DumpKey(metricPrefix, ".name"), metrics[i].name);
         WriteOptionalDouble(output, DumpKey(metricPrefix, ".value"), metrics[i].metric.value, 6);
         WriteScalarMetricUnit(output, DumpKey(metricPrefix, ".unit"), metrics[i].metric.unit);
+        WriteScalarMetricIssue(output, DumpKey(metricPrefix, ".issue"), metrics[i].metric.issue);
     }
 }
 
@@ -511,7 +512,8 @@ bool LoadNamedScalarMetrics(
         const std::string metricPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         if (!LoadString(values, DumpKey(metricPrefix, ".name"), metric.name, error) ||
             !LoadOptionalDouble(values, DumpKey(metricPrefix, ".value"), metric.metric.value, error) ||
-            !LoadScalarMetricUnit(values, DumpKey(metricPrefix, ".unit"), metric.metric.unit, error)) {
+            !LoadScalarMetricUnit(values, DumpKey(metricPrefix, ".unit"), metric.metric.unit, error) ||
+            !LoadScalarMetricIssue(values, DumpKey(metricPrefix, ".issue"), metric.metric.issue, error)) {
             return false;
         }
         field.push_back(std::move(metric));

@@ -13,7 +13,8 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     dump.snapshot.gpu.fan = ScalarMetric{1500.0, ScalarMetricUnit::Rpm};
     dump.snapshot.gpu.fps = ScalarMetric{std::nullopt, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
     dump.snapshot.gpu.fpsAppName = "dota";
-    dump.snapshot.boardTemperatures.push_back({"cpu", ScalarMetric{55.0, ScalarMetricUnit::Celsius}});
+    dump.snapshot.boardTemperatures.push_back(
+        {"cpu", ScalarMetric{std::nullopt, ScalarMetricUnit::Celsius, ScalarMetricIssue::PermissionRequired}});
     dump.snapshot.boardFans.push_back({"system", ScalarMetric{900.0, ScalarMetricUnit::Rpm}});
 
     std::string text;
@@ -25,6 +26,8 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     EXPECT_NE(text.find("gpu.fps.unit=\"FPS\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.issue=\"permission_required\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.app_name=\"dota\""), std::string::npos);
+    EXPECT_NE(text.find("board.temperatures.0.issue=\"permission_required\""), std::string::npos);
+    EXPECT_NE(text.find("board.fans.0.issue=\"none\""), std::string::npos);
 
     TelemetryDump loaded;
     std::string error;
@@ -39,7 +42,9 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     ASSERT_EQ(loaded.snapshot.boardTemperatures.size(), 1u);
     ASSERT_EQ(loaded.snapshot.boardFans.size(), 1u);
     EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.unit, ScalarMetricUnit::Celsius);
+    EXPECT_EQ(loaded.snapshot.boardTemperatures[0].metric.issue, ScalarMetricIssue::PermissionRequired);
     EXPECT_EQ(loaded.snapshot.boardFans[0].metric.unit, ScalarMetricUnit::Rpm);
+    EXPECT_EQ(loaded.snapshot.boardFans[0].metric.issue, ScalarMetricIssue::None);
 }
 
 TEST(SnapshotDump, RejectsNonCanonicalScalarMetricUnitTokensOnLoad) {

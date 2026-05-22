@@ -63,7 +63,13 @@ std::optional<std::string> FindAutoBoardSensorName(
         if (auto match = findContaining("system"); match.has_value()) {
             return match;
         }
-        return findContaining("sys");
+        if (auto match = findContaining("sys"); match.has_value()) {
+            return match;
+        }
+        if (auto match = findContaining("motherboard"); match.has_value()) {
+            return match;
+        }
+        return findContaining("board");
     }
     return std::nullopt;
 }
@@ -88,6 +94,11 @@ bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
         if (auto sensorName = FindAutoBoardSensorName(name, state.board_.availableFanNames); sensorName.has_value()) {
             state.settings_.board.fanSensorNames[name] = *sensorName;
             state.resolvedSelections_.boardFanSensorNames[name] = *sensorName;
+            resolved = true;
+        } else if (state.board_.availableFanNames.size() == 1) {
+            // Some laptop providers expose a single shared fan as just "Fan"; bind it to any requested fan fallback.
+            state.settings_.board.fanSensorNames[name] = state.board_.availableFanNames.front();
+            state.resolvedSelections_.boardFanSensorNames[name] = state.board_.availableFanNames.front();
             resolved = true;
         }
     }

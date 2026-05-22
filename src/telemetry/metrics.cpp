@@ -380,6 +380,15 @@ MetricValue ResolveBoardMetric(const std::vector<NamedScalarMetric>& metrics,
         if (metric.name != logicalName) {
             continue;
         }
+        if (!metric.metric.value.has_value() && metric.metric.issue == ScalarMetricIssue::PermissionRequired) {
+            return BuildResolvedMetric(snapshot,
+                definition,
+                metricRef,
+                std::string(kPermissionRequiredText),
+                0.0,
+                0.0,
+                MetricValueState::PermissionRequired);
+        }
         const double numericValue = FiniteNonNegativeOr(metric.metric.value.value_or(0.0));
         const double ratio = ResolveMetricRatio(definition, numericValue);
         return BuildResolvedMetric(

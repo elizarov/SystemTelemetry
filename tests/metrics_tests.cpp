@@ -246,6 +246,21 @@ TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     EXPECT_DOUBLE_EQ(metric.peakRatio, 0.55);
 }
 
+TEST(Metrics, ResolvesBoardPermissionIssueAsAdminIndicator) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.boardTemperatures.push_back(
+        {"cpu", ScalarMetric{std::nullopt, ScalarMetricUnit::Celsius, ScalarMetricIssue::PermissionRequired}});
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& metric = source.ResolveMetric("board.temp.cpu");
+    EXPECT_EQ(metric.label, "Temp");
+    EXPECT_EQ(metric.valueText, "!admin");
+    EXPECT_EQ(metric.state, MetricValueState::PermissionRequired);
+    EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
+}
+
 TEST(Metrics, ResolvesBoardFanMetricsThroughPrefixBinding) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;

@@ -1,5 +1,6 @@
 #include "config/config_telemetry.h"
 
+#include "config/config_resolution.h"
 #include "util/numeric_format.h"
 #include "util/text_format.h"
 
@@ -63,6 +64,7 @@ TelemetrySettings ExtractTelemetrySettings(const AppConfig& config) {
     settings.board.temperatureSensorNames = config.layout.board.temperatureSensorNames;
     settings.board.fanSensorNames = config.layout.board.fanSensorNames;
     settings.selection = ExtractTelemetrySelectionSettings(config);
+    settings.collectPresentedFps = CollectLayoutBindings(config.layout).presentedFpsRequested;
     return settings;
 }
 

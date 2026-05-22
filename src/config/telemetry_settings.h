@@ -24,6 +24,7 @@ struct TelemetrySelectionSettings {
 struct TelemetrySettings {
     BoardTelemetrySettings board;
     TelemetrySelectionSettings selection;
+    bool collectPresentedFps = false;
 
     bool operator==(const TelemetrySettings& other) const = default;
 };

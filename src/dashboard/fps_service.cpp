@@ -399,7 +399,7 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider& fpsProvider) {
     std::vector<char> response;
     switch (serviceRequest->id) {
         case CashDashServiceRequestId::PresentedFpsSample:
-            response = SerializeFpsServiceSample(fpsProvider.Sample());
+            response = SerializeFpsServiceSample(fpsProvider.Sample(serviceRequest->fpsOptions));
             break;
     }
     if (response.empty()) {
