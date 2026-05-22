@@ -219,7 +219,6 @@ std::optional<LayoutNodeFieldEditKey> LayoutEditAnchorNodeFieldKey(const LayoutE
 
 std::optional<LayoutContainerChildOrderEditKey> LayoutEditAnchorContainerChildOrderKey(const LayoutEditAnchorKey& key) {
     const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
-    return containerOrderKey != nullptr ?
-        std::optional<LayoutContainerChildOrderEditKey>(*containerOrderKey) :
+    return containerOrderKey != nullptr ? std::optional<LayoutContainerChildOrderEditKey>(*containerOrderKey) :
         std::nullopt;
 }

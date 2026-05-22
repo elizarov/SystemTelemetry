@@ -73,8 +73,7 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty() ?
         FormatText("layout.%s", config.display.layout.c_str()) :
-        key.editCardId.empty() ?
-        "layout" :
+        key.editCardId.empty() ? "layout" :
         FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     return FormatText("[%s] %s = metric_list(%s)",
@@ -92,8 +91,7 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty() ?
         FormatText("layout.%s", config.display.layout.c_str()) :
-        key.editCardId.empty() ?
-        "layout" :
+        key.editCardId.empty() ? "layout" :
         FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     return FormatText("[%s] %s = metric_list()", sectionName.c_str(), memberName.c_str());
@@ -108,8 +106,7 @@ std::optional<std::string> BuildContainerChildOrderTooltipLine(
 
     const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty() ?
         FormatText("layout.%s", config.display.layout.c_str()) :
-        key.editCardId.empty() ?
-        "layout" :
+        key.editCardId.empty() ? "layout" :
         FormatText("card.%s", key.editCardId.c_str());
     const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
     std::string text = FormatText("[%s] %s = %s(", sectionName.c_str(), memberName.c_str(), node->name.c_str());

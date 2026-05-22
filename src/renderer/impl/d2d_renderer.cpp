@@ -532,8 +532,7 @@ bool D2DRenderer::DrawToBitmap(
 
     const UINT bitmapWidth = static_cast<UINT>(std::max(1, width));
     const UINT bitmapHeight = static_cast<UINT>(std::max(1, height));
-    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ?
-        D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
         palette_.Get(RenderColorId::Background).ToD2DColorF();
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
@@ -622,8 +621,7 @@ bool D2DRenderer::DrawToLiveLayerBitmap(
         d2dDeviceContext_->SetTarget(previousTarget.Get());
         return false;
     }
-    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ?
-        D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
         palette_.Get(RenderColorId::Background).ToD2DColorF();
     d2dActiveRenderTarget_->Clear(clearColor);
     draw();

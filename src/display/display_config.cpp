@@ -212,8 +212,7 @@ int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
 
     std::string screenshotError;
     Trace trace;
-    const double targetScale = HasExplicitDisplayScale(config.display.scale) ?
-        config.display.scale :
+    const double targetScale = HasExplicitDisplayScale(config.display.scale) ? config.display.scale :
         ComputeMonitorFittedScale(config,
             targetMonitor->rect.right - targetMonitor->rect.left,
             targetMonitor->rect.bottom - targetMonitor->rect.top);

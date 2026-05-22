@@ -403,8 +403,7 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
         return;
     }
     layoutResolver_->SetEditArtifactContext(widget.overlayOwners,
-        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ?
-            LayoutEditOverlayAffordanceLayer::Foreground :
+        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ? LayoutEditOverlayAffordanceLayer::Foreground :
             LayoutEditOverlayAffordanceLayer::Background);
     widget.widget->Draw(*this, widget, metrics);
     layoutResolver_->ResetEditArtifactContext();
@@ -454,8 +453,7 @@ bool DashboardRenderer::DrawWindowInternal(
         if (presentationHwnd_ == nullptr) {
             return presentation_->PresentFrameSynchronously(std::move(frame));
         }
-        return waitForPresentation ?
-            presentation_->PublishFrameAndWait(std::move(frame)) :
+        return waitForPresentation ? presentation_->PublishFrameAndWait(std::move(frame)) :
             presentation_->PublishFrame(std::move(frame));
     }();
     if (!presented) {
@@ -1466,8 +1464,7 @@ void DashboardRenderer::WriteTraceFmt(ResourceStringId format, ...) const {
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const {
-    return axis == LayoutGuideAxis::Vertical ?
-        std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
+    return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
         std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 

@@ -83,8 +83,7 @@ long long RectArea(const RenderRect& rect) {
 }
 
 int WidgetExtentForAxis(const LayoutEditWidgetRegion& widget, LayoutGuideAxis axis) {
-    return axis == LayoutGuideAxis::Vertical ?
-        std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
+    return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
         std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 

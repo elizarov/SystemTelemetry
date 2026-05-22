@@ -62,8 +62,7 @@ std::optional<unsigned int> ParseHexText(std::string text) {
     }
     char* end = nullptr;
     const unsigned long value = std::strtoul(text.c_str(), &end, 16);
-    return end != nullptr && *end == '\0' ?
-        std::optional<unsigned int>{static_cast<unsigned int>(value)} :
+    return end != nullptr && *end == '\0' ? std::optional<unsigned int>{static_cast<unsigned int>(value)} :
         std::nullopt;
 }
 
@@ -423,8 +422,7 @@ private:
             IADLXGPUPtr candidate;
             const ADLX_RESULT result = gpus->At(index, &candidate);
             const AdlxGpuIdentity identity = candidate != nullptr ? ReadAdlxGpuIdentity(candidate) : AdlxGpuIdentity{};
-            const int rank = candidate != nullptr && adapter_.has_value() ?
-                AmdDeviceMatchRank(*adapter_, identity) :
+            const int rank = candidate != nullptr && adapter_.has_value() ? AmdDeviceMatchRank(*adapter_, identity) :
                 (candidate != nullptr ? 0 : -1);
             trace().WriteFmt(TracePrefix::AmdAdlx,
                 RES_STR("gpu_candidate index=%u result=%d vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "

@@ -313,8 +313,7 @@ std::string FormatMetricValueText(const MetricDefinitionConfig& definition,
                 FormatMemoryValue(*primaryValue, *secondaryValue, definition.unit) :
                 std::string("N/A");
         case MetricDisplayStyle::Throughput:
-            return primaryValue.has_value() ?
-                FormatThroughputValue(*primaryValue, definition.unit) :
+            return primaryValue.has_value() ? FormatThroughputValue(*primaryValue, definition.unit) :
                 std::string("N/A");
         case MetricDisplayStyle::SizeAuto:
             return primaryValue.has_value() ? FormatSizeAutoValue(*primaryValue, definition.unit) : std::string("N/A");
@@ -1075,8 +1074,7 @@ const MetricSource::DriveRowCacheEntry& MetricSource::CacheDriveRow(size_t rowIn
         driveUsageDefinition_ != nullptr ?
             FormatMetricValueText(*driveUsageDefinition_, "drive.usage", drive.usedPercent) :
             std::string{},
-        driveFreeDefinition_ != nullptr ?
-            FormatMetricValueText(*driveFreeDefinition_, "drive.free", drive.freeGb) :
+        driveFreeDefinition_ != nullptr ? FormatMetricValueText(*driveFreeDefinition_, "drive.free", drive.freeGb) :
             std::string{}};
     entry.rowIndex = rowIndex;
     return entry;

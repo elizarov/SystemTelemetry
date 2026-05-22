@@ -772,8 +772,7 @@ private:
         device_ = device;
         sysmanGpuName_ = ResolveGpuName(properties);
         gpuName_ = matchKind != nullptr && std::string_view(matchKind) == "device_id" && adapter_.has_value() &&
-                !adapter_->adapterName.empty() ?
-            adapter_->adapterName :
+                !adapter_->adapterName.empty() ? adapter_->adapterName :
             sysmanGpuName_;
         trace_.WriteFmt(TracePrefix::IntelLevelZero,
             RES_STR("device_selected match=\"%s\" sysman_name=\"%s\" display_name=\"%s\" selected_adapter=\"%s\""),

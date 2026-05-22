@@ -484,8 +484,7 @@ bool DashboardRenderThread::PresentFrame(Renderer& renderer,
         }
     }
     if (activeTimeline != nullptr) {
-        const auto retention = metricTargetsUpdated ?
-            DashboardAnimationTimeline::TrackRetention::PruneUntouched :
+        const auto retention = metricTargetsUpdated ? DashboardAnimationTimeline::TrackRetention::PruneUntouched :
             DashboardAnimationTimeline::TrackRetention::KeepUntouched;
         const std::size_t trackCountBeforeEndFrame = activeTimeline->TrackCount();
         const std::size_t prunedCount = activeTimeline->EndFrame(retention);

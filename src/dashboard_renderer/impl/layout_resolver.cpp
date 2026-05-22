@@ -210,8 +210,7 @@ void DashboardLayoutResolver::RegisterEditableAnchorRegion(
     region.targetRect = registration.targetRect;
     region.anchorRect = registration.anchorRect;
     region.shape = registration.shape;
-    const int anchorHitInset = registration.shape == AnchorShape::Wedge ?
-        std::max(1, renderer_.ScaleLogical(2)) :
+    const int anchorHitInset = registration.shape == AnchorShape::Wedge ? std::max(1, renderer_.ScaleLogical(2)) :
         std::max(4, renderer_.ScaleLogical(5));
     region.anchorHitPadding = anchorHitInset;
     region.anchorHitRect = RenderRect{region.anchorRect.left - anchorHitInset,
@@ -469,8 +468,7 @@ bool DashboardLayoutResolver::AnchorMatchesActiveContainerChildDrag(
 
 void DashboardLayoutResolver::TagOverlayAffordanceLayers(const DashboardOverlayState& overlayState) {
     const auto layerForOwners = [&](const std::vector<LayoutEditOverlayOwner>& owners) {
-        return OverlayOwnerMatchesActiveDrag(owners, overlayState) ?
-            LayoutEditOverlayAffordanceLayer::Foreground :
+        return OverlayOwnerMatchesActiveDrag(owners, overlayState) ? LayoutEditOverlayAffordanceLayer::Foreground :
             LayoutEditOverlayAffordanceLayer::Background;
     };
     const auto tagAnchorRegions = [&](std::vector<LayoutEditAnchorRegion>& regions) {
@@ -478,8 +476,7 @@ void DashboardLayoutResolver::TagOverlayAffordanceLayers(const DashboardOverlayS
             const bool foreground = AnchorMatchesActiveMetricListDrag(region, overlayState) ||
                 AnchorMatchesActiveContainerChildDrag(region, overlayState) ||
                 OverlayOwnerMatchesActiveDrag(region.overlayOwners, overlayState);
-            region.overlayLayer = foreground ?
-                LayoutEditOverlayAffordanceLayer::Foreground :
+            region.overlayLayer = foreground ? LayoutEditOverlayAffordanceLayer::Foreground :
                 LayoutEditOverlayAffordanceLayer::Background;
         }
     };
@@ -643,11 +640,9 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
         LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome} :
         LayoutEditWidgetIdentity{renderCardId, renderCardId, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
     const DashboardRenderer::LayoutEditParameter gapParameter = renderCardId.empty() ?
-        (horizontal ?
-            DashboardRenderer::LayoutEditParameter::DashboardColumnGap :
+        (horizontal ? DashboardRenderer::LayoutEditParameter::DashboardColumnGap :
             DashboardRenderer::LayoutEditParameter::DashboardRowGap) :
-        (horizontal ?
-            DashboardRenderer::LayoutEditParameter::CardColumnGap :
+        (horizontal ? DashboardRenderer::LayoutEditParameter::CardColumnGap :
             DashboardRenderer::LayoutEditParameter::CardRowGap);
     const bool gapAnchorAlreadyRegistered =
         std::any_of(gapEditAnchors_.begin(), gapEditAnchors_.end(), [&](const auto& anchor) {
@@ -670,16 +665,14 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
             anchor.drawEnd = RenderPoint{firstGapTrail.left, rect.top};
             anchor.dragAxis = AnchorDragAxis::Horizontal;
             anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
-            anchor.value = renderCardId.empty() ?
-                renderer.Config().layout.dashboard.columnGap :
+            anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.columnGap :
                 renderer.Config().layout.cardStyle.columnGap;
         } else {
             anchor.drawStart = RenderPoint{rect.left, firstGapLead.bottom};
             anchor.drawEnd = RenderPoint{rect.left, firstGapTrail.top};
             anchor.dragAxis = AnchorDragAxis::Vertical;
             anchor.handleRect = MakeSquareAnchorRect(anchor.drawEnd.x, anchor.drawEnd.y, handleSize);
-            anchor.value = renderCardId.empty() ?
-                renderer.Config().layout.dashboard.rowGap :
+            anchor.value = renderCardId.empty() ? renderer.Config().layout.dashboard.rowGap :
                 renderer.Config().layout.cardStyle.rowGap;
         }
         anchor.hitRect = anchor.handleRect.Inflate(hitInset, hitInset);
@@ -694,8 +687,7 @@ void DashboardLayoutResolver::AddLayoutEditGuide(DashboardRenderer& renderer,
     for (const auto& child : node.children) {
         const DashboardLayoutResolver::ParsedWidgetInfo* childWidget = FindParsedWidgetInfo(renderer, child);
         childFixedExtents.push_back(!horizontal && childWidget != nullptr &&
-                    (childWidget->fixedPreferredHeightInRows || childWidget->verticalSpring) ?
-                1u :
+                    (childWidget->fixedPreferredHeightInRows || childWidget->verticalSpring) ? 1u :
                 0u);
     }
     for (size_t i = 0; i + 1 < childRects.size(); ++i) {
@@ -908,8 +900,7 @@ void DashboardLayoutResolver::ResolveNodeWidgetsInternal(DashboardRenderer& rend
     }
 
     const bool horizontal = node.name == "columns";
-    const int gap = horizontal ?
-        renderer.ScaleLogical(renderer.config_.layout.cardStyle.columnGap) :
+    const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.cardStyle.columnGap) :
         renderer.ScaleLogical(renderer.config_.layout.cardStyle.rowGap);
 
     const int totalAvailable = (horizontal ? (rect.right - rect.left) : (rect.bottom - rect.top)) -
@@ -1159,8 +1150,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         }
 
         const bool horizontal = node.name == "columns";
-        const int gap = horizontal ?
-            renderer.ScaleLogical(renderer.config_.layout.dashboard.columnGap) :
+        const int gap = horizontal ? renderer.ScaleLogical(renderer.config_.layout.dashboard.columnGap) :
             renderer.ScaleLogical(renderer.config_.layout.dashboard.rowGap);
         int totalWeight = 0;
         for (const auto& child : node.children) {
@@ -1181,9 +1171,7 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         for (size_t i = 0; i < node.children.size(); ++i) {
             const auto& child = node.children[i];
             const int childWeight = (std::max)(1, child.weight);
-            const int size = (i + 1 == node.children.size()) ?
-                ((horizontal ?
-                    rect.right : rect.bottom) - cursor) :
+            const int size = (i + 1 == node.children.size()) ? ((horizontal ? rect.right : rect.bottom) - cursor) :
                 (std::max)(0, remainingAvailable * childWeight / (std::max)(1, remainingWeight));
 
             RenderRect childRect = rect;

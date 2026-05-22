@@ -184,8 +184,7 @@ int EffectiveGaugePreferredRadius(const WidgetHost& renderer, const std::string&
 
 int GaugeFilledSegmentCount(const GaugeSegmentLayout& layout, const ScalarFillSample& sample) {
     const double clampedRatio = ClampFinite(sample.valueRatio.value_or(0.0), 0.0, 1.0);
-    return !sample.valueRatio.has_value() || clampedRatio <= 0.0 ?
-        0 :
+    return !sample.valueRatio.has_value() || clampedRatio <= 0.0 ? 0 :
         std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(layout.segmentCount))),
             1,
             layout.segmentCount);
@@ -193,8 +192,7 @@ int GaugeFilledSegmentCount(const GaugeSegmentLayout& layout, const ScalarFillSa
 
 int GaugePeakSegment(const GaugeSegmentLayout& layout, const ScalarFillSample& sample) {
     const double clampedPeakRatio = ClampFinite(sample.peakRatio.value_or(0.0), 0.0, 1.0);
-    return !sample.peakRatio.has_value() || clampedPeakRatio <= 0.0 ?
-        -1 :
+    return !sample.peakRatio.has_value() || clampedPeakRatio <= 0.0 ? -1 :
         std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(layout.segmentCount))) - 1,
             0,
             layout.segmentCount - 1);
@@ -362,8 +360,7 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
         renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
-            metric.state == MetricValueState::PermissionRequired ?
-                WidgetHost::LayoutEditParameter::ColorWarning :
+            metric.state == MetricValueState::PermissionRequired ? WidgetHost::LayoutEditParameter::ColorWarning :
                 WidgetHost::LayoutEditParameter::ColorForeground);
         renderer.EditArtifacts().RegisterDynamicTextAnchor(
             valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));

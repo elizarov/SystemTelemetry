@@ -176,8 +176,7 @@ void ResetGpuProviderState(RealTelemetryCollectorState& state) {
 
 void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
     if (!state.gpu_.selectedAdapter.has_value()) {
-        state.snapshot_.gpu.name = state.settings_.selection.preferredGpuAdapterName.empty() ?
-            "GPU" :
+        state.snapshot_.gpu.name = state.settings_.selection.preferredGpuAdapterName.empty() ? "GPU" :
             state.settings_.selection.preferredGpuAdapterName;
         state.snapshot_.gpu.vram.totalGb = 0.0;
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_adapter_selected none"));

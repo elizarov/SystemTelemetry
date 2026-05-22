@@ -662,8 +662,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
         const bool constrained = constrainedWidth > 0;
         const int parameterWidth =
             std::max(1, dashboardRenderer_.Renderer().MeasureTextWidth(TextStyleId::Small, callout.parameterLine));
-        const int descriptionWidth = callout.descriptionLine.empty() ?
-            0 :
+        const int descriptionWidth = callout.descriptionLine.empty() ? 0 :
             std::max(1, dashboardRenderer_.Renderer().MeasureTextWidth(TextStyleId::Small, callout.descriptionLine));
         const int contentWidth = std::max(parameterWidth, descriptionWidth);
         const int bubbleWidth = constrained ? constrainedWidth : contentWidth + bubblePaddingX * 2;

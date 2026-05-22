@@ -138,8 +138,7 @@ public:
         }
 
         cachedSample_ = *sample;
-        diagnostics_ = sample->diagnostics.empty() ?
-            ResourceStringText(RES_STR("FPS service provider active.")) :
+        diagnostics_ = sample->diagnostics.empty() ? ResourceStringText(RES_STR("FPS service provider active.")) :
             sample->diagnostics;
         initialized_ = true;
         trace_.WriteFmt(

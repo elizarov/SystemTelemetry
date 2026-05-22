@@ -273,8 +273,7 @@ const std::string& DashboardApp::LastError() const {
 
 void DashboardApp::ApplyConfigPlacement() {
     const AppConfig& config = controller_.State().config;
-    UINT targetDpi = hwnd_ != nullptr ?
-        CurrentWindowDpi() :
+    UINT targetDpi = hwnd_ != nullptr ? CurrentWindowDpi() :
         GetMonitorDpi(MonitorFromPoint(POINT{100, 100}, MONITOR_DEFAULTTOPRIMARY));
     double targetScale = ResolveCurrentDisplayScale(targetDpi);
     int left = 100 + ScaleLogicalToPhysical(config.display.position.x, targetScale);
@@ -498,11 +497,9 @@ bool DashboardApp::ApplyWindowDpi(UINT dpi, const RECT* suggestedRect) {
     }
 
     if (suggestedRect != nullptr) {
-        const int width = HasExplicitDisplayScale(controller_.State().config.display.scale) ?
-            WindowWidth() :
+        const int width = HasExplicitDisplayScale(controller_.State().config.display.scale) ? WindowWidth() :
             suggestedRect->right - suggestedRect->left;
-        const int height = HasExplicitDisplayScale(controller_.State().config.display.scale) ?
-            WindowHeight() :
+        const int height = HasExplicitDisplayScale(controller_.State().config.display.scale) ? WindowHeight() :
             suggestedRect->bottom - suggestedRect->top;
         SetDashboardWindowGeometry(
             suggestedRect->left, suggestedRect->top, width, height, SWP_NOZORDER | SWP_NOACTIVATE, "dpi_change");
@@ -751,8 +748,7 @@ bool DashboardApp::DrainPendingTelemetryUpdate(TelemetryUpdate& update) {
 }
 
 MonitorPlacementInfo DashboardApp::GetWindowPlacementInfo() const {
-    return hwnd_ != nullptr ?
-        GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale) :
+    return hwnd_ != nullptr ? GetMonitorPlacementForWindow(hwnd_, controller_.State().config.display.scale) :
         movePlacementInfo_;
 }
 
@@ -1402,8 +1398,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,
                     "wm_capturechanged",
                     "new_owner=\"%s\" handled=\"%s\"",
-                    reinterpret_cast<HWND>(lParam) == nullptr ?
-                        "none" :
+                    reinterpret_cast<HWND>(lParam) == nullptr ? "none" :
                         (reinterpret_cast<HWND>(lParam) == hwnd_ ? "dashboard" : "other"),
                     handled ? "true" : "false");
                 if (handled) {

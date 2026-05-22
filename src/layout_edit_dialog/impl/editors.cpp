@@ -598,8 +598,7 @@ LayoutEditValidationResult ValidateDateTimeFormatSelection(LayoutEditDialogState
         return {false, FindLocalizedText(RES_STR("layout_edit.validation.choose_date_time_format"))};
     }
     const std::string format = Trim(ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO));
-    return !format.empty() ?
-        LayoutEditValidationResult{true, ""} :
+    return !format.empty() ? LayoutEditValidationResult{true, ""} :
         LayoutEditValidationResult{false, FindLocalizedText(RES_STR("layout_edit.validation.choose_date_time_format"))};
 }
 
@@ -953,12 +952,10 @@ LayoutEditValidationResult ValidateCurrentSelectionInput(LayoutEditDialogState* 
         char valueBuffer[128] = {};
         GetDlgItemTextA(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, valueBuffer, ARRAYSIZE(valueBuffer));
         if (state->selectedLeaf->valueFormat == configschema::ValueFormat::Integer) {
-            return TryParseDialogInteger(valueBuffer).has_value() ?
-                LayoutEditValidationResult{true, ""} :
+            return TryParseDialogInteger(valueBuffer).has_value() ? LayoutEditValidationResult{true, ""} :
                 LayoutEditValidationResult{false, FindLocalizedText(RES_STR("layout_edit.validation.whole_number"))};
         }
-        return TryParseDialogDouble(valueBuffer).has_value() ?
-            LayoutEditValidationResult{true, ""} :
+        return TryParseDialogDouble(valueBuffer).has_value() ? LayoutEditValidationResult{true, ""} :
             LayoutEditValidationResult{false, FindLocalizedText(RES_STR("layout_edit.validation.number"))};
     }
 
@@ -1194,9 +1191,8 @@ bool PreviewSelectedColor(LayoutEditDialogState* state, HWND hwnd) {
             state->dialog->Host().ApplyColorExpressionPreview(*parameter, FormatColorExpression(*expression));
     } else {
         applied = color.has_value() &&
-            (parameter != nullptr ?
-                    state->dialog->Host().ApplyColorPreview(*parameter, *color) :
-                    state->dialog->Host().ApplyThemeColorPreview(*themeColorKey, *color));
+            (parameter != nullptr ? state->dialog->Host().ApplyColorPreview(*parameter, *color) :
+                state->dialog->Host().ApplyThemeColorPreview(*themeColorKey, *color));
     }
     const AppConfig& config = state->dialog->Host().CurrentConfig();
     std::optional<unsigned int> resolvedColor;
@@ -1309,8 +1305,7 @@ bool SetSelectedDialogColor(LayoutEditDialogState* state, HWND hwnd, unsigned in
 
     state->dialog->Host().TraceLayoutEditDialogEvent("picker_apply_begin",
         BuildTraceNodeDetail(state->selectedNode, " picked=%s", QuoteTraceText(FormatTraceColorHex(color)).c_str()));
-    const bool applied = parameter != nullptr ?
-        state->dialog->Host().ApplyColorPreview(*parameter, color) :
+    const bool applied = parameter != nullptr ? state->dialog->Host().ApplyColorPreview(*parameter, color) :
         state->dialog->Host().ApplyThemeColorPreview(*themeColorKey, color);
     if (!applied) {
         state->dialog->Host().TraceLayoutEditDialogEvent(
@@ -1577,8 +1572,7 @@ bool RevertSelectedLayoutEditField(LayoutEditDialogState* state, HWND hwnd) {
                 state->originalConfig.layout.board.temperatureSensorNames :
                 state->originalConfig.layout.board.fanSensorNames;
             const auto it = bindings.find(target->logicalName);
-            binding = it != bindings.end() ?
-                std::optional<std::string>(it->second) :
+            binding = it != bindings.end() ? std::optional<std::string>(it->second) :
                 std::optional<std::string>(std::string());
         }
         const bool applied = state->dialog->Host().ApplyMetricPreview(*metricKey,

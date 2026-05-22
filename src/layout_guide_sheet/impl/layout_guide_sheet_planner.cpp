@@ -158,8 +158,7 @@ std::string LayoutGuideSheetCalloutKey(
     const std::string& parameterLine, const std::string& descriptionLine, const TooltipPayload& payload) {
     if (const auto* anchor = std::get_if<LayoutEditAnchorRegion>(&payload);
         anchor != nullptr && std::holds_alternative<LayoutContainerChildOrderEditKey>(anchor->key.subject)) {
-        return anchor->shape == AnchorShape::HorizontalReorder ?
-            "overview_horizontal_layout_reorder" :
+        return anchor->shape == AnchorShape::HorizontalReorder ? "overview_horizontal_layout_reorder" :
             "overview_vertical_layout_reorder";
     }
     if (const std::optional<LayoutEditFocusKey> focusKey = TooltipPayloadFocusKey(payload); focusKey.has_value()) {
@@ -179,8 +178,7 @@ std::string LayoutGuideSheetCalloutKey(
         }
     }
     if (const auto* guide = std::get_if<LayoutEditGuide>(&payload); guide != nullptr && guide->renderCardId.empty()) {
-        return guide->axis == LayoutGuideAxis::Horizontal ?
-            "overview_horizontal_sizing_guide" :
+        return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide" :
             "overview_vertical_sizing_guide";
     }
     return FormatText("%s\n%s", parameterLine.c_str(), descriptionLine.c_str());

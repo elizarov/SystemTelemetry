@@ -117,9 +117,8 @@ FilePath JoinPath(const FilePath& base, const FilePath& child) {
     }
     const std::string baseText = base.string();
     const std::string childText = child.string();
-    return FilePath(IsSeparator(baseText.back()) ?
-            FormatText("%s%s", baseText.c_str(), childText.c_str()) :
-            FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
+    return FilePath(IsSeparator(baseText.back()) ? FormatText("%s%s", baseText.c_str(), childText.c_str()) :
+        FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
 }
 
 FilePath JoinPath(const FilePath& base, const char* child) {

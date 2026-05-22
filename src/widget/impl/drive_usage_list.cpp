@@ -379,11 +379,9 @@ void DriveUsageListWidget::ResolveLayoutState(const WidgetHost& renderer, const 
     layoutState_.visibleRows = static_cast<int>(layoutState_.rowBands.size());
     layoutState_.activityAnchorCenterX = layoutState_.headerColumns.read.left +
         ((std::max)(0, layoutState_.headerColumns.write.right - layoutState_.headerColumns.read.left) / 2);
-    const int firstRowTop = layoutState_.visibleRows > 0 ?
-        static_cast<int>(layoutState_.rowBands.front().top) :
+    const int firstRowTop = layoutState_.visibleRows > 0 ? static_cast<int>(layoutState_.rowBands.front().top) :
         static_cast<int>(layoutState_.headerRect.bottom);
-    const int firstRowBottom = layoutState_.visibleRows > 0 ?
-        static_cast<int>(layoutState_.rowBands.front().bottom) :
+    const int firstRowBottom = layoutState_.visibleRows > 0 ? static_cast<int>(layoutState_.rowBands.front().bottom) :
         static_cast<int>(layoutState_.headerRect.bottom);
     layoutState_.firstRowContentTop =
         firstRowTop + (std::max)(0, ((firstRowBottom - firstRowTop) - layoutState_.rowContentHeight) / 2);

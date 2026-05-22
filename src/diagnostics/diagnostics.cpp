@@ -772,8 +772,7 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
                 options_.editLayoutWidgetName,
                 trace_,
                 options_.hoverPoint.has_value(),
-                options_.hoverPoint.has_value() ?
-                    RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y} :
+                options_.hoverPoint.has_value() ? RenderPoint{options_.hoverPoint->x, options_.hoverPoint->y} :
                     RenderPoint{},
                 &screenshotError)) {
             return ReportSaveError(

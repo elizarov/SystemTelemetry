@@ -261,8 +261,7 @@ bool BuildLayoutEditTooltipTextForPayload(
                 rowIndex = anchor->key.anchorId;
                 addRowAnchor = anchor->shape == AnchorShape::Plus;
             }
-            tooltipText = addRowAnchor ?
-                BuildMetricListAddRowTooltipText(config, *nodeFieldKey) :
+            tooltipText = addRowAnchor ? BuildMetricListAddRowTooltipText(config, *nodeFieldKey) :
                 BuildMetricListOrderTooltipText(config, *nodeFieldKey, rowIndex);
             if (tooltipText.empty()) {
                 return AbortTooltipBuild(errorReason, "empty_metric_list_text");

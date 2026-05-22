@@ -58,8 +58,7 @@ std::string DescribeWidgetGuide(const LayoutEditWidgetGuide& guide) {
 }
 
 std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
-    const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome ?
-        " dashboard" :
+    const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome ? " dashboard" :
         FormatText(" card=%s", anchor.key.widget.renderCardId.c_str());
     return FormatText("axis=%s parameter=%s path=%s%s",
         AxisName(anchor.axis),
@@ -73,12 +72,9 @@ std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
     const std::optional<LayoutMetricEditKey> metricKey = LayoutEditAnchorMetricKey(key);
     const std::string subject = parameter.has_value() ?
         FormatText("parameter=%s", DescribeWidgetParameter(*parameter).c_str()) :
-        metricKey.has_value() ?
-        FormatText("metric=%s", metricKey->metricId.c_str()) :
-        LayoutEditAnchorNodeFieldKey(key).has_value() ?
-        "node_field" :
-        LayoutEditAnchorContainerChildOrderKey(key).has_value() ?
-        "container_child_reorder" :
+        metricKey.has_value() ? FormatText("metric=%s", metricKey->metricId.c_str()) :
+        LayoutEditAnchorNodeFieldKey(key).has_value() ? "node_field" :
+        LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder" :
         "subject=unknown";
     std::string detail = FormatText("%s anchor_id=%d", subject.c_str(), key.anchorId);
     if (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
@@ -655,12 +651,9 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
         SetCursor(LoadCursorA(nullptr,
-            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ?
-                IDC_SIZEALL :
-                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both ?
-                IDC_SIZEALL :
-                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical ?
-                IDC_SIZEWE :
+            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL :
+                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both ? IDC_SIZEALL :
+                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical ? IDC_SIZEWE :
                 IDC_SIZENS));
         return true;
     }
@@ -680,10 +673,8 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeWidgetEditDrag_.has_value()) {
         const auto& guide = activeWidgetEditDrag_->guide;
         SetCursor(LoadCursorA(nullptr,
-            guide.angularDrag ?
-                IDC_CROSS :
-                guide.axis == LayoutGuideAxis::Vertical ?
-                IDC_SIZEWE :
+            guide.angularDrag ? IDC_CROSS :
+                guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE :
                 IDC_SIZENS));
         return true;
     }
@@ -941,12 +932,9 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const auto dragAxis = region != nullptr ? region->dragAxis : AnchorDragAxis::Vertical;
         const auto dragMode = region != nullptr ? region->dragMode : AnchorDragMode::AxisDelta;
         SetCursor(LoadCursorA(nullptr,
-            dragMode == AnchorDragMode::RadialDistance ?
-                IDC_SIZEALL :
-                dragAxis == AnchorDragAxis::Both ?
-                IDC_SIZEALL :
-                dragAxis == AnchorDragAxis::Vertical ?
-                IDC_SIZEWE :
+            dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL :
+                dragAxis == AnchorDragAxis::Both ? IDC_SIZEALL :
+                dragAxis == AnchorDragAxis::Vertical ? IDC_SIZEWE :
                 IDC_SIZENS));
         return;
     }
@@ -954,10 +942,8 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
     if (resolution.hoveredWidgetEditGuide.has_value()) {
         const LayoutEditWidgetGuide& widgetGuide = *resolution.hoveredWidgetEditGuide;
         SetCursor(LoadCursorA(nullptr,
-            widgetGuide.angularDrag ?
-                IDC_CROSS :
-                widgetGuide.axis == LayoutGuideAxis::Vertical ?
-                IDC_SIZEWE :
+            widgetGuide.angularDrag ? IDC_CROSS :
+                widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE :
                 IDC_SIZENS));
         return;
     }

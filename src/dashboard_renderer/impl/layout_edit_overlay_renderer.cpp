@@ -314,8 +314,7 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
 
         const bool reorderShape =
             highlighted.shape == AnchorShape::VerticalReorder || highlighted.shape == AnchorShape::HorizontalReorder;
-        const int outlineWidth = reorderShape ?
-            (std::max)(1, renderer_.ScaleLogical(1)) :
+        const int outlineWidth = reorderShape ? (std::max)(1, renderer_.ScaleLogical(1)) :
             (activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
         DrawLayoutEditAnchorShape(renderer_.Renderer(),
             highlighted.shape,
@@ -348,8 +347,7 @@ std::optional<DashboardLayoutEditOverlayRenderer::OverlayAffordanceRect> Dashboa
                 card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
             if (MatchesCardChromeSelectionIdentity(*overlayState.hoveredEditableCard, cardIdentity) &&
                 !card.chromeLayout.titleRect.IsEmpty()) {
-                const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty() ?
-                    card.chromeLayout.titleRect :
+                const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty() ? card.chromeLayout.titleRect :
                     UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
                 return OverlayAffordanceRect{titleRect, &card.chrome.overlayOwners, card.chrome.overlayLayer};
             }
@@ -701,8 +699,7 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(
         const RenderPoint start = ApplyOverlayDragOffset(
             overlayState, RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.overlayOwners);
         const RenderPoint end = ApplyOverlayDragOffset(overlayState,
-            guide.axis == LayoutGuideAxis::Vertical ?
-                RenderPoint{guide.lineRect.left, guide.lineRect.bottom} :
+            guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom} :
                 RenderPoint{guide.lineRect.right, guide.lineRect.top},
             guide.overlayOwners);
         renderer_.Renderer().DrawSolidLine(start,
@@ -865,8 +862,7 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
         return;
     }
     const int padding = std::max(1, renderer_.ScaleLogical(1));
-    const RenderRect outlineRect = outside ?
-        rect.Inflate(padding, padding) :
+    const RenderRect outlineRect = outside ? rect.Inflate(padding, padding) :
         RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
     const RenderRect drawRect = outlineRect.IsEmpty() ? rect : outlineRect;
     const int strokeWidth =

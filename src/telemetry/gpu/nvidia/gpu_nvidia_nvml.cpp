@@ -448,8 +448,7 @@ private:
             const bool pciOk = pciResult.has_value() && *pciResult == kNvmlSuccess;
             const std::string candidateName = nameResult == kNvmlSuccess ? KnownNvmlName(name) : std::string();
             const int rank = candidate != nullptr && adapter_.has_value() ?
-                NvidiaDeviceMatchRank(*adapter_, pciOk ?
-                    &pci : nullptr, candidateName) :
+                NvidiaDeviceMatchRank(*adapter_, pciOk ? &pci : nullptr, candidateName) :
                 (candidate != nullptr ? 1 : 0);
             const std::string pciResultText =
                 pciResult.has_value() ? nvml_.ResultText(*pciResult) : std::string("unavailable");

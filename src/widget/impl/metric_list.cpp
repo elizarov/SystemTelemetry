@@ -133,8 +133,7 @@ void DrawMetricListRow(WidgetHost& renderer,
                     WidgetHost::LayoutEditParameter::FontValue,
                     rowIndex * 2 + 1,
                     renderer.Config().layout.fonts.value.size),
-                row.state == MetricValueState::PermissionRequired ?
-                    WidgetHost::LayoutEditParameter::ColorWarning :
+                row.state == MetricValueState::PermissionRequired ? WidgetHost::LayoutEditParameter::ColorWarning :
                     WidgetHost::LayoutEditParameter::ColorForeground);
             if (rowIndex < static_cast<int>(metricRefs.size()) && !IsRuntimePlaceholderMetricId(metricRefs[rowIndex])) {
                 renderer.EditArtifacts().RegisterDynamicTextAnchor(

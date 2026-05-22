@@ -22,7 +22,7 @@ FORMAT_OPTION_COVERAGE = {
     "ContinuationIndentWidth": "wrapped parameters, arguments, and conditions use four-space continuation indentation",
     "ColumnLimit": "long declarations, calls, and comments exercise wrapping decisions",
     "BreakBeforeBraces": "namespace, class, function, loop, and switch braces attach",
-    "BreakBeforeTernaryOperators": "long and nested ternary expressions break without padded operator columns",
+    "BreakBeforeTernaryOperators": "long and nested ternary expressions break as compact branches without padded operator columns",
     "NamespaceIndentation": "namespace contents are not indented",
     "IndentCaseLabels": "switch case labels are indented inside the switch block",
     "IndentAccessModifiers": "class access labels stay outdented from members",
@@ -44,7 +44,7 @@ FORMAT_OPTION_COVERAGE = {
     "BinPackParameters": "long function parameters wrap onto separate continuation lines",
     "BreakConstructorInitializers": "constructor initializer lists break after the colon",
     "PackConstructorInitializers": "constructor initializer lists keep one initializer per continuation line",
-    "PenaltyIndentedWhitespace": "long ternary expressions prefer shallow continuation breaks over horizontal alignment",
+    "PenaltyIndentedWhitespace": "long ternary expressions prefer compact continuation breaks over horizontal alignment",
     "AllowShortBlocksOnASingleLine": "short loop blocks expand across multiple lines",
     "AllowShortCaseLabelsOnASingleLine": "short case labels expand across multiple lines",
     "AllowShortFunctionsOnASingleLine": "non-empty short functions expand and empty functions stay single-line",
@@ -126,6 +126,8 @@ class FormatCommandTests(unittest.TestCase):
         golden_text = read_fixture(GOLDEN_FIXTURE)
 
         self.assertNotRegex(golden_text, r"\S {2,}\?")
+        self.assertIn('return isFontsSection ? "Revert Font Changes" :', golden_text)
+        self.assertNotIn("return isFontsSection ?\n", golden_text)
         for line_number, line in enumerate(golden_text.splitlines(), start=1):
             match = re.match(r"^( +)\S", line)
             if match:

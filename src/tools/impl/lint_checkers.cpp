@@ -346,8 +346,7 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
             if (literalIndex < static_cast<int>(text.size()) &&
                 (text[static_cast<size_t>(literalIndex)] == '"' || text[static_cast<size_t>(literalIndex)] == '\'')) {
                 const bool raw = literalIndex > 0 && text.substr(static_cast<size_t>(literalIndex - 1), 2) == "R\"";
-                const int end = raw ?
-                    SkipRawStringLiteral(text, literalIndex - 1) :
+                const int end = raw ? SkipRawStringLiteral(text, literalIndex - 1) :
                     SkipQuotedLiteral(text, literalIndex, text[static_cast<size_t>(literalIndex)]);
                 if (!IsAllowedConstWideStringLiteral(text, index, literalIndex, end)) {
                     lines.push_back(line);

@@ -187,10 +187,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 notify->code == TCN_SELCHANGE) {
                 if (state != nullptr) {
                     const int selectedTab = TabCtrl_GetCurSel(notify->hwndFrom);
-                    state->colorEditViewMode = selectedTab == 1 ?
-                        ColorEditViewMode::Lch :
-                        selectedTab == 2 ?
-                        ColorEditViewMode::Hsv :
+                    state->colorEditViewMode = selectedTab == 1 ? ColorEditViewMode::Lch :
+                        selectedTab == 2 ? ColorEditViewMode::Hsv :
                         ColorEditViewMode::Rgb;
                     if (const auto color = ReadColorDialogValue(hwnd); color.has_value()) {
                         state->updatingControls = true;

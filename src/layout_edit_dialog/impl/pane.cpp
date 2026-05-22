@@ -2267,8 +2267,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int addButtonWidth = (std::max)(132,
                 MeasureTextWidthForControl(hwnd,
                     IDC_LAYOUT_EDIT_REVERT,
-                    state->metricListAddRowButton != nullptr ?
-                        ReadWindowTextValue(state->metricListAddRowButton) :
+                    state->metricListAddRowButton != nullptr ? ReadWindowTextValue(state->metricListAddRowButton) :
                         std::string("Add row")) +
                     28);
             const int rowVisibleHeight = comboFieldVisibleHeight;
@@ -2374,12 +2373,9 @@ void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
         state != nullptr && (state->selectedLeaf != nullptr || isFontsSection || isThemeSection || isLayoutSection);
     SetDialogControlText(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
-        isFontsSection ?
-            "Revert Font Changes" :
-            isThemeSection ?
-            "Revert Theme" :
-            isLayoutSection ?
-            "Revert Layout" :
+        isFontsSection ? "Revert Font Changes" :
+            isThemeSection ? "Revert Theme" :
+            isLayoutSection ? "Revert Layout" :
             "Revert Field");
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }

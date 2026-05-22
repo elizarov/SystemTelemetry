@@ -314,16 +314,11 @@ std::string BuildSavedConfigText(
     const auto updateKey =
         [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
             const std::string& sectionName, const std::string& key, const std::string& value) {
-            size_t sectionStart = sectionName == "[gpu]" ?
-                ensureSectionAfter(sectionName, "[display]") :
-                sectionName == "[network]" ?
-                ensureSectionAfter(sectionName, "[gpu]") :
-                sectionName == "[storage]" ?
-                ensureSectionAfter(sectionName, "[network]") :
-                sectionName == "[board]" ?
-                ensureSectionAfter(sectionName, "[storage]") :
-                sectionName == "[metrics]" ?
-                ensureSectionAfter(sectionName, "[board]") :
+            size_t sectionStart = sectionName == "[gpu]" ? ensureSectionAfter(sectionName, "[display]") :
+                sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]") :
+                sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]") :
+                sectionName == "[board]" ? ensureSectionAfter(sectionName, "[storage]") :
+                sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]") :
                 ensureSection(sectionName);
             if (sectionStart >= lines.size()) {
                 return;

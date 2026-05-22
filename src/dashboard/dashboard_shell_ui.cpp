@@ -222,8 +222,7 @@ std::string FormatScalePercentageValue(double scale) {
 }
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
-    return description.empty() ?
-        std::string(name) :
+    return description.empty() ? std::string(name) :
         FormatText("%.*s - %.*s",
             static_cast<int>(name.size()),
             name.data(),
@@ -694,8 +693,7 @@ std::vector<std::string> DashboardShellUi::AvailableBoardMetricSensorBindings(co
     }
 
     const BoardVendorTelemetrySample sample = state.telemetryUpdate.dump.boardProvider;
-    return target->kind == BoardMetricBindingKind::Temperature ?
-        sample.availableTemperatureNames :
+    return target->kind == BoardMetricBindingKind::Temperature ? sample.availableTemperatureNames :
         sample.availableFanNames;
 }
 
@@ -1164,8 +1162,7 @@ void DashboardShellUi::ShowContextMenu(
         const UINT commandId = kCommandScaleBase + 1 + static_cast<UINT>(i);
         const UINT flags = MF_STRING |
             (HasExplicitDisplayScale(state.config.display.scale) &&
-                        AreScalesEqual(state.config.display.scale, scaleEntries[i]) ?
-                    MF_CHECKED :
+                        AreScalesEqual(state.config.display.scale, scaleEntries[i]) ? MF_CHECKED :
                     MF_UNCHECKED);
         const std::string label = FormatScaleLabel(scaleEntries[i]);
         AppendMenuText(scaleMenu, flags, commandId, label);

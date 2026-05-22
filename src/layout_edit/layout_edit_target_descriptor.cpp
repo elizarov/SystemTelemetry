@@ -55,8 +55,7 @@ const LayoutNodeFieldEditDescriptor* FindLayoutNodeFieldEditDescriptor(const Lay
 std::optional<LayoutNodeFieldEditKey> LayoutNodeFieldEditKeyForWidgetParameter(
     std::string editCardId, std::vector<size_t> nodePath, WidgetClass widgetClass) {
     LayoutNodeFieldEditKey key{std::move(editCardId), std::move(nodePath), widgetClass, LayoutNodeField::Parameter};
-    return FindLayoutNodeFieldEditDescriptor(key) != nullptr ?
-        std::optional<LayoutNodeFieldEditKey>(std::move(key)) :
+    return FindLayoutNodeFieldEditDescriptor(key) != nullptr ? std::optional<LayoutNodeFieldEditKey>(std::move(key)) :
         std::nullopt;
 }
 
@@ -76,7 +75,6 @@ std::string_view LayoutNodeFieldEditMenuSubject(const LayoutNodeFieldEditKey& ke
 
 std::string LayoutNodeFieldEditTraceLabel(const LayoutNodeFieldEditKey& key, std::string_view sectionName) {
     const std::string prefix(sectionName);
-    return prefix.empty() ?
-        std::string(EnumToString(key.widgetClass)) :
+    return prefix.empty() ? std::string(EnumToString(key.widgetClass)) :
         FormatText("%s.%s", prefix.c_str(), EnumToString(key.widgetClass));
 }

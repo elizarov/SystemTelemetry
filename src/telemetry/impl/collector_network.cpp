@@ -306,8 +306,7 @@ void ResolveNetworkSelection(RealTelemetryCollectorState& state) {
                 TracePrefix::Telemetry, RES_STR("network_ip_missing interface=%u"), selected->interfaceIndex);
         }
     } else {
-        state.snapshot_.network.adapterName = state.settings_.selection.preferredAdapterName.empty() ?
-            "Auto" :
+        state.snapshot_.network.adapterName = state.settings_.selection.preferredAdapterName.empty() ? "Auto" :
             state.settings_.selection.preferredAdapterName;
         state.snapshot_.network.ipAddress = "N/A";
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("network_selected interface=none"));
