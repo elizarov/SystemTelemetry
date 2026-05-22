@@ -1,6 +1,7 @@
 @echo off
 setlocal
 for %%I in ("%~dp0.") do set "REPO_ROOT=%%~fI"
+set "CASEDASH_PRE_DEVENV_PATH=%PATH%"
 
 if /I "%GITHUB_ACTIONS%"=="true" (
     call :github_devenv
@@ -105,6 +106,10 @@ if exist "%REPO_ROOT%\vcpkg.json" if not defined CMAKE_TOOLCHAIN_FILE if not def
     exit /b 1
 )
 
+if not defined CASEDASH_NODE_EXE call :find_host_tool node.exe CASEDASH_NODE_EXE
+if not defined CASEDASH_NPM_EXE call :find_host_tool npm.cmd CASEDASH_NPM_EXE
+if not defined CASEDASH_NPM_EXE call :find_host_tool npm CASEDASH_NPM_EXE
+
 if defined CASEDASH_FORCE_CONFIGURE set "NEED_CONFIGURE=1"
 
 if "%NEED_CONFIGURE%"=="1" (
@@ -156,6 +161,19 @@ del /q "%REPO_ROOT%\build\RD*" >nul 2>nul
 del /q "%REPO_ROOT%\build\CSC*.TMP" >nul 2>nul
 rmdir /s /q "%BUILD_TMP%" >nul 2>nul
 exit /b %BUILD_RC%
+
+:find_host_tool
+set "%~2="
+set "FIND_TOOL_SAVED_PATH=%PATH%"
+if defined CASEDASH_PRE_DEVENV_PATH set "PATH=%PATH%;%CASEDASH_PRE_DEVENV_PATH%"
+for /f "delims=" %%I in ('where %~1 2^>nul') do (
+    set "%~2=%%I"
+    goto find_host_tool_done
+)
+:find_host_tool_done
+set "PATH=%FIND_TOOL_SAVED_PATH%"
+set "FIND_TOOL_SAVED_PATH="
+exit /b 0
 
 :github_devenv
 if defined VSCMD_ARG_TGT_ARCH exit /b 0

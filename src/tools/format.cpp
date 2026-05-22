@@ -6,6 +6,7 @@
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -49,6 +50,7 @@ struct Options {
     std::string root;
     std::string targetFile;
     bool stdoutMode = false;
+    bool verbose = false;
 };
 
 struct Token {
@@ -60,6 +62,10 @@ struct FileFormatResult {
     bool ok = true;
     bool changed = false;
     bool parseHadErrors = false;
+    std::string parseErrorNodeType;
+    int parseErrorLine = 0;
+    int parseErrorColumn = 0;
+    std::string parseErrorSnippet;
     std::string formatted;
     std::string error;
 };
@@ -67,6 +73,10 @@ struct FileFormatResult {
 struct ParseResult {
     bool ok = false;
     bool hasErrors = false;
+    std::string errorNodeType;
+    int errorLine = 0;
+    int errorColumn = 0;
+    std::string errorSnippet;
 };
 
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
@@ -86,7 +96,7 @@ void PrintUsage() {
     std::fprintf(stderr, "  CaseDashTools.exe format fix\n");
     std::fprintf(stderr, "  CaseDashTools.exe format changed\n");
     std::fprintf(stderr, "  CaseDashTools.exe format fix changed\n");
-    std::fprintf(stderr, "  CaseDashTools.exe format [--root path] --file path [--stdout]\n");
+    std::fprintf(stderr, "  CaseDashTools.exe format [--root path] --file path [--stdout] [-v|--verbose]\n");
 }
 
 std::string NormalizeLineEndings(std::string_view text) {
@@ -403,6 +413,36 @@ std::string TrimLeft(std::string_view value) {
     return std::string(value.substr(index));
 }
 
+std::string SingleLineSnippet(std::string_view text, uint32_t startByte, uint32_t endByte) {
+    if (startByte >= text.size()) {
+        return {};
+    }
+    if (endByte <= startByte || endByte > text.size()) {
+        endByte = static_cast<uint32_t>(std::min(text.size(), static_cast<size_t>(startByte) + 120));
+    }
+    std::string snippet(text.substr(startByte, std::min<uint32_t>(endByte - startByte, 120)));
+    for (char& ch : snippet) {
+        if (ch == '\r' || ch == '\n' || ch == '\t') {
+            ch = ' ';
+        }
+    }
+    return tools::lint::Trim(snippet);
+}
+
+TSNode FindFirstErrorNode(TSNode node) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(node, index);
+        if (ts_node_has_error(child)) {
+            return FindFirstErrorNode(child);
+        }
+    }
+    if (std::strcmp(ts_node_type(node), "ERROR") == 0 || ts_node_is_missing(node)) {
+        return node;
+    }
+    return node;
+}
+
 class SimpleFormatter {
 public:
     std::string Format(const std::vector<Token>& tokens) {
@@ -664,10 +704,20 @@ ParseResult ParseCpp(std::string_view text) {
         return {};
     }
     const TSNode root = ts_tree_root_node(tree);
-    const bool hasErrors = ts_node_has_error(root);
+    ParseResult result;
+    result.ok = true;
+    result.hasErrors = ts_node_has_error(root);
+    if (result.hasErrors) {
+        const TSNode errorNode = FindFirstErrorNode(root);
+        const TSPoint point = ts_node_start_point(errorNode);
+        result.errorNodeType = ts_node_type(errorNode);
+        result.errorLine = static_cast<int>(point.row) + 1;
+        result.errorColumn = static_cast<int>(point.column) + 1;
+        result.errorSnippet = SingleLineSnippet(text, ts_node_start_byte(errorNode), ts_node_end_byte(errorNode));
+    }
     ts_tree_delete(tree);
     ts_parser_delete(parser);
-    return {true, hasErrors};
+    return result;
 }
 
 FileFormatResult FormatOneText(std::string_view text) {
@@ -679,6 +729,10 @@ FileFormatResult FormatOneText(std::string_view text) {
     SimpleFormatter formatter;
     FileFormatResult result;
     result.parseHadErrors = parse.hasErrors;
+    result.parseErrorNodeType = parse.errorNodeType;
+    result.parseErrorLine = parse.errorLine;
+    result.parseErrorColumn = parse.errorColumn;
+    result.parseErrorSnippet = parse.errorSnippet;
     result.formatted = formatter.Format(Tokenize(normalized));
     result.changed = normalized != result.formatted;
     return result;
@@ -693,12 +747,7 @@ bool IsEligibleCppPath(std::string_view root, std::string_view path) {
         return false;
     }
     const std::string extension = tools::lint::ToLowerAscii(tools::lint::Extension(path));
-    if (extension != ".cpp" && extension != ".h") {
-        return false;
-    }
-    const size_t slash = relative.find_last_of('/');
-    const std::string fileName = slash == std::string::npos ? relative : relative.substr(slash + 1);
-    return fileName != "board_gigabyte_siv_bridge.cpp" && fileName != "board_msi_center_bridge.cpp";
+    return extension == ".cpp" || extension == ".h";
 }
 
 std::string QuoteCommandArgument(std::string_view value) {
@@ -860,6 +909,8 @@ std::optional<Options> ParseOptions(int argc, char** argv) {
             options.targetFile = argv[++index];
         } else if (arg == "--stdout") {
             options.stdoutMode = true;
+        } else if (arg == "-v" || arg == "--verbose") {
+            options.verbose = true;
         } else {
             return std::nullopt;
         }
@@ -928,6 +979,17 @@ int RunFormat(int argc, char** argv) {
         }
         if (result.parseHadErrors) {
             ++parseErrorCount;
+            if (options.verbose) {
+                const std::string relative =
+                    tools::lint::NormalizeSeparators(tools::lint::RelativePath(file, options.root));
+                std::fprintf(stderr,
+                    "%s:%d:%d: tree-sitter parse recovery at %s: %s\n",
+                    relative.c_str(),
+                    result.parseErrorLine,
+                    result.parseErrorColumn,
+                    result.parseErrorNodeType.c_str(),
+                    result.parseErrorSnippet.c_str());
+            }
         }
         if (options.stdoutMode) {
             std::fwrite(result.formatted.data(), 1, result.formatted.size(), stdout);

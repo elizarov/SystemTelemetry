@@ -10,7 +10,8 @@ namespace {
 
 void PrintUsage() {
     std::fprintf(stderr, "Usage:\n");
-    std::fprintf(stderr, "  CaseDashTools.exe format [fix] [changed] [--root <path>] [--file <path>] [--stdout]\n");
+    std::fprintf(stderr,
+        "  CaseDashTools.exe format [fix] [changed] [--root <path>] [--file <path>] [--stdout] [-v|--verbose]\n");
     std::fprintf(stderr,
         "  CaseDashTools.exe lint_check [--config <path>] [--check] [--no-progress] [--report-json <path>] "
         "[-v|--verbose]\n");
