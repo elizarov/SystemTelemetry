@@ -338,14 +338,15 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const bool isResize = overlayState.mode == DashboardPlacementOverlayMode::Resize;
     const std::string titleText = isResize ? "Resize Mode" : "Move Mode";
     const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
-    const std::string scaleText = FormatText("Scale: %s%%, monitor default: %s%%",
-        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.displayScale) * 100.0, 1).c_str(),
+    const std::string appScaleText = FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.displayScale) * 100.0, 1);
+    const std::string monitorDefaultScaleText = FormatText("Monitor default scale: %s%%",
         FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.monitorDefaultScale) * 100.0, 1).c_str());
-    const std::string positionSizeText = FormatText("Pos: %d,%d; Size: %dx%d",
+    const std::string positionSizeText = FormatText("Pos: %d,%d; Size: %dx%d (%s%%)",
         overlayState.relativePosition.x,
         overlayState.relativePosition.y,
         WindowWidth(),
-        WindowHeight());
+        WindowHeight(),
+        appScaleText.c_str());
     const std::string hintText =
         isResize ? "Release to resize" : (overlayState.placeOnRelease ? "Release to place" : "Left-click to place");
 
@@ -357,7 +358,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     preferredContentWidth =
         (std::max)(preferredContentWidth, Renderer().MeasureTextWidth(TextStyleId::Small, monitorText));
     preferredContentWidth =
-        (std::max)(preferredContentWidth, Renderer().MeasureTextWidth(TextStyleId::Small, scaleText));
+        (std::max)(preferredContentWidth, Renderer().MeasureTextWidth(TextStyleId::Small, monitorDefaultScaleText));
     preferredContentWidth =
         (std::max)(preferredContentWidth, Renderer().MeasureTextWidth(TextStyleId::Small, positionSizeText));
     const int contentWidth = (std::min)(maxContentWidth, preferredContentWidth);
@@ -392,7 +393,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
         y += bodyHeight + lineGap;
     };
     drawBodyLine(monitorText, true);
-    drawBodyLine(scaleText);
+    drawBodyLine(monitorDefaultScaleText);
     drawBodyLine(positionSizeText);
     Renderer().DrawText(
         RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, overlayRect.bottom - padding},
