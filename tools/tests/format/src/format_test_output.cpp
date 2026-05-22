@@ -458,6 +458,12 @@ std::string SelectCurrentSensorName(const BoardConfig& board, const std::string&
     return currentValue;
 }
 
+std::optional<double> LayoutEditAnchorValue(const LayoutEditAnchor* anchor) {
+    return LayoutEditAnchorParameter(anchor->key).has_value() ?
+        std::optional<double>(static_cast<double>(anchor->value)) :
+        std::nullopt;
+}
+
 size_t SelectConfigSectionStart(const std::string& sectionName) {
     size_t sectionStart =
         sectionName == "[gpu]" ? ensureSectionAfter(sectionName, "[display]") :

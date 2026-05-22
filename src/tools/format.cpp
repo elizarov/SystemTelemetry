@@ -1923,6 +1923,35 @@ private:
         return lines;
     }
 
+    std::vector<std::string> FormatTernaryPart(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        int valueIndentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::string inlineText = prefix + FormatInline(tokens);
+        AppendSuffix(inlineText, suffix);
+        if (Fits(indentLevel, inlineText)) {
+            return {Indent(indentLevel) + inlineText};
+        }
+        const std::optional<size_t> question = FindTopLevelToken(tokens, "?");
+        if (!question) {
+            return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
+        std::vector<Token> condition(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*question + 1));
+        std::string conditionLine = prefix + FormatInline(condition);
+        if (!Fits(indentLevel, conditionLine)) {
+            return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
+        std::vector<Token> value(tokens.begin() + static_cast<std::ptrdiff_t>(*question + 1), tokens.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + conditionLine);
+        std::vector<std::string> valueLines = FormatRange(value, valueIndentLevel, {}, std::move(suffix), true);
+        lines.insert(lines.end(), valueLines.begin(), valueLines.end());
+        return lines;
+    }
+
     std::vector<std::string> FormatTernaryChain(
         const std::vector<Token>& tokens,
         int indentLevel,
@@ -1959,8 +1988,13 @@ private:
                 partSuffix = suffix;
             }
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
-            std::vector<std::string> partLines =
-                FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
+            std::vector<std::string> partLines = FormatTernaryPart(
+                parts[index],
+                partIndent,
+                indentLevel + 1,
+                std::move(partPrefix),
+                std::move(partSuffix)
+            );
             lines.insert(lines.end(), partLines.begin(), partLines.end());
         }
         return lines;
@@ -3125,14 +3159,18 @@ private:
     }
 
     bool ContainsTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
+        return FindTopLevelToken(tokens, tokenText).has_value();
+    }
+
+    std::optional<size_t> FindTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
         int depth = 0;
-        for (const Token& token : tokens) {
-            UpdateDepth(token, depth);
-            if (depth == 0 && token.text == tokenText) {
-                return true;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && tokens[index].text == tokenText) {
+                return index;
             }
         }
-        return false;
+        return std::nullopt;
     }
 
     bool ContainsWord(const std::vector<Token>& tokens, std::string_view text) const {
