@@ -14,7 +14,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
-- `docs/format.md` owns the experimental native formatter ideology, wrapping model, format constants, and include-sorting policy.
+- `docs/format.md` owns the native formatter ideology, wrapping model, format constants, and include-sorting policy.
 - `docs/source_policy_guardrails.md` owns short explanations for hard source-policy lessons, including lint-enforced bans and review-enforced rules that are too noisy to check mechanically.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
-- `.clang-format` and the project normalization pass in `tools\run_clang_format.ps1` are the maintained source of truth for C++ formatting policy. The normalization pass keeps style constraints that clang-format cannot express directly, including no padded ternary operator columns and leading indentation on four-space columns. The golden formatter fixture under `tools\tests\format\src` stays synchronized with every configured formatting option and normalization rule. `format.cmd` owns narrow exclusions for mixed-mode C++/CLI bridge `.cpp` files that clang-format versions do not format consistently.
+- `docs\format.md`, `src\tools\format.cpp`, and `tools\format_config.json` are the maintained source of truth for C++ formatting policy. The golden formatter fixture under `tools\tests\format\src` stays synchronized with native formatter output produced through `format.cmd --stdout`. The legacy `.clang-format` and `tools\run_clang_format.ps1` path remains only for staged pre-commit formatting until the native formatter owns an equivalent staged/restage workflow.
 - `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
@@ -44,7 +44,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep vcpkg overlay ports under `cmake\vcpkg-ports\` as package recipes only; do not copy fetched third-party source into the repository.
-- Keep project-specific format constants, macro names for the experimental native formatter grammar, and include-sorting groups in `tools\format_config.json`; the formatter source owns style behavior, while the vcpkg overlay grammar consumes macro categories without hardcoding CaseDash or Windows SDK macro names in C++.
+- Keep project-specific format constants, macro names for the native formatter grammar, and include-sorting groups in `tools\format_config.json`; the formatter source owns style behavior, while the vcpkg overlay grammar consumes macro categories without hardcoding CaseDash or Windows SDK macro names in C++.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
 - Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and unused-include checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.

@@ -27,10 +27,18 @@ namespace std_fixture{template<typename T> class vector{}; class string{};}
 class FormattingExample{
 	public:
 	int * pointer;
+
+
 	int & reference;
 	FormattingExample(int * pointerValue,int & referenceValue):pointer(pointerValue),reference(referenceValue){}
 	private:
 	int value;
+};
+
+class MacroSeparatedMethodHost{
+#define FORMAT_FIXTURE_METHOD_MARKER(value) (value)
+void MethodAfterMacro(){}
+int fieldAfterMethod;
 };
 
 struct FormatTableRow{
@@ -46,6 +54,8 @@ unsigned muchLongerBits : 2;
 };
 
 enum class RuntimeConfigFieldValueKind{HexColor,Integer};
+
+
 struct RuntimeConfigFieldDescriptor{RuntimeConfigFieldValueKind kind;const char* key;int keyLength;};
 
 constexpr int kPrimaryFlag=1;
@@ -63,11 +73,15 @@ class BenchmarkLikeHost{
 };
 
 int ShortNonEmpty(){return 1;}
+
+
 void EmptyFunction(){}
 
 std::string FormatNamedMenuLabel(std::string_view name,std::string_view description){
 return description.empty()?std::string(name):FormatText("%.*s - %.*s",static_cast<int>(name.size()),name.data(),static_cast<int>(description.size()),description.data());
 }
+
+
 
 const char* SelectRevertLabel(bool isFontsSection,bool isThemeSection,bool isLayoutSection,bool isMetricsSection){
 return isFontsSection?"Revert Font Changes":isThemeSection?"Revert Theme":isLayoutSection?"Revert Layout":isMetricsSection?"Revert Metrics":"Revert Field";
