@@ -1,0 +1,108 @@
+#include "format_options.h"
+
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#include <windows.h>
+
+#include <algorithm>
+#include <vector>
+
+#include "vendor/library.h"
+
+#include "Alpha/thing.h"
+#include "zeta/thing.h"
+
+namespace format_fixture {
+class FormattingExample {
+public:
+    int* pointer;
+    int& reference;
+
+    FormattingExample(int* pointerValue, int& referenceValue) : pointer(pointerValue), reference(referenceValue) {}
+
+private:
+    int value;
+};
+
+struct FormatTableRow {
+    const char* name;
+    int labelControl;
+    int editControl;
+    int flags;
+};
+
+constexpr int kPrimaryFlag = 1;
+constexpr int kSecondaryFlag = 2;
+constexpr int kTertiaryFlag = 4;
+constexpr FormatTableRow kFormatRows[] = {{"alpha.metric.row.with.extra.detail.and.column.limit.coverage",
+                                              100,
+                                              200,
+                                              kPrimaryFlag | kSecondaryFlag | kTertiaryFlag},
+    {"beta.metric.row.with.extra.detail", 300, 400, kPrimaryFlag | kTertiaryFlag},
+    {"gamma.metric.row", 500, 600, kSecondaryFlag}};
+
+int ShortNonEmpty() {
+    return 1;
+}
+
+void EmptyFunction() {}
+
+int ManyParameters(int* firstPointerWithLongName,
+    int& firstReferenceWithLongName,
+    int secondValueWithLongName,
+    int thirdValueWithLongName,
+    int fourthValueWithLongName,
+    int fifthValueWithLongName,
+    int sixthValueWithLongName) {
+    int localValueWithLongName = firstPointerWithLongName ? *firstPointerWithLongName : 0;  // trailing
+    if (localValueWithLongName)
+        return firstReferenceWithLongName;
+    while (localValueWithLongName < secondValueWithLongName)
+        ++localValueWithLongName;
+    for (int index = 0; index < thirdValueWithLongName; ++index) {
+        localValueWithLongName += index;
+    }
+    switch (localValueWithLongName) {
+        case 1:
+            return fourthValueWithLongName;
+        default:
+            break;
+    }
+    return VeryLongFunctionCall(firstReferenceWithLongName,
+        secondValueWithLongName,
+        thirdValueWithLongName,
+        fourthValueWithLongName,
+        fifthValueWithLongName,
+        sixthValueWithLongName,
+        localValueWithLongName,
+        123456789,
+        987654321);
+}
+
+void ControlFlowVariety(int* values, int count) {
+    if (count > 0) {
+        values[0] += 1;
+    } else
+        values[0] = 0;
+    for (int outer = 0; outer < count; ++outer) {
+        if (values[outer] % 2 == 0)
+            values[outer] += outer;
+        else {
+            values[outer] -= outer;
+        }
+    }
+    int index = 0;
+    while (index < count) {
+        values[index] += index;
+        ++index;
+    }
+    do {
+        --index;
+    } while (index > 0);
+}
+
+void LongComment() {
+    // This deliberately long comment should remain as one physical line because ReflowComments is false even though it is beyond the configured column limit for the fixture.
+}
+}  // namespace format_fixture

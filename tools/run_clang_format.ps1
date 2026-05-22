@@ -8,6 +8,10 @@ param(
     [ValidateSet('all', 'changed', 'staged')]
     [string]$Scope = 'all',
 
+    [string]$TargetFile,
+
+    [switch]$Stdout,
+
     [switch]$Restage
 )
 
@@ -55,11 +59,17 @@ function Resolve-ClangFormatPath {
         return $command.Source
     }
 
-    $devenvCmd = Join-Path $RepoRoot 'devenv.cmd'
-    if ($env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $devenvCmd)) {
-        $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-format.exe" 2>$null | Select-Object -First 1
-        if ($LASTEXITCODE -eq 0 -and $probe) {
-            return $probe.Trim()
+    $scriptRepoRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+    $candidateRoots = @($RepoRoot, $scriptRepoRoot) | Where-Object {
+        -not [string]::IsNullOrWhiteSpace($_)
+    } | Select-Object -Unique
+    foreach ($candidateRoot in $candidateRoots) {
+        $devenvCmd = Join-Path $candidateRoot 'devenv.cmd'
+        if ($env:GITHUB_ACTIONS -ne 'true' -and (Test-Path -LiteralPath $devenvCmd)) {
+            $probe = & cmd /c "call `"$devenvCmd`" >nul 2>&1 && where clang-format.exe" 2>$null | Select-Object -First 1
+            if ($LASTEXITCODE -eq 0 -and $probe) {
+                return $probe.Trim()
+            }
         }
     }
 
@@ -195,6 +205,31 @@ function Get-StagedCppFiles {
     }
 }
 
+function Get-TargetCppFile {
+    param(
+        [string]$RepoRoot,
+        [string]$RelativePath
+    )
+
+    if ([string]::IsNullOrWhiteSpace($RelativePath)) {
+        throw '--file requires a non-empty path.'
+    }
+    if ([System.IO.Path]::IsPathRooted($RelativePath)) {
+        throw '--file expects a path relative to --root.'
+    }
+
+    $rootPrefix = [System.IO.Path]::GetFullPath($RepoRoot.TrimEnd('\') + '\')
+    $fullPath = [System.IO.Path]::GetFullPath((Join-Path $RepoRoot $RelativePath))
+    if (-not $fullPath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw '--file must stay inside --root.'
+    }
+    if (-not (Test-EligibleCppPath -RepoRoot $RepoRoot -FullPath $fullPath)) {
+        throw ("--file target is not an eligible formatter input: {0}" -f $RelativePath)
+    }
+
+    Get-Item -LiteralPath $fullPath
+}
+
 function Invoke-FormatFile {
     param(
         [string]$ClangFormatPath,
@@ -211,11 +246,22 @@ if (-not $clangFormat) {
     Write-Error 'clang-format.exe was not found. Install the Visual Studio LLVM tools or add clang-format to PATH.'
 }
 
-$files = switch ($Scope) {
-    'all' { @(Get-AllCppFiles -RepoRoot $resolvedRoot) }
-    'changed' { @(Get-ChangedCppFiles -RepoRoot $resolvedRoot) }
-    'staged' { @(Get-StagedCppFiles -RepoRoot $resolvedRoot) }
-    default { throw "Unsupported scope '$Scope'." }
+if ($Stdout -and [string]::IsNullOrWhiteSpace($TargetFile)) {
+    throw '--stdout requires --file.'
+}
+if (-not [string]::IsNullOrWhiteSpace($TargetFile) -and $Scope -eq 'changed') {
+    throw '--file is incompatible with changed scope.'
+}
+
+$files = if (-not [string]::IsNullOrWhiteSpace($TargetFile)) {
+    @(Get-TargetCppFile -RepoRoot $resolvedRoot -RelativePath $TargetFile)
+} else {
+    switch ($Scope) {
+        'all' { @(Get-AllCppFiles -RepoRoot $resolvedRoot) }
+        'changed' { @(Get-ChangedCppFiles -RepoRoot $resolvedRoot) }
+        'staged' { @(Get-StagedCppFiles -RepoRoot $resolvedRoot) }
+        default { throw "Unsupported scope '$Scope'." }
+    }
 }
 
 if ($files.Count -eq 0) {
@@ -226,6 +272,11 @@ if ($files.Count -eq 0) {
 
     Write-Host ("No eligible {0} C++ source files were found." -f $Scope)
     exit 0
+}
+
+if ($Stdout) {
+    & $clangFormat $files[0].FullName
+    exit $LASTEXITCODE
 }
 
 $failed = $false
