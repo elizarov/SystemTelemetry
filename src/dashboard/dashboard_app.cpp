@@ -368,6 +368,7 @@ void DashboardApp::ApplyConfigPlacement() {
     double targetScale = ResolveCurrentDisplayScale(targetDpi);
     int left = 100 + ScaleLogicalToPhysical(config.display.position.x, targetScale);
     int top = 100 + ScaleLogicalToPhysical(config.display.position.y, targetScale);
+    RECT targetMonitorRect{};
     bool monitorResolved = config.display.monitorName.empty();
     if (const auto monitor = FindTargetMonitor(config.display.monitorName); monitor.has_value()) {
         monitorResolved = true;
@@ -375,15 +376,30 @@ void DashboardApp::ApplyConfigPlacement() {
         targetScale = ResolveCurrentDisplayScale(targetDpi);
         left = monitor->rect.left + ScaleLogicalToPhysical(config.display.position.x, targetScale);
         top = monitor->rect.top + ScaleLogicalToPhysical(config.display.position.y, targetScale);
+        targetMonitorRect = monitor->rect;
     }
 
     if (!monitorResolved) {
         return;
     }
 
+    const SIZE targetSize = ComputeWindowSizeForScale(config, targetScale);
+    const RECT targetClientRect{left, top, left + targetSize.cx, top + targetSize.cy};
+    if (nativeTitlebarVisible_) {
+        if (!IsRectUsable(targetMonitorRect)) {
+            targetMonitorRect = GetMonitorPlacementForRect(targetClientRect, config.display.scale).monitorRect;
+        }
+        const DashboardTitlebarGeometry targetTitlebarGeometry = ResolveDashboardTitlebarGeometry(targetClientRect,
+            targetMonitorRect,
+            ComputeNativeTitlebarFrameMarginsForDpi(targetSize.cx, targetSize.cy, targetDpi));
+        if (!targetTitlebarGeometry.canShow) {
+            // Fullscreen and top-edge placements cannot carry the hover titlebar frame into the target rect.
+            HideNativeTitlebar();
+        }
+    }
+
     const UINT currentDpi = CurrentWindowDpi();
     if (targetDpi != currentDpi) {
-        const RECT targetClientRect{left, top, left + WindowWidth(), top + WindowHeight()};
         const RECT targetWindowRect = ResolveWindowRectForDashboardClientRect(targetClientRect);
         SetWindowPos(hwnd_,
             nullptr,
@@ -400,7 +416,7 @@ void DashboardApp::ApplyConfigPlacement() {
         return;
     }
     SetDashboardWindowGeometry(
-        left, top, WindowWidth(), WindowHeight(), SWP_NOACTIVATE | SWP_NOZORDER, "config_placement");
+        left, top, targetSize.cx, targetSize.cy, SWP_NOACTIVATE | SWP_NOZORDER, "config_placement");
 }
 
 void DashboardApp::SetDashboardWindowGeometry(
@@ -639,14 +655,19 @@ RECT DashboardApp::DashboardClientScreenRect() const {
     return RECT{topLeft.x, topLeft.y, bottomRight.x, bottomRight.y};
 }
 
-DashboardTitlebarFrameMargins DashboardApp::ComputeNativeTitlebarFrameMargins(int clientWidth, int clientHeight) const {
+DashboardTitlebarFrameMargins DashboardApp::ComputeNativeTitlebarFrameMarginsForDpi(
+    int clientWidth, int clientHeight, UINT dpi) const {
     RECT adjustedRect{0, 0, clientWidth, clientHeight};
     const DWORD exStyle =
         hwnd_ != nullptr ? static_cast<DWORD>(GetWindowLongPtrA(hwnd_, GWL_EXSTYLE)) : WS_EX_TOOLWINDOW;
-    if (!AdjustDashboardWindowRectForDpi(adjustedRect, kDashboardVisibleTitlebarStyle, exStyle, CurrentWindowDpi())) {
+    if (!AdjustDashboardWindowRectForDpi(adjustedRect, kDashboardVisibleTitlebarStyle, exStyle, dpi)) {
         return {};
     }
     return DashboardTitlebarFrameMarginsFromAdjustedRect(adjustedRect, clientWidth, clientHeight);
+}
+
+DashboardTitlebarFrameMargins DashboardApp::ComputeNativeTitlebarFrameMargins(int clientWidth, int clientHeight) const {
+    return ComputeNativeTitlebarFrameMarginsForDpi(clientWidth, clientHeight, CurrentWindowDpi());
 }
 
 DashboardTitlebarGeometry DashboardApp::ResolveNativeTitlebarGeometry(const RECT& dashboardClientRect) const {

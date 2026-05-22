@@ -139,6 +139,8 @@ private:
     void RetryConfigPlacementIfPending();
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
     RECT DashboardClientScreenRect() const;
+    DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMarginsForDpi(
+        int clientWidth, int clientHeight, UINT dpi) const;
     DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMargins(int clientWidth, int clientHeight) const;
     DashboardTitlebarGeometry ResolveNativeTitlebarGeometry(const RECT& dashboardClientRect) const;
     RECT ResolveWindowRectForDashboardClientRect(const RECT& dashboardClientRect) const;
