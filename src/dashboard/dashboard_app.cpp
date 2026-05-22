@@ -731,6 +731,22 @@ bool DashboardApp::ShouldSuppressNativeTitlebarRepaint() const {
            nativeTitlebarVisible_;
 }
 
+void DashboardApp::RedrawNativeTitlebarNow() const {
+    if (!nativeTitlebarVisible_ || titlebarHoverProbeHwnd_ == nullptr || !IsWindowVisible(titlebarHoverProbeHwnd_)) {
+        return;
+    }
+
+    // Mouse-move storms can starve normal WM_PAINT delivery during live resize; present this frame now.
+    RedrawWindow(
+        titlebarHoverProbeHwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN | RDW_NOERASE);
+    if (titlebarThemeComboHwnd_ != nullptr && IsWindowVisible(titlebarThemeComboHwnd_)) {
+        RedrawWindow(titlebarThemeComboHwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+    }
+    if (titlebarLayoutComboHwnd_ != nullptr && IsWindowVisible(titlebarLayoutComboHwnd_)) {
+        RedrawWindow(titlebarLayoutComboHwnd_, nullptr, nullptr, RDW_INVALIDATE | RDW_UPDATENOW | RDW_NOERASE);
+    }
+}
+
 void DashboardApp::ClearNativeTitlebarProbeRegion(bool redraw) {
     if (titlebarHoverProbeHwnd_ != nullptr && nativeTitlebarProbeRounded_) {
         SetWindowRgn(titlebarHoverProbeHwnd_, nullptr, redraw ? TRUE : FALSE);
@@ -824,7 +840,7 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
             flags |= SWP_NOZORDER;
         }
         if (suppressRepaint) {
-            flags |= SWP_NOREDRAW;
+            flags |= SWP_NOREDRAW | SWP_NOCOPYBITS;
         }
         SetWindowPos(titlebarHoverProbeHwnd_,
             wasVisible ? nullptr : HWND_TOP,
@@ -845,6 +861,9 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         UpdateNativeTitlebarControls();
         if (!wasVisible || rectChanged || alphaChanged || suppressRepaint) {
             InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
+        }
+        if (suppressRepaint) {
+            RedrawNativeTitlebarNow();
         }
     } else {
         ShowNativeTitlebarControls(false);
@@ -1104,7 +1123,7 @@ void DashboardApp::PositionNativeTitlebarCombo(HWND combo, const RECT& closedRec
         const bool suppressRepaint = ShouldSuppressNativeTitlebarRepaint();
         UINT flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER;
         if (suppressRepaint) {
-            flags |= SWP_NOREDRAW;
+            flags |= SWP_NOREDRAW | SWP_NOCOPYBITS;
         }
         SetWindowPos(
             combo, nullptr, targetRect.left, targetRect.top, RectWidth(targetRect), RectHeight(targetRect), flags);
