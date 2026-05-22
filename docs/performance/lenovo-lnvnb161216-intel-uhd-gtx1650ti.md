@@ -17,13 +17,13 @@ Ranges use direct `build\CaseDashBenchmarks.exe` runs unless a note says otherwi
 | Benchmark | Current known range | Important split |
 | --- | --- | --- |
 | `animation 240 2` | `animation_loop` and `animation_frame` about `0.65-1.53 ms` | Current direct reruns report `snapshot_animations=28`, `overlay_animations=0`, and `active_chunk_frames=120`. |
-| `snapshot-handoff 20 2` | `snapshot_loop` about `14.1-16.2 ms` | `presentation_frame_build` carries nearly all cost; `presentation_frame_publish` stays near `0.00-0.01 ms`. |
-| `edit-layout 240 2` | `drag_loop` about `4.44-5.73 ms` | `snap` about `0.16-0.19 ms`, `apply` about `0.12-0.15 ms`, `paint_draw` about `4.12-5.35 ms`. |
+| `snapshot-handoff 20 2` | `snapshot_loop` about `8.3-10.6 ms` | `presentation_frame_build` carries nearly all cost; `presentation_frame_publish` stays near `0.00-0.01 ms`. |
+| `edit-layout 240 2` | `drag_loop` about `3.63-4.17 ms` | `snap` about `0.12-0.14 ms`, `apply` about `0.09-0.11 ms`, `paint_draw` about `3.38-3.89 ms`. |
 | `layout-guide-sheet 20 2` | `sheet_loop` about `192-223 ms` | `sheet_place` is dominant at about `100-118 ms`; `sheet_draw` is about `58-63 ms`. |
 | `layout-switch 240 2` | `switch_loop` about `8.89-11.78 ms` | `switch_apply` about `1.48-2.04 ms`, `dialog_refresh` about `0.33-0.43 ms`, `switch_paint` about `7.03-9.26 ms`. |
-| `mouse-hover 240 2` | `hover_loop` about `1.72-2.02 ms` | `hover_hit_test` about `0.40-0.50 ms`; repaint is about `1.22-1.62 ms`. |
+| `mouse-hover 240 2` | `hover_loop` about `1.50-1.53 ms` | `hover_hit_test` about `0.38-0.44 ms`; repaint is about `1.07-1.13 ms`. |
 | `theme-change 240 2` | `theme_loop` about `5.38-6.73 ms` | `dashboard_config` about `1.25-1.57 ms`, `theme_preview` about `0.44-0.48 ms`, `theme_paint` about `3.26-4.16 ms`. |
-| `update-telemetry 240 2`, non-elevated default | `update_loop` about `4.69-7.02 ms` | `telemetry_update` about `1.40-2.11 ms`, `paint_draw` about `3.01-4.91 ms`; provider paths that require elevation report unavailable quickly. |
+| `update-telemetry 240 2`, non-elevated default | `update_loop` about `5.54-5.82 ms` | `telemetry_update` about `2.53-2.63 ms`, `paint_draw` about `3.01-3.18 ms`; provider paths that require elevation report unavailable quickly. |
 | `update-telemetry 240 2`, elevated default Intel GPU | `update_loop` about `21.1-25.6 ms` | `telemetry_update` about `17.5-21.2 ms`, `paint_draw` about `3.6-4.4 ms`; Lenovo board sensors are the dominant added cost. |
 | `update-telemetry 240 2`, elevated no board sensor rows | `update_loop` about `3.93-5.17 ms` | `telemetry_update` about `1.28-1.55 ms`, `paint_draw` about `2.65-3.62 ms`; this diagnostic variant isolates the provider baseline without Lenovo temperature or fan requests. |
 | `update-telemetry 240 2`, elevated NVIDIA selected without board sensor rows | `update_loop` about `5.25 ms` | `telemetry_update` about `2.33 ms`, `paint_draw` about `2.92 ms`; NVIDIA NVML/NVAPI is modest when Lenovo board collection is absent. |
