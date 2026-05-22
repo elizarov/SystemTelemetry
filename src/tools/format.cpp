@@ -552,28 +552,54 @@ private:
         allowOriginalBlank_ = true;
     }
 
-    void EmitBlankLine() {
-        FlushPending();
-        if (allowOriginalBlank_ && !outputLines_.empty() && !outputLines_.back().empty()) {
-            outputLines_.push_back({});
-            allowOriginalBlank_ = false;
-        }
-    }
-
     void HandleOriginalNewline(const std::vector<Token>& tokens, size_t& index) {
         size_t newlineCount = 1;
         while (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::Newline) {
             ++index;
             ++newlineCount;
         }
-        if (
-            pendingTokens_.empty() &&
-            pendingPrefix_.empty() &&
-            !outputLines_.empty() &&
-            tools::lint::StartsWith(outputLines_.back(), "#include")
-        ) {
-            EmitBlankLine();
+        if (ShouldPreserveOriginalBlankSeparator(tokens, index, newlineCount)) {
+            EmitOriginalBlankSeparator();
         }
+    }
+
+    bool ShouldPreserveOriginalBlankSeparator(
+        const std::vector<Token>& tokens,
+        size_t newlineIndex,
+        size_t newlineCount
+    ) const {
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, newlineIndex);
+        const bool hasBlankSeparator =
+            newlineCount > 1 || (previous && tokens[*previous].kind == TokenKind::Preprocessor);
+        if (!hasBlankSeparator) {
+            return false;
+        }
+        if (!pendingTokens_.empty() || !pendingPrefix_.empty() || groupDepth_ != 0) {
+            return false;
+        }
+        const size_t next = NextSignificantIndex(tokens, newlineIndex + 1);
+        if (next >= tokens.size() || tokens[next].text == "}") {
+            return false;
+        }
+        if (outputLines_.empty() || outputLines_.back().empty()) {
+            return false;
+        }
+        const std::string trimmed = tools::lint::Trim(outputLines_.back());
+        if (trimmed.empty()) {
+            return false;
+        }
+        if (trimmed.back() == '{' || trimmed.back() == ':') {
+            return false;
+        }
+        return true;
+    }
+
+    void EmitOriginalBlankSeparator() {
+        if (outputLines_.empty() || outputLines_.back().empty()) {
+            return;
+        }
+        outputLines_.push_back({});
+        allowOriginalBlank_ = false;
     }
 
     void EmitCodeToken(const std::vector<Token>& tokens, size_t& index) {

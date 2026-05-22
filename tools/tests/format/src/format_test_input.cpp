@@ -154,9 +154,16 @@ return;
 
 void StandaloneLockBlock(LightweightMutex& mutex,TelemetryUpdate update,HWND hwnd){
 {
+
+
 const LightweightMutexLock lock(mutex); pendingTelemetryUpdate_ =
 update; hasPendingTelemetryUpdate_=true;
-}if(hwnd!=nullptr){PostMessageA(hwnd,kTelemetryUpdateMessage,0,0);}
+
+
+}
+
+
+if(hwnd!=nullptr){PostMessageA(hwnd,kTelemetryUpdateMessage,0,0);}
 }
 
 int UnarySigns(int value){
@@ -241,6 +248,8 @@ return VeryLongFunctionCall(firstReferenceWithLongName,secondValueWithLongName,t
 
 void ControlFlowVariety(int * values,int count){
 if(count>0){values[0]+=1;}else values[0]=0;
+
+
 for(int outer=0;outer<count;++outer){if(values[outer]%2==0)values[outer]+=outer;else{values[outer]-=outer;}}
 int index=0;
 while(index<count){values[index]+=index;++index;}

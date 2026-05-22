@@ -2,7 +2,7 @@
 
 This document describes the intended source-formatting ideology for the native formatter used by `format.cmd`.
 
-The formatter leaves minimal freedom to authors. Line breaks, indentation, wrapping, and grouping are tool decisions, and authors should not hand-shape code to create visual layout. Each run computes layout from syntax and these rules; previous line breaks are not honored. Comments are the deliberate escape hatch: use comments to explain intent or split conceptual groups when the formatter's structural grouping is not enough.
+The formatter leaves minimal freedom to authors. Line breaks, indentation, wrapping, and grouping are tool decisions, and authors should not hand-shape code to create visual layout. Each run computes layout from syntax and these rules; previous ordinary line breaks are not honored. Source blank-line separators and comments are the deliberate semantic escape hatch: use comments to explain intent or add empty lines to split conceptual groups when the formatter's structural grouping and blank-line separators are not enough.
 
 ## Goals
 
@@ -39,7 +39,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Separate namespace opening lines and namespace closing braces from neighboring declarations with one empty line.
 - Remove trailing whitespace from every line, including comment-only and trailing-comment lines.
 - Preserve the source token sequence except for include sorting. Outside include sorting, the formatter only changes spaces and line breaks, and never adds or removes braces by itself.
-- Do not preserve source blank lines. Empty lines are removed and reinserted only where formatter rules require a structural boundary.
+- Preserve one source blank line when it separates already closed declarations or statements at the same structural level. Multiple source blank lines collapse to one. Blank lines at the beginning of a block, class, struct, enum, namespace, or immediately before its closing brace are not preserved.
 - Never vertically align tokens, comments, assignments, parameters, ternary arms, or consecutive declarations.
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
 - Do not break string literals, character literals, numeric constants, or comments only to satisfy the line width.
@@ -51,7 +51,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Separate a multi-line field declaration from neighboring declarations with one empty line, even when the neighbors are also fields.
 - Separate fields from neighboring methods by one empty line, including empty inline method definitions, defaulted or deleted method declarations, pure virtual declarations, and method declarations without bodies. Trailing comments on fields do not change the separation rule.
 - Apply declaration-separation blank lines only in declaration scopes: top level, namespaces, classes, structs, and enums. Function, method, and lambda bodies are executable scopes and do not get declaration-separation blank lines.
-- Do not insert blank lines inside a group only for visual rhythm. Use comments when a group needs an explicit conceptual split.
+- Insert required structural blank lines even when the source omits them. Preserve optional source blank-line separators only where the separator rule allows them.
 - Put block-opening braces for code blocks at the end of the introducing line, then line break immediately after the brace.
 - Treat a standalone braced statement block as a code block. Its opening brace and closing brace occupy their own structural lines, and the closing brace does not attach to the following statement.
 - Keep empty braces as `{}`.
@@ -72,14 +72,18 @@ Namespaces are grouping syntax, not indentation syntax. The formatter keeps name
 
 ```cpp
 namespace app {
+    
 class Widget {
 public:
     void Paint();
 };
 
 namespace detail {
+    
 void Helper();
+
 }
+
 }
 ```
 

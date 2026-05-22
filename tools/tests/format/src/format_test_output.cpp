@@ -43,6 +43,7 @@ class string {};
 class FormattingExample {
 public:
     int* pointer;
+
     int& reference;
 
     FormattingExample(int* pointerValue, int& referenceValue) : pointer(pointerValue), reference(referenceValue) {}
@@ -200,6 +201,7 @@ void StandaloneLockBlock(LightweightMutex& mutex, TelemetryUpdate update, HWND h
         pendingTelemetryUpdate_ = update;
         hasPendingTelemetryUpdate_ = true;
     }
+
     if (hwnd != nullptr) {
         PostMessageA(hwnd, kTelemetryUpdateMessage, 0, 0);
     }
@@ -390,6 +392,7 @@ void ControlFlowVariety(int* values, int count) {
     if (count > 0) {
         values[0] += 1;
     } else values[0] = 0;
+
     for (int outer = 0; outer < count; ++outer) {
         if (values[outer] % 2 == 0) values[outer] += outer;
         else {
