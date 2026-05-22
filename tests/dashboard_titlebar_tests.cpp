@@ -79,13 +79,30 @@ TEST(DashboardTitlebarGeometry, SuppressesTitlebarWhenDashboardFillsMonitor) {
     EXPECT_FALSE(geometry.canShow);
 }
 
-TEST(DashboardTitlebarGeometry, SuppressesTitlebarWhenNativeFrameCrossesMonitorTopOrSideEdge) {
+TEST(DashboardTitlebarGeometry, SuppressesTitlebarWhenNoRoomAboveOnSameMonitor) {
     const RECT monitor{0, 0, 800, 600};
     const DashboardTitlebarFrameMargins margins{8, 32, 8, 8};
 
     EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{100, 20, 500, 220}, monitor, margins).canShow);
-    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{2, 100, 402, 300}, monitor, margins).canShow);
-    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{400, 100, 798, 300}, monitor, margins).canShow);
+    EXPECT_TRUE(ResolveDashboardTitlebarGeometry(RECT{100, 32, 500, 220}, monitor, margins).canShow);
+}
+
+TEST(DashboardTitlebarGeometry, SuppressesTitlebarWhenDashboardTouchesMonitorEdge) {
+    const RECT monitor{0, 0, 800, 600};
+    const DashboardTitlebarFrameMargins margins{8, 32, 8, 8};
+
+    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{0, 100, 400, 300}, monitor, margins).canShow);
+    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{100, 0, 500, 300}, monitor, margins).canShow);
+    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{400, 100, 800, 300}, monitor, margins).canShow);
+    EXPECT_FALSE(ResolveDashboardTitlebarGeometry(RECT{100, 300, 500, 600}, monitor, margins).canShow);
+}
+
+TEST(DashboardTitlebarGeometry, AllowsTitlebarWhenNativeSideFrameCrossesMonitorSideButClientIsInset) {
+    const RECT monitor{0, 0, 800, 600};
+    const DashboardTitlebarFrameMargins margins{8, 32, 8, 8};
+
+    EXPECT_TRUE(ResolveDashboardTitlebarGeometry(RECT{2, 100, 402, 300}, monitor, margins).canShow);
+    EXPECT_TRUE(ResolveDashboardTitlebarGeometry(RECT{400, 100, 798, 300}, monitor, margins).canShow);
 }
 
 TEST(DashboardTitlebarGeometry, KeepsFrameGeometryAvailableWhenMonitorFitSuppressesHover) {
@@ -99,7 +116,7 @@ TEST(DashboardTitlebarGeometry, KeepsFrameGeometryAvailableWhenMonitorFitSuppres
     ExpectRect(geometry.virtualHoverRect, 100, -12, 500, 20);
 }
 
-TEST(DashboardTitlebarGeometry, AllowsTitlebarWhenOnlyNativeBottomFrameCrossesMonitorEdge) {
+TEST(DashboardTitlebarGeometry, AllowsTitlebarWhenOnlyNativeBottomFrameCrossesMonitorEdgeAndClientIsInset) {
     const RECT monitor{0, 0, 800, 600};
     const DashboardTitlebarFrameMargins margins{8, 32, 8, 8};
 
