@@ -1,8 +1,11 @@
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cwchar>
 #include <iomanip>
 #include <iostream>
 #include <optional>
@@ -10,6 +13,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <Wbemidl.h>
 
 #include "config/color_resolver.h"
 #include "config/config_parser.h"
@@ -26,13 +30,17 @@
 #include "layout_guide_sheet/layout_guide_sheet.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/board/lenovo/board_lenovo_vantage.h"
+#include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
+#include "util/text_encoding.h"
+#include "util/text_format.h"
 #include "util/trace.h"
+#include "util/win32_format.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
     X(Animation, "animation")                                                                                          \
@@ -43,6 +51,7 @@
     X(MouseHover, "mouse-hover")                                                                                       \
     X(SnapshotHandoff, "snapshot-handoff")                                                                             \
     X(TelemetryInit, "telemetry-init")                                                                                 \
+    X(TemperatureSources, "temperature-sources")                                                                       \
     X(ThemeChange, "theme-change")                                                                                     \
     X(UpdateTelemetry, "update-telemetry")
 
@@ -206,6 +215,8 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     BenchmarkCommandLine commandLine{*parsedBenchmark};
     if (commandLine.benchmark == Benchmark::LenovoGameZone) {
         commandLine.iterations = 5;
+    } else if (commandLine.benchmark == Benchmark::TemperatureSources) {
+        commandLine.iterations = 1;
     } else if (commandLine.benchmark == Benchmark::TelemetryInit) {
         commandLine.iterations = 2;
     }
@@ -706,6 +717,25 @@ struct LenovoGameZoneBenchTotals {
     BenchResult loop;
     PhaseStats sample;
     BoardVendorTelemetrySample lastSample;
+};
+
+struct TemperatureSourceResult {
+    std::string source;
+    std::chrono::nanoseconds elapsed{};
+    std::optional<double> temperatureC;
+    std::string diagnostics;
+    bool available = false;
+};
+
+struct TemperatureSourceStats {
+    std::string source;
+    PhaseStats timing;
+    TemperatureSourceResult last;
+};
+
+struct TemperatureSourcesBenchTotals {
+    BenchResult loop;
+    std::vector<TemperatureSourceStats> sources;
 };
 
 class AnimationBenchmarkRenderWorker {
@@ -1259,6 +1289,669 @@ void PrintLenovoGameZoneBenchResult(const LenovoGameZoneBenchTotals& totals) {
     PrintNamedScalarMetrics("fan", sample.fans);
 }
 
+class BenchmarkBstr {
+public:
+    explicit BenchmarkBstr(const wchar_t* value) : value_(SysAllocString(value)) {}
+
+    explicit BenchmarkBstr(const std::wstring& value) : value_(SysAllocString(value.c_str())) {}
+
+    ~BenchmarkBstr() {
+        SysFreeString(value_);
+    }
+
+    BenchmarkBstr(const BenchmarkBstr&) = delete;
+    BenchmarkBstr& operator=(const BenchmarkBstr&) = delete;
+
+    BSTR Get() const {
+        return value_;
+    }
+
+    bool Valid() const {
+        return value_ != nullptr;
+    }
+
+private:
+    BSTR value_ = nullptr;
+};
+
+template <typename T> class BenchmarkComObject {
+public:
+    BenchmarkComObject() = default;
+
+    ~BenchmarkComObject() {
+        Reset();
+    }
+
+    BenchmarkComObject(const BenchmarkComObject&) = delete;
+    BenchmarkComObject& operator=(const BenchmarkComObject&) = delete;
+
+    T* Get() const {
+        return value_;
+    }
+
+    T** Out() {
+        Reset();
+        return &value_;
+    }
+
+    void Reset() {
+        if (value_ != nullptr) {
+            value_->Release();
+            value_ = nullptr;
+        }
+    }
+
+private:
+    T* value_ = nullptr;
+};
+
+class BenchmarkComApartment {
+public:
+    BenchmarkComApartment() : status_(CoInitializeEx(nullptr, COINIT_MULTITHREADED)) {
+        uninitialize_ = SUCCEEDED(status_);
+    }
+
+    ~BenchmarkComApartment() {
+        if (uninitialize_) {
+            CoUninitialize();
+        }
+    }
+
+    bool Ready() const {
+        return SUCCEEDED(status_) || status_ == RPC_E_CHANGED_MODE;
+    }
+
+    HRESULT Status() const {
+        return status_;
+    }
+
+private:
+    HRESULT status_ = E_FAIL;
+    bool uninitialize_ = false;
+};
+
+std::string FormatBenchmarkHresult(HRESULT value) {
+    std::string text;
+    AppendHresult(text, value);
+    return text;
+}
+
+bool IsSaneTemperatureC(double value) {
+    return std::isfinite(value) && value > 0.0 && value <= 125.0;
+}
+
+bool StartsWithWide(const wchar_t* text, const wchar_t* prefix) {
+    return text != nullptr && prefix != nullptr && std::wcsncmp(text, prefix, std::wcslen(prefix)) == 0;
+}
+
+bool ContainsWide(const wchar_t* text, const wchar_t* needle) {
+    return text != nullptr && needle != nullptr && std::wcsstr(text, needle) != nullptr;
+}
+
+std::string EscapeBenchmarkText(const std::string& text) {
+    std::string escaped;
+    escaped.reserve(text.size());
+    for (const char ch : text) {
+        if (ch == '"' || ch == '\r' || ch == '\n' || ch == '\t') {
+            escaped.push_back(' ');
+        } else {
+            escaped.push_back(ch);
+        }
+        if (escaped.size() >= 1400) {
+            escaped += "...";
+            break;
+        }
+    }
+    return escaped;
+}
+
+std::optional<double> NumericVariantValue(const VARIANT& value) {
+    if ((value.vt & VT_BYREF) != 0) {
+        return std::nullopt;
+    }
+    switch (value.vt) {
+        case VT_I1:
+            return static_cast<double>(value.cVal);
+        case VT_UI1:
+            return static_cast<double>(value.bVal);
+        case VT_I2:
+            return static_cast<double>(value.iVal);
+        case VT_UI2:
+            return static_cast<double>(value.uiVal);
+        case VT_I4:
+        case VT_INT:
+            return static_cast<double>(value.lVal);
+        case VT_UI4:
+        case VT_UINT:
+            return static_cast<double>(value.ulVal);
+        case VT_I8:
+            return static_cast<double>(value.llVal);
+        case VT_UI8:
+            return static_cast<double>(value.ullVal);
+        case VT_R4:
+            return static_cast<double>(value.fltVal);
+        case VT_R8:
+            return value.dblVal;
+        case VT_BSTR:
+            if (value.bstrVal != nullptr) {
+                wchar_t* end = nullptr;
+                const double parsed = std::wcstod(value.bstrVal, &end);
+                if (end != value.bstrVal && std::isfinite(parsed)) {
+                    return parsed;
+                }
+            }
+            return std::nullopt;
+        default:
+            return std::nullopt;
+    }
+}
+
+std::string FormatVariantBrief(const VARIANT& value) {
+    if (value.vt == VT_EMPTY) {
+        return "empty";
+    }
+    if (value.vt == VT_NULL) {
+        return "null";
+    }
+    if (value.vt == VT_BOOL) {
+        return value.boolVal == VARIANT_TRUE ? "true" : "false";
+    }
+    if (value.vt == VT_BSTR) {
+        return value.bstrVal != nullptr ? TextFromWide(value.bstrVal) : std::string();
+    }
+    const std::optional<double> numeric = NumericVariantValue(value);
+    if (numeric.has_value()) {
+        std::ostringstream text;
+        text << std::fixed << std::setprecision(2) << *numeric;
+        return text.str();
+    }
+    return FormatText("vt=%u", static_cast<unsigned int>(value.vt));
+}
+
+std::optional<double> InterpretPossibleTemperature(double raw) {
+    if (IsSaneTemperatureC(raw)) {
+        return raw;
+    }
+    const double acpiCelsius = (raw / 10.0) - 273.15;
+    if (raw > 1000.0 && IsSaneTemperatureC(acpiCelsius)) {
+        return acpiCelsius;
+    }
+    return std::nullopt;
+}
+
+std::optional<double> ReadNumericProperty(IWbemClassObject* object, const wchar_t* propertyName, std::string& text) {
+    VARIANT value;
+    VariantInit(&value);
+    const HRESULT hr = object != nullptr ? object->Get(propertyName, 0, &value, nullptr, nullptr) : E_POINTER;
+    if (FAILED(hr)) {
+        text = FormatText("%s=%s", TextFromWide(propertyName).c_str(), FormatBenchmarkHresult(hr).c_str());
+        return std::nullopt;
+    }
+    text = FormatText("%s=%s", TextFromWide(propertyName).c_str(), FormatVariantBrief(value).c_str());
+    const std::optional<double> numeric = NumericVariantValue(value);
+    VariantClear(&value);
+    return numeric;
+}
+
+bool ConnectWmiServices(const wchar_t* namespacePath, BenchmarkComObject<IWbemServices>& services, std::string& error) {
+    HRESULT securityHr = CoInitializeSecurity(nullptr,
+        -1,
+        nullptr,
+        nullptr,
+        RPC_C_AUTHN_LEVEL_DEFAULT,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        nullptr,
+        EOAC_NONE,
+        nullptr);
+    if (FAILED(securityHr) && securityHr != RPC_E_TOO_LATE) {
+        error = FormatText("CoInitializeSecurity failed: %s", FormatBenchmarkHresult(securityHr).c_str());
+        return false;
+    }
+
+    BenchmarkComObject<IWbemLocator> locator;
+    HRESULT hr = CoCreateInstance(CLSID_WbemLocator, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(locator.Out()));
+    if (FAILED(hr) || locator.Get() == nullptr) {
+        error = FormatText("WbemLocator creation failed: %s", FormatBenchmarkHresult(hr).c_str());
+        return false;
+    }
+
+    BenchmarkBstr namespaceBstr(namespacePath);
+    if (!namespaceBstr.Valid()) {
+        error = "WMI namespace allocation failed";
+        return false;
+    }
+    hr = locator.Get()->ConnectServer(
+        namespaceBstr.Get(), nullptr, nullptr, nullptr, 0, nullptr, nullptr, services.Out());
+    if (FAILED(hr) || services.Get() == nullptr) {
+        error = FormatText("WMI connection failed: %s", FormatBenchmarkHresult(hr).c_str());
+        return false;
+    }
+
+    hr = CoSetProxyBlanket(services.Get(),
+        RPC_C_AUTHN_WINNT,
+        RPC_C_AUTHZ_NONE,
+        nullptr,
+        RPC_C_AUTHN_LEVEL_CALL,
+        RPC_C_IMP_LEVEL_IMPERSONATE,
+        nullptr,
+        EOAC_NONE);
+    if (FAILED(hr)) {
+        error = FormatText("WMI proxy security failed: %s", FormatBenchmarkHresult(hr).c_str());
+        return false;
+    }
+    return true;
+}
+
+TemperatureSourceResult MakeTemperatureSourceResult(
+    const std::string& source, const Clock::time_point& start, std::string diagnostics) {
+    TemperatureSourceResult result;
+    result.source = source;
+    result.elapsed = Clock::now() - start;
+    result.diagnostics = std::move(diagnostics);
+    return result;
+}
+
+TemperatureSourceResult ProbeWmiTemperatureQuery(const std::string& source,
+    const wchar_t* namespacePath,
+    const wchar_t* queryText,
+    const std::vector<const wchar_t*>& propertyNames) {
+    const auto start = Clock::now();
+    BenchmarkComApartment apartment;
+    if (!apartment.Ready()) {
+        return MakeTemperatureSourceResult(source,
+            start,
+            FormatText("COM initialization failed: %s", FormatBenchmarkHresult(apartment.Status()).c_str()));
+    }
+
+    BenchmarkComObject<IWbemServices> services;
+    std::string error;
+    if (!ConnectWmiServices(namespacePath, services, error)) {
+        return MakeTemperatureSourceResult(source, start, error);
+    }
+
+    BenchmarkBstr language(L"WQL");
+    BenchmarkBstr query(queryText);
+    BenchmarkComObject<IEnumWbemClassObject> enumerator;
+    HRESULT hr = services.Get()->ExecQuery(
+        language.Get(), query.Get(), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, enumerator.Out());
+    if (FAILED(hr) || enumerator.Get() == nullptr) {
+        return MakeTemperatureSourceResult(
+            source, start, FormatText("ExecQuery failed: %s", FormatBenchmarkHresult(hr).c_str()));
+    }
+
+    TemperatureSourceResult result;
+    result.source = source;
+    std::ostringstream details;
+    size_t rowCount = 0;
+    while (rowCount < 8) {
+        ULONG returned = 0;
+        BenchmarkComObject<IWbemClassObject> object;
+        hr = enumerator.Get()->Next(1500, 1, object.Out(), &returned);
+        if (hr == WBEM_S_FALSE || returned == 0) {
+            break;
+        }
+        if (FAILED(hr)) {
+            details << " read_failed=" << FormatBenchmarkHresult(hr);
+            break;
+        }
+        ++rowCount;
+        details << " row" << rowCount << "{";
+        for (const wchar_t* propertyName : propertyNames) {
+            std::string propertyText;
+            const std::optional<double> raw = ReadNumericProperty(object.Get(), propertyName, propertyText);
+            details << propertyText << ";";
+            if (!result.temperatureC.has_value() && raw.has_value()) {
+                result.temperatureC = InterpretPossibleTemperature(*raw);
+            }
+        }
+        details << "}";
+    }
+    result.available = result.temperatureC.has_value();
+    result.elapsed = Clock::now() - start;
+    result.diagnostics =
+        FormatText("namespace=%s rows=%zu %s", TextFromWide(namespacePath).c_str(), rowCount, details.str().c_str());
+    return result;
+}
+
+std::string FormatWmiOutputProperties(IWbemClassObject* object, std::optional<double>& possibleTemperature) {
+    if (object == nullptr) {
+        return "no_output";
+    }
+
+    SAFEARRAY* names = nullptr;
+    HRESULT hr = object->GetNames(nullptr, WBEM_FLAG_NONSYSTEM_ONLY, nullptr, &names);
+    if (FAILED(hr) || names == nullptr) {
+        return FormatText("GetNames failed: %s", FormatBenchmarkHresult(hr).c_str());
+    }
+
+    LONG lower = 0;
+    LONG upper = -1;
+    SafeArrayGetLBound(names, 1, &lower);
+    SafeArrayGetUBound(names, 1, &upper);
+    std::ostringstream text;
+    for (LONG index = lower; index <= upper; ++index) {
+        BSTR name = nullptr;
+        if (FAILED(SafeArrayGetElement(names, &index, &name)) || name == nullptr) {
+            continue;
+        }
+        std::string propertyText;
+        const std::optional<double> raw = ReadNumericProperty(object, name, propertyText);
+        if (!possibleTemperature.has_value() && raw.has_value()) {
+            possibleTemperature = InterpretPossibleTemperature(*raw);
+        }
+        text << propertyText << ";";
+        SysFreeString(name);
+    }
+    SafeArrayDestroy(names);
+    return text.str();
+}
+
+size_t WmiInputPropertyCount(IWbemClassObject* inParams) {
+    if (inParams == nullptr) {
+        return 0;
+    }
+    SAFEARRAY* names = nullptr;
+    const HRESULT hr = inParams->GetNames(nullptr, WBEM_FLAG_NONSYSTEM_ONLY, nullptr, &names);
+    if (FAILED(hr) || names == nullptr) {
+        return 0;
+    }
+    LONG lower = 0;
+    LONG upper = -1;
+    SafeArrayGetLBound(names, 1, &lower);
+    SafeArrayGetUBound(names, 1, &upper);
+    SafeArrayDestroy(names);
+    return upper >= lower ? static_cast<size_t>(upper - lower + 1) : 0;
+}
+
+std::optional<std::wstring> FirstWmiRelPath(
+    IWbemServices* services, const wchar_t* className, std::string& diagnostics) {
+    BenchmarkBstr language(L"WQL");
+    const std::wstring queryText = std::wstring(L"SELECT __RELPATH FROM ") + className;
+    BenchmarkBstr query(queryText);
+    BenchmarkComObject<IEnumWbemClassObject> enumerator;
+    HRESULT hr = services->ExecQuery(
+        language.Get(), query.Get(), WBEM_FLAG_FORWARD_ONLY | WBEM_FLAG_RETURN_IMMEDIATELY, nullptr, enumerator.Out());
+    if (FAILED(hr) || enumerator.Get() == nullptr) {
+        diagnostics = FormatText("instance query failed: %s", FormatBenchmarkHresult(hr).c_str());
+        return std::nullopt;
+    }
+
+    ULONG returned = 0;
+    BenchmarkComObject<IWbemClassObject> object;
+    hr = enumerator.Get()->Next(1500, 1, object.Out(), &returned);
+    if (hr == WBEM_S_FALSE || returned == 0) {
+        diagnostics = "no instances";
+        return std::nullopt;
+    }
+    if (FAILED(hr)) {
+        diagnostics = FormatText("instance read failed: %s", FormatBenchmarkHresult(hr).c_str());
+        return std::nullopt;
+    }
+
+    VARIANT value;
+    VariantInit(&value);
+    hr = object.Get()->Get(L"__RELPATH", 0, &value, nullptr, nullptr);
+    if (FAILED(hr) || value.vt != VT_BSTR || value.bstrVal == nullptr) {
+        VariantClear(&value);
+        diagnostics = FormatText("instance path missing: %s", FormatBenchmarkHresult(hr).c_str());
+        return std::nullopt;
+    }
+    std::wstring path(value.bstrVal);
+    VariantClear(&value);
+    return path;
+}
+
+bool ShouldInvokeLenovoGetter(const wchar_t* methodName) {
+    return StartsWithWide(methodName, L"Get") &&
+           (ContainsWide(methodName, L"Temp") || ContainsWide(methodName, L"Thermal") ||
+               ContainsWide(methodName, L"Sensor") || ContainsWide(methodName, L"Fan") ||
+               ContainsWide(methodName, L"Data"));
+}
+
+TemperatureSourceResult ProbeLenovoWmiGetterMethods() {
+    const auto start = Clock::now();
+    static constexpr const wchar_t* kClasses[] = {
+        L"LENOVO_GAMEZONE_DATA",
+        L"LENOVO_GAMEZONE_CPU_OC_DATA",
+        L"LENOVO_GAMEZONE_GPU_OC_DATA",
+        L"LENOVO_UTILITY_DATA",
+        L"LENOVO_SUPERKEY_DATA",
+        L"BatteryTemperature",
+    };
+
+    BenchmarkComApartment apartment;
+    if (!apartment.Ready()) {
+        return MakeTemperatureSourceResult("lenovo_wmi_getters",
+            start,
+            FormatText("COM initialization failed: %s", FormatBenchmarkHresult(apartment.Status()).c_str()));
+    }
+
+    BenchmarkComObject<IWbemServices> services;
+    std::string error;
+    if (!ConnectWmiServices(L"ROOT\\WMI", services, error)) {
+        return MakeTemperatureSourceResult("lenovo_wmi_getters", start, error);
+    }
+
+    TemperatureSourceResult result;
+    result.source = "lenovo_wmi_getters";
+    std::ostringstream details;
+    size_t invoked = 0;
+    for (const wchar_t* className : kClasses) {
+        BenchmarkBstr classBstr(className);
+        BenchmarkComObject<IWbemClassObject> classObject;
+        HRESULT hr = services.Get()->GetObject(classBstr.Get(), 0, nullptr, classObject.Out(), nullptr);
+        if (FAILED(hr) || classObject.Get() == nullptr) {
+            details << TextFromWide(className) << "{class=" << FormatBenchmarkHresult(hr) << "} ";
+            continue;
+        }
+
+        std::string instanceDiagnostics;
+        const std::optional<std::wstring> objectPath = FirstWmiRelPath(services.Get(), className, instanceDiagnostics);
+        details << TextFromWide(className) << "{";
+        if (!objectPath.has_value()) {
+            details << instanceDiagnostics << "} ";
+            continue;
+        }
+
+        hr = classObject.Get()->BeginMethodEnumeration(0);
+        if (FAILED(hr)) {
+            details << "method_enum=" << FormatBenchmarkHresult(hr) << "} ";
+            continue;
+        }
+
+        while (invoked < 80) {
+            BSTR methodName = nullptr;
+            BenchmarkComObject<IWbemClassObject> inParams;
+            BenchmarkComObject<IWbemClassObject> outParams;
+            hr = classObject.Get()->NextMethod(0, &methodName, inParams.Out(), outParams.Out());
+            if (hr == WBEM_S_NO_MORE_DATA) {
+                break;
+            }
+            if (FAILED(hr) || methodName == nullptr) {
+                details << "next_method=" << FormatBenchmarkHresult(hr) << ";";
+                break;
+            }
+
+            const bool invoke = ShouldInvokeLenovoGetter(methodName) && WmiInputPropertyCount(inParams.Get()) == 0;
+            if (invoke) {
+                BenchmarkBstr pathBstr(*objectPath);
+                BenchmarkBstr methodBstr(methodName);
+                BenchmarkComObject<IWbemClassObject> output;
+                const HRESULT methodHr = services.Get()->ExecMethod(
+                    pathBstr.Get(), methodBstr.Get(), 0, nullptr, nullptr, output.Out(), nullptr);
+                std::optional<double> possibleTemperature;
+                details << TextFromWide(methodName) << "=";
+                if (SUCCEEDED(methodHr)) {
+                    details << FormatWmiOutputProperties(output.Get(), possibleTemperature);
+                    if (!result.temperatureC.has_value() && possibleTemperature.has_value() &&
+                        ContainsWide(methodName, L"Temp")) {
+                        result.temperatureC = possibleTemperature;
+                    }
+                } else {
+                    details << FormatBenchmarkHresult(methodHr);
+                }
+                details << ";";
+                ++invoked;
+            }
+            SysFreeString(methodName);
+        }
+        classObject.Get()->EndMethodEnumeration();
+        details << "} ";
+    }
+
+    result.available = result.temperatureC.has_value();
+    result.elapsed = Clock::now() - start;
+    result.diagnostics = FormatText("invoked_getters=%zu %s", invoked, details.str().c_str());
+    return result;
+}
+
+TemperatureSourceResult ProbeLenovoGameZoneSource(Trace& trace) {
+    const auto start = Clock::now();
+    const BoardVendorTelemetrySample sample = CaptureLenovoGameZoneWmiSensorSample(trace, ExtractBoardVendorInfo());
+    TemperatureSourceResult result;
+    result.source = "lenovo_gamezone_wmi";
+    result.elapsed = Clock::now() - start;
+    result.available = false;
+    for (const NamedScalarMetric& metric : sample.temperatures) {
+        if (metric.metric.value.has_value() && IsSaneTemperatureC(*metric.metric.value)) {
+            result.temperatureC = *metric.metric.value;
+            result.available = true;
+            break;
+        }
+    }
+    result.diagnostics = FormatText("provider=%s driver=%s available=%s temperatures=%zu fans=%zu diagnostics=%s",
+        sample.providerName.c_str(),
+        sample.driverLibrary.c_str(),
+        sample.available ? "yes" : "no",
+        sample.temperatures.size(),
+        sample.fans.size(),
+        sample.diagnostics.c_str());
+    return result;
+}
+
+TemperatureSourceResult ProbeGpuProviderTemperature(
+    const std::string& source, std::string_view preferredAdapter, Trace& trace) {
+    const auto start = Clock::now();
+    GpuAdapterSelection selection = ResolveGpuAdapterSelection(trace, preferredAdapter);
+    if (!selection.selectedAdapter.has_value()) {
+        return MakeTemperatureSourceResult(source,
+            start,
+            FormatText("no selected adapter for preferred adapter \"%s\"", std::string(preferredAdapter).c_str()));
+    }
+
+    const auto initStart = Clock::now();
+    std::unique_ptr<GpuVendorTelemetryProvider> provider =
+        CreateGpuVendorTelemetryProvider(trace, selection.selectedAdapter, false);
+    const bool initialized = provider != nullptr && provider->Initialize();
+    const Duration initDuration = Clock::now() - initStart;
+    if (!initialized || provider == nullptr) {
+        return MakeTemperatureSourceResult(source,
+            start,
+            FormatText("provider initialization failed adapter=\"%s\" init_ms=%.2f",
+                selection.selectedAdapter->adapterName.c_str(),
+                initDuration.count()));
+    }
+
+    const auto sampleStart = Clock::now();
+    const GpuVendorTelemetrySample sample = provider->Sample();
+    const Duration sampleDuration = Clock::now() - sampleStart;
+
+    TemperatureSourceResult result;
+    result.source = source;
+    result.elapsed = Clock::now() - start;
+    result.temperatureC = sample.temperatureC;
+    result.available = sample.temperatureC.has_value() && IsSaneTemperatureC(*sample.temperatureC);
+    result.diagnostics =
+        FormatText("adapter=\"%s\" provider=\"%s\" init_ms=%.2f sample_ms=%.2f available=%s diagnostics=%s",
+            selection.selectedAdapter->adapterName.c_str(),
+            sample.providerName.c_str(),
+            initDuration.count(),
+            sampleDuration.count(),
+            sample.available ? "yes" : "no",
+            sample.diagnostics.c_str());
+    return result;
+}
+
+std::vector<TemperatureSourceResult> ProbeTemperatureSources(Trace& trace) {
+    std::vector<TemperatureSourceResult> results;
+    results.push_back(ProbeLenovoGameZoneSource(trace));
+    results.push_back(ProbeLenovoWmiGetterMethods());
+    results.push_back(ProbeWmiTemperatureQuery("windows_acpi_thermal_zone",
+        L"ROOT\\WMI",
+        L"SELECT InstanceName, CurrentTemperature FROM MSAcpi_ThermalZoneTemperature",
+        {L"InstanceName", L"CurrentTemperature"}));
+    results.push_back(ProbeWmiTemperatureQuery("windows_perf_thermal_zone",
+        L"ROOT\\CIMV2",
+        L"SELECT Name, Temperature FROM Win32_PerfFormattedData_Counters_ThermalZoneInformation",
+        {L"Name", L"Temperature"}));
+    results.push_back(ProbeWmiTemperatureQuery("windows_storage_temperature",
+        L"ROOT\\Microsoft\\Windows\\Storage",
+        L"SELECT FriendlyName, Temperature FROM MSFT_PhysicalDisk",
+        {L"FriendlyName", L"Temperature"}));
+    results.push_back(ProbeWmiTemperatureQuery("librehardwaremonitor_wmi",
+        L"ROOT\\LibreHardwareMonitor",
+        L"SELECT Name, Value FROM Sensor WHERE SensorType='Temperature'",
+        {L"Name", L"Value"}));
+    results.push_back(ProbeWmiTemperatureQuery("openhardwaremonitor_wmi",
+        L"ROOT\\OpenHardwareMonitor",
+        L"SELECT Name, Value FROM Sensor WHERE SensorType='Temperature'",
+        {L"Name", L"Value"}));
+    results.push_back(ProbeGpuProviderTemperature("intel_level_zero_gpu_temp", "Intel", trace));
+    results.push_back(ProbeGpuProviderTemperature("nvidia_nvml_gpu_temp", "NVIDIA", trace));
+    return results;
+}
+
+void RecordTemperatureSourceResult(TemperatureSourcesBenchTotals& totals, const TemperatureSourceResult& result) {
+    auto it = std::find_if(totals.sources.begin(), totals.sources.end(), [&](const TemperatureSourceStats& stats) {
+        return stats.source == result.source;
+    });
+    if (it == totals.sources.end()) {
+        TemperatureSourceStats stats;
+        stats.source = result.source;
+        stats.last = result;
+        RecordPhase(stats.timing, result.elapsed);
+        totals.sources.push_back(std::move(stats));
+        return;
+    }
+    it->last = result;
+    RecordPhase(it->timing, result.elapsed);
+}
+
+TemperatureSourcesBenchTotals RunTemperatureSourcesBenchmark(size_t iterations, Trace& trace) {
+    TemperatureSourcesBenchTotals totals{};
+    if (iterations == 0) {
+        return totals;
+    }
+
+    const auto start = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const std::vector<TemperatureSourceResult> results = ProbeTemperatureSources(trace);
+        for (const TemperatureSourceResult& result : results) {
+            RecordTemperatureSourceResult(totals, result);
+        }
+    }
+    totals.loop.total = Clock::now() - start;
+    totals.loop.perIteration = totals.loop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+void PrintTemperatureSourcesBenchResult(const TemperatureSourcesBenchTotals& totals) {
+    PrintBenchLoopResult("source_loop", totals.loop);
+    for (const TemperatureSourceStats& stats : totals.sources) {
+        const double totalMs = Duration(stats.timing.total).count();
+        const double avgMs = stats.timing.samples > 0 ? totalMs / static_cast<double>(stats.timing.samples) : 0.0;
+        std::cout << std::left << std::setw(22) << "temperature_source" << " source=\"" << stats.source
+                  << "\" avg_ms=" << std::fixed << std::setprecision(2) << avgMs << " samples=" << stats.timing.samples
+                  << " available=" << (stats.last.available ? "yes" : "no") << " value_c=";
+        if (stats.last.temperatureC.has_value()) {
+            std::cout << std::fixed << std::setprecision(2) << *stats.last.temperatureC;
+        } else {
+            std::cout << "N/A";
+        }
+        std::cout << " diagnostics=\"" << EscapeBenchmarkText(stats.last.diagnostics) << "\"\n";
+    }
+}
+
 LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
     DashboardRenderer& renderer, const SystemSnapshot& snapshot, size_t iterations) {
     LayoutGuideSheetBenchTotals totals{};
@@ -1603,6 +2296,14 @@ int RunLenovoGameZoneBenchmarkCommand(size_t iterations, double renderScale, Tra
     return 0;
 }
 
+int RunTemperatureSourcesBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    std::cout << "temperature_sources_benchmark iterations=" << iterations << " render_scale_ignored=" << renderScale
+              << "\n";
+    const TemperatureSourcesBenchTotals totals = RunTemperatureSourcesBenchmark(iterations, trace);
+    PrintTemperatureSourcesBenchResult(totals);
+    return 0;
+}
+
 int RunUpdateTelemetryBenchmarkCommand(
     size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
     const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
@@ -1681,6 +2382,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
         case Benchmark::TelemetryInit:
             return RunTelemetryInitBenchmarkCommand(
                 commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
+        case Benchmark::TemperatureSources:
+            return RunTemperatureSourcesBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::ThemeChange:
             return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
