@@ -286,6 +286,12 @@ void StructuredBindingLoop(const BoardSelections& resolvedSelections) {
     }
 }
 
+void SelectFocusedMetric(const FocusKey* focusKey) {
+    if (const auto* metricCandidate = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
+        metricKey = *metricCandidate;
+    }
+}
+
 double NormalizeAngleCandidate(double angleDegrees) {
     for (double candidate : {angleDegrees - 360.0, angleDegrees + 360.0}) {
         Use(candidate);

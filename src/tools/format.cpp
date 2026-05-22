@@ -2126,6 +2126,9 @@ private:
                 return false;
             }
         }
+        if (IsUnaryPrefixOperator(tokens, index) && IsUnaryPrefixOperator(tokens, prevIndex)) {
+            return false;
+        }
         if ((prev == "*" || prev == "&") && token.kind == TokenKind::Word) {
             return !IsUnaryPrefixOperator(tokens, prevIndex);
         }
