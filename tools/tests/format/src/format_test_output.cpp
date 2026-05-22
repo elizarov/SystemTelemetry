@@ -66,6 +66,13 @@ public:
     virtual ~DashboardShellHost() = default;
 };
 
+__declspec(noinline) bool DashboardController::FinishConfigMutation(
+    DashboardShellHost& shell,
+    bool refreshThemedIcons
+) {
+    return refreshThemedIcons;
+}
+
 struct FormatTableRow {
     const char* name;
     int labelControl;

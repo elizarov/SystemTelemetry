@@ -2220,7 +2220,7 @@ private:
             const std::string& text = tokens[index].text;
             if (IsGroupOpen(text) && depth == 0) {
                 if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
-                    if (IsParenthesizedCalleeGroup(tokens, index, *close)) {
+                    if (IsNonWrappablePrefixGroup(tokens, index, *close)) {
                         UpdateDepth(tokens[index], depth);
                         continue;
                     }
@@ -2240,7 +2240,7 @@ private:
                 if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsParenthesizedCalleeGroup(tokens, index, *close) &&
+                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
                         !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
                         return GroupPair{index, *close};
@@ -2252,6 +2252,10 @@ private:
         return std::nullopt;
     }
 
+    bool IsNonWrappablePrefixGroup(const std::vector<Token>& tokens, size_t open, size_t close) const {
+        return IsParenthesizedCalleeGroup(tokens, open, close) || IsDeclspecGroup(tokens, open);
+    }
+
     bool IsParenthesizedCalleeGroup(const std::vector<Token>& tokens, size_t open, size_t close) const {
         if (open >= tokens.size() || tokens[open].text != "(") {
             return false;
@@ -2261,6 +2265,14 @@ private:
         }
         const size_t next = NextSignificantIndex(tokens, close + 1);
         return next < tokens.size() && tokens[next].text == "(";
+    }
+
+    bool IsDeclspecGroup(const std::vector<Token>& tokens, size_t open) const {
+        if (open >= tokens.size() || tokens[open].text != "(") {
+            return false;
+        }
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, open);
+        return previous && tokens[*previous].text == "__declspec";
     }
 
     bool IsEmptyGroupPair(const std::vector<Token>& tokens, size_t open, size_t close) const {
