@@ -806,6 +806,10 @@ private:
             }
             return;
         }
+        if (IsTypeDeclarationTrailingDeclarator(closedBlock.kind, tokens, next)) {
+            pendingPrefix_ = "} ";
+            return;
+        }
         if (
             next < tokens.size() &&
             tokens[next].kind == TokenKind::Word &&
@@ -2949,9 +2953,6 @@ private:
         ) {
             return true;
         }
-        if (!pendingPrefix_.empty()) {
-            return true;
-        }
         if (ContainsTopLevelAssignment(pendingTokens_)) {
             return false;
         }
@@ -2997,6 +2998,17 @@ private:
                 return DeclarationKind::None;
         }
         return DeclarationKind::None;
+    }
+
+    bool IsTypeDeclarationTrailingDeclarator(BlockKind blockKind, const std::vector<Token>& tokens, size_t next) const {
+        if (blockKind != BlockKind::TypeDeclaration && blockKind != BlockKind::EnumDeclaration) {
+            return false;
+        }
+        if (next >= tokens.size()) {
+            return false;
+        }
+        const Token& token = tokens[next];
+        return token.kind == TokenKind::Word || token.text == "*" || token.text == "&" || token.text == "&&";
     }
 
     DeclarationKind ClassifySemicolonDeclaration(const std::vector<Token>& tokens) const {

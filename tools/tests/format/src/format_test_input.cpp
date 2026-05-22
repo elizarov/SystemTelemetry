@@ -178,6 +178,11 @@ void ReturnOnly(){
 return;
 }
 
+void BuildSearchContext(){
+struct SearchContext{const AppConfig* config=nullptr;const std::optional<TargetMonitorInfo>* configuredMonitor=nullptr;DisplayMenuOption* options=nullptr;size_t capacity=0;size_t count=0;bool hasConfiguredWallpaper=false;bool isConfiguredAtOrigin=false;}context{&config,&configuredMonitor,options,capacity,0,hasConfiguredWallpaper,isConfiguredAtOrigin};
+Use(context);
+}
+
 void StandaloneLockBlock(LightweightMutex& mutex,TelemetryUpdate update,HWND hwnd){
 {
 
