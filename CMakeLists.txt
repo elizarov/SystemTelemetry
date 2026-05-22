@@ -181,6 +181,7 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_menu_format.cpp
+    src/dashboard/display_placement_menu_bitmap.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/dashboard/dashboard_titlebar.cpp
     src/dashboard/dashboard_tooltip.cpp
@@ -661,6 +662,7 @@ add_executable(CaseDashTests
     src/dashboard/dashboard_titlebar.cpp
     src/dashboard/dashboard_tooltip.cpp
     src/dashboard/dashboard_window_chrome.cpp
+    src/dashboard/display_placement_menu_bitmap.cpp
     src/display/monitor.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
