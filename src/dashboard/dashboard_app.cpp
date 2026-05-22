@@ -726,21 +726,26 @@ void DashboardApp::DestroyNativeTitlebarProbe() {
     nativeTitlebarProbeRectValid_ = false;
 }
 
-void DashboardApp::ClearNativeTitlebarProbeRegion() {
+bool DashboardApp::ShouldSuppressNativeTitlebarRepaint() const {
+    return controller_.State().isMoving && placementInteractionMode_ == PlacementInteractionMode::Resize &&
+           nativeTitlebarVisible_;
+}
+
+void DashboardApp::ClearNativeTitlebarProbeRegion(bool redraw) {
     if (titlebarHoverProbeHwnd_ != nullptr && nativeTitlebarProbeRounded_) {
-        SetWindowRgn(titlebarHoverProbeHwnd_, nullptr, TRUE);
+        SetWindowRgn(titlebarHoverProbeHwnd_, nullptr, redraw ? TRUE : FALSE);
     }
     nativeTitlebarProbeRounded_ = false;
     nativeTitlebarProbeRegionWidth_ = 0;
     nativeTitlebarProbeRegionHeight_ = 0;
 }
 
-void DashboardApp::UpdateNativeTitlebarProbeRegion(int width, int height) {
+void DashboardApp::UpdateNativeTitlebarProbeRegion(int width, int height, bool redraw) {
     if (titlebarHoverProbeHwnd_ == nullptr) {
         return;
     }
     if (!nativeTitlebarVisible_ || width <= 0 || height <= 0) {
-        ClearNativeTitlebarProbeRegion();
+        ClearNativeTitlebarProbeRegion(redraw);
         return;
     }
     if (nativeTitlebarProbeRounded_ && nativeTitlebarProbeRegionWidth_ == width &&
@@ -753,7 +758,7 @@ void DashboardApp::UpdateNativeTitlebarProbeRegion(int width, int height) {
     if (region == nullptr) {
         return;
     }
-    if (SetWindowRgn(titlebarHoverProbeHwnd_, region, TRUE) == 0) {
+    if (SetWindowRgn(titlebarHoverProbeHwnd_, region, redraw ? TRUE : FALSE) == 0) {
         DeleteObject(region);
         return;
     }
@@ -780,10 +785,11 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         return;
     }
 
+    const bool suppressRepaint = ShouldSuppressNativeTitlebarRepaint();
     const RECT dashboardClientRect = DashboardClientScreenRect();
     DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(dashboardClientRect);
-    if (!geometry.canShow && nativeTitlebarDragMoveActive_ && controller_.State().isMoving && nativeTitlebarVisible_) {
-        // Preserve the custom strip during an active titlebar drag even after hover eligibility no longer fits.
+    if (!geometry.canShow && controller_.State().isMoving && nativeTitlebarVisible_) {
+        // Preserve the custom strip during active placement even after normal hover eligibility no longer fits.
         const DashboardTitlebarFrameMargins margins =
             ComputeNativeTitlebarFrameMargins(RectWidth(dashboardClientRect), RectHeight(dashboardClientRect));
         geometry = ResolveDashboardTitlebarFrameGeometry(dashboardClientRect, margins);
@@ -817,6 +823,9 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         if (wasVisible) {
             flags |= SWP_NOZORDER;
         }
+        if (suppressRepaint) {
+            flags |= SWP_NOREDRAW;
+        }
         SetWindowPos(titlebarHoverProbeHwnd_,
             wasVisible ? nullptr : HWND_TOP,
             geometry.virtualHoverRect.left,
@@ -827,14 +836,14 @@ void DashboardApp::UpdateNativeTitlebarProbe() {
         nativeTitlebarProbeRect_ = geometry.virtualHoverRect;
         nativeTitlebarProbeRectValid_ = true;
     }
-    UpdateNativeTitlebarProbeRegion(width, height);
+    UpdateNativeTitlebarProbeRegion(width, height, !suppressRepaint);
     if (!wasVisible) {
         ShowWindow(titlebarHoverProbeHwnd_, SW_SHOWNOACTIVATE);
     }
     nativeTitlebarProbeVisible_ = true;
     if (nativeTitlebarVisible_) {
         UpdateNativeTitlebarControls();
-        if (!wasVisible || rectChanged || alphaChanged) {
+        if (!wasVisible || rectChanged || alphaChanged || suppressRepaint) {
             InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
         }
     } else {
@@ -1092,13 +1101,17 @@ void DashboardApp::PositionNativeTitlebarCombo(HWND combo, const RECT& closedRec
         rectMatches = TitlebarRectsEqual(currentRect, targetRect);
     }
     if (!rectMatches) {
-        SetWindowPos(combo,
-            nullptr,
-            targetRect.left,
-            targetRect.top,
-            RectWidth(targetRect),
-            RectHeight(targetRect),
-            SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER);
+        const bool suppressRepaint = ShouldSuppressNativeTitlebarRepaint();
+        UINT flags = SWP_NOACTIVATE | SWP_NOZORDER | SWP_NOOWNERZORDER;
+        if (suppressRepaint) {
+            flags |= SWP_NOREDRAW;
+        }
+        SetWindowPos(
+            combo, nullptr, targetRect.left, targetRect.top, RectWidth(targetRect), RectHeight(targetRect), flags);
+        if (suppressRepaint) {
+            InvalidateRect(titlebarHoverProbeHwnd_, nullptr, FALSE);
+            InvalidateRect(combo, nullptr, FALSE);
+        }
     }
     if (!IsWindowVisible(combo)) {
         ShowWindow(combo, SW_SHOWNOACTIVATE);
@@ -1540,7 +1553,9 @@ void DashboardApp::InvokeNativeTitlebarButton(NativeTitlebarButton button) {
 void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     const bool resizeActive =
         controller_.State().isMoving && placementInteractionMode_ == PlacementInteractionMode::Resize;
-    if (hwnd_ == nullptr || !IsWindowVisible(hwnd_) || (controller_.State().isMoving && !resizeActive) ||
+    const bool placementKeepsTitlebarVisible = controller_.State().isMoving && nativeTitlebarVisible_;
+    if (hwnd_ == nullptr || !IsWindowVisible(hwnd_) ||
+        (controller_.State().isMoving && !resizeActive && !placementKeepsTitlebarVisible) ||
         layoutEditModalUiDepth_ > 0) {
         HideTitlebarTooltip("titlebar_unavailable");
         return;
@@ -1554,10 +1569,15 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     }
 
     const RECT clientRect = DashboardClientScreenRect();
-    const DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(clientRect);
+    DashboardTitlebarGeometry geometry = ResolveNativeTitlebarGeometry(clientRect);
+    if (!geometry.canShow && placementKeepsTitlebarVisible) {
+        const DashboardTitlebarFrameMargins margins =
+            ComputeNativeTitlebarFrameMargins(RectWidth(clientRect), RectHeight(clientRect));
+        geometry = ResolveDashboardTitlebarFrameGeometry(clientRect, margins);
+    }
     const bool cursorInClient = PtInRect(&clientRect, cursor) != FALSE;
     const bool cursorInTitlebarBand = geometry.canShow && PtInRect(&geometry.virtualHoverRect, cursor) != FALSE;
-    const bool cursorInsideHoverArea = cursorInClient || cursorInTitlebarBand;
+    const bool cursorInsideHoverArea = placementKeepsTitlebarVisible || cursorInClient || cursorInTitlebarBand;
     if (nativeTitlebarComboDropdownOpen_) {
         HideTitlebarTooltip("titlebar_combo_open");
         StartNativeTitlebarHoverTimer();
@@ -1578,7 +1598,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
         // inside the combined dashboard/titlebar area.
         if (enteredHoverArea && !nativeTitlebarVisible_ && geometry.canShow) {
             ShowNativeTitlebar(geometry);
-        } else if (nativeTitlebarVisible_ && !geometry.canShow) {
+        } else if (nativeTitlebarVisible_ && !geometry.canShow && !placementKeepsTitlebarVisible) {
             HideNativeTitlebar();
             StopNativeTitlebarHoverTimer();
         } else if (enteredHoverArea && geometry.canShow) {
@@ -1741,7 +1761,7 @@ void DashboardApp::StartResizeModeAt(POINT cursorClientPoint) {
     clampMoveCursorAnchorClientPoint_ = true;
     suppressMoveStopOnNextLeftButtonUp_ = false;
     stopMoveModeWhenLeftButtonReleased_ = true;
-    nativeTitlebarDragMoveActive_ = false;
+    nativeTitlebarDragMoveActive_ = nativeTitlebarVisible_;
     controller_.State().isMoving = true;
     StopNativeTitlebarHoverTimer();
     SetCapture(hwnd_);
@@ -1765,7 +1785,8 @@ void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
     clampMoveCursorAnchorClientPoint_ = clampCursorAnchorClientPoint;
     suppressMoveStopOnNextLeftButtonUp_ = false;
     stopMoveModeWhenLeftButtonReleased_ = placeOnRelease;
-    nativeTitlebarDragMoveActive_ = keepNativeTitlebarDuringMove && nativeTitlebarVisible_;
+    const bool keepVisibleTitlebarDuringMove = keepNativeTitlebarDuringMove || nativeTitlebarVisible_;
+    nativeTitlebarDragMoveActive_ = keepVisibleTitlebarDuringMove && nativeTitlebarVisible_;
     placementInteractionMode_ = PlacementInteractionMode::Move;
     resizeAnchorScreenPoint_ = {};
     resizeCursorBottomRightOffset_ = {};

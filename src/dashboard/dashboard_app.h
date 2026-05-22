@@ -146,8 +146,9 @@ private:
     void UpdateNativeTitlebarProbe();
     bool CreateNativeTitlebarProbe();
     void DestroyNativeTitlebarProbe();
-    void ClearNativeTitlebarProbeRegion();
-    void UpdateNativeTitlebarProbeRegion(int width, int height);
+    bool ShouldSuppressNativeTitlebarRepaint() const;
+    void ClearNativeTitlebarProbeRegion(bool redraw = true);
+    void UpdateNativeTitlebarProbeRegion(int width, int height, bool redraw = true);
     void ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry);
     void HideNativeTitlebar();
     bool CreateNativeTitlebarControls();
