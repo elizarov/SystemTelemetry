@@ -211,8 +211,10 @@ private:
         bool placeOnRelease,
         bool keepNativeTitlebarDuringMove);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
+    void StartResizeModeFromNativeTitlebar(POINT screenPoint, DisplayResizeCorner corner);
     RECT DashboardResizeHandleRect(DisplayResizeCorner corner) const;
     std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
+    std::optional<DisplayResizeCorner> HitTestNativeTitlebarResizeHandle(POINT clientPoint) const;
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;

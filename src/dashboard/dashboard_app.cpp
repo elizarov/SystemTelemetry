@@ -1967,6 +1967,10 @@ void DashboardApp::UpdateNativeTitlebarButtonHover(POINT screenPoint) {
     }
     POINT clientPoint = screenPoint;
     ScreenToClient(titlebarHoverProbeHwnd_, &clientPoint);
+    if (HitTestNativeTitlebarResizeHandle(clientPoint).has_value()) {
+        SetNativeTitlebarButtonState(NativeTitlebarButton::None, nativeTitlebarPressedButton_);
+        return;
+    }
     SetNativeTitlebarButtonState(HitTestNativeTitlebarButton(clientPoint), nativeTitlebarPressedButton_);
 }
 
@@ -1978,6 +1982,10 @@ void DashboardApp::UpdateNativeTitlebarTooltip(POINT screenPoint) {
 
     POINT probeClientPoint = screenPoint;
     ScreenToClient(titlebarHoverProbeHwnd_, &probeClientPoint);
+    if (HitTestNativeTitlebarResizeHandle(probeClientPoint).has_value()) {
+        HideTitlebarTooltip("titlebar_resize_handle");
+        return;
+    }
     const DashboardTitlebarControlLayout layout = NativeTitlebarControlLayout();
     const DashboardTitlebarTooltipTarget target = ResolveDashboardTitlebarTooltipTarget(probeClientPoint,
         layout.appMenuRect,
@@ -2348,6 +2356,12 @@ void DashboardApp::StartMoveModeFromNativeTitlebar(POINT screenPoint) {
     StartMoveMode(true, clientPoint, false, true, true);
 }
 
+void DashboardApp::StartResizeModeFromNativeTitlebar(POINT screenPoint, DisplayResizeCorner corner) {
+    POINT clientPoint = screenPoint;
+    ScreenToClient(hwnd_, &clientPoint);
+    StartResizeModeAt(clientPoint, corner);
+}
+
 RECT DashboardApp::DashboardResizeHandleRect(DisplayResizeCorner corner) const {
     const int width = WindowWidth();
     const int height = WindowHeight();
@@ -2381,6 +2395,33 @@ std::optional<DisplayResizeCorner> DashboardApp::HitTestDashboardResizeHandle(Re
             return corner;
         }
     }
+    return std::nullopt;
+}
+
+std::optional<DisplayResizeCorner> DashboardApp::HitTestNativeTitlebarResizeHandle(POINT clientPoint) const {
+    if (titlebarHoverProbeHwnd_ == nullptr) {
+        return std::nullopt;
+    }
+
+    RECT clientRect{};
+    GetClientRect(titlebarHoverProbeHwnd_, &clientRect);
+    if (!IsRectUsable(clientRect)) {
+        return std::nullopt;
+    }
+
+    const int hitSize = std::max(12, ScaleLogicalToPhysical(kDashboardResizeHandleLogical, CurrentWindowDpi()));
+    const RECT topLeftRect{
+        clientRect.left, clientRect.top, std::min(clientRect.right, clientRect.left + hitSize), clientRect.bottom};
+    if (PtInRect(&topLeftRect, clientPoint) != FALSE) {
+        return DisplayResizeCorner::TopLeft;
+    }
+
+    const RECT topRightRect{
+        std::max(clientRect.left, clientRect.right - hitSize), clientRect.top, clientRect.right, clientRect.bottom};
+    if (PtInRect(&topRightRect, clientPoint) != FALSE) {
+        return DisplayResizeCorner::TopRight;
+    }
+
     return std::nullopt;
 }
 
@@ -2998,6 +3039,15 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
             UpdateNativeTitlebarHoverFromCursor();
             if (nativeTitlebarVisible_) {
                 const POINT probeClientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
+                if (shellUi_ != nullptr && !shellUi_->IsLayoutEditModalUiActive()) {
+                    const std::optional<DisplayResizeCorner> resizeCorner =
+                        HitTestNativeTitlebarResizeHandle(probeClientPoint);
+                    if (resizeCorner.has_value()) {
+                        ResetNativeTitlebarButtonState();
+                        StartResizeModeFromNativeTitlebar(probeScreenPoint, *resizeCorner);
+                        return 0;
+                    }
+                }
                 const DashboardTitlebarControlLayout layout = NativeTitlebarControlLayout();
                 const NativeTitlebarButton button = HitTestNativeTitlebarButton(probeClientPoint, layout);
                 if (button != NativeTitlebarButton::None) {
@@ -3031,6 +3081,19 @@ LRESULT DashboardApp::HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM
             }
             break;
         case WM_SETCURSOR:
+            if (nativeTitlebarVisible_) {
+                POINT screenPoint{};
+                if (GetCursorPos(&screenPoint)) {
+                    POINT probeClientPoint = screenPoint;
+                    ScreenToClient(hwnd, &probeClientPoint);
+                    const std::optional<DisplayResizeCorner> resizeCorner =
+                        HitTestNativeTitlebarResizeHandle(probeClientPoint);
+                    if (resizeCorner.has_value()) {
+                        SetCursor(LoadCursorA(nullptr, ResizeCursorName(*resizeCorner)));
+                        return TRUE;
+                    }
+                }
+            }
             SetCursor(LoadCursorA(nullptr, IDC_ARROW));
             return TRUE;
         case WM_ERASEBKGND:
