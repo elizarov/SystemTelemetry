@@ -26,7 +26,7 @@ Other top-level areas:
 
 - `resources/` contains the resource script, source config and localization files for the generated text atlas, dialog templates, manifest, and fallback executable icon; build-generated trace string catalog text joins that same atlas.
 - `tests/` contains unit tests for config, layout resolution, retained-history behavior, and the native benchmark host.
-- `src/tools/` contains native repository tools built into `build\CaseDashTools.exe`, including the maintained combined lint scanner behind `lint.cmd`. `tools/` contains script entrypoints for formatting, profiling, generated assets, and compatibility helpers, while `tools/lint_config.json` owns the lint policy data.
+- `src/tools/` contains native repository tools built into `build\CaseDashTools.exe`, including the maintained combined lint scanner behind `lint.cmd` and the experimental tree-sitter formatter subcommand. `tools/` contains script entrypoints for formatting, profiling, generated assets, and compatibility helpers, while `tools/lint_config.json` owns the lint policy data.
 - `.agents/skills/` contains reusable agent or automation skills.
 - `web/` contains the static website source, browser-side theme switching code, CSS, and the website build script that generates `web/dist/`.
 - `.github/workflows/` contains runner-hosted build, test, format, lint, unused-include, package, release, and website deployment automation.

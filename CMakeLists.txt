@@ -247,12 +247,7 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_menu_format.cpp
-    src/dashboard/display_placement_menu_bitmap.cpp
-    src/dashboard/native_theme_colors.cpp
     src/dashboard/dashboard_shell_ui.cpp
-    src/dashboard/dashboard_titlebar.cpp
-    src/dashboard/dashboard_tooltip.cpp
-    src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
@@ -311,9 +306,8 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/board_service_sample.cpp
-    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -325,7 +319,6 @@ add_executable(CaseDash WIN32
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
-    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
@@ -390,8 +383,6 @@ set(casedash_release_speed_sources
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_shell_ui.cpp
-    src/dashboard/dashboard_titlebar.cpp
-    src/dashboard/dashboard_tooltip.cpp
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
@@ -435,11 +426,10 @@ set(casedash_release_speed_sources
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
-    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -613,8 +603,6 @@ target_link_options(CaseDash PRIVATE
 
 target_link_libraries(CaseDash PRIVATE
     user32
-    dwmapi
-    uxtheme
     gdi32
     d3d11
     d2d1
@@ -625,8 +613,6 @@ target_link_libraries(CaseDash PRIVATE
     comctl32
     ws2_32
     ole32
-    oleaut32
-    wbemuuid
     advapi32
     dbghelp
     wtsapi32
@@ -847,8 +833,12 @@ set_target_properties(CaseDashHeadless PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
+find_package(unofficial-tree-sitter CONFIG REQUIRED)
+find_package(unofficial-tree-sitter-cpp CONFIG REQUIRED)
+
 add_executable(CaseDashTools
     src/tools/tools_main.cpp
+    src/tools/format.cpp
     src/tools/lint_check.cpp
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp
@@ -879,6 +869,10 @@ target_link_options(CaseDashTools PRIVATE
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+)
+target_link_libraries(CaseDashTools PRIVATE
+    unofficial::tree-sitter::tree-sitter
+    unofficial::tree-sitter-cpp::tree-sitter-cpp
 )
 set_target_properties(CaseDashTools PROPERTIES
     OUTPUT_NAME "CaseDashTools"
@@ -919,12 +913,9 @@ add_executable(CaseDashTests
     tests/widget_class_tests.cpp
     tests/font_anchor_tests.cpp
     tests/metric_list_widget_tests.cpp
-    tests/drive_usage_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp
-    tests/dashboard_titlebar_tests.cpp
-    tests/display_menu_options_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -975,12 +966,6 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
-    src/dashboard/dashboard_titlebar.cpp
-    src/dashboard/dashboard_tooltip.cpp
-    src/dashboard/dashboard_window_chrome.cpp
-    src/dashboard/display_placement_menu_bitmap.cpp
-    src/dashboard/native_theme_colors.cpp
-    src/display/monitor.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
@@ -992,7 +977,6 @@ add_executable(CaseDashTests
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
-    src/util/scale.cpp
     src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/board/board_vendor_selection.cpp
@@ -1084,10 +1068,7 @@ target_link_options(CaseDashTests PRIVATE
 target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
-    dwmapi
-    uxtheme
     gdi32
-    advapi32
     d3d11
     d2d1
     dwrite
@@ -1116,8 +1097,6 @@ add_executable(CaseDashBenchmarks
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/win32_format.cpp
-    src/util/elevated_process.cpp
-    src/util/paths.cpp
     src/util/scale.cpp
     src/config/config_telemetry.cpp
     src/config/config_primitives.cpp
@@ -1147,8 +1126,8 @@ add_executable(CaseDashBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -1160,7 +1139,6 @@ add_executable(CaseDashBenchmarks
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
-    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
@@ -1302,8 +1280,6 @@ target_link_libraries(CaseDashBenchmarks PRIVATE
     dxgi
     ws2_32
     ole32
-    oleaut32
-    wbemuuid
     advapi32
     ${MSCOREE_LIB}
 )
