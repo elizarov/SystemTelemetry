@@ -16,7 +16,6 @@
 #include "telemetry/fps_service_protocol.h"
 #include "util/command_line.h"
 #include "util/paths.h"
-#include "util/text_encoding.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 
@@ -201,8 +200,8 @@ bool IsServiceAbsentOrPendingDelete(DWORD status) {
 }
 
 DWORD WaitForServiceDeletedOrPendingDelete() {
-    const ULONGLONG startedAt = GetTickCount64();
-    for (;;) {
+    const DWORD startedAt = GetTickCount();
+    while (GetTickCount() - startedAt < kServiceDeleteWaitMs) {
         ServiceHandle manager;
         ServiceHandle service;
         const DWORD status = OpenInstalledService(manager, SERVICE_QUERY_STATUS, service);
@@ -212,11 +211,9 @@ DWORD WaitForServiceDeletedOrPendingDelete() {
         if (status != ERROR_SUCCESS) {
             return status;
         }
-        if (GetTickCount64() - startedAt >= kServiceDeleteWaitMs) {
-            return ERROR_TIMEOUT;
-        }
         Sleep(100);
     }
+    return ERROR_TIMEOUT;
 }
 
 bool IsExpectedServiceBinaryPath(const std::string& command) {
@@ -261,8 +258,8 @@ DWORD ServicePollIntervalMs(const SERVICE_STATUS_PROCESS& status) {
 }
 
 DWORD WaitForServiceState(SC_HANDLE service, DWORD expectedState, DWORD timeoutMs) {
-    const ULONGLONG startedAt = GetTickCount64();
-    for (;;) {
+    const DWORD startedAt = GetTickCount();
+    while (GetTickCount() - startedAt < timeoutMs) {
         SERVICE_STATUS_PROCESS status{};
         const DWORD queryStatus = QueryServiceStatusProcess(service, status);
         if (queryStatus != ERROR_SUCCESS) {
@@ -274,47 +271,21 @@ DWORD WaitForServiceState(SC_HANDLE service, DWORD expectedState, DWORD timeoutM
         if (status.dwCurrentState == SERVICE_STOPPED && expectedState != SERVICE_STOPPED) {
             return StoppedServiceStatusCode(status);
         }
-        if (GetTickCount64() - startedAt >= timeoutMs) {
-            return ERROR_TIMEOUT;
-        }
         Sleep(ServicePollIntervalMs(status));
     }
-}
 
-std::optional<std::string> QueryProcessImagePath(DWORD processId) {
-    Handle process(OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, FALSE, processId));
-    if (process.Get() == nullptr) {
-        return std::nullopt;
+    SERVICE_STATUS_PROCESS status{};
+    const DWORD queryStatus = QueryServiceStatusProcess(service, status);
+    if (queryStatus != ERROR_SUCCESS) {
+        return queryStatus;
     }
-
-    std::wstring path(MAX_PATH, wchar_t{});
-    DWORD size = static_cast<DWORD>(path.size());
-    if (!QueryFullProcessImageNameW(process.Get(), 0, path.data(), &size) || size == 0) {
-        return std::nullopt;
+    if (status.dwCurrentState == expectedState) {
+        return ERROR_SUCCESS;
     }
-    path.resize(size);
-    return TextFromWide(path);
-}
-
-bool IsProcessImageExpected(const SERVICE_STATUS_PROCESS& status) {
-    if (status.dwProcessId == 0) {
-        return false;
+    if (status.dwCurrentState == SERVICE_STOPPED && expectedState != SERVICE_STOPPED) {
+        return StoppedServiceStatusCode(status);
     }
-    const auto executablePath = GetExecutablePath();
-    const auto processPath = QueryProcessImagePath(status.dwProcessId);
-    return executablePath.has_value() && processPath.has_value() &&
-           NormalizeCommandPath(*processPath) == NormalizeCommandPath(executablePath->string());
-}
-
-bool IsProcessImageExpectedOrUnqueryable(const SERVICE_STATUS_PROCESS& status) {
-    if (status.dwProcessId == 0) {
-        return false;
-    }
-    const auto executablePath = GetExecutablePath();
-    const auto processPath = QueryProcessImagePath(status.dwProcessId);
-    return executablePath.has_value() &&
-           (!processPath.has_value() ||
-               NormalizeCommandPath(*processPath) == NormalizeCommandPath(executablePath->string()));
+    return ERROR_TIMEOUT;
 }
 
 DWORD StartServiceIfNeeded(SC_HANDLE service) {
@@ -638,10 +609,6 @@ DWORD InstallOrUpdateFpsService() {
         const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
         const bool binaryPathChanged =
             !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
-        SERVICE_STATUS_PROCESS previousStatus{};
-        const bool runningUnexpectedProcess =
-            QueryServiceStatusProcess(service.Get(), previousStatus) == ERROR_SUCCESS &&
-            previousStatus.dwCurrentState == SERVICE_RUNNING && !IsProcessImageExpected(previousStatus);
         if (!ChangeServiceConfigA(service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
@@ -655,7 +622,7 @@ DWORD InstallOrUpdateFpsService() {
                 kFpsServiceDisplayName)) {
             return GetLastError();
         }
-        if (binaryPathChanged || runningUnexpectedProcess) {
+        if (binaryPathChanged) {
             const DWORD stopStatus = StopServiceIfRunning(service.Get());
             if (stopStatus != ERROR_SUCCESS && stopStatus != ERROR_SERVICE_NOT_ACTIVE) {
                 return stopStatus;
@@ -704,5 +671,5 @@ bool IsFpsServiceRunningForCurrentExecutable() {
     if (QueryServiceStatusProcess(service.Get(), serviceStatus) != ERROR_SUCCESS) {
         return false;
     }
-    return serviceStatus.dwCurrentState == SERVICE_RUNNING && IsProcessImageExpectedOrUnqueryable(serviceStatus);
+    return serviceStatus.dwCurrentState == SERVICE_RUNNING;
 }
