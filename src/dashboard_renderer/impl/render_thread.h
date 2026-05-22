@@ -20,6 +20,7 @@ struct DashboardPresentationAnimation {
     WidgetAnimationPtr animation;
     WidgetAnimationStatePtr targetState;
     RenderPoint translation{};
+    std::optional<RenderRect> clipRect;
 };
 
 struct DashboardPresentationVersions {

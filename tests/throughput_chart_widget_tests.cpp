@@ -307,7 +307,9 @@ public:
         return std::nullopt;
     }
 
-    void AddWidgetAnimation(WidgetAnimationPtr animation, WidgetAnimationStatePtr targetState) override {
+    void AddWidgetAnimation(WidgetAnimationPtr animation,
+        WidgetAnimationStatePtr targetState,
+        std::optional<RenderRect> = std::nullopt) override {
         if (animation != nullptr && targetState != nullptr) {
             animations.push_back(CapturedWidgetAnimation{std::move(animation), std::move(targetState)});
         }

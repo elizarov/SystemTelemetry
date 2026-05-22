@@ -33,6 +33,12 @@ struct DrawnText {
     RenderColorId color = RenderColorId::Foreground;
 };
 
+struct CapturedWidgetAnimation {
+    WidgetAnimationPtr animation;
+    WidgetAnimationStatePtr targetState;
+    std::optional<RenderRect> clipRect;
+};
+
 class MetricListTestEditArtifacts final : public WidgetEditArtifactRegistrar {
 public:
     void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override {
@@ -329,8 +335,17 @@ public:
         return std::nullopt;
     }
 
+    void AddWidgetAnimation(WidgetAnimationPtr animation,
+        WidgetAnimationStatePtr targetState,
+        std::optional<RenderRect> clipRect = std::nullopt) override {
+        if (animation != nullptr && targetState != nullptr) {
+            animations.push_back(CapturedWidgetAnimation{std::move(animation), std::move(targetState), clipRect});
+        }
+    }
+
     MetricListTestEditArtifacts editArtifacts;
     mutable std::vector<DrawnText> drawnTexts;
+    std::vector<CapturedWidgetAnimation> animations;
 
 private:
     AppConfig config_{};
@@ -365,6 +380,15 @@ MetricsSectionConfig BuildMetricsConfig() {
     MetricsSectionConfig metrics;
     metrics.definitions.push_back(
         MetricDefinitionConfig{"gpu.fps", MetricDisplayStyle::Scalar, false, 240.0, "FPS", "FPS"});
+    return metrics;
+}
+
+MetricsSectionConfig BuildMetricListMetricsConfig() {
+    MetricsSectionConfig metrics;
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"cpu.ram", MetricDisplayStyle::Memory, true, 0.0, "GB", "RAM"});
+    metrics.definitions.push_back(
+        MetricDefinitionConfig{"cpu.clock", MetricDisplayStyle::Scalar, false, 5.0, "GHz", "Clock"});
     return metrics;
 }
 
@@ -426,6 +450,33 @@ TEST(MetricListWidget, MiddleEllipsizesLongGpuFpsAnnotationBeforeItOverlapsValue
     });
     ASSERT_NE(valueIt, renderer.drawnTexts.end());
     EXPECT_LE(valueIt->rect.Width(), 56);
+}
+
+TEST(MetricListWidget, ClipsPartiallyOverflowingRowAnimationToWidgetRect) {
+    MetricListTestRenderer renderer;
+    MetricListWidget widget = BuildMetricListWidget();
+    WidgetLayout layout;
+    layout.rect = RenderRect{0, 0, 240, 51};
+    layout.cardId = "cpu";
+    layout.editCardId = "cpu";
+
+    SystemSnapshot snapshot;
+    snapshot.cpu.memory = MemoryMetric{8.0, 16.0};
+    snapshot.cpu.clock = ScalarMetric{3.5, ScalarMetricUnit::Gigahertz};
+    const MetricsSectionConfig metrics = BuildMetricListMetricsConfig();
+    MetricSource source(snapshot, metrics);
+
+    widget.ResolveLayoutState(renderer, layout.rect);
+    widget.Draw(renderer, layout, source);
+
+    ASSERT_EQ(renderer.animations.size(), 2u);
+    const CapturedWidgetAnimation& overflow = renderer.animations.back();
+    ASSERT_TRUE(overflow.clipRect.has_value());
+    EXPECT_EQ(overflow.clipRect->left, layout.rect.left);
+    EXPECT_EQ(overflow.clipRect->top, layout.rect.top);
+    EXPECT_EQ(overflow.clipRect->right, layout.rect.right);
+    EXPECT_EQ(overflow.clipRect->bottom, layout.rect.bottom);
+    EXPECT_GT(overflow.animation->DirtyBounds().bottom, layout.rect.bottom);
 }
 
 TEST(MetricListWidget, UsesWarningColorForAdminIndicatorInValueAndAnnotationSlots) {

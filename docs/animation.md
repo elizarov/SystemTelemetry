@@ -113,7 +113,7 @@ Keys follow data, not visual slots. Reordering rows or moving widgets preserves 
 
 `ThroughputChartSample` is the widget-private state used by throughput charts. It stores compact retained-history body samples in display order, the live leader value, shared vertical graph maximum, time-marker offset in one-second sample units, fractional plot shift in one-second sample units, and guide spacing. Non-finite sample values become `0`. Throughput retained history keeps 30 ready-to-draw one-second averages plus the last four raw 250 ms samples for the live leader, so the chart still covers 30 seconds while transferring and drawing fewer points. Scalar retained histories separately keep 120 raw 250 ms samples for peak ghosts on bars and gauges.
 
-Widget-private animation primitives own their render geometry. They draw sampled private state onto `Renderer` and report conservative dirty bounds for retained composition.
+Widget-private animation primitives own their render geometry. They draw sampled private state onto `Renderer` and report conservative dirty bounds for retained composition. Widgets can submit an optional command-level animation clip bound when the static bitmap pass used a tighter clip than the primitive geometry, such as list rows inside a partially filled widget.
 
 ## Interpolation
 
@@ -231,9 +231,9 @@ Surface changes also retarget the live-layer bitmap pool to the active size.
 
 Telemetry snapshot updates and layout or style changes present the full live surface because they update layer bitmaps or animation geometry.
 
-Animation-only frames use retained dirty-window composition. The render thread prepares each current animation primitive once, collects its conservative dirty bound and sampled state, restores those non-coalesced regions from the snapshot bitmap, restores the same regions from the overlay bitmap when an overlay exists, and draws each prepared animation once.
+Animation-only frames use retained dirty-window composition. The render thread prepares each current animation primitive once, collects its conservative dirty bound intersected with any command-level animation clip bound, restores those non-coalesced regions from the snapshot bitmap, restores the same regions from the overlay bitmap when an overlay exists, and draws each prepared animation once.
 
-Dirty bounds are also used as animation clip bounds. Animation output cannot leak outside the restored retained-buffer region or survive on another flip-chain buffer.
+Dirty bounds are also used as animation clip bounds. When a command-level animation clip bound exists, it further limits the dirty region and draw clip. Animation output cannot leak outside the restored retained-buffer region, an explicit widget clip, or survive on another flip-chain buffer.
 
 Dirty rectangles are renderer-internal redraw regions. Renderer backends may use them for retained target restoration and redrawing; they are not required to forward them as DXGI dirty-present metadata.
 

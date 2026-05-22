@@ -444,7 +444,8 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
                                         readIndicatorRect,
                                         layoutState_.activitySegments,
                                         layoutState_.activitySegmentGap),
-            MakeScalarFillAnimationState(readTarget));
+            MakeScalarFillAnimationState(readTarget),
+            widget.rect);
         DrawSegmentIndicatorTrack(renderer.Renderer(),
             writeIndicatorRect,
             layoutState_.activitySegments,
@@ -454,10 +455,12 @@ void DriveUsageListWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget
                                         writeIndicatorRect,
                                         layoutState_.activitySegments,
                                         layoutState_.activitySegmentGap),
-            MakeScalarFillAnimationState(writeTarget));
+            MakeScalarFillAnimationState(writeTarget),
+            widget.rect);
         DrawWidgetPillBarTrack(renderer.Renderer(), barRect);
         renderer.AddWidgetAnimation(MakeWidgetPillBarAnimation(AnimationDataKey{drive->label, "used"}, barRect),
-            MakeScalarFillAnimationState(usageTarget));
+            MakeScalarFillAnimationState(usageTarget),
+            widget.rect);
         const int splitX = barRect.left + ((std::max)(0, barRect.right - barRect.left) / 2);
         renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
             RenderRect{barRect.left, barRect.top, splitX, barRect.bottom});

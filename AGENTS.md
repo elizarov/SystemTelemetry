@@ -21,7 +21,10 @@ Keep a single source of truth for terminology, examples, format descriptions, an
 
 ## Commit messages and pull requests
 
-Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior, structure, validation, or tooling outcomes rather than file-by-file narration. Mention docs only when docs are the explicit task. Pull requests must follow the same structure.
+Write commit messages with a concise subject starting with an action verb. Good examples include `Added`, `Changed`, `Fixed`, `Improved`, `Refactored`, and `Removed`. For non-trivial changes, add a short body with tight bullets that summarize each meaningful change or improvement. Keep bullets factual, present-tense, and focused on behavior outcomes rather than file-by-file narration. Mention docs or tests only when they were the explicit task.
+
+Pull requests must follow the same structure as commit messages. Do not use `## Summary`, `## Testing`, generated checklists, or template-style section headings in pull request descriptions. Use direct factual bullets instead.
+Don't include any validation or test updates updates, unless they were the explicit reason.
 
 ## Build And Validation
 
