@@ -421,6 +421,24 @@ bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_vi
     return false;
 }
 
+bool ConfigureDisplayGuard(
+    DisplayState& state,
+    DisplayOption option,
+    DashboardShellHost& shell,
+    UpdatedConfig updatedConfig
+) {
+    if (!::ConfigureDisplay(
+        updatedConfig,
+        state.telemetryUpdate.dump,
+        option.fittedScale,
+        shell.TraceLog(),
+        shell.WindowHandle()
+    )) {
+        return true;
+    }
+    return false;
+}
+
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
     TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditUi,

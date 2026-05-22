@@ -1668,6 +1668,15 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
+        if (std::optional < std::vector < std::string >> combined = TryFormatCombinedControlNestedCall(
+            tokens,
+            group,
+            indentLevel,
+            prefix,
+            suffix
+        )) {
+            return *combined;
+        }
         std::vector<Token> firstLineTokens(
             tokens.begin(),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
@@ -1701,6 +1710,72 @@ private:
             }
         }
         std::string closeLine = FormatInline(suffixTokens);
+        AppendSuffix(closeLine, suffix);
+        lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::optional <
+    std::vector <
+    std::string >> TryFormatCombinedControlNestedCall(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        if (tokens[group.open].text != "(") {
+            return std::nullopt;
+        }
+        std::vector<Token> controlPrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
+        if (!StartsWithControlHeader(controlPrefix) || StartsWithControlFor(controlPrefix)) {
+            return std::nullopt;
+        }
+        std::vector<Token> condition(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        const std::optional<GroupPair> nested = FindFirstGroupPair(condition);
+        if (!nested || nested->open == 0 || condition[nested->open].text != "(") {
+            return std::nullopt;
+        }
+        if (NextSignificantIndex(condition, nested->close + 1) < condition.size()) {
+            return std::nullopt;
+        }
+        std::vector<Token> nestedPrefix(
+            condition.begin(),
+            condition.begin() + static_cast<std::ptrdiff_t>(nested->open + 1)
+        );
+        std::string firstLine = std::string(prefix) + FormatInline(controlPrefix) + FormatInline(nestedPrefix);
+        if (!Fits(indentLevel, firstLine)) {
+            return std::nullopt;
+        }
+        std::vector<Token> nestedInner(
+            condition.begin() + static_cast<std::ptrdiff_t>(nested->open + 1),
+            condition.begin() + static_cast<std::ptrdiff_t>(nested->close)
+        );
+        std::vector<Token> controlSuffix(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + firstLine);
+        std::vector < std::vector < Token >> elements = SplitTopLevel(nestedInner, ',');
+        if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
+            std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
+            lines.insert(lines.end(), childLines.begin(), childLines.end());
+        } else {
+            for (size_t index = 0; index < elements.size(); ++index) {
+                if (elements[index].empty()) {
+                    continue;
+                }
+                std::string elementSuffix;
+                if (index + 1 < elements.size()) {
+                    elementSuffix = ",";
+                }
+                std::vector<std::string> elementLines =
+                    FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                lines.insert(lines.end(), elementLines.begin(), elementLines.end());
+            }
+        }
+        std::string closeLine = ")" + FormatInline(controlSuffix);
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
@@ -3533,12 +3608,10 @@ bool GitHeadExists(const std::string& root) {
 std::vector<std::string> GetChangedFiles(const std::string& root) {
     std::vector<std::string> paths;
     if (GitHeadExists(root)) {
-        if (
-            std::optional < std::vector < std::string >> changed = RunGit(
-                root,
-                {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--", "*.cpp", "*.h"}
-            )
-        ) {
+        if (std::optional < std::vector < std::string >> changed = RunGit(
+            root,
+            {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--", "*.cpp", "*.h"}
+        )) {
             paths.insert(paths.end(), changed->begin(), changed->end());
         }
     } else if (
@@ -3549,12 +3622,10 @@ std::vector<std::string> GetChangedFiles(const std::string& root) {
     ) {
         paths.insert(paths.end(), staged->begin(), staged->end());
     }
-    if (
-        std::optional < std::vector < std::string >> untracked = RunGit(
-            root,
-            {"-c", "core.safecrlf=false", "ls-files", "--others", "--exclude-standard", "--", "*.cpp", "*.h"}
-        )
-    ) {
+    if (std::optional < std::vector < std::string >> untracked = RunGit(
+        root,
+        {"-c", "core.safecrlf=false", "ls-files", "--others", "--exclude-standard", "--", "*.cpp", "*.h"}
+    )) {
         paths.insert(paths.end(), untracked->begin(), untracked->end());
     }
     return EligibleFromRelative(root, UniqueSorted(std::move(paths)));
@@ -3567,12 +3638,10 @@ std::optional<std::string> ResolveTargetFile(const std::string& root, std::strin
     const std::string fullPath = tools::lint::AbsolutePath(tools::lint::JoinPath(root, targetFile));
     const std::string normalizedRoot = tools::lint::NormalizeSeparators(tools::lint::AbsolutePath(root));
     const std::string normalizedFile = tools::lint::NormalizeSeparators(fullPath);
-    if (
-        !tools::lint::StartsWith(
-            tools::lint::ToLowerAscii(normalizedFile),
-            tools::lint::ToLowerAscii(normalizedRoot) + "/"
-        )
-    ) {
+    if (!tools::lint::StartsWith(
+        tools::lint::ToLowerAscii(normalizedFile),
+        tools::lint::ToLowerAscii(normalizedRoot) + "/"
+    )) {
         return std::nullopt;
     }
     if (!IsEligibleCppPath(root, fullPath)) {

@@ -274,6 +274,11 @@ if(field.kind==RuntimeConfigFieldValueKind::HexColor && std::string_view(field.k
 return false;
 }
 
+bool ConfigureDisplayGuard(DisplayState& state,DisplayOption option,DashboardShellHost& shell,UpdatedConfig updatedConfig){
+if(!::ConfigureDisplay(updatedConfig,state.telemetryUpdate.dump,option.fittedScale,shell.TraceLog(),shell.WindowHandle())){return true;}
+return false;
+}
+
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }
