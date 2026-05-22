@@ -34,7 +34,8 @@ HANDLE g_serviceWorker = nullptr;
 
 class Handle {
 public:
-    explicit Handle(HANDLE handle = nullptr) : handle_(handle) {}
+    explicit Handle(HANDLE handle = nullptr) :
+        handle_(handle) {}
 
     ~Handle() {
         if (handle_ != nullptr && handle_ != INVALID_HANDLE_VALUE) {
@@ -45,7 +46,8 @@ public:
     Handle(const Handle&) = delete;
     Handle& operator=(const Handle&) = delete;
 
-    Handle(Handle&& other) noexcept : handle_(std::exchange(other.handle_, nullptr)) {}
+    Handle(Handle&& other) noexcept :
+        handle_(std::exchange(other.handle_, nullptr)) {}
 
     Handle& operator=(Handle&& other) noexcept {
         if (this != &other) {
@@ -73,7 +75,8 @@ private:
 
 class ServiceHandle {
 public:
-    explicit ServiceHandle(SC_HANDLE handle = nullptr) : handle_(handle) {}
+    explicit ServiceHandle(SC_HANDLE handle = nullptr) :
+        handle_(handle) {}
 
     ~ServiceHandle() {
         if (handle_ != nullptr) {
@@ -84,7 +87,8 @@ public:
     ServiceHandle(const ServiceHandle&) = delete;
     ServiceHandle& operator=(const ServiceHandle&) = delete;
 
-    ServiceHandle(ServiceHandle&& other) noexcept : handle_(std::exchange(other.handle_, nullptr)) {}
+    ServiceHandle(ServiceHandle&& other) noexcept :
+        handle_(std::exchange(other.handle_, nullptr)) {}
 
     ServiceHandle& operator=(ServiceHandle&& other) noexcept {
         if (this != &other) {
@@ -106,7 +110,8 @@ private:
 
 class LocalMemory {
 public:
-    explicit LocalMemory(void* memory = nullptr) : memory_(memory) {}
+    explicit LocalMemory(void* memory = nullptr) :
+        memory_(memory) {}
 
     ~LocalMemory() {
         if (memory_ != nullptr) {
@@ -117,7 +122,8 @@ public:
     LocalMemory(const LocalMemory&) = delete;
     LocalMemory& operator=(const LocalMemory&) = delete;
 
-    LocalMemory(LocalMemory&& other) noexcept : memory_(std::exchange(other.memory_, nullptr)) {}
+    LocalMemory(LocalMemory&& other) noexcept :
+        memory_(std::exchange(other.memory_, nullptr)) {}
 
     LocalMemory& operator=(LocalMemory&& other) noexcept {
         if (this != &other) {
@@ -330,8 +336,7 @@ SECURITY_ATTRIBUTES PipeSecurityAttributes(LocalMemory& securityDescriptor) {
 Handle CreateFpsPipeInstance() {
     LocalMemory securityDescriptor;
     SECURITY_ATTRIBUTES securityAttributes = PipeSecurityAttributes(securityDescriptor);
-    return Handle(CreateNamedPipeA(
-        kFpsServicePipeName,
+    return Handle(CreateNamedPipeA(kFpsServicePipeName,
         PIPE_ACCESS_DUPLEX | FILE_FLAG_OVERLAPPED,
         PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
         PIPE_UNLIMITED_INSTANCES,
@@ -511,8 +516,7 @@ DWORD InstallOrUpdateFpsService() {
         return GetLastError();
     }
 
-    ServiceHandle service(CreateServiceA(
-        manager.Get(),
+    ServiceHandle service(CreateServiceA(manager.Get(),
         kFpsServiceName,
         kFpsServiceDisplayName,
         kServiceAccess,
@@ -538,8 +542,7 @@ DWORD InstallOrUpdateFpsService() {
         const std::optional<std::string> previousBinaryPath = QueryServiceBinaryPath(service.Get());
         const bool binaryPathChanged =
             !previousBinaryPath.has_value() || !IsExpectedServiceBinaryPath(*previousBinaryPath);
-        if (!ChangeServiceConfigA(
-                service.Get(),
+        if (!ChangeServiceConfigA(service.Get(),
                 SERVICE_WIN32_OWN_PROCESS,
                 SERVICE_AUTO_START,
                 SERVICE_ERROR_NORMAL,

@@ -62,8 +62,9 @@ using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
 
 class UnsupportedGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    UnsupportedGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter)
-        : trace_(trace), adapter_(std::move(adapter)) {}
+    UnsupportedGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter) :
+        trace_(trace),
+        adapter_(std::move(adapter)) {}
 
     bool Initialize() override {
         sample_.providerName = "Unsupported GPU";
@@ -76,15 +77,14 @@ public:
         } else {
             const FpsTelemetrySample fpsSample =
                 fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-            fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                : fpsSample.diagnostics;
+            fpsDiagnostics_ = fpsSample.diagnostics.empty() ?
+                ResourceStringText(RES_STR("Presented FPS ETW provider unavailable.")) :
+                fpsSample.diagnostics;
         }
 
         const std::string adapterName = adapter_.has_value() ? adapter_->adapterName : std::string();
         const unsigned int vendorId = adapter_.has_value() ? adapter_->vendorId : 0;
-        trace_.WriteFmt(
-            TracePrefix::UnsupportedGpu,
+        trace_.WriteFmt(TracePrefix::UnsupportedGpu,
             RES_STR("initialize vendor_id=0x%04X name=\"%s\" fps=\"%s\""),
             vendorId,
             adapterName.c_str(),
@@ -106,8 +106,7 @@ public:
             if (trace_.Enabled(TracePrefix::UnsupportedGpu)) {
                 const std::string fpsText =
                     fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
-                trace_.WriteFmt(
-                    TracePrefix::UnsupportedGpu,
+                trace_.WriteFmt(TracePrefix::UnsupportedGpu,
                     RES_STR("get_presented_fps available=%s value=%s process=\"%s\" diagnostics=\"%s\""),
                     Trace::BoolText(fpsSample.fps.has_value()),
                     fpsText.c_str(),
@@ -229,8 +228,7 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
-            trace.WriteFmt(
-                TracePrefix::GpuVendor,
+            trace.WriteFmt(TracePrefix::GpuVendor,
                 RES_STR("adapter_enum index=%u hr=0x%08X"),
                 adapterIndex,
                 static_cast<unsigned int>(enumHr));
@@ -256,12 +254,10 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             if (duplicateIndex.has_value()) {
                 const bool replace =
                     !HasUsableGpuPciAddress(adapters[*duplicateIndex].info) && HasUsableGpuPciAddress(info);
-                trace.WriteFmt(
-                    TracePrefix::GpuVendor,
-                    RES_STR(
-                        "adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
-                        "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
-                        "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
+                trace.WriteFmt(TracePrefix::GpuVendor,
+                    RES_STR("adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
+                            "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
+                            "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
                     adapterIndex,
                     adapters[*duplicateIndex].info.adapterIndex,
                     Trace::BoolText(replace),
@@ -286,8 +282,7 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
 
             adapters.push_back(EnumeratedGpuAdapter{info, vendor});
 
-            trace.WriteFmt(
-                TracePrefix::GpuVendor,
+            trace.WriteFmt(TracePrefix::GpuVendor,
                 RES_STR(
                     "adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
                     "pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
@@ -308,8 +303,7 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             continue;
         }
 
-        trace.WriteFmt(
-            TracePrefix::GpuVendor,
+        trace.WriteFmt(TracePrefix::GpuVendor,
             RES_STR("adapter_skip index=%u hr=0x%08X software=%s name=\"%s\""),
             adapterIndex,
             static_cast<unsigned int>(descHr),
@@ -349,11 +343,9 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
 
     if (selection.selectedAdapter.has_value()) {
         const GpuVendor vendor = SelectGpuVendor(*selection.selectedAdapter);
-        trace.WriteFmt(
-            TracePrefix::GpuVendor,
-            RES_STR(
-                "adapter_selected index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
-                "pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""),
+        trace.WriteFmt(TracePrefix::GpuVendor,
+            RES_STR("adapter_selected index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
+                    "pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""),
             selection.selectedAdapter->adapterIndex,
             selection.selectedAdapter->vendorId,
             selection.selectedAdapter->deviceId,
@@ -379,8 +371,7 @@ std::optional<GpuAdapterInfo> ExtractPrimaryGpuAdapterInfo(Trace& trace) {
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
     Trace& trace, const std::optional<GpuAdapterInfo>& adapter) {
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
-    trace.WriteFmt(
-        TracePrefix::GpuVendor,
+    trace.WriteFmt(TracePrefix::GpuVendor,
         RES_STR("create vendor=%s adapter=\"%s\""),
         GpuVendorName(vendor),
         adapter.has_value() ? adapter->adapterName.c_str() : "");

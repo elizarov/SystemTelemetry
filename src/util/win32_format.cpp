@@ -10,8 +10,7 @@ void AppendHresult(std::string& text, long value) {
 
 std::string FormatWin32Error(unsigned long value) {
     char message[256]{};
-    const DWORD length = FormatMessageA(
-        FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+    const DWORD length = FormatMessageA(FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
         nullptr,
         static_cast<DWORD>(value),
         0,

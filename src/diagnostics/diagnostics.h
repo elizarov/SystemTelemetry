@@ -19,8 +19,7 @@
 
 struct AppConfig;
 
-bool SaveDumpScreenshot(
-    const FilePath& imagePath,
+bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -32,8 +31,7 @@ bool SaveDumpScreenshot(
     bool hasHoverPoint = false,
     RenderPoint hoverPoint = {},
     std::string* errorText = nullptr);
-bool SaveLayoutGuideSheet(
-    const FilePath& imagePath,
+bool SaveLayoutGuideSheet(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
     double scale,
@@ -67,8 +65,7 @@ public:
 
 private:
     void ReportError(TracePrefix prefix, const std::string& traceText, std::string_view message);
-    bool ReportSaveError(
-        ResourceStringId traceEvent,
+    bool ReportSaveError(ResourceStringId traceEvent,
         const char* messageAction,
         const FilePath& path,
         std::string_view detail = {},
@@ -98,8 +95,7 @@ bool ApplyDiagnosticsThemeOverride(
     AppConfig& config, const DiagnosticsOptions& options, DiagnosticsSession* diagnostics = nullptr);
 FilePath ResolveDiagnosticsOutputPath(
     const FilePath& workingDirectory, const FilePath& configuredPath, std::string_view defaultFileName);
-std::optional<FilePath> PromptSavePath(
-    HWND owner,
+std::optional<FilePath> PromptSavePath(HWND owner,
     const FilePath& initialDirectory,
     std::string_view defaultFileName,
     std::string_view filter,
@@ -107,14 +103,12 @@ std::optional<FilePath> PromptSavePath(
 int RunElevatedSaveConfigMode(const FilePath& sourcePath, const FilePath& targetPath);
 std::string FormatTelemetryInitializeError(std::string_view errorText);
 
-std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(
-    const AppConfig& runtimeConfig,
+std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppConfig& runtimeConfig,
     const DiagnosticsOptions& diagnosticsOptions,
     Trace& trace,
     TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);
-bool ReloadTelemetryCollectorFromDisk(
-    const FilePath& configPath,
+bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
     AppConfig& activeConfig,
     std::unique_ptr<TelemetryRuntime>& telemetry,
     const DiagnosticsOptions& diagnosticsOptions,

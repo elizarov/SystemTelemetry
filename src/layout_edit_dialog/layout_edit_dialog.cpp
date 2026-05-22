@@ -22,7 +22,8 @@ constexpr wchar_t kFilterCueText[] = L"Filter settings";  // EM_SETCUEBANNER sen
 
 }  // namespace
 
-LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) : host_(host) {}
+LayoutEditDialog::LayoutEditDialog(LayoutEditDialogHost& host) :
+    host_(host) {}
 
 LayoutEditDialog::~LayoutEditDialog() {
     Close();
@@ -244,17 +245,16 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
         } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
             initialFocusTrace = FormatText("[card.%s] title", cardTitleKey->cardId.c_str());
         } else if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey)) {
-            initialFocusTrace = nodeFieldKey->editCardId.empty()
-                ? FormatText("[layout] %s", EnumToString(nodeFieldKey->widgetClass))
-                : FormatText("[card.%s] %s", nodeFieldKey->editCardId.c_str(), EnumToString(nodeFieldKey->widgetClass));
+            initialFocusTrace = nodeFieldKey->editCardId.empty() ?
+                FormatText("[layout] %s", EnumToString(nodeFieldKey->widgetClass)) :
+                FormatText("[card.%s] %s", nodeFieldKey->editCardId.c_str(), EnumToString(nodeFieldKey->widgetClass));
         } else {
             initialFocusTrace = "weight";
         }
     }
     host_.TraceLayoutEditDialogEvent("open", FormatText("initial_focus=%s", QuoteTraceText(initialFocusTrace).c_str()));
 
-    HWND dialog = CreateDialogParamA(
-        host_.LayoutEditDialogInstance(),
+    HWND dialog = CreateDialogParamA(host_.LayoutEditDialogInstance(),
         MAKEINTRESOURCEA(IDD_LAYOUT_EDIT_CONFIGURATION),
         nullptr,
         LayoutEditDialog::DialogProc,

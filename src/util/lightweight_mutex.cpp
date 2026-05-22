@@ -5,7 +5,8 @@
 static_assert(sizeof(SRWLOCK) == sizeof(LightweightMutex));
 static_assert(alignof(SRWLOCK) <= alignof(LightweightMutex));
 
-LightweightMutexLock::LightweightMutexLock(LightweightMutex& mutex) : mutex_(mutex.storage_) {
+LightweightMutexLock::LightweightMutexLock(LightweightMutex& mutex) :
+    mutex_(mutex.storage_) {
     AcquireSRWLockExclusive(static_cast<SRWLOCK*>(mutex_));
 }
 

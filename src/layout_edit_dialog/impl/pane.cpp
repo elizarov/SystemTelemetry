@@ -144,8 +144,7 @@ constexpr char kDialogBlankText[] = " ";
 constexpr char kDialogMeasureSampleText[] = "Ag";
 constexpr double kLchGradientChromaMax = 0.4;
 constexpr int kColorModeControls[] = {IDC_LAYOUT_EDIT_COLOR_MODE_LABEL, IDC_LAYOUT_EDIT_COLOR_MODE_COMBO};
-constexpr int kDerivedColorControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
+constexpr int kDerivedColorControls[] = {IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
     IDC_LAYOUT_EDIT_COLOR_BASE_COMBO,
     IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK,
     IDC_LAYOUT_EDIT_COLOR_ROTATE_EDIT,
@@ -159,16 +158,14 @@ constexpr int kDerivedColorControls[] = {
     IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT,
     IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL};
-constexpr int kLiteralColorControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+constexpr int kLiteralColorControls[] = {IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
     IDC_LAYOUT_EDIT_COLOR_HEX_EDIT,
     IDC_LAYOUT_EDIT_COLOR_VIEW_TAB,
     IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL,
     IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT,
     IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_PICK};
-constexpr int kRgbColorControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_RED_LABEL,
+constexpr int kRgbColorControls[] = {IDC_LAYOUT_EDIT_COLOR_RED_LABEL,
     IDC_LAYOUT_EDIT_COLOR_RED_EDIT,
     IDC_LAYOUT_EDIT_COLOR_RED_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT,
@@ -180,8 +177,7 @@ constexpr int kRgbColorControls[] = {
     IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT,
     IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT};
-constexpr int kLchColorControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_LABEL,
+constexpr int kLchColorControls[] = {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_LABEL,
     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT,
     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT,
@@ -193,8 +189,7 @@ constexpr int kLchColorControls[] = {
     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT,
     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT};
-constexpr int kHsvColorControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_HSV_HUE_LABEL,
+constexpr int kHsvColorControls[] = {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_LABEL,
     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT,
     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_GRADIENT,
@@ -209,19 +204,16 @@ constexpr int kHsvColorControls[] = {
 constexpr int kColorPreviewControls[] = {IDC_LAYOUT_EDIT_COLOR_SWATCH, IDC_LAYOUT_EDIT_COLOR_SAMPLE};
 constexpr int kSectionSelectorControls[] = {IDC_LAYOUT_EDIT_THEME_LABEL, IDC_LAYOUT_EDIT_THEME_COMBO};
 constexpr int kFontFaceControls[] = {IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_FACE_EDIT};
-constexpr int kFontControls[] = {
-    IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
+constexpr int kFontControls[] = {IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
     IDC_LAYOUT_EDIT_FONT_SIZE_EDIT,
     IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
     IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
     IDC_LAYOUT_EDIT_FONT_SAMPLE};
-constexpr int kWeightControls[] = {
-    IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL,
+constexpr int kWeightControls[] = {IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL,
     IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT,
     IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL,
     IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT};
-constexpr int kMetricControls[] = {
-    IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
+constexpr int kMetricControls[] = {IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE,
     IDC_LAYOUT_EDIT_METRIC_SCALE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT,
@@ -232,8 +224,7 @@ constexpr int kMetricControls[] = {
 constexpr int kMetricBindingControls[] = {IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT};
 constexpr int kDateTimeFormatControls[] = {
     IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO};
-constexpr int kColorPreviewInvalidationControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_SWATCH,
+constexpr int kColorPreviewInvalidationControls[] = {IDC_LAYOUT_EDIT_COLOR_SWATCH,
     IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL,
     IDC_LAYOUT_EDIT_COLOR_SAMPLE,
     IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT,
@@ -248,8 +239,7 @@ constexpr int kColorPreviewInvalidationControls[] = {
 constexpr int kFontEditorLabelControls[] = {
     IDC_LAYOUT_EDIT_FONT_FACE_LABEL, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL};
 constexpr int kGlobalFontFamilyLabelControls[] = {IDC_LAYOUT_EDIT_FONT_FACE_LABEL};
-constexpr int kColorEditorLabelControls[] = {
-    IDC_LAYOUT_EDIT_COLOR_MODE_LABEL,
+constexpr int kColorEditorLabelControls[] = {IDC_LAYOUT_EDIT_COLOR_MODE_LABEL,
     IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
     IDC_LAYOUT_EDIT_COLOR_RED_LABEL,
     IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL,
@@ -262,13 +252,11 @@ constexpr int kColorEditorLabelControls[] = {
     IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_LABEL,
     IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_LABEL};
 constexpr int kWeightEditorLabelControls[] = {IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL, IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL};
-constexpr int kMetricEditorLabelControls[] = {
-    IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
+constexpr int kMetricEditorLabelControls[] = {IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_SCALE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_UNIT_LABEL,
     IDC_LAYOUT_EDIT_METRIC_LABEL_LABEL};
-constexpr int kMetricEditorBindingLabelControls[] = {
-    IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
+constexpr int kMetricEditorBindingLabelControls[] = {IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_SCALE_LABEL,
     IDC_LAYOUT_EDIT_METRIC_UNIT_LABEL,
     IDC_LAYOUT_EDIT_METRIC_LABEL_LABEL,
@@ -286,46 +274,45 @@ constexpr LabeledControlIds kMetricEditorRows[] = {
     {IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT}};
 constexpr ColorChannelControlIds kRgbColorChannelRows[] = {
     {IDC_LAYOUT_EDIT_COLOR_RED_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_RED_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_RED_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_RED_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_RED_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT}};
+        IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT}};
 constexpr ColorChannelControlIds kLchColorChannelRows[] = {
     {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_LCH_HUE_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT}};
+        IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT}};
 constexpr ColorChannelControlIds kHsvColorChannelRows[] = {
     {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_HSV_HUE_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_HSV_HUE_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_GRADIENT},
+        IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_GRADIENT},
     {IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_LABEL,
-     IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_EDIT,
-     IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
-     IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_GRADIENT}};
+        IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_EDIT,
+        IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
+        IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_GRADIENT}};
 
-constexpr const char* kLayoutEditControlClassNames[] = {
-    WC_STATICA,
+constexpr const char* kLayoutEditControlClassNames[] = {WC_STATICA,
     WC_EDITA,
     WC_COMBOBOXA,
     WC_COMBOBOXA,
@@ -339,8 +326,7 @@ constexpr const char* kLayoutEditControlClassNames[] = {
     WC_TREEVIEWA,
     TRACKBAR_CLASSA,
     WC_TABCONTROLA};
-constexpr DWORD kLayoutEditControlStyles[] = {
-    0,
+constexpr DWORD kLayoutEditControlStyles[] = {0,
     WS_TABSTOP | WS_BORDER | ES_AUTOHSCROLL | ES_LEFT,
     CBS_DROPDOWNLIST | WS_VSCROLL | WS_TABSTOP,
     CBS_DROPDOWN | CBS_AUTOHSCROLL | WS_VSCROLL | WS_TABSTOP,
@@ -357,8 +343,7 @@ constexpr DWORD kLayoutEditControlStyles[] = {
 static_assert(static_cast<size_t>(LayoutEditControlKind::Count) == ARRAYSIZE(kLayoutEditControlClassNames));
 static_assert(static_cast<size_t>(LayoutEditControlKind::Count) == ARRAYSIZE(kLayoutEditControlStyles));
 
-constexpr const char* kLayoutEditControlTexts[] = {
-    "",
+constexpr const char* kLayoutEditControlTexts[] = {"",
     "Filter:",
     "Theme:",
     "Font name:",
@@ -415,12 +400,12 @@ constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_THEME_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::Theme},
     {IDC_LAYOUT_EDIT_THEME_COMBO, 0, 0, 172, 70, LayoutEditControlKind::ComboList, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_THEME_PREVIEW,
-     0,
-     0,
-     210,
-     86,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        210,
+        86,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_FONT_FACE_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::FontName},
     {IDC_LAYOUT_EDIT_FONT_FACE_EDIT, 0, 0, 172, 100, LayoutEditControlKind::ComboEdit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_FONT_SIZE_LABEL, 0, 0, 28, 8, LayoutEditControlKind::Label, LayoutEditControlText::Size},
@@ -440,29 +425,29 @@ constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_COLOR_MIX_CHECK, 0, 0, 44, 10, LayoutEditControlKind::Check, LayoutEditControlText::Mix},
     {IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT, 0, 0, 60, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER,
-     0,
-     0,
-     106,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        106,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::Color},
     {IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO,
-     0,
-     0,
-     172,
-     70,
-     LayoutEditControlKind::ComboList,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        172,
+        70,
+        LayoutEditControlKind::ComboList,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK, 0, 0, 44, 10, LayoutEditControlKind::Check, LayoutEditControlText::Alpha},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT, 0, 0, 60, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER,
-     0,
-     0,
-     106,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        106,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HEX_LABEL, 0, 0, 18, 8, LayoutEditControlKind::Label, LayoutEditControlText::Hex},
     {IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, 0, 0, 60, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_PICK, 0, 0, 64, 14, LayoutEditControlKind::Button, LayoutEditControlText::Pick},
@@ -472,164 +457,164 @@ constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_COLOR_RED_EDIT, 0, 0, 30, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, 0, 0, 150, 14, LayoutEditControlKind::Trackbar, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_RED_GRADIENT,
-     0,
-     0,
-     150,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        150,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Green},
     {IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT, 0, 0, 30, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER, 0, 0, 150, 14, LayoutEditControlKind::Trackbar, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_GREEN_GRADIENT,
-     0,
-     0,
-     150,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        150,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Blue},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, 0, 0, 30, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, 0, 0, 150, 14, LayoutEditControlKind::Trackbar, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_BLUE_GRADIENT,
-     0,
-     0,
-     150,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        150,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::AlphaLabel},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, 0, 0, 30, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER, 0, 0, 150, 14, LayoutEditControlKind::Trackbar, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_LABEL,
-     0,
-     0,
-     1,
-     8,
-     LayoutEditControlKind::Label,
-     LayoutEditControlText::Lightness},
+        0,
+        0,
+        1,
+        8,
+        LayoutEditControlKind::Label,
+        LayoutEditControlText::Lightness},
     {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT, 0, 0, 48, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Chroma},
     {IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT, 0, 0, 48, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_HUE_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Hue},
     {IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT, 0, 0, 48, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_LCH_HUE_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Hue},
     {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT, 0, 0, 48, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_HUE_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_LABEL,
-     0,
-     0,
-     1,
-     8,
-     LayoutEditControlKind::Label,
-     LayoutEditControlText::Saturation},
+        0,
+        0,
+        1,
+        8,
+        LayoutEditControlKind::Label,
+        LayoutEditControlText::Saturation},
     {IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT,
-     0,
-     0,
-     48,
-     14,
-     LayoutEditControlKind::Edit,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        48,
+        14,
+        LayoutEditControlKind::Edit,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_LABEL, 0, 0, 1, 8, LayoutEditControlKind::Label, LayoutEditControlText::Value},
     {IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_EDIT, 0, 0, 48, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
-     0,
-     0,
-     132,
-     14,
-     LayoutEditControlKind::Trackbar,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        14,
+        LayoutEditControlKind::Trackbar,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_GRADIENT,
-     0,
-     0,
-     132,
-     8,
-     LayoutEditControlKind::OwnerDrawStatic,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        132,
+        8,
+        LayoutEditControlKind::OwnerDrawStatic,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_WEIGHT_FIRST_LABEL,
-     0,
-     0,
-     98,
-     8,
-     LayoutEditControlKind::Label,
-     LayoutEditControlText::FirstItemWeight},
+        0,
+        0,
+        98,
+        8,
+        LayoutEditControlKind::Label,
+        LayoutEditControlText::FirstItemWeight},
     {IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT, 0, 0, 60, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_WEIGHT_SECOND_LABEL,
-     0,
-     0,
-     98,
-     8,
-     LayoutEditControlKind::Label,
-     LayoutEditControlText::SecondItemWeight},
+        0,
+        0,
+        98,
+        8,
+        LayoutEditControlKind::Label,
+        LayoutEditControlText::SecondItemWeight},
     {IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT, 0, 0, 60, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_METRIC_STYLE_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::Style},
     {IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE, 0, 0, 172, 8, LayoutEditControlKind::Label, LayoutEditControlText::Empty},
@@ -641,20 +626,20 @@ constexpr LayoutEditControlSpec kLayoutEditControlSpecs[] = {
     {IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT, 0, 0, 172, 14, LayoutEditControlKind::Edit, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_METRIC_BINDING_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::Binding},
     {IDC_LAYOUT_EDIT_METRIC_BINDING_EDIT,
-     0,
-     0,
-     172,
-     70,
-     LayoutEditControlKind::ComboList,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        172,
+        70,
+        LayoutEditControlKind::ComboList,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL, 0, 0, 34, 8, LayoutEditControlKind::Label, LayoutEditControlText::Format},
     {IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO,
-     0,
-     0,
-     172,
-     90,
-     LayoutEditControlKind::ComboList,
-     LayoutEditControlText::Empty},
+        0,
+        0,
+        172,
+        90,
+        LayoutEditControlKind::ComboList,
+        LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_HINT, 0, 0, 210, 18, LayoutEditControlKind::Label, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_STATUS_TEXT, 0, 0, 154, 12, LayoutEditControlKind::Label, LayoutEditControlText::Empty},
     {IDC_LAYOUT_EDIT_REVERT, 0, 0, 76, 14, LayoutEditControlKind::Button, LayoutEditControlText::RevertField},
@@ -801,8 +786,7 @@ HWND CreateLayoutEditControl(HWND hwnd, const LayoutEditControlSpec& spec, WPARA
     const char* text = LayoutEditControlTextValue(spec.text);
 
     const RECT initialRect = DialogUnitRect(hwnd, spec.left, spec.top, spec.width, spec.height);
-    HWND control = CreateWindowExA(
-        0,
+    HWND control = CreateWindowExA(0,
         kLayoutEditControlClassNames[kind],
         text,
         WS_CHILD | WS_VISIBLE | kLayoutEditControlStyles[kind],
@@ -926,9 +910,9 @@ ControlIdList ActiveEditorLabelControls(LayoutEditEditorKind kind, bool showBind
         case LayoutEditEditorKind::Weights:
             return MakeControlIdList(kWeightEditorLabelControls, ARRAYSIZE(kWeightEditorLabelControls));
         case LayoutEditEditorKind::Metric:
-            return showBinding
-                ? MakeControlIdList(kMetricEditorBindingLabelControls, ARRAYSIZE(kMetricEditorBindingLabelControls))
-                : MakeControlIdList(kMetricEditorLabelControls, ARRAYSIZE(kMetricEditorLabelControls));
+            return showBinding ?
+                MakeControlIdList(kMetricEditorBindingLabelControls, ARRAYSIZE(kMetricEditorBindingLabelControls)) :
+                MakeControlIdList(kMetricEditorLabelControls, ARRAYSIZE(kMetricEditorLabelControls));
         case LayoutEditEditorKind::DateTimeFormat:
             return MakeControlIdList(kDateTimeFormatLabelControls, ARRAYSIZE(kDateTimeFormatLabelControls));
         case LayoutEditEditorKind::LayoutSelector:
@@ -1008,8 +992,7 @@ COLORREF RgbColor(int red, int green, int blue) {
 }
 
 COLORREF ColorRefFromBytes(ColorBytes color) {
-    return RgbColor(
-        static_cast<int>(std::lround(color.r)),
+    return RgbColor(static_cast<int>(std::lround(color.r)),
         static_cast<int>(std::lround(color.g)),
         static_cast<int>(std::lround(color.b)));
 }
@@ -1111,8 +1094,7 @@ std::pair<int, int> SliderTrackHorizontalBounds(HWND hwnd, int sliderId, int fal
     return {fallbackLeft + static_cast<int>(channelRect.left), channelWidth};
 }
 
-int LayoutLabeledControlRow(
-    HWND hwnd,
+int LayoutLabeledControlRow(HWND hwnd,
     int labelId,
     int controlId,
     int left,
@@ -1142,8 +1124,7 @@ int LayoutLabeledControlRow(
 
 void SetDialogCenteredRowBounds(
     HWND hwnd, int controlId, int left, int top, int width, int height, int rowHeight, bool applyVisualAdjustment) {
-    SetDialogControlBounds(
-        hwnd,
+    SetDialogControlBounds(hwnd,
         controlId,
         left,
         top + ((rowHeight - height) / 2) + (applyVisualAdjustment ? RowLabelVisualTopAdjustment(hwnd) : 0),
@@ -1170,8 +1151,7 @@ int LayoutEditorHint(HWND hwnd, int left, int top, int width) {
     return top + hintHeight;
 }
 
-int LayoutLabeledControlRows(
-    HWND hwnd,
+int LayoutLabeledControlRows(HWND hwnd,
     const LabeledControlIds* rows,
     size_t rowCount,
     int left,
@@ -1192,12 +1172,16 @@ int LayoutLabeledControlRows(
 
 }  // namespace
 
-DialogRedrawScope::DialogRedrawScope(HWND hwnd, UINT redrawFlags) : hwnd_(hwnd), redrawFlags_(redrawFlags) {
+DialogRedrawScope::DialogRedrawScope(HWND hwnd, UINT redrawFlags) :
+    hwnd_(hwnd),
+    redrawFlags_(redrawFlags) {
     BeginWindowRedrawSuspension(hwnd_);
 }
 
-DialogRedrawScope::DialogRedrawScope(HWND hwnd, const RECT& redrawRect, UINT redrawFlags)
-    : hwnd_(hwnd), redrawRect_(redrawRect), redrawFlags_(redrawFlags | RDW_ERASE) {
+DialogRedrawScope::DialogRedrawScope(HWND hwnd, const RECT& redrawRect, UINT redrawFlags) :
+    hwnd_(hwnd),
+    redrawRect_(redrawRect),
+    redrawFlags_(redrawFlags | RDW_ERASE) {
     BeginWindowRedrawSuspension(hwnd_);
 }
 
@@ -1206,8 +1190,10 @@ DialogRedrawScope::~DialogRedrawScope() {
     EndWindowRedrawSuspension(hwnd_, rect, redrawFlags_);
 }
 
-DialogRedrawScope::DialogRedrawScope(DialogRedrawScope&& other) noexcept
-    : hwnd_(other.hwnd_), redrawRect_(other.redrawRect_), redrawFlags_(other.redrawFlags_) {
+DialogRedrawScope::DialogRedrawScope(DialogRedrawScope&& other) noexcept :
+    hwnd_(other.hwnd_),
+    redrawRect_(other.redrawRect_),
+    redrawFlags_(other.redrawFlags_) {
     other.hwnd_ = nullptr;
     other.redrawRect_.reset();
     other.redrawFlags_ = 0;
@@ -1228,8 +1214,9 @@ DialogRedrawScope& DialogRedrawScope::operator=(DialogRedrawScope&& other) noexc
     return *this;
 }
 
-DialogDescendantRedrawScope::DialogDescendantRedrawScope(HWND hwnd, UINT redrawFlags)
-    : root_(hwnd), redrawFlags_(redrawFlags) {
+DialogDescendantRedrawScope::DialogDescendantRedrawScope(HWND hwnd, UINT redrawFlags) :
+    root_(hwnd),
+    redrawFlags_(redrawFlags) {
     BeginWindowRedrawSuspension(root_);
 }
 
@@ -1579,11 +1566,10 @@ void ShowLayoutEditEditors(HWND hwnd, LayoutEditEditorKind kind, bool showBindin
     const bool showLayoutSelector = kind == LayoutEditEditorKind::LayoutSelector;
     const bool showSectionSelector = showThemeSelector || showLayoutSelector;
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_VALUE_EDIT, showNumeric);
-    ShowDialogControl(
-        hwnd,
+    ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_SUMMARY,
         !(showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
-          showGlobalFontFamily || showDateTimeFormat || showSectionSelector));
+            showGlobalFontFamily || showDateTimeFormat || showSectionSelector));
     ShowDialogControls(hwnd, kSectionSelectorControls, ARRAYSIZE(kSectionSelectorControls), showSectionSelector);
     ShowDialogControl(hwnd, IDC_LAYOUT_EDIT_THEME_PREVIEW, showThemeSelector);
 
@@ -1596,8 +1582,7 @@ void ShowLayoutEditEditors(HWND hwnd, LayoutEditEditorKind kind, bool showBindin
     ShowDialogControls(hwnd, kMetricControls, ARRAYSIZE(kMetricControls), showMetric);
     ShowDialogControls(hwnd, kMetricBindingControls, ARRAYSIZE(kMetricBindingControls), showMetric && showBinding);
     ShowDialogControls(hwnd, kDateTimeFormatControls, ARRAYSIZE(kDateTimeFormatControls), showDateTimeFormat);
-    ShowDialogControl(
-        hwnd,
+    ShowDialogControl(hwnd,
         IDC_LAYOUT_EDIT_HINT,
         showNumeric || showFont || showColor || showWeights || showMetric || showMetricListOrder ||
             showGlobalFontFamily || showDateTimeFormat || showSectionSelector);
@@ -1634,8 +1619,7 @@ void EnsureMetricListOrderEditorControls(LayoutEditDialogState* state, HWND hwnd
     }
     if (state->metricListRowControls.size() == rowCount) {
         if (state->metricListAddRowButton == nullptr) {
-            state->metricListAddRowButton = CreateMetricListEditorControl(
-                hwnd,
+            state->metricListAddRowButton = CreateMetricListEditorControl(hwnd,
                 LayoutEditControlKind::Button,
                 LayoutEditControlText::AddRow,
                 IDC_LAYOUT_EDIT_METRIC_LIST_ADD_ROW);
@@ -1684,15 +1668,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int outerEdgeMargin = static_cast<int>(treeRect->left);
     const int dividerGap = std::max(0, static_cast<int>(dividerRect->left - treeRect->right));
     const int leftPaneBottom = clientRect.bottom - outerEdgeMargin;
-    SetDialogControlBounds(
-        hwnd,
+    SetDialogControlBounds(hwnd,
         IDC_LAYOUT_EDIT_TREE,
         static_cast<int>(treeRect->left),
         static_cast<int>(treeRect->top),
         static_cast<int>(treeRect->right - treeRect->left),
         std::max(1, leftPaneBottom - static_cast<int>(treeRect->top)));
-    SetDialogControlBounds(
-        hwnd,
+    SetDialogControlBounds(hwnd,
         IDC_LAYOUT_EDIT_DIVIDER,
         static_cast<int>(dividerRect->left),
         static_cast<int>(dividerRect->top),
@@ -1708,8 +1690,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int footerTop = footerBottom - footerHeight;
     SetDialogControlBounds(hwnd, IDC_LAYOUT_EDIT_FOOTER_HINT, paneLeft, footerTop, paneWidth, footerHeight);
 
-    const int revertWidth = std::max(
-        DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_REVERT),
+    const int revertWidth = std::max(DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_REVERT),
         MeasureTextWidthForControl(hwnd, IDC_LAYOUT_EDIT_REVERT, ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_REVERT)) +
             24);
     const int revertHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_REVERT);
@@ -1718,15 +1699,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     const int statusHeight = MeasureTextHeightForControl(hwnd, IDC_LAYOUT_EDIT_STATUS_TEXT, statusText, statusWidth);
     const int statusRowHeight = std::max(statusHeight, revertHeight);
     const int statusTop = footerTop - metrics.statusToFooterGap - statusRowHeight;
-    SetDialogControlBounds(
-        hwnd,
+    SetDialogControlBounds(hwnd,
         IDC_LAYOUT_EDIT_STATUS_TEXT,
         paneLeft,
         statusTop + ((statusRowHeight - statusHeight) / 2),
         statusWidth,
         statusHeight);
-    SetDialogControlBounds(
-        hwnd,
+    SetDialogControlBounds(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
         paneRight - revertWidth,
         statusTop + ((statusRowHeight - revertHeight) / 2),
@@ -1740,8 +1719,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     y += titleHeight + metrics.headerGap;
 
     const std::string locationText = ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_LOCATION);
-    const int locationHeight = MeasureTextHeightForControl(
-        hwnd,
+    const int locationHeight = MeasureTextHeightForControl(hwnd,
         IDC_LAYOUT_EDIT_LOCATION,
         locationText.empty() ? std::string_view(kDialogBlankText, 1) : std::string_view(locationText),
         paneWidth,
@@ -1794,8 +1772,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             break;
         }
         case LayoutEditEditorKind::Font: {
-            const int fontFaceRowHeight = LayoutLabeledControlRow(
-                hwnd,
+            const int fontFaceRowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_FONT_FACE_LABEL,
                 IDC_LAYOUT_EDIT_FONT_FACE_EDIT,
                 innerLeft,
@@ -1806,8 +1783,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 singleLineFieldHeight);
             cursorY += fontFaceRowHeight + metrics.rowGap;
 
-            const int labelHeight = MeasureTextHeightForControl(
-                hwnd,
+            const int labelHeight = MeasureTextHeightForControl(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
                 ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_FONT_SIZE_LABEL),
                 labelColumnWidth,
@@ -1819,8 +1795,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int weightEditHeight = DialogControlLayoutHeightForVisibleHeight(
                 hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT, singleLineFieldHeight);
             const int sizeRowHeight = Max4Int(singleLineFieldHeight, labelHeight, sizeEditHeight, weightEditHeight);
-            SetDialogCenteredRowBounds(
-                hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_LABEL,
                 innerLeft,
                 cursorY,
@@ -1829,8 +1804,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 sizeRowHeight,
                 false);
             const int sizeControlLeft = innerLeft + labelColumnWidth + metrics.labelGap;
-            SetDialogCenteredRowBounds(
-                hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_SIZE_EDIT,
                 sizeControlLeft,
                 cursorY,
@@ -1839,15 +1813,14 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 sizeRowHeight,
                 false);
 
-            const int weightLabelWidth = MeasureTextWidthForControl(
-                                             hwnd,
-                                             IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
-                                             ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL)) +
+            const int weightLabelWidth =
+                MeasureTextWidthForControl(hwnd,
+                    IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
+                    ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL)) +
                 8;
             const int weightEditLeft = sizeControlLeft + sizeEditWidth + metrics.inlineGap + weightLabelWidth;
             const int weightEditWidth = std::max(72, innerRight - weightEditLeft);
-            SetDialogCenteredRowBounds(
-                hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_LABEL,
                 sizeControlLeft + sizeEditWidth + metrics.inlineGap,
                 cursorY,
@@ -1855,8 +1828,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 labelHeight,
                 sizeRowHeight,
                 false);
-            SetDialogCenteredRowBounds(
-                hwnd,
+            SetDialogCenteredRowBounds(hwnd,
                 IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT,
                 weightEditLeft,
                 cursorY,
@@ -1874,8 +1846,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             break;
         }
         case LayoutEditEditorKind::GlobalFontFamily: {
-            const int fontFaceRowHeight = LayoutLabeledControlRow(
-                hwnd,
+            const int fontFaceRowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_FONT_FACE_LABEL,
                 IDC_LAYOUT_EDIT_FONT_FACE_EDIT,
                 innerLeft,
@@ -1893,8 +1864,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int comboWidth = innerWidth - labelColumnWidth - metrics.labelGap;
             const int comboHeight =
                 std::max(DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO), singleLineFieldHeight);
-            const int rowHeight = LayoutLabeledControlRow(
-                hwnd,
+            const int rowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_THEME_LABEL,
                 IDC_LAYOUT_EDIT_THEME_COMBO,
                 innerLeft,
@@ -1912,8 +1882,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int comboWidth = innerWidth - labelColumnWidth - metrics.labelGap;
             const int comboHeight =
                 std::max(DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_THEME_COMBO), singleLineFieldHeight);
-            const int rowHeight = LayoutLabeledControlRow(
-                hwnd,
+            const int rowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_THEME_LABEL,
                 IDC_LAYOUT_EDIT_THEME_COMBO,
                 innerLeft,
@@ -1939,8 +1908,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             ShowColorEditorControls(hwnd, true, supportsDerived, derivedMode);
 
             if (supportsDerived) {
-                const int modeRowHeight = LayoutLabeledControlRow(
-                    hwnd,
+                const int modeRowHeight = LayoutLabeledControlRow(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MODE_LABEL,
                     IDC_LAYOUT_EDIT_COLOR_MODE_COMBO,
                     innerLeft,
@@ -1952,16 +1920,15 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 cursorY += modeRowHeight + metrics.rowGap;
             }
 
-            const int swatchSize = std::max(
-                DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_SWATCH),
+            const int swatchSize = std::max(DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_SWATCH),
                 DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT) + 4);
             if (!derivedMode) {
                 const int pickWidth = DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
                 const int pickHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_PICK);
-                const int hexLabelWidth = MeasureTextWidthForControl(
-                                              hwnd,
-                                              IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
-                                              ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)) +
+                const int hexLabelWidth =
+                    MeasureTextWidthForControl(hwnd,
+                        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+                        ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)) +
                     8;
                 const int hexEditHeight = DialogControlLayoutHeightForVisibleHeight(
                     hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_EDIT, singleLineFieldHeight);
@@ -1970,14 +1937,12 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 const int hexEditLeft = hexLabelLeft + hexLabelWidth + metrics.labelGap;
                 const int hexEditWidth = std::max(76, pickLeft - metrics.inlineGap - hexEditLeft);
                 const int firstRowHeight = Max3Int(swatchSize, hexEditHeight, pickHeight);
-                const int hexLabelHeight = MeasureTextHeightForControl(
-                    hwnd,
+                const int hexLabelHeight = MeasureTextHeightForControl(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                     ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL),
                     hexLabelWidth,
                     true);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_SWATCH,
                     innerLeft,
                     cursorY,
@@ -1985,8 +1950,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     swatchSize,
                     firstRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
                     hexLabelLeft,
                     cursorY,
@@ -1994,8 +1958,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     hexLabelHeight,
                     firstRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_HEX_EDIT,
                     hexEditLeft,
                     cursorY,
@@ -2008,8 +1971,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 cursorY += firstRowHeight + metrics.sampleGap;
             }
 
-            const int sampleHeight = MeasureTextHeightForControl(
-                hwnd,
+            const int sampleHeight = MeasureTextHeightForControl(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_SAMPLE,
                 ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_SAMPLE),
                 innerWidth,
@@ -2017,15 +1979,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             if (derivedMode) {
                 const int derivedHexLeft = innerLeft + swatchSize + metrics.inlineGap;
                 const int derivedHexWidth = std::max(1, innerRight - derivedHexLeft);
-                const int derivedHexHeight = MeasureTextHeightForControl(
-                    hwnd,
+                const int derivedHexHeight = MeasureTextHeightForControl(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL,
                     ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL),
                     derivedHexWidth,
                     true);
                 const int firstRowHeight = std::max(swatchSize, derivedHexHeight);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_SWATCH,
                     innerLeft,
                     cursorY,
@@ -2033,8 +1993,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     swatchSize,
                     firstRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_DERIVED_HEX_LABEL,
                     derivedHexLeft,
                     cursorY,
@@ -2048,8 +2007,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             cursorY += sampleHeight + metrics.sampleGap;
 
             if (derivedMode) {
-                const int baseRowHeight = LayoutLabeledControlRow(
-                    hwnd,
+                const int baseRowHeight = LayoutLabeledControlRow(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_BASE_LABEL,
                     IDC_LAYOUT_EDIT_COLOR_BASE_COMBO,
                     innerLeft,
@@ -2060,10 +2018,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     singleLineFieldHeight);
                 cursorY += baseRowHeight + metrics.rowGap;
 
-                const int checkboxWidth = std::max(
-                    labelColumnWidth + metrics.labelGap + 82,
-                    MeasureTextWidthForControl(
-                        hwnd,
+                const int checkboxWidth = std::max(labelColumnWidth + metrics.labelGap + 82,
+                    MeasureTextWidthForControl(hwnd,
                         IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
                         ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL)) +
                         metrics.labelGap);
@@ -2080,12 +2036,10 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                         hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT, singleLineFieldHeight),
                     DialogControlLayoutHeightForVisibleHeight(
                         hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT, singleLineFieldHeight));
-                const int derivedSliderHeight = Max3Int(
-                    DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER),
+                const int derivedSliderHeight = Max3Int(DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER),
                     DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER),
                     DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER));
-                const CheckSliderRowLayout derivedSliderLayout{
-                    innerLeft,
+                const CheckSliderRowLayout derivedSliderLayout{innerLeft,
                     checkboxWidth,
                     valueLeft,
                     valueEditWidth,
@@ -2094,30 +2048,26 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     derivedFieldHeight,
                     derivedSliderHeight,
                     metrics.rowGap};
-                cursorY = LayoutCheckSliderRow(
-                    hwnd,
+                cursorY = LayoutCheckSliderRow(hwnd,
                     derivedSliderLayout,
                     cursorY,
                     IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK,
                     IDC_LAYOUT_EDIT_COLOR_ROTATE_EDIT,
                     IDC_LAYOUT_EDIT_COLOR_ROTATE_SLIDER);
-                cursorY = LayoutCheckSliderRow(
-                    hwnd,
+                cursorY = LayoutCheckSliderRow(hwnd,
                     derivedSliderLayout,
                     cursorY,
                     IDC_LAYOUT_EDIT_COLOR_MIX_CHECK,
                     IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT,
                     IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER);
 
-                const int mixTargetLabelHeight = MeasureTextHeightForControl(
-                    hwnd,
+                const int mixTargetLabelHeight = MeasureTextHeightForControl(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
                     ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL),
                     checkboxWidth,
                     true);
                 const int mixTargetRowHeight = std::max(mixTargetLabelHeight, derivedFieldHeight);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_LABEL,
                     innerLeft,
                     cursorY,
@@ -2125,8 +2075,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     mixTargetLabelHeight,
                     mixTargetRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO,
                     valueLeft,
                     cursorY,
@@ -2136,16 +2085,14 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     false);
                 cursorY += mixTargetRowHeight + metrics.rowGap;
 
-                cursorY = LayoutCheckSliderRow(
-                    hwnd,
+                cursorY = LayoutCheckSliderRow(hwnd,
                     derivedSliderLayout,
                     cursorY,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER);
             } else {
-                const int valueEditWidth = Max3Int(
-                    DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT),
+                const int valueEditWidth = Max3Int(DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_RED_EDIT),
                     DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT),
                     DialogControlWidth(hwnd, IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT));
                 const int sliderLeft =
@@ -2158,10 +2105,8 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 const int alphaEditHeight = DialogControlLayoutHeightForVisibleHeight(
                     hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, singleLineFieldHeight);
                 const int alphaSliderHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER);
-                const int gradientBarHeight = std::max(
-                    1,
-                    MeasureTextHeightForControl(
-                        hwnd,
+                const int gradientBarHeight = std::max(1,
+                    MeasureTextHeightForControl(hwnd,
                         channelRows[0].labelId,
                         ReadDialogControlText(hwnd, channelRows[0].labelId),
                         labelColumnWidth,
@@ -2202,22 +2147,19 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                         hwnd, channel.sliderId, rowSliderLeft, tabCursorY, rowSliderWidth, channelSliderHeights[i]);
                     const auto [gradientLeft, gradientWidth] =
                         SliderTrackHorizontalBounds(hwnd, channel.sliderId, rowSliderLeft, rowSliderWidth);
-                    SetDialogControlBounds(
-                        hwnd,
+                    SetDialogControlBounds(hwnd,
                         channel.gradientId,
                         gradientLeft,
                         tabCursorY + channelSliderHeights[i] + gradientGap,
                         gradientWidth,
                         gradientBarHeight);
-                    SetDialogControlBounds(
-                        hwnd,
+                    SetDialogControlBounds(hwnd,
                         channel.labelId,
                         rowLeft,
                         tabCursorY + ((channelSliderHeights[i] - labelHeight) / 2),
                         labelColumnWidth,
                         labelHeight);
-                    SetDialogControlBounds(
-                        hwnd,
+                    SetDialogControlBounds(hwnd,
                         channel.editId,
                         rowEditLeft,
                         tabCursorY + ((channelSliderHeights[i] - channelEditHeights[i]) / 2),
@@ -2231,15 +2173,13 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                 }
                 cursorY += tabHeight + metrics.rowGap;
 
-                const int alphaLabelHeight = MeasureTextHeightForControl(
-                    hwnd,
+                const int alphaLabelHeight = MeasureTextHeightForControl(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL,
                     ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL),
                     labelColumnWidth,
                     true);
                 const int alphaRowHeight = Max3Int(alphaEditHeight, alphaSliderHeight, alphaLabelHeight);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL,
                     innerLeft,
                     cursorY,
@@ -2247,8 +2187,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     alphaLabelHeight,
                     alphaRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT,
                     innerLeft + labelColumnWidth + metrics.labelGap,
                     cursorY,
@@ -2256,8 +2195,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
                     alphaEditHeight,
                     alphaRowHeight,
                     false);
-                SetDialogCenteredRowBounds(
-                    hwnd,
+                SetDialogCenteredRowBounds(hwnd,
                     IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER,
                     sliderLeft,
                     cursorY,
@@ -2273,8 +2211,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
         }
         case LayoutEditEditorKind::Weights: {
             const int editWidth = std::min(88, std::max(60, innerWidth - labelColumnWidth - metrics.labelGap));
-            cursorY = LayoutLabeledControlRows(
-                hwnd,
+            cursorY = LayoutLabeledControlRows(hwnd,
                 kWeightEditorRows,
                 ARRAYSIZE(kWeightEditorRows),
                 innerLeft,
@@ -2292,8 +2229,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int controlWidth = innerWidth - labelColumnWidth - metrics.labelGap;
             const int metricRowHeight =
                 std::max(DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_METRIC_STYLE_VALUE), singleLineFieldHeight);
-            cursorY = LayoutLabeledControlRows(
-                hwnd,
+            cursorY = LayoutLabeledControlRows(hwnd,
                 kMetricEditorRows,
                 showBinding ? ARRAYSIZE(kMetricEditorRows) : ARRAYSIZE(kMetricEditorRows) - 1,
                 innerLeft,
@@ -2311,8 +2247,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int controlWidth = innerWidth - labelColumnWidth - metrics.labelGap;
             const int comboHeight = std::max(
                 DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO), singleLineFieldHeight);
-            const int rowHeight = LayoutLabeledControlRow(
-                hwnd,
+            const int rowHeight = LayoutLabeledControlRow(hwnd,
                 IDC_LAYOUT_EDIT_DATETIME_FORMAT_LABEL,
                 IDC_LAYOUT_EDIT_DATETIME_FORMAT_COMBO,
                 innerLeft,
@@ -2330,13 +2265,12 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int comboFieldVisibleHeight =
                 (std::max)(1, DialogControlVisibleHeight(hwnd, IDC_LAYOUT_EDIT_FONT_FACE_EDIT));
             const int addButtonWidth = (std::max)(132,
-                                                  MeasureTextWidthForControl(
-                                                      hwnd,
-                                                      IDC_LAYOUT_EDIT_REVERT,
-                                                      state->metricListAddRowButton != nullptr
-                                                          ? ReadWindowTextValue(state->metricListAddRowButton)
-                                                          : std::string("Add row")) +
-                                                      28);
+                MeasureTextWidthForControl(hwnd,
+                    IDC_LAYOUT_EDIT_REVERT,
+                    state->metricListAddRowButton != nullptr ?
+                        ReadWindowTextValue(state->metricListAddRowButton) :
+                        std::string("Add row")) +
+                    28);
             const int rowVisibleHeight = comboFieldVisibleHeight;
             const int comboDropHeight = std::max(220, rowVisibleHeight + 180);
             const int buttonsWidth = (buttonWidth * 3) + (metrics.inlineGap * 2);
@@ -2367,8 +2301,7 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
             const int addButtonHeight = DialogControlHeight(hwnd, IDC_LAYOUT_EDIT_REVERT);
             const int addButtonLeft = innerRight - addButtonWidth;
             if (state->metricListAddRowButton != nullptr) {
-                SetWindowPos(
-                    state->metricListAddRowButton,
+                SetWindowPos(state->metricListAddRowButton,
                     nullptr,
                     addButtonLeft,
                     cursorY,
@@ -2415,13 +2348,12 @@ void LayoutLayoutEditRightPane(LayoutEditDialogState* state, HWND hwnd) {
     }
 
     if (kind == LayoutEditEditorKind::Font) {
-        if (const auto* parameter = state->selectedLeaf != nullptr
-                ? std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey)
-                : nullptr;
+        if (const auto* parameter = state->selectedLeaf != nullptr ?
+                std::get_if<LayoutEditParameter>(&state->selectedLeaf->focusKey) :
+                nullptr;
             parameter != nullptr && state->selectedLeaf->valueFormat == configschema::ValueFormat::FontSpec) {
             const auto font = FindLayoutEditTooltipFontValue(state->dialog->Host().CurrentConfig(), *parameter);
-            SetFontSamplePreview(
-                state,
+            SetFontSamplePreview(state,
                 hwnd,
                 std::optional<LayoutEditParameter>(*parameter),
                 font.has_value() && *font != nullptr ? *font : nullptr);
@@ -2440,13 +2372,15 @@ void UpdateLayoutEditActionState(LayoutEditDialogState* state, HWND hwnd) {
         state->selectedNode->label.rfind("layout.", 0) == 0;
     const bool canRevert =
         state != nullptr && (state->selectedLeaf != nullptr || isFontsSection || isThemeSection || isLayoutSection);
-    SetDialogControlText(
-        hwnd,
+    SetDialogControlText(hwnd,
         IDC_LAYOUT_EDIT_REVERT,
-        isFontsSection        ? "Revert Font Changes"
-            : isThemeSection  ? "Revert Theme"
-            : isLayoutSection ? "Revert Layout"
-                              : "Revert Field");
+        isFontsSection ?
+            "Revert Font Changes" :
+            isThemeSection ?
+            "Revert Theme" :
+            isLayoutSection ?
+            "Revert Layout" :
+            "Revert Field");
     EnableWindow(GetDlgItem(hwnd, IDC_LAYOUT_EDIT_REVERT), canRevert ? TRUE : FALSE);
 }
 

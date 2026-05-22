@@ -6,8 +6,7 @@ namespace {
 
 RenderColor ToRenderColor(ColorConfig color) {
     const unsigned int rgb = color.ToRgb();
-    return RenderColor{
-        static_cast<std::uint8_t>((rgb >> 16) & 0xFFu),
+    return RenderColor{static_cast<std::uint8_t>((rgb >> 16) & 0xFFu),
         static_cast<std::uint8_t>((rgb >> 8) & 0xFFu),
         static_cast<std::uint8_t>(rgb & 0xFFu),
         color.Alpha()};
@@ -21,8 +20,7 @@ std::size_t ColorSlot(RenderColorId id) {
 
 D2D1_COLOR_F RenderColor::ToD2DColorF() const {
     constexpr float kScale = 1.0f / 255.0f;
-    return D2D1::ColorF(
-        static_cast<float>(r) * kScale,
+    return D2D1::ColorF(static_cast<float>(r) * kScale,
         static_cast<float>(g) * kScale,
         static_cast<float>(b) * kScale,
         static_cast<float>(a) * kScale);

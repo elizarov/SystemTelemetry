@@ -5,8 +5,7 @@
 
 class Renderer;
 
-void DrawLayoutEditAnchorShape(
-    Renderer& renderer,
+void DrawLayoutEditAnchorShape(Renderer& renderer,
     AnchorShape shape,
     const RenderRect& rect,
     RenderColorId color,

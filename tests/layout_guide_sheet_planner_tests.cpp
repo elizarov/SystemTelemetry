@@ -65,8 +65,7 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
     EXPECT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
     LayoutGuideSheetRenderer sheetRenderer(renderer);
 
-    return BuiltInLayoutGuideSheetContext{
-        config,
+    return BuiltInLayoutGuideSheetContext{config,
         renderer.CollectLayoutEditActiveRegions(overlayState),
         sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
         renderer.CollectLayoutGuideSheetCardSummaries()};
@@ -218,8 +217,7 @@ TEST(LayoutGuideSheetPlanner, OverviewCalloutsDoNotUseWidgetColorTargets) {
         if (!callout.hoverColorParameter.has_value()) {
             continue;
         }
-        EXPECT_TRUE(
-            *callout.hoverColorParameter == LayoutEditParameter::ColorForeground ||
+        EXPECT_TRUE(*callout.hoverColorParameter == LayoutEditParameter::ColorForeground ||
             *callout.hoverColorParameter == LayoutEditParameter::ColorIcon)
             << callout.parameterLine;
         EXPECT_EQ(callout.parameterLine.find("track_color"), std::string::npos) << callout.parameterLine;
@@ -293,32 +291,28 @@ TEST(LayoutGuideSheetPlanner, PlacementPromotesOuterSideItemsToTopAndBottom) {
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Top));
     EXPECT_TRUE(sides.contains(LayoutGuideSheetExitSide::Bottom));
     EXPECT_EQ(
-        std::count_if(
-            callouts.begin(),
+        std::count_if(callouts.begin(),
             callouts.end(),
             [](const LayoutGuideSheetPlacementCallout& callout) {
                 return callout.exitSide == LayoutGuideSheetExitSide::Left;
             }),
         2);
     EXPECT_EQ(
-        std::count_if(
-            callouts.begin(),
+        std::count_if(callouts.begin(),
             callouts.end(),
             [](const LayoutGuideSheetPlacementCallout& callout) {
                 return callout.exitSide == LayoutGuideSheetExitSide::Right;
             }),
         2);
     EXPECT_EQ(
-        std::count_if(
-            callouts.begin(),
+        std::count_if(callouts.begin(),
             callouts.end(),
             [](const LayoutGuideSheetPlacementCallout& callout) {
                 return callout.exitSide == LayoutGuideSheetExitSide::Top;
             }),
         1);
     EXPECT_EQ(
-        std::count_if(
-            callouts.begin(),
+        std::count_if(callouts.begin(),
             callouts.end(),
             [](const LayoutGuideSheetPlacementCallout& callout) {
                 return callout.exitSide == LayoutGuideSheetExitSide::Bottom;

@@ -34,8 +34,7 @@ void TextWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widge
 
 void TextWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const MetricSource& metrics) const {
     const std::string text = metrics.ResolveText(metric_);
-    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(
-        widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
         text,
         TextStyleId::Text,
         RenderColorId::Foreground,

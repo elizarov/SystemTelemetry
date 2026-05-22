@@ -109,11 +109,13 @@ void FillThemePreviewPixels(
         for (int x = minX; x <= maxX; ++x) {
             const double sampleX = x + 0.5;
             const double sampleY = y + 0.5;
-            const double backgroundWeight = ((geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-                                             (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)) /
+            const double backgroundWeight =
+                ((geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
+                    (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)) /
                 denom;
-            const double foregroundWeight = ((geometry.bottomY - geometry.topY) * (sampleX - geometry.bottomX) +
-                                             (geometry.leftX - geometry.bottomX) * (sampleY - geometry.bottomY)) /
+            const double foregroundWeight =
+                ((geometry.bottomY - geometry.topY) * (sampleX - geometry.bottomX) +
+                    (geometry.leftX - geometry.bottomX) * (sampleY - geometry.bottomY)) /
                 denom;
             const double accentWeight = 1.0 - backgroundWeight - foregroundWeight;
             if (backgroundWeight < -0.001 || foregroundWeight < -0.001 || accentWeight < -0.001) {
@@ -144,8 +146,9 @@ const std::vector<uint32_t>& CachedThemePreviewPixels(
     ThemePreviewPixelCacheKey key{
         width, height, dpi, systemFace, theme.background.ToRgba(), theme.foreground.ToRgba(), theme.accent.ToRgba()};
     std::vector<ThemePreviewPixelCacheEntry>& cache = ThemePreviewPixelCache();
-    auto found = std::find_if(
-        cache.begin(), cache.end(), [&](const ThemePreviewPixelCacheEntry& entry) { return entry.key == key; });
+    auto found = std::find_if(cache.begin(), cache.end(), [&](const ThemePreviewPixelCacheEntry& entry) {
+        return entry.key == key;
+    });
     if (found != cache.end()) {
         if (found != cache.begin()) {
             ThemePreviewPixelCacheEntry entry = std::move(*found);
@@ -195,8 +198,7 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     bitmapInfo.bmiHeader.biPlanes = 1;
     bitmapInfo.bmiHeader.biBitCount = 32;
     bitmapInfo.bmiHeader.biCompression = BI_RGB;
-    SetDIBitsToDevice(
-        dc,
+    SetDIBitsToDevice(dc,
         rect.left,
         rect.top,
         static_cast<DWORD>(width),
@@ -216,20 +218,18 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     HGDIOBJ oldBrush = SelectObject(dc, GetStockObject(NULL_BRUSH));
     POINT points[] = {
         {rect.left + static_cast<LONG>(std::lround(geometry.leftX)),
-         rect.top + static_cast<LONG>(std::lround(geometry.topY))},
+            rect.top + static_cast<LONG>(std::lround(geometry.topY))},
         {rect.left + static_cast<LONG>(std::lround(geometry.rightX)),
-         rect.top + static_cast<LONG>(std::lround(geometry.topY))},
+            rect.top + static_cast<LONG>(std::lround(geometry.topY))},
         {rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),
-         rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
+            rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
     Polygon(dc, points, 3);
     SelectObject(dc, guidePen);
-    MoveToEx(
-        dc,
+    MoveToEx(dc,
         rect.left + static_cast<int>(std::lround(geometry.bottomX)),
         rect.top + static_cast<int>(std::lround(geometry.topY)),
         nullptr);
-    LineTo(
-        dc,
+    LineTo(dc,
         rect.left + static_cast<int>(std::lround(geometry.bottomX)),
         rect.top + static_cast<int>(std::lround(geometry.bottomY)));
     SelectObject(dc, oldBrush);
@@ -242,18 +242,15 @@ void DrawThemePreviewTriangle(HDC dc, const RECT& rect, const ThemeConfig& theme
     HFONT oldFont = reinterpret_cast<HFONT>(SelectObject(dc, GetStockObject(DEFAULT_GUI_FONT)));
     const int labelInset = ScaledPreviewPixels(dpi, 2);
     const int labelHeight = std::max(1, geometry.topLabelBand - (labelInset * 2));
-    const RECT topLeftLabel{
-        rect.left,
+    const RECT topLeftLabel{rect.left,
         rect.top + labelInset,
         rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) - 4,
         rect.top + labelInset + labelHeight};
-    const RECT topRightLabel{
-        rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4,
+    const RECT topRightLabel{rect.left + static_cast<LONG>(std::lround(geometry.bottomX)) + 4,
         rect.top + labelInset,
         rect.right,
         rect.top + labelInset + labelHeight};
-    const RECT bottomLabel{
-        rect.left,
+    const RECT bottomLabel{rect.left,
         rect.top + static_cast<LONG>(std::lround(geometry.bottomY)) + labelInset,
         rect.right,
         rect.bottom - labelInset};

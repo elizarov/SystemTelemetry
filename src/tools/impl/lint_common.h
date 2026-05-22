@@ -109,8 +109,7 @@ std::string FormatCount(int value);
 std::string StripCommentsAndStrings(std::string_view text);
 
 std::vector<std::string> ConfigStrings(const JsonValue& config, std::string_view key);
-std::set<std::string> RequireSuffixGroup(
-    const std::map<std::string, std::set<std::string>>& suffixGroups,
+std::set<std::string> RequireSuffixGroup(const std::map<std::string, std::set<std::string>>& suffixGroups,
     std::string_view configPath,
     std::string_view groupName);
 

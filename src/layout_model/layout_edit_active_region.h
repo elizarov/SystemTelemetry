@@ -49,8 +49,7 @@ struct LayoutEditContainerChildReorderRegion {
     RenderRect childRect{};
 };
 
-using LayoutEditActiveRegionPayload = std::variant<
-    LayoutEditCardRegion,
+using LayoutEditActiveRegionPayload = std::variant<LayoutEditCardRegion,
     LayoutEditWidgetRegion,
     LayoutEditGuide,
     LayoutEditContainerChildReorderRegion,

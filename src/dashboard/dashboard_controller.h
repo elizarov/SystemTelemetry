@@ -90,8 +90,7 @@ public:
     bool RestoreLayoutEditSessionSavedLayout(DashboardShellHost& shell);
     bool ApplyLayoutGuideWeights(
         DashboardShellHost& shell, const LayoutEditLayoutTarget& target, const std::vector<int>& weights);
-    bool ApplyLayoutGuideAdjacentWeights(
-        DashboardShellHost& shell,
+    bool ApplyLayoutGuideAdjacentWeights(DashboardShellHost& shell,
         const LayoutEditLayoutTarget& target,
         size_t separatorIndex,
         int firstWeight,
@@ -115,8 +114,7 @@ public:
     bool ApplyLayoutEditCardTitle(
         DashboardShellHost& shell, const LayoutCardTitleEditKey& key, const std::string& title);
     void ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config);
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
-        DashboardShellHost& shell,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(DashboardShellHost& shell,
         const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,

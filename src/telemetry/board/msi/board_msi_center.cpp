@@ -44,7 +44,7 @@ std::optional<FilePath> FindInstalledMsiCenterDirectory() {
     char childName[256];
     DWORD childNameLength = ARRAYSIZE(childName);
     while (RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
-           ERROR_SUCCESS) {
+        ERROR_SUCCESS) {
         HKEY childKey = nullptr;
         if (RegOpenKeyExA(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
             const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
@@ -72,7 +72,8 @@ std::optional<FilePath> FindInstalledMsiCenterDirectory() {
 
 class MsiCenterCapture final : public MsiCenterCaptureSink {
 public:
-    explicit MsiCenterCapture(Trace& trace) : trace_(trace) {}
+    explicit MsiCenterCapture(Trace& trace) :
+        trace_(trace) {}
 
     void AddFanReading(const wchar_t* title, double rpm) override {
         snapshot_.fans.push_back(BoardSensorReading{TextFromNullableWide(title), rpm});
@@ -132,7 +133,9 @@ private:
 
 class MsiCenterBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    MsiCenterBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) : trace_(trace), info_(std::move(info)) {}
+    MsiCenterBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) :
+        trace_(trace),
+        info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
@@ -140,8 +143,7 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace().WriteFmt(
-            TracePrefix::MsiCenter,
+        trace().WriteFmt(TracePrefix::MsiCenter,
             RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
@@ -165,8 +167,7 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            AppendRequestedBoardMetricIndex(
-                requestedTemperatureIndexBySourceName_,
+            AppendRequestedBoardMetricIndex(requestedTemperatureIndexBySourceName_,
                 ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name),
                 i);
         }
@@ -176,14 +177,12 @@ public:
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_,
+            AppendFormat(requestedDiagnosticsSuffix_,
                 RES_STR(" requested_temps=%s"),
                 JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_,
+            AppendFormat(requestedDiagnosticsSuffix_,
                 RES_STR(" requested_fans=%s"),
                 JoinNames(settings_.requestedFanNames).c_str());
         }

@@ -44,7 +44,8 @@ class UniqueHandle final {
 public:
     UniqueHandle() = default;
 
-    explicit UniqueHandle(HANDLE value) : value_(value) {}
+    explicit UniqueHandle(HANDLE value) :
+        value_(value) {}
 
     UniqueHandle(const UniqueHandle&) = delete;
     UniqueHandle& operator=(const UniqueHandle&) = delete;
@@ -76,8 +77,7 @@ bool IsSaneCelsius(double value) {
 }
 
 UniqueHandle OpenAsusAtkDevice() {
-    return UniqueHandle(CreateFileA(
-        kAsusAtkDevicePath,
+    return UniqueHandle(CreateFileA(kAsusAtkDevicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr,
@@ -99,8 +99,7 @@ bool QueryAsusAtkDsts(
     return result != FALSE && bytesReturned >= sizeof(status);
 }
 
-void TraceAtkDriverResult(
-    Trace& trace,
+void TraceAtkDriverResult(Trace& trace,
     const char* kind,
     std::uint32_t deviceId,
     const char* name,
@@ -112,8 +111,7 @@ void TraceAtkDriverResult(
     if (name != nullptr && name[0] != '\0') {
         AppendFormat(text, " name=\"%s\"", name);
     }
-    AppendFormat(
-        text,
+    AppendFormat(text,
         " ok=%d error=%lu bytes=%lu status=0x%08x",
         ok ? 1 : 0,
         static_cast<unsigned long>(error),
@@ -164,8 +162,7 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
         const DWORD error = GetLastError();
         snapshot.diagnostics =
             FormatText(RES_STR("ASUS ATKACPI device open failed: %lu"), static_cast<unsigned long>(error));
-        trace.WriteFmt(
-            TracePrefix::AsusArmouryCrate,
+        trace.WriteFmt(TracePrefix::AsusArmouryCrate,
             RES_STR("atk_driver_open_failed error=%lu"),
             static_cast<unsigned long>(error));
         return snapshot;
@@ -180,8 +177,7 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
         RES_STR("ASUS Armoury Crate ATKACPI query completed. fan_count=%zu temp_count=%zu"),
         snapshot.fans.size(),
         snapshot.temperatures.size());
-    trace.WriteFmt(
-        TracePrefix::AsusArmouryCrate,
+    trace.WriteFmt(TracePrefix::AsusArmouryCrate,
         RES_STR("atk_driver_snapshot_done fan_count=%zu temp_count=%zu"),
         snapshot.fans.size(),
         snapshot.temperatures.size());
@@ -190,8 +186,9 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
 
 class AsusArmouryCrateBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    AsusArmouryCrateBoardTelemetryProvider(Trace& trace, BoardVendorInfo info)
-        : trace_(trace), info_(std::move(info)) {}
+    AsusArmouryCrateBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) :
+        trace_(trace),
+        info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
@@ -199,8 +196,7 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace_.WriteFmt(
-            TracePrefix::AsusArmouryCrate,
+        trace_.WriteFmt(TracePrefix::AsusArmouryCrate,
             RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
@@ -218,8 +214,7 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            AppendRequestedBoardMetricIndex(
-                requestedTemperatureIndexBySourceName_,
+            AppendRequestedBoardMetricIndex(requestedTemperatureIndexBySourceName_,
                 ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name),
                 i);
         }
@@ -229,14 +224,12 @@ public:
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_,
+            AppendFormat(requestedDiagnosticsSuffix_,
                 RES_STR(" requested_temps=%s"),
                 JoinNames(settings_.requestedTemperatureNames).c_str());
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(
-                requestedDiagnosticsSuffix_,
+            AppendFormat(requestedDiagnosticsSuffix_,
                 RES_STR(" requested_fans=%s"),
                 JoinNames(settings_.requestedFanNames).c_str());
         }

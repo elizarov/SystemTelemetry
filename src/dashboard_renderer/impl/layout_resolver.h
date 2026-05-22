@@ -55,16 +55,14 @@ public:
 
     void Clear();
     void ClearDynamicEditArtifacts();
-    void ResolveNodeWidgets(
-        DashboardRenderer& renderer,
+    void ResolveNodeWidgets(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,
         bool instantiateWidgets);
     void BuildWidgetEditGuides(DashboardRenderer& renderer);
     void BuildStaticEditableAnchors(DashboardRenderer& renderer);
-    void AddLayoutEditGuide(
-        DashboardRenderer& renderer,
+    void AddLayoutEditGuide(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         const std::vector<RenderRect>& childRects,
@@ -73,8 +71,7 @@ public:
         const std::string& editCardId,
         const std::vector<size_t>& nodePath,
         const std::vector<LayoutEditOverlayOwner>& overlayOwners);
-    void ResolveNodeWidgetsInternal(
-        DashboardRenderer& renderer,
+    void ResolveNodeWidgetsInternal(DashboardRenderer& renderer,
         const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,
@@ -92,29 +89,24 @@ public:
     int PreferredNodeHeight(const DashboardRenderer& renderer, const LayoutNodeConfig& node, int width) const;
     const ParsedWidgetInfo* FindParsedWidgetInfo(const DashboardRenderer& renderer, const LayoutNodeConfig& node) const;
     WidgetLayout ResolveWidgetLayout(
-        const DashboardRenderer& renderer,
-        const LayoutNodeConfig& node,
-        const RenderRect& rect,
-        bool instantiateWidget) const;
+        const DashboardRenderer& renderer, const LayoutNodeConfig& node, const RenderRect& rect, bool instantiateWidget)
+        const;
     void RegisterStaticEditAnchor(LayoutEditAnchorRegistration registration) override;
     void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) override;
     void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override;
     void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) override;
-    void RegisterStaticTextAnchor(
-        const RenderRect& rect,
+    void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
         LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) override;
-    void RegisterDynamicTextAnchor(
-        const TextLayoutResult& layoutResult,
+    void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
         LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) override;
-    void RegisterDynamicTextAnchor(
-        const RenderRect& rect,
+    void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
@@ -132,16 +124,14 @@ private:
 
     void RegisterEditableAnchorRegion(
         std::vector<LayoutEditAnchorRegion>& regions, const LayoutEditAnchorRegistration& registration);
-    void RegisterTextAnchor(
-        std::vector<LayoutEditAnchorRegion>& regions,
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         LayoutEditTargetOutline targetOutline);
-    void RegisterTextAnchor(
-        std::vector<LayoutEditAnchorRegion>& regions,
+    void RegisterTextAnchor(std::vector<LayoutEditAnchorRegion>& regions,
         const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         LayoutEditTargetOutline targetOutline);

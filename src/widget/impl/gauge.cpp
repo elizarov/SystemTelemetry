@@ -40,29 +40,25 @@ GaugeSegmentLayout ComputeGaugeSegmentLayout(
 
     layout.maxSegmentSweep = layout.totalSweep / static_cast<double>(layout.segmentCount);
     const double minSegmentSweep = MinimumGaugeSegmentSweep(layout.totalSweep, layout.segmentCount);
-    const double maxSegmentGap =
-        (std::max)(0.0,
-                   (layout.totalSweep - (minSegmentSweep * static_cast<double>(layout.segmentCount))) /
-                       static_cast<double>(layout.segmentCount - 1));
+    const double maxSegmentGap = (std::max)(0.0,
+        (layout.totalSweep - (minSegmentSweep * static_cast<double>(layout.segmentCount))) /
+            static_cast<double>(layout.segmentCount - 1));
     layout.segmentGap = std::clamp(requestedSegmentGap, 0.0, maxSegmentGap);
-    layout.segmentSweep =
-        (std::max)(minSegmentSweep,
-                   (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
-                       static_cast<double>(layout.segmentCount));
+    layout.segmentSweep = (std::max)(minSegmentSweep,
+        (layout.totalSweep - (layout.segmentGap * static_cast<double>(layout.segmentCount - 1))) /
+            static_cast<double>(layout.segmentCount));
     layout.pitchSweep = layout.segmentSweep + layout.segmentGap;
     return layout;
 }
 
 RenderPoint PolarPoint(int cx, int cy, int radius, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return RenderPoint{
-        cx + static_cast<int>(std::lround(std::cos(radians) * static_cast<double>(radius))),
+    return RenderPoint{cx + static_cast<int>(std::lround(std::cos(radians) * static_cast<double>(radius))),
         cy + static_cast<int>(std::lround(std::sin(radians) * static_cast<double>(radius)))};
 }
 
 RenderRect ExpandSegmentBounds(RenderPoint start, RenderPoint end, int inset) {
-    return RenderRect{
-        ((std::min))(start.x, end.x) - inset,
+    return RenderRect{((std::min))(start.x, end.x) - inset,
         ((std::min))(start.y, end.y) - inset,
         ((std::max))(start.x, end.x) + inset + 1,
         ((std::max))(start.y, end.y) + inset + 1};
@@ -97,8 +93,7 @@ struct RenderPointF {
 
 RenderPointF RenderArcPoint(RenderPoint center, int radiusX, int radiusY, double angleDegrees) {
     const double radians = angleDegrees * 3.14159265358979323846 / 180.0;
-    return RenderPointF{
-        static_cast<double>(center.x) + std::cos(radians) * static_cast<double>(radiusX),
+    return RenderPointF{static_cast<double>(center.x) + std::cos(radians) * static_cast<double>(radiusX),
         static_cast<double>(center.y) + std::sin(radians) * static_cast<double>(radiusY)};
 }
 
@@ -149,8 +144,7 @@ RenderRect ComputeGaugeSegmentBounds(
         right = (std::max)(right, point.x);
         bottom = (std::max)(bottom, point.y);
     }
-    return RenderRect{
-        static_cast<int>(std::floor(left)),
+    return RenderRect{static_cast<int>(std::floor(left)),
         static_cast<int>(std::floor(top)),
         static_cast<int>(std::ceil(right)),
         static_cast<int>(std::ceil(bottom))};
@@ -190,26 +184,23 @@ int EffectiveGaugePreferredRadius(const WidgetHost& renderer, const std::string&
 
 int GaugeFilledSegmentCount(const GaugeSegmentLayout& layout, const ScalarFillSample& sample) {
     const double clampedRatio = ClampFinite(sample.valueRatio.value_or(0.0), 0.0, 1.0);
-    return !sample.valueRatio.has_value() || clampedRatio <= 0.0
-        ? 0
-        : std::clamp(
-              static_cast<int>(std::ceil(clampedRatio * static_cast<double>(layout.segmentCount))),
-              1,
-              layout.segmentCount);
+    return !sample.valueRatio.has_value() || clampedRatio <= 0.0 ?
+        0 :
+        std::clamp(static_cast<int>(std::ceil(clampedRatio * static_cast<double>(layout.segmentCount))),
+            1,
+            layout.segmentCount);
 }
 
 int GaugePeakSegment(const GaugeSegmentLayout& layout, const ScalarFillSample& sample) {
     const double clampedPeakRatio = ClampFinite(sample.peakRatio.value_or(0.0), 0.0, 1.0);
-    return !sample.peakRatio.has_value() || clampedPeakRatio <= 0.0
-        ? -1
-        : std::clamp(
-              static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(layout.segmentCount))) - 1,
-              0,
-              layout.segmentCount - 1);
+    return !sample.peakRatio.has_value() || clampedPeakRatio <= 0.0 ?
+        -1 :
+        std::clamp(static_cast<int>(std::ceil(clampedPeakRatio * static_cast<double>(layout.segmentCount))) - 1,
+            0,
+            layout.segmentCount - 1);
 }
 
-void DrawGaugeFill(
-    Renderer& renderer,
+void DrawGaugeFill(Renderer& renderer,
     const GaugeSegmentLayout& gaugeLayout,
     const std::vector<RenderArc>& ringSegments,
     int ringThickness,
@@ -222,8 +213,7 @@ void DrawGaugeFill(
             std::span<const RenderArc>(ringSegments.data(), static_cast<size_t>(filledSegments)), accentStroke);
     }
     if (sample.valueRatio.has_value() && peakSegment >= 0 && static_cast<size_t>(peakSegment) < ringSegments.size()) {
-        renderer.DrawArc(
-            ringSegments[static_cast<size_t>(peakSegment)],
+        renderer.DrawArc(ringSegments[static_cast<size_t>(peakSegment)],
             RenderStroke::Solid(RenderColorId::PeakGhost, static_cast<float>(ringThickness)));
     }
 }
@@ -231,9 +221,11 @@ void DrawGaugeFill(
 class GaugeFillAnimation final : public WidgetAnimation {
 public:
     GaugeFillAnimation(
-        AnimationDataKey key, GaugeSegmentLayout gaugeLayout, std::vector<RenderArc> ringSegments, int ringThickness)
-        : key_(std::move(key)), gaugeLayout_(gaugeLayout), ringSegments_(std::move(ringSegments)),
-          ringThickness_(ringThickness) {}
+        AnimationDataKey key, GaugeSegmentLayout gaugeLayout, std::vector<RenderArc> ringSegments, int ringThickness) :
+        key_(std::move(key)),
+        gaugeLayout_(gaugeLayout),
+        ringSegments_(std::move(ringSegments)),
+        ringThickness_(ringThickness) {}
 
     const AnimationDataKey& Key() const override {
         return key_;
@@ -278,8 +270,7 @@ void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRec
     layoutState_.cy = rect.top + ((std::max)(0, rect.bottom - rect.top) / 2);
     layoutState_.ringThickness =
         (std::max)(1, renderer.Renderer().ScaleLogical(renderer.Config().layout.gauge.ringThickness));
-    layoutState_.segmentLayout = ComputeGaugeSegmentLayout(
-        renderer.Config().layout.gauge.sweepDegrees,
+    layoutState_.segmentLayout = ComputeGaugeSegmentLayout(renderer.Config().layout.gauge.sweepDegrees,
         renderer.Config().layout.gauge.segmentCount,
         renderer.Config().layout.gauge.segmentGapDegrees);
     layoutState_.innerRadius = (std::max)(0, layoutState_.outerRadius - layoutState_.ringThickness);
@@ -293,8 +284,7 @@ void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRec
     layoutState_.labelHeight = renderer.Renderer().TextMetrics().smallText;
     layoutState_.guideHalfExtension = (std::max)(1, layoutState_.ringThickness / 2);
     layoutState_.hitInset = (std::max)(4, renderer.Renderer().ScaleLogical(5));
-    layoutState_.segmentCountAnchorRect = RenderRect{
-        layoutState_.cx - layoutState_.anchorHalf,
+    layoutState_.segmentCountAnchorRect = RenderRect{layoutState_.cx - layoutState_.anchorHalf,
         layoutState_.cy - layoutState_.outerRadius - layoutState_.anchorHalf,
         layoutState_.cx - layoutState_.anchorHalf + layoutState_.anchorSize,
         layoutState_.cy - layoutState_.outerRadius - layoutState_.anchorHalf + layoutState_.anchorSize};
@@ -302,13 +292,11 @@ void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRec
         layoutState_.cx, layoutState_.cy, layoutState_.outerRadius * 2, layoutState_.anchorPadding);
     layoutState_.ringThicknessAnchorRect = MakeCircleAnchorRect(
         layoutState_.cx, layoutState_.cy, layoutState_.innerRadius * 2, layoutState_.anchorPadding);
-    layoutState_.valueRect = RenderRect{
-        layoutState_.cx - layoutState_.halfWidth,
+    layoutState_.valueRect = RenderRect{layoutState_.cx - layoutState_.halfWidth,
         layoutState_.cy + layoutState_.valueBottom - layoutState_.valueHeight,
         layoutState_.cx + layoutState_.halfWidth,
         layoutState_.cy + layoutState_.valueBottom};
-    layoutState_.labelRect = RenderRect{
-        layoutState_.cx - layoutState_.halfWidth,
+    layoutState_.labelRect = RenderRect{layoutState_.cx - layoutState_.halfWidth,
         layoutState_.cy + layoutState_.labelBottom - layoutState_.labelHeight,
         layoutState_.cx + layoutState_.halfWidth,
         layoutState_.cy + layoutState_.labelBottom};
@@ -319,15 +307,13 @@ void GaugeWidget::ResolveLayoutState(const WidgetHost& renderer, const RenderRec
     for (int i = 0; i < layoutState_.segmentLayout.segmentCount; ++i) {
         const double slotStart =
             layoutState_.segmentLayout.gaugeStart + layoutState_.segmentLayout.pitchSweep * static_cast<double>(i);
-        layoutState_.ringSegments.push_back(MakeRingSegmentArc(
-            layoutState_.cx,
+        layoutState_.ringSegments.push_back(MakeRingSegmentArc(layoutState_.cx,
             layoutState_.cy,
             layoutState_.outerRadius,
             layoutState_.ringThickness,
             slotStart,
             layoutState_.segmentLayout.segmentSweep));
-        layoutState_.ringSegmentBounds.push_back(ComputeGaugeSegmentBounds(
-            layoutState_.cx,
+        layoutState_.ringSegmentBounds.push_back(ComputeGaugeSegmentBounds(layoutState_.cx,
             layoutState_.cy,
             layoutState_.outerRadius,
             layoutState_.ringThickness,
@@ -368,34 +354,29 @@ void GaugeWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget, const M
     if (renderer.CurrentRenderMode() != WidgetHost::RenderMode::Blank) {
         const RenderColorId valueColor =
             metric.state == MetricValueState::PermissionRequired ? RenderColorId::Warning : RenderColorId::Foreground;
-        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(
-            layoutState_.valueRect,
+        const WidgetHost::TextLayoutResult valueLayout = renderer.Renderer().DrawTextBlock(layoutState_.valueRect,
             metric.valueText,
             TextStyleId::Big,
             valueColor,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center));
-        renderer.EditArtifacts().RegisterDynamicTextAnchor(
-            valueLayout,
+        renderer.EditArtifacts().RegisterDynamicTextAnchor(valueLayout,
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontBig, 0, renderer.Config().layout.fonts.big.size),
-            metric.state == MetricValueState::PermissionRequired ? WidgetHost::LayoutEditParameter::ColorWarning
-                                                                 : WidgetHost::LayoutEditParameter::ColorForeground);
+            metric.state == MetricValueState::PermissionRequired ?
+                WidgetHost::LayoutEditParameter::ColorWarning :
+                WidgetHost::LayoutEditParameter::ColorForeground);
         renderer.EditArtifacts().RegisterDynamicTextAnchor(
             valueLayout, renderer.MakeMetricTextBinding(widget, metric_, 100));
     }
-    const RenderRect ringBounds{
-        layoutState_.cx - layoutState_.outerRadius,
+    const RenderRect ringBounds{layoutState_.cx - layoutState_.outerRadius,
         layoutState_.cy - layoutState_.outerRadius,
         layoutState_.cx + layoutState_.outerRadius,
         layoutState_.cy + layoutState_.outerRadius};
-    renderer.EditArtifacts().RegisterDynamicColorEditRegion(
-        WidgetHost::LayoutEditParameter::ColorAccent,
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorAccent,
         RenderRect{ringBounds.left, ringBounds.top, layoutState_.cx, ringBounds.bottom});
-    renderer.EditArtifacts().RegisterDynamicColorEditRegion(
-        WidgetHost::LayoutEditParameter::ColorTrack,
+    renderer.EditArtifacts().RegisterDynamicColorEditRegion(WidgetHost::LayoutEditParameter::ColorTrack,
         RenderRect{layoutState_.cx, ringBounds.top, ringBounds.right, ringBounds.bottom});
-    renderer.Renderer().DrawText(
-        layoutState_.labelRect,
+    renderer.Renderer().DrawText(layoutState_.labelRect,
         metric.label,
         TextStyleId::Small,
         RenderColorId::MutedText,
@@ -406,59 +387,48 @@ void GaugeWidget::BuildStaticAnchors(WidgetHost& renderer, const WidgetLayout& w
     const int cx = layoutState_.cx;
     const int cy = layoutState_.cy;
     const int outerRadius = layoutState_.outerRadius;
-    renderer.EditArtifacts().RegisterStaticEditAnchor(
-        LayoutEditAnchorRegistration{
-            .key =
-                LayoutEditAnchorKey{
-                    LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                    WidgetHost::LayoutEditParameter::GaugeSegmentCount,
-                    0},
-            .targetRect = widget.rect,
-            .anchorRect = layoutState_.segmentCountAnchorRect,
-            .shape = AnchorShape::Diamond,
-            .value = renderer.Config().layout.gauge.segmentCount,
-            .drag = LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Both, RenderPoint{cx, cy - outerRadius}),
-            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered});
-    renderer.EditArtifacts().RegisterStaticEditAnchor(
-        LayoutEditAnchorRegistration{
-            .key =
-                LayoutEditAnchorKey{
-                    LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                    WidgetHost::LayoutEditParameter::GaugeOuterPadding,
-                    0},
-            .targetRect = layoutState_.outerPaddingAnchorRect,
-            .anchorRect = layoutState_.outerPaddingAnchorRect,
-            .shape = AnchorShape::Circle,
-            .value = renderer.Config().layout.gauge.outerPadding,
-            .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
-            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
-            .targetOutline = LayoutEditTargetOutline::Hidden});
-    renderer.EditArtifacts().RegisterStaticEditAnchor(
-        LayoutEditAnchorRegistration{
-            .key =
-                LayoutEditAnchorKey{
-                    LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-                    WidgetHost::LayoutEditParameter::GaugeRingThickness,
-                    0},
-            .targetRect = layoutState_.ringThicknessAnchorRect,
-            .anchorRect = layoutState_.ringThicknessAnchorRect,
-            .shape = AnchorShape::Circle,
-            .value = renderer.Config().layout.gauge.ringThickness,
-            .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
-            .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
-            .targetOutline = LayoutEditTargetOutline::Hidden});
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            WidgetHost::LayoutEditParameter::GaugeSegmentCount,
+            0},
+        .targetRect = widget.rect,
+        .anchorRect = layoutState_.segmentCountAnchorRect,
+        .shape = AnchorShape::Diamond,
+        .value = renderer.Config().layout.gauge.segmentCount,
+        .drag = LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Both, RenderPoint{cx, cy - outerRadius}),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered});
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            WidgetHost::LayoutEditParameter::GaugeOuterPadding,
+            0},
+        .targetRect = layoutState_.outerPaddingAnchorRect,
+        .anchorRect = layoutState_.outerPaddingAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.gauge.outerPadding,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            WidgetHost::LayoutEditParameter::GaugeRingThickness,
+            0},
+        .targetRect = layoutState_.ringThicknessAnchorRect,
+        .anchorRect = layoutState_.ringThicknessAnchorRect,
+        .shape = AnchorShape::Circle,
+        .value = renderer.Config().layout.gauge.ringThickness,
+        .drag = LayoutEditAnchorDrag::RadialDistance(RenderPoint{cx, cy}, -1.0),
+        .visibility = LayoutEditAnchorVisibility::WhenWidgetHovered,
+        .targetOutline = LayoutEditTargetOutline::Hidden});
     const MetricDefinitionConfig* definition = renderer.FindConfiguredMetricDefinition(metric_);
     if (definition != nullptr && !definition->label.empty()) {
-        renderer.EditArtifacts().RegisterStaticTextAnchor(
-            layoutState_.labelRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
             renderer.MakeEditableTextBinding(
                 widget, WidgetHost::LayoutEditParameter::FontSmall, 1, renderer.Config().layout.fonts.smallText.size),
             WidgetHost::LayoutEditParameter::ColorMutedText);
-        renderer.EditArtifacts().RegisterStaticTextAnchor(
-            layoutState_.labelRect,
+        renderer.EditArtifacts().RegisterStaticTextAnchor(layoutState_.labelRect,
             definition->label,
             TextStyleId::Small,
             TextLayoutOptions::SingleLine(TextHorizontalAlign::Center, TextVerticalAlign::Center),
@@ -480,42 +450,41 @@ void GaugeWidget::BuildEditGuides(WidgetHost& renderer, const WidgetLayout& widg
     const int hitInset = layoutState_.hitInset;
     const int halfWidth = layoutState_.halfWidth;
 
-    const auto addRadialGuide = [&](WidgetHost::LayoutEditParameter parameter,
-                                    int guideId,
-                                    double angleDegrees,
-                                    double value,
-                                    double angularMin,
-                                    double angularMax) {
-        const int innerGuideRadius = (std::max)(1, outerRadius - ringThickness - guideHalfExtension);
-        const int outerGuideRadius = outerRadius + guideHalfExtension;
-        const RenderPoint guideStart = PolarPoint(cx, cy, innerGuideRadius, angleDegrees);
-        const RenderPoint guideEnd = PolarPoint(cx, cy, outerGuideRadius, angleDegrees);
-        LayoutEditWidgetGuide guide;
-        guide.axis = LayoutGuideAxis::Vertical;
-        guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
-        guide.parameter = parameter;
-        guide.guideId = guideId;
-        guide.widgetRect = widget.rect;
-        guide.drawStart = guideStart;
-        guide.drawEnd = guideEnd;
-        guide.hitRect = ExpandSegmentBounds(guideStart, guideEnd, hitInset);
-        guide.dragOrigin = RenderPoint{cx, cy};
-        guide.value = value;
-        guide.angularDrag = true;
-        guide.angularMin = angularMin;
-        guide.angularMax = angularMax;
-        renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
-    };
+    const auto addRadialGuide =
+        [&](WidgetHost::LayoutEditParameter parameter,
+            int guideId,
+            double angleDegrees,
+            double value,
+            double angularMin,
+            double angularMax) {
+            const int innerGuideRadius = (std::max)(1, outerRadius - ringThickness - guideHalfExtension);
+            const int outerGuideRadius = outerRadius + guideHalfExtension;
+            const RenderPoint guideStart = PolarPoint(cx, cy, innerGuideRadius, angleDegrees);
+            const RenderPoint guideEnd = PolarPoint(cx, cy, outerGuideRadius, angleDegrees);
+            LayoutEditWidgetGuide guide;
+            guide.axis = LayoutGuideAxis::Vertical;
+            guide.widget = LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath};
+            guide.parameter = parameter;
+            guide.guideId = guideId;
+            guide.widgetRect = widget.rect;
+            guide.drawStart = guideStart;
+            guide.drawEnd = guideEnd;
+            guide.hitRect = ExpandSegmentBounds(guideStart, guideEnd, hitInset);
+            guide.dragOrigin = RenderPoint{cx, cy};
+            guide.value = value;
+            guide.angularDrag = true;
+            guide.angularMin = angularMin;
+            guide.angularMax = angularMax;
+            renderer.EditArtifacts().RegisterWidgetEditGuide(std::move(guide));
+        };
 
-    addRadialGuide(
-        WidgetHost::LayoutEditParameter::GaugeSweepDegrees,
+    addRadialGuide(WidgetHost::LayoutEditParameter::GaugeSweepDegrees,
         0,
         gaugeLayout.gaugeEnd,
         gaugeLayout.totalSweep,
         0.0,
         360.0);
-    addRadialGuide(
-        WidgetHost::LayoutEditParameter::GaugeSegmentGapDegrees,
+    addRadialGuide(WidgetHost::LayoutEditParameter::GaugeSegmentGapDegrees,
         gaugeLayout.segmentCount,
         gaugeLayout.gaugeStart + gaugeLayout.segmentSweep,
         gaugeLayout.segmentGap,

@@ -58,8 +58,7 @@ AutoStartUpdateResult EnableAutoStartRegistration() {
 AutoStartUpdateResult DisableAutoStartRegistration() {
     const LSTATUS registryStatus = WriteAutoStartRegistryValue(false);
     const DWORD serviceStatus = StopAndDeleteFpsService();
-    return {
-        registryStatus == ERROR_SUCCESS && serviceStatus == ERROR_SUCCESS,
+    return {registryStatus == ERROR_SUCCESS && serviceStatus == ERROR_SUCCESS,
         IsAccessDenied(registryStatus) || IsAccessDenied(serviceStatus)};
 }
 
@@ -108,8 +107,7 @@ bool IsAutoStartEnabledForCurrentExecutable() {
 LSTATUS WriteAutoStartRegistryValue(bool enabled) {
     HKEY key = nullptr;
     DWORD disposition = 0;
-    const LSTATUS createStatus = RegCreateKeyExA(
-        HKEY_LOCAL_MACHINE,
+    const LSTATUS createStatus = RegCreateKeyExA(HKEY_LOCAL_MACHINE,
         kAutoStartRunSubKey,
         0,
         nullptr,
@@ -130,8 +128,7 @@ LSTATUS WriteAutoStartRegistryValue(bool enabled) {
             return ERROR_FILE_NOT_FOUND;
         }
         const std::string command = QuoteCommandLineArgument(executablePath->string());
-        result = RegSetValueExA(
-            key,
+        result = RegSetValueExA(key,
             kAutoStartValueName,
             0,
             REG_SZ,

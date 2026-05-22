@@ -22,16 +22,14 @@ class LayoutGuideSheetRenderer {
 public:
     explicit LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer);
 
-    bool SavePng(
-        const FilePath& imagePath,
+    bool SavePng(const FilePath& imagePath,
         const SystemSnapshot& snapshot,
         std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         std::vector<std::string>* traceDetails = nullptr,
         std::string* errorText = nullptr,
         LayoutGuideSheetRenderStats* stats = nullptr);
-    bool RenderOffscreen(
-        const SystemSnapshot& snapshot,
+    bool RenderOffscreen(const SystemSnapshot& snapshot,
         std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         std::vector<std::string>* traceDetails = nullptr,
@@ -43,8 +41,7 @@ private:
     using SurfaceDrawCallback = FunctionRef<void()>;
     using SurfaceRenderer = FunctionRef<bool(int width, int height, SurfaceDrawCallback draw)>;
 
-    bool Render(
-        const SystemSnapshot& snapshot,
+    bool Render(const SystemSnapshot& snapshot,
         std::vector<LayoutGuideSheetCalloutRequest>& callouts,
         const std::vector<std::string>& selectedCardIds,
         const SurfaceRenderer& renderSurface,

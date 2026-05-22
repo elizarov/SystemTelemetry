@@ -39,8 +39,7 @@ public:
     virtual bool ApplyMetricListOrder(
         const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) = 0;
     virtual bool ApplyContainerChildOrder(const LayoutContainerChildOrderEditKey& key, int fromIndex, int toIndex) = 0;
-    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(
-        const LayoutEditLayoutTarget& target,
+    virtual std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) = 0;

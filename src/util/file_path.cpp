@@ -47,11 +47,14 @@ std::string TrimTrailingSeparators(std::string path) {
 
 }  // namespace
 
-FilePath::FilePath(const char* path) : path_(path != nullptr ? path : "") {}
+FilePath::FilePath(const char* path) :
+    path_(path != nullptr ? path : "") {}
 
-FilePath::FilePath(std::string path) : path_(std::move(path)) {}
+FilePath::FilePath(std::string path) :
+    path_(std::move(path)) {}
 
-FilePath::FilePath(std::string_view path) : path_(path) {}
+FilePath::FilePath(std::string_view path) :
+    path_(path) {}
 
 bool FilePath::Empty() const {
     return path_.empty();
@@ -114,9 +117,9 @@ FilePath JoinPath(const FilePath& base, const FilePath& child) {
     }
     const std::string baseText = base.string();
     const std::string childText = child.string();
-    return FilePath(
-        IsSeparator(baseText.back()) ? FormatText("%s%s", baseText.c_str(), childText.c_str())
-                                     : FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
+    return FilePath(IsSeparator(baseText.back()) ?
+            FormatText("%s%s", baseText.c_str(), childText.c_str()) :
+            FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
 }
 
 FilePath JoinPath(const FilePath& base, const char* child) {

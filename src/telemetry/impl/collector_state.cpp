@@ -1,6 +1,7 @@
 #include "telemetry/impl/collector_state.h"
 
-RealTelemetryCollectorState::RealTelemetryCollectorState(Trace& trace) : trace_(trace) {}
+RealTelemetryCollectorState::RealTelemetryCollectorState(Trace& trace) :
+    trace_(trace) {}
 
 RealTelemetryCollectorState::~RealTelemetryCollectorState() {
     if (cpu_.query != nullptr) {

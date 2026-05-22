@@ -42,7 +42,8 @@ std::string CleanProcessDisplayName(std::string processName) {
 
 class Handle {
 public:
-    explicit Handle(HANDLE handle = INVALID_HANDLE_VALUE) : handle_(handle) {}
+    explicit Handle(HANDLE handle = INVALID_HANDLE_VALUE) :
+        handle_(handle) {}
 
     ~Handle() {
         if (handle_ != INVALID_HANDLE_VALUE) {
@@ -118,7 +119,8 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
 
 class FpsServiceClientProvider final : public FpsTelemetryProvider {
 public:
-    explicit FpsServiceClientProvider(Trace& trace) : trace_(trace) {}
+    explicit FpsServiceClientProvider(Trace& trace) :
+        trace_(trace) {}
 
     bool Initialize() override {
         if (initialized_) {
@@ -136,8 +138,9 @@ public:
         }
 
         cachedSample_ = *sample;
-        diagnostics_ = sample->diagnostics.empty() ? ResourceStringText(RES_STR("FPS service provider active."))
-                                                   : sample->diagnostics;
+        diagnostics_ = sample->diagnostics.empty() ?
+            ResourceStringText(RES_STR("FPS service provider active.")) :
+            sample->diagnostics;
         initialized_ = true;
         trace_.WriteFmt(
             TracePrefix::FpsServiceClient, RES_STR("initialize_done diagnostics=\"%s\""), diagnostics_.c_str());
@@ -178,7 +181,8 @@ std::unique_ptr<FpsTelemetryProvider> CreateFpsServiceClientProvider(Trace& trac
 
 class FpsHybridProvider final : public FpsTelemetryProvider {
 public:
-    explicit FpsHybridProvider(Trace& trace) : trace_(trace) {}
+    explicit FpsHybridProvider(Trace& trace) :
+        trace_(trace) {}
 
     bool Initialize() override {
         if (TryInitializeServiceProvider()) {

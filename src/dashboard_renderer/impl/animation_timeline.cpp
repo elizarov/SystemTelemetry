@@ -4,8 +4,8 @@
 #include <iterator>
 #include <utility>
 
-DashboardAnimationTimeline::DashboardAnimationTimeline(std::chrono::milliseconds duration)
-    : duration_(duration.count() > 0 ? duration : std::chrono::milliseconds(1)) {}
+DashboardAnimationTimeline::DashboardAnimationTimeline(std::chrono::milliseconds duration) :
+    duration_(duration.count() > 0 ? duration : std::chrono::milliseconds(1)) {}
 
 void DashboardAnimationTimeline::BeginFrame(Clock::time_point now) {
     frameTime_ = now;

@@ -206,8 +206,7 @@ protected:
 // The callback is invoked from the telemetry worker thread. It must not call back into TelemetryRuntime, touch UI state
 // directly, or retain references from the passed update after returning; copy any data needed by another thread.
 // Creation initializes telemetry synchronously before returning so startup errors are reported deterministically.
-std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
-    const TelemetryCollectorOptions& options,
+std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,

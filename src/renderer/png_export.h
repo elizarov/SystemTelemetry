@@ -17,8 +17,7 @@ enum class PngPixelFormat {
 
 bool SaveBgraPng(
     const FilePath& imagePath, int width, int height, const std::vector<std::uint8_t>& bgra, std::string* errorText);
-bool SaveWicBitmapSourcePng(
-    IWICImagingFactory* factory,
+bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     IWICBitmapSource* source,
     const FilePath& imagePath,
     PngPixelFormat pixelFormat,

@@ -38,8 +38,7 @@ bool SetHresultError(std::string* errorText, ResourceStringId prefix, HRESULT hr
 
 bool SetPrefixedHresultError(std::string* errorText, std::string_view prefix, ResourceStringId suffix, HRESULT hr) {
     if (errorText != nullptr) {
-        AssignFormat(
-            *errorText,
+        AssignFormat(*errorText,
             RES_STR("%.*s%s hr="),
             static_cast<int>(prefix.size()),
             prefix.data(),
@@ -82,8 +81,7 @@ bool SaveBgraPngWithInitializedCom(
     const UINT bitmapHeight = static_cast<UINT>(height);
     const UINT stride = bitmapWidth * 4u;
     const UINT byteCount = static_cast<UINT>(bgra.size());
-    hr = factory->CreateBitmapFromMemory(
-        bitmapWidth,
+    hr = factory->CreateBitmapFromMemory(bitmapWidth,
         bitmapHeight,
         GUID_WICPixelFormat32bppBGRA,
         stride,
@@ -100,8 +98,7 @@ bool SaveBgraPngWithInitializedCom(
 
 }  // namespace
 
-bool SaveWicBitmapSourcePng(
-    IWICImagingFactory* factory,
+bool SaveWicBitmapSourcePng(IWICImagingFactory* factory,
     IWICBitmapSource* source,
     const FilePath& imagePath,
     PngPixelFormat pixelFormat,

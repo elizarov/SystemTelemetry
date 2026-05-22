@@ -123,8 +123,7 @@ private:
     void DrawResolvedWidget(const WidgetLayout& widget, const MetricSource& metrics);
     void DrawResolvedWidgetOverlay(const WidgetLayout& widget, const MetricSource& metrics);
     const LayoutCardConfig* FindCardConfigById(const std::string& id) const;
-    void AddLayoutEditGuide(
-        const LayoutNodeConfig& node,
+    void AddLayoutEditGuide(const LayoutNodeConfig& node,
         const RenderRect& rect,
         const std::vector<RenderRect>& childRects,
         int gap,
@@ -132,8 +131,7 @@ private:
         const std::string& editCardId,
         const std::vector<size_t>& nodePath,
         const std::vector<LayoutEditOverlayOwner>& overlayOwners);
-    void ResolveNodeWidgetsInternal(
-        const LayoutNodeConfig& node,
+    void ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,
         std::vector<std::string>& cardReferenceStack,
@@ -143,8 +141,7 @@ private:
         bool instantiateWidgets);
     void BuildWidgetEditGuides();
     void BuildStaticEditableAnchors();
-    bool BuildPresentationFrame(
-        const SystemSnapshot& snapshot,
+    bool BuildPresentationFrame(const SystemSnapshot& snapshot,
         const DashboardOverlayState& overlayState,
         DashboardPresentationFrame& frame,
         PresentationBuildOptions options);
@@ -167,8 +164,7 @@ private:
     void MarkSnapshotLayerUpdated(
         const SystemSnapshot& snapshot, const std::string& overlaySignature, std::uint64_t surfaceVersion);
     bool CanReuseLiveLayerBitmaps(PresentationBuildOptions options) const;
-    bool DrawLayerBitmap(
-        RenderBitmap& bitmap,
+    bool DrawLayerBitmap(RenderBitmap& bitmap,
         int width,
         int height,
         RenderBitmapClear clear,
@@ -178,8 +174,7 @@ private:
     RenderBitmap AcquireLiveLayerBitmap(int width, int height) const;
     void RecycleFrameLayers(DashboardPresentationFrame frame) const;
     bool ResolveLayout(bool includeWidgetState = true);
-    void ResolveNodeWidgets(
-        const LayoutNodeConfig& node,
+    void ResolveNodeWidgets(const LayoutNodeConfig& node,
         const RenderRect& rect,
         std::vector<WidgetLayout>& widgets,
         bool instantiateWidgets = true);
@@ -203,13 +198,11 @@ private:
     void BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState);
     void ResolveLayoutGuideSheetDynamicArtifactCollisions();
     void EndLayoutGuideSheetDynamicArtifacts();
-    void DrawLayoutGuideSheetCard(
-        const std::string& cardId,
+    void DrawLayoutGuideSheetCard(const std::string& cardId,
         const RenderRect& sourceRect,
         const RenderRect& destRect,
         const MetricSource& metrics);
-    void DrawLayoutGuideSheetOverlay(
-        const DashboardOverlayState& overlayState,
+    void DrawLayoutGuideSheetOverlay(const DashboardOverlayState& overlayState,
         const RenderRect& sourceRect,
         const RenderRect& destRect,
         const MetricSource& metrics);

@@ -338,7 +338,7 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
                 ++literalIndex;
             }
             while (literalIndex < static_cast<int>(text.size()) &&
-                   (text[static_cast<size_t>(literalIndex)] == ' ' || text[static_cast<size_t>(literalIndex)] == '\t' ||
+                (text[static_cast<size_t>(literalIndex)] == ' ' || text[static_cast<size_t>(literalIndex)] == '\t' ||
                     text[static_cast<size_t>(literalIndex)] == '\r' ||
                     text[static_cast<size_t>(literalIndex)] == '\n')) {
                 ++literalIndex;
@@ -346,8 +346,9 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
             if (literalIndex < static_cast<int>(text.size()) &&
                 (text[static_cast<size_t>(literalIndex)] == '"' || text[static_cast<size_t>(literalIndex)] == '\'')) {
                 const bool raw = literalIndex > 0 && text.substr(static_cast<size_t>(literalIndex - 1), 2) == "R\"";
-                const int end = raw ? SkipRawStringLiteral(text, literalIndex - 1)
-                                    : SkipQuotedLiteral(text, literalIndex, text[static_cast<size_t>(literalIndex)]);
+                const int end = raw ?
+                    SkipRawStringLiteral(text, literalIndex - 1) :
+                    SkipQuotedLiteral(text, literalIndex, text[static_cast<size_t>(literalIndex)]);
                 if (!IsAllowedConstWideStringLiteral(text, index, literalIndex, end)) {
                     lines.push_back(line);
                 }
@@ -378,15 +379,16 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
 
 class ArchitectureChecker final : public Checker {
 public:
-    ArchitectureChecker(const JsonValue& config, CheckerContext context)
-        : context_(std::move(context)), roots_(ConfigStrings(config, "roots")),
-          headerSuffixes_(RequireSuffixGroup(
-              context_.suffixGroups, "architecture.header_suffix_group", config.At("header_suffix_group").AsString())),
-          implementationSuffixes_(RequireSuffixGroup(
-              context_.suffixGroups,
-              "architecture.implementation_suffix_group",
-              config.At("implementation_suffix_group").AsString())),
-          headerSuffix_(*headerSuffixes_.begin()), implementationSuffix_(*implementationSuffixes_.begin()) {
+    ArchitectureChecker(const JsonValue& config, CheckerContext context) :
+        context_(std::move(context)),
+        roots_(ConfigStrings(config, "roots")),
+        headerSuffixes_(RequireSuffixGroup(
+            context_.suffixGroups, "architecture.header_suffix_group", config.At("header_suffix_group").AsString())),
+        implementationSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+            "architecture.implementation_suffix_group",
+            config.At("implementation_suffix_group").AsString())),
+        headerSuffix_(*headerSuffixes_.begin()),
+        implementationSuffix_(*implementationSuffixes_.begin()) {
         const std::vector<std::string> headerBodyAllowlist = ConfigStrings(config, "header_body_allowlist");
         headerBodyAllowlist_.insert(headerBodyAllowlist.begin(), headerBodyAllowlist.end());
         const std::vector<std::string> cppWithoutHeaderAllowlist =
@@ -500,11 +502,10 @@ private:
             const int line =
                 static_cast<int>(std::count(record.strippedText.begin(), record.strippedText.begin() + brace, '\n')) +
                 1;
-            violations_.push_back(
-                {record.relative + ":" + std::to_string(line),
-                 "header-body",
-                 "Function body for " + name +
-                     " appears in a header; move non-template logic to a matching .cpp file."});
+            violations_.push_back({record.relative + ":" + std::to_string(line),
+                "header-body",
+                "Function body for " + name +
+                    " appears in a header; move non-template logic to a matching .cpp file."});
             brace = record.strippedText.find('{', brace + 1);
         }
     }
@@ -518,11 +519,10 @@ private:
         if (cppWithoutHeaderAllowlist_.find(record.relative) == cppWithoutHeaderAllowlist_.end()) {
             const std::string expected = PairedHeaderForCpp(record.relative);
             if (!FileExists(JoinPath(context_.projectRoot, expected))) {
-                violations_.push_back(
-                    {record.relative + ":1",
-                     "missing-header",
-                     record.relative + " has no matching header " + expected +
-                         "; add one or allowlist the translation unit."});
+                violations_.push_back({record.relative + ":1",
+                    "missing-header",
+                    record.relative + " has no matching header " + expected +
+                        "; add one or allowlist the translation unit."});
             }
         }
 
@@ -560,11 +560,10 @@ private:
             if (definition.relpath == expectedCpp) {
                 continue;
             }
-            violations_.push_back(
-                {definition.relpath + ":" + std::to_string(definition.line),
-                 "impl-mismatch",
-                 definition.name + " is declared from " + ownerHeader + " but implemented in " + definition.relpath +
-                     "; expected " + expectedCpp + "."});
+            violations_.push_back({definition.relpath + ":" + std::to_string(definition.line),
+                "impl-mismatch",
+                definition.name + " is declared from " + ownerHeader + " but implemented in " + definition.relpath +
+                    "; expected " + expectedCpp + "."});
         }
     }
 
@@ -598,13 +597,14 @@ struct IncludeRoot {
 
 class IncludeStyleChecker final : public Checker {
 public:
-    IncludeStyleChecker(const JsonValue& config, CheckerContext context)
-        : context_(std::move(context)), roots_(ConfigStrings(config, "roots")),
-          suffixes_(RequireSuffixGroup(
-              context_.suffixGroups, "include_style.suffix_group", config.At("suffix_group").AsString())),
-          trackedOnly_(config.Find("tracked_only") != nullptr && config.At("tracked_only").AsBool()),
-          nolintPattern_(MakeRegex(config.At("nolint_pattern").AsString())),
-          nolintMessage_(config.At("nolint_message").AsString()) {
+    IncludeStyleChecker(const JsonValue& config, CheckerContext context) :
+        context_(std::move(context)),
+        roots_(ConfigStrings(config, "roots")),
+        suffixes_(RequireSuffixGroup(
+            context_.suffixGroups, "include_style.suffix_group", config.At("suffix_group").AsString())),
+        trackedOnly_(config.Find("tracked_only") != nullptr && config.At("tracked_only").AsBool()),
+        nolintPattern_(MakeRegex(config.At("nolint_pattern").AsString())),
+        nolintMessage_(config.At("nolint_message").AsString()) {
         for (const std::string& root : ConfigStrings(config, "include_roots")) {
             includeRoots_.push_back({root, AbsolutePath(JoinPath(context_.projectRoot, root))});
         }
@@ -633,12 +633,11 @@ public:
             if (NormalizeInclude(include.text) == expected) {
                 continue;
             }
-            violations_.push_back(
-                {record.relative + ":" + std::to_string(include.line),
-                 "include-style",
-                 "Project header \"" + include.text + "\" resolves to " +
-                     RelativePath(resolved->first, context_.projectRoot) + "; use \"" + expected + "\" from the " +
-                     resolved->second + " include root instead of a relative or local shorthand path."});
+            violations_.push_back({record.relative + ":" + std::to_string(include.line),
+                "include-style",
+                "Project header \"" + include.text + "\" resolves to " +
+                    RelativePath(resolved->first, context_.projectRoot) + "; use \"" + expected + "\" from the " +
+                    resolved->second + " include root instead of a relative or local shorthand path."});
         }
     }
 
@@ -769,22 +768,21 @@ struct PackageLocSummary {
 
 class SourceDependencyChecker final : public Checker {
 public:
-    SourceDependencyChecker(const JsonValue& config, CheckerContext context)
-        : context_(std::move(context)), roots_(ConfigStrings(config, "roots")),
-          sourceRootName_(roots_.empty() ? "" : roots_[0]),
-          sourceRoot_(AbsolutePath(JoinPath(context_.projectRoot, sourceRootName_))),
-          suffixes_(RequireSuffixGroup(
-              context_.suffixGroups, "source_dependencies.suffix_group", config.At("suffix_group").AsString())),
-          headerSuffixes_(RequireSuffixGroup(
-              context_.suffixGroups,
-              "source_dependencies.header_suffix_group",
-              config.At("header_suffix_group").AsString())),
-          largeSourceFileLocThreshold_(
-              config.Find("large_source_file_loc_threshold") != nullptr
-                  ? config.At("large_source_file_loc_threshold").AsInt()
-                  : 1000),
-          packageEncapsulationMessage_(config.At("package_encapsulation_message").AsString()),
-          packageDependencyMessage_(config.At("package_dependency_message").AsString()) {
+    SourceDependencyChecker(const JsonValue& config, CheckerContext context) :
+        context_(std::move(context)),
+        roots_(ConfigStrings(config, "roots")),
+        sourceRootName_(roots_.empty() ? "" : roots_[0]),
+        sourceRoot_(AbsolutePath(JoinPath(context_.projectRoot, sourceRootName_))),
+        suffixes_(RequireSuffixGroup(
+            context_.suffixGroups, "source_dependencies.suffix_group", config.At("suffix_group").AsString())),
+        headerSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+            "source_dependencies.header_suffix_group",
+            config.At("header_suffix_group").AsString())),
+        largeSourceFileLocThreshold_(config.Find("large_source_file_loc_threshold") != nullptr ?
+                config.At("large_source_file_loc_threshold").AsInt() :
+                1000),
+        packageEncapsulationMessage_(config.At("package_encapsulation_message").AsString()),
+        packageDependencyMessage_(config.At("package_dependency_message").AsString()) {
         const std::vector<std::string> universalPackageDependencies =
             ConfigStrings(config, "universal_package_dependencies");
         universalPackageDependencies_.insert(universalPackageDependencies.begin(), universalPackageDependencies.end());
@@ -972,18 +970,16 @@ private:
             if (sourcePackage == targetPackage) {
                 continue;
             }
-            findings.push_back(
-                {source + " -> " + target,
-                 "package-encapsulation",
-                 FormatTemplate(
-                     packageEncapsulationMessage_,
-                     {
-                         {"source", source},
-                         {"target", target},
-                         {"source_package", sourcePackage},
-                         {"target_package", targetPackage},
-                         {"target_package_root", sourceRootName_ + "/" + targetPackage},
-                     })});
+            findings.push_back({source + " -> " + target,
+                "package-encapsulation",
+                FormatTemplate(packageEncapsulationMessage_,
+                    {
+                        {"source", source},
+                        {"target", target},
+                        {"source_package", sourcePackage},
+                        {"target_package", targetPackage},
+                        {"target_package_root", sourceRootName_ + "/" + targetPackage},
+                    })});
         }
         return findings;
     }
@@ -1010,20 +1006,18 @@ private:
             if (targetPackage == sourcePackage || allowed->second.find(targetPackage) != allowed->second.end()) {
                 continue;
             }
-            findings.push_back(
-                {source + " -> " + target,
-                 "package-dependency-" + sourcePackage,
-                 FormatTemplate(
-                     packageDependencyMessage_,
-                     {
-                         {"source", source},
-                         {"target", target},
-                         {"source_package", sourcePackage},
-                         {"target_package", targetPackage},
-                         {"allowed_dependencies",
-                          FormatAllowedPackageDependencies(
-                              sourcePackage, allowed->second, universalPackageDependencies_)},
-                     })});
+            findings.push_back({source + " -> " + target,
+                "package-dependency-" + sourcePackage,
+                FormatTemplate(packageDependencyMessage_,
+                    {
+                        {"source", source},
+                        {"target", target},
+                        {"source_package", sourcePackage},
+                        {"target_package", targetPackage},
+                        {"allowed_dependencies",
+                            FormatAllowedPackageDependencies(
+                                sourcePackage, allowed->second, universalPackageDependencies_)},
+                    })});
         }
         return findings;
     }
@@ -1049,17 +1043,15 @@ private:
                 }
                 allowedPackages += package;
             }
-            findings.push_back(
-                {source + " -> " + target,
-                 external->second.violationKind,
-                 FormatTemplate(
-                     external->second.violationMessage,
-                     {
-                         {"source", source},
-                         {"target", target},
-                         {"source_package", sourcePackage},
-                         {"allowed_packages", allowedPackages},
-                     })});
+            findings.push_back({source + " -> " + target,
+                external->second.violationKind,
+                FormatTemplate(external->second.violationMessage,
+                    {
+                        {"source", source},
+                        {"target", target},
+                        {"source_package", sourcePackage},
+                        {"allowed_packages", allowedPackages},
+                    })});
         }
         return findings;
     }
@@ -1184,9 +1176,8 @@ private:
             }
             const auto summary = summaries.find(package);
             const int totalLoc = summary == summaries.end() ? 0 : summary->second.TotalLoc();
-            lines.push_back(
-                "  " + std::to_string(index + 1) + ". " + FormatCount(totalLoc) + " LOC: " + package + " -> " +
-                dependencies);
+            lines.push_back("  " + std::to_string(index + 1) + ". " + FormatCount(totalLoc) + " LOC: " + package +
+                " -> " + dependencies);
         }
         return lines;
     }
@@ -1249,12 +1240,13 @@ bool LineCouldMatchRule(const LineRule& rule, const std::string& line) {
 
 class SourcePolicyChecker final : public Checker {
 public:
-    SourcePolicyChecker(const JsonValue& config, CheckerContext context)
-        : context_(std::move(context)), roots_(ConfigStrings(config, "roots")),
-          suffixes_(RequireSuffixGroup(
-              context_.suffixGroups, "source_policy.suffix_group", config.At("suffix_group").AsString())),
-          guardrailsDoc_(config.Find("guardrails_doc") != nullptr ? config.At("guardrails_doc").AsString() : ""),
-          wideLiteralMessage_(config.At("wide_literals").At("message").AsString()) {
+    SourcePolicyChecker(const JsonValue& config, CheckerContext context) :
+        context_(std::move(context)),
+        roots_(ConfigStrings(config, "roots")),
+        suffixes_(RequireSuffixGroup(
+            context_.suffixGroups, "source_policy.suffix_group", config.At("suffix_group").AsString())),
+        guardrailsDoc_(config.Find("guardrails_doc") != nullptr ? config.At("guardrails_doc").AsString() : ""),
+        wideLiteralMessage_(config.At("wide_literals").At("message").AsString()) {
         const JsonValue* rules = config.Find("line_rules");
         if (rules != nullptr) {
             for (const JsonValue& rule : rules->AsArray()) {
@@ -1284,10 +1276,9 @@ public:
                                 continue;
                             }
                         }
-                        violations_.push_back(
-                            {record.relative + ":" + std::to_string(index + 1),
-                             rule.kind,
-                             FormatRuleMessage(rule.message, match)});
+                        violations_.push_back({record.relative + ":" + std::to_string(index + 1),
+                            rule.kind,
+                            FormatRuleMessage(rule.message, match)});
                         if (rule.captureGroup < 0) {
                             break;
                         }
@@ -1300,10 +1291,9 @@ public:
         }
 
         for (int line : FindUndocumentedWideLiteralLines(record.text)) {
-            violations_.push_back(
-                {record.relative + ":" + std::to_string(line),
-                 "source-policy",
-                 FormatRuleMessage(wideLiteralMessage_, {})});
+            violations_.push_back({record.relative + ":" + std::to_string(line),
+                "source-policy",
+                FormatRuleMessage(wideLiteralMessage_, {})});
         }
     }
 

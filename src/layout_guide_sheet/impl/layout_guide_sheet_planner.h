@@ -11,18 +11,15 @@ struct AppConfig;
 
 std::vector<std::string> SelectLayoutGuideSheetCards(const std::vector<LayoutGuideSheetCardSummary>& cards);
 
-void BuildLayoutGuideSheetCallouts(
-    const AppConfig& config,
+void BuildLayoutGuideSheetCallouts(const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const std::vector<LayoutGuideSheetCardSummary>& cards,
     const std::vector<std::string>& selectedCardIds,
     std::vector<LayoutGuideSheetCalloutRequest>& callouts);
 
-void BuildLayoutGuideSheetOverviewCallouts(
-    const AppConfig& config,
+void BuildLayoutGuideSheetOverviewCallouts(const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     std::vector<LayoutGuideSheetCalloutRequest>& callouts);
 
-void AppendLayoutGuideSheetCardCallouts(
-    std::vector<LayoutGuideSheetCalloutRequest>& merged,
+void AppendLayoutGuideSheetCardCallouts(std::vector<LayoutGuideSheetCalloutRequest>& merged,
     const std::vector<LayoutGuideSheetCalloutRequest>& cardCallouts);

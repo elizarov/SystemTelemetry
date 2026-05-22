@@ -6,8 +6,7 @@
 
 struct AppConfig;
 
-void WriteLayoutEditActiveRegionTrace(
-    Trace& trace,
+void WriteLayoutEditActiveRegionTrace(Trace& trace,
     const AppConfig& config,
     const LayoutEditActiveRegions& regions,
     const DashboardOverlayState& overlayState);

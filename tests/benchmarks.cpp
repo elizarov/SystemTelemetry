@@ -194,8 +194,8 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     const std::string_view firstArg = argv[1];
     const std::optional<Benchmark> parsedBenchmark = ParseBenchmarkName(firstArg);
     if (!parsedBenchmark.has_value()) {
-        std::cerr << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames()
-                  << "\n";
+        std::cerr
+            << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames() << "\n";
         return std::nullopt;
     }
 
@@ -314,10 +314,8 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
     const double denominator = static_cast<double>((std::max)(size_t{1}, iterations - 1));
     for (size_t index = 0; index < iterations; ++index) {
         const double t = static_cast<double>(index) / denominator;
-        path.push_back(
-            RenderPoint{
-                static_cast<int>(std::lround(t * static_cast<double>(maxX))),
-                static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
+        path.push_back(RenderPoint{static_cast<int>(std::lround(t * static_cast<double>(maxX))),
+            static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
     }
     return path;
 }
@@ -343,8 +341,7 @@ void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
 
 HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
     const std::string windowTitle(title);
-    return CreateWindowExA(
-        WS_EX_TOOLWINDOW,
+    return CreateWindowExA(WS_EX_TOOLWINDOW,
         "STATIC",
         windowTitle.c_str(),
         WS_POPUP,
@@ -360,8 +357,12 @@ HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
 
 class BenchmarkHost : private LayoutEditHost {
 public:
-    BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
-        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this) {
+    BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace) :
+        config_(config),
+        trace_(trace),
+        renderer_(trace_),
+        renderScale_(renderScale),
+        layoutEditController_(*this) {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
         renderer_.SetImmediatePresent(true);
@@ -540,8 +541,7 @@ private:
         return applied;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
-        const LayoutEditLayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override {
@@ -675,9 +675,10 @@ struct SnapshotHandoffBenchTotals {
 
 class AnimationBenchmarkRenderWorker {
 public:
-    explicit AnimationBenchmarkRenderWorker(HWND hwnd)
-        : hwnd_(hwnd), requestEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
-          responseEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
+    explicit AnimationBenchmarkRenderWorker(HWND hwnd) :
+        hwnd_(hwnd),
+        requestEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
+        responseEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
 
     ~AnimationBenchmarkRenderWorker() {
         Shutdown();
@@ -844,8 +845,9 @@ void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
 }
 
 void PrintBenchLoopResult(const char* name, const BenchResult& result) {
-    std::cout << std::left << std::setw(18) << name << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(18) << name << " total_ms=" << std::fixed << std::setprecision(2)
+        << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
 LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
@@ -1047,8 +1049,7 @@ ThemeChangeBenchTotals RunThemeChangeBenchmark(
     return totals;
 }
 
-BenchResult RunDragBenchmark(
-    BenchmarkHost& host,
+BenchResult RunDragBenchmark(BenchmarkHost& host,
     const LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
     const std::vector<std::vector<int>>& weightSequence) {
@@ -1102,13 +1103,15 @@ BenchResult RunMouseHoverBenchmark(BenchmarkHost& host, const std::vector<Render
 }
 
 void PrintBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "drag_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "drag_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+        << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
 void PrintMouseHoverBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "hover_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "hover_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+        << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
 BenchResult RunTelemetryUpdateBenchmark(BenchmarkHost& host, TelemetryCollector& telemetry, size_t iterations) {
@@ -1125,8 +1128,9 @@ BenchResult RunTelemetryUpdateBenchmark(BenchmarkHost& host, TelemetryCollector&
 }
 
 void PrintTelemetryBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "update_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "update_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+        << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
 LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
@@ -1161,9 +1165,9 @@ LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
 }
 
 void PrintLayoutGuideSheetBenchResult(const LayoutGuideSheetBenchTotals& totals) {
-    std::cout << std::left << std::setw(14) << "sheet_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << totals.generationLoop.total.count() << " per_iter_ms=" << totals.generationLoop.perIteration.count()
-              << "\n";
+    std::cout
+        << std::left << std::setw(14) << "sheet_loop" << " total_ms=" << std::fixed << std::setprecision(2)
+        << totals.generationLoop.total.count() << " per_iter_ms=" << totals.generationLoop.perIteration.count() << "\n";
     for (const std::string& detail : totals.traceDetails) {
         std::cout << std::left << std::setw(14) << "sheet_trace" << " " << detail << "\n";
     }
@@ -1176,8 +1180,9 @@ void PrintPhaseResult(const char* name, const PhaseStats& stats) {
 
     const double totalMs = DurationMilliseconds(stats.total);
     const double averageMs = totalMs / static_cast<double>(stats.samples);
-    std::cout << std::left << std::setw(14) << name << " total_ms=" << std::fixed << std::setprecision(2) << totalMs
-              << " avg_ms=" << averageMs << " samples=" << stats.samples << "\n";
+    std::cout
+        << std::left << std::setw(14) << name << " total_ms=" << std::fixed << std::setprecision(2) << totalMs
+        << " avg_ms=" << averageMs << " samples=" << stats.samples << "\n";
 }
 
 int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
@@ -1211,9 +1216,9 @@ int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& 
         return 1;
     }
 
-    std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
-              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "layout_edit_drag_benchmark guide_children=" << initialWeights.size() << " separator_index="
+        << guide->separatorIndex << " iterations=" << weightSequence.size() << " render_scale=" << renderScale << "\n";
 
     const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
     PrintBenchResult(result);
@@ -1259,11 +1264,11 @@ int RunAnimationBenchmarkCommand(size_t iterations, double renderScale, Trace& t
         return 1;
     }
 
-    std::cout << "animation_benchmark iterations=" << iterations << " render_scale=" << renderScale
-              << " window=" << frame.width << "x" << frame.height
-              << " snapshot_animations=" << frame.snapshotAnimations.size()
-              << " overlay_animations=" << frame.overlayAnimations.size()
-              << " active_chunk_frames=" << kAnimationBenchmarkActiveTransitionChunkFrames << "\n";
+    std::cout
+        << "animation_benchmark iterations=" << iterations << " render_scale=" << renderScale << " window="
+        << frame.width << "x" << frame.height << " snapshot_animations=" << frame.snapshotAnimations.size()
+        << " overlay_animations=" << frame.overlayAnimations.size()
+        << " active_chunk_frames=" << kAnimationBenchmarkActiveTransitionChunkFrames << "\n";
     const AnimationBenchTotals totals = RunAnimationFrameBenchmark(std::move(frame), hwnd, iterations);
     DestroyWindow(hwnd);
     renderer.Shutdown();
@@ -1306,10 +1311,10 @@ int RunSnapshotHandoffBenchmarkCommand(size_t iterations, double renderScale, Tr
         return 1;
     }
 
-    std::cout << "snapshot_handoff_benchmark mode=threaded_vsync telemetry_cadence_ms="
-              << kSnapshotHandoffBenchmarkCadence.count() << " iterations=" << iterations
-              << " render_scale=" << renderScale << " window=" << renderer.WindowWidth() << "x"
-              << renderer.WindowHeight() << "\n";
+    std::cout
+        << "snapshot_handoff_benchmark mode=threaded_vsync telemetry_cadence_ms="
+        << kSnapshotHandoffBenchmarkCadence.count() << " iterations=" << iterations << " render_scale=" << renderScale
+        << " window=" << renderer.WindowWidth() << "x" << renderer.WindowHeight() << "\n";
     const SnapshotHandoffBenchTotals totals = RunSnapshotHandoffBenchmark(renderer, *telemetry, iterations);
     renderer.Shutdown();
     DestroyWindow(hwnd);
@@ -1346,8 +1351,9 @@ int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace
         return 1;
     }
 
-    std::cout << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
+        << " render_scale=" << renderScale << "\n";
     const LayoutSwitchBenchTotals totals = RunLayoutSwitchBenchmark(host, layoutNames, iterations);
     PrintBenchLoopResult("switch_loop", totals.switchLoop);
     PrintPhaseResult("switch_apply", totals.phases.switchApply);
@@ -1378,8 +1384,9 @@ int RunThemeChangeBenchmarkCommand(size_t iterations, double renderScale, Trace&
         return 1;
     }
 
-    std::cout << "theme_change_benchmark themes=" << themeNames.size() << " iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "theme_change_benchmark themes=" << themeNames.size() << " iterations=" << iterations
+        << " render_scale=" << renderScale << "\n";
     const ThemeChangeBenchTotals totals = RunThemeChangeBenchmark(host, themeNames, iterations);
     PrintBenchLoopResult("theme_loop", totals.changeLoop);
     PrintPhaseResult("config_copy", totals.phases.configCopy);
@@ -1415,11 +1422,11 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
         std::cerr << totals.errorText << "\n";
         return 1;
     }
-    std::cout << "layout_guide_sheet_benchmark iterations=" << iterations << " render_scale=" << renderScale
-              << " selected_cards=" << totals.selectedCards << " callouts=" << totals.callouts << "\n";
+    std::cout
+        << "layout_guide_sheet_benchmark iterations=" << iterations << " render_scale=" << renderScale
+        << " selected_cards=" << totals.selectedCards << " callouts=" << totals.callouts << "\n";
     PrintLayoutGuideSheetBenchResult(totals);
-    PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuideActiveRegions),
+    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideActiveRegions),
         totals.phases[PhaseIndex(BenchPhase::LayoutGuideActiveRegions)]);
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuidePlan), totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlan)]);
     PrintPhaseResult(
@@ -1453,9 +1460,9 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
         return 1;
     }
 
-    std::cout << "mouse_hover_benchmark path_points=" << path.size()
-              << " window=" << host.LayoutRenderer().WindowWidth() << "x" << host.LayoutRenderer().WindowHeight()
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "mouse_hover_benchmark path_points=" << path.size() << " window=" << host.LayoutRenderer().WindowWidth()
+        << "x" << host.LayoutRenderer().WindowHeight() << " render_scale=" << renderScale << "\n";
     const BenchResult result = RunMouseHoverBenchmark(host, path);
     PrintMouseHoverBenchResult(result);
 
@@ -1482,8 +1489,9 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
         return 1;
     }
 
-    std::cout << "update_telemetry_benchmark mode=sync_collector iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "update_telemetry_benchmark mode=sync_collector iterations=" << iterations << " render_scale=" << renderScale
+        << "\n";
     const BenchResult result = RunTelemetryUpdateBenchmark(host, *telemetry, iterations);
     PrintTelemetryBenchResult(result);
 

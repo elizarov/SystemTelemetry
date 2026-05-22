@@ -34,8 +34,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
         return true;
     }
     if (config.display.monitorName.empty()) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper,
+        trace.WriteFmt(TracePrefix::Wallpaper,
             RES_STR("skipped_missing_monitor wallpaper=\"%s\""),
             config.display.wallpaper.c_str());
         return false;
@@ -43,8 +42,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
 
     const std::optional<TargetMonitorInfo> targetMonitor = FindTargetMonitor(config.display.monitorName);
     if (!targetMonitor.has_value()) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper,
+        trace.WriteFmt(TracePrefix::Wallpaper,
             RES_STR("monitor_unresolved monitor=\"%s\" wallpaper=\"%s\""),
             config.display.monitorName.c_str(),
             config.display.wallpaper.c_str());
@@ -83,8 +81,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
     UINT monitorCount = 0;
     const HRESULT countStatus = desktopWallpaper->GetMonitorDevicePathCount(&monitorCount);
     if (FAILED(countStatus)) {
-        trace.WriteFmt(
-            TracePrefix::Wallpaper,
+        trace.WriteFmt(TracePrefix::Wallpaper,
             RES_STR("monitor_count_failed hr=0x%08lX"),
             static_cast<unsigned long>(countStatus));
     } else {
@@ -103,8 +100,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
                 const HRESULT setStatus = desktopWallpaper->SetWallpaper(monitorId, wideWallpaperPath.c_str());
                 applied = SUCCEEDED(setStatus);
                 const std::string pathText = wallpaperPath.string();
-                trace.WriteFmt(
-                    TracePrefix::Wallpaper,
+                trace.WriteFmt(TracePrefix::Wallpaper,
                     RES_STR("apply_%s monitor=\"%s\" path=\"%s\" hr=0x%08lX"),
                     applied ? "done" : "failed",
                     config.display.monitorName.c_str(),
@@ -119,8 +115,7 @@ bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace) {
 
     if (!targetFound) {
         const std::string pathText = wallpaperPath.string();
-        trace.WriteFmt(
-            TracePrefix::Wallpaper,
+        trace.WriteFmt(TracePrefix::Wallpaper,
             RES_STR("target_not_found monitor=\"%s\" path=\"%s\""),
             config.display.monitorName.c_str(),
             pathText.c_str());
@@ -140,8 +135,7 @@ bool ConfigureDisplay(
 
     if (CanWriteRuntimeConfig(configPath) && CanWriteRuntimeConfig(imagePath)) {
         std::string screenshotError;
-        const bool imageSaved = SaveDumpScreenshot(
-            imagePath,
+        const bool imageSaved = SaveDumpScreenshot(imagePath,
             dump.snapshot,
             config,
             targetScale,
@@ -193,8 +187,7 @@ bool ConfigureDisplay(
     return launched && exitCode == 0;
 }
 
-int RunElevatedConfigureDisplayMode(
-    const FilePath& sourceConfigPath,
+int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
     const FilePath& sourceDumpPath,
     const FilePath& targetConfigPath,
     const FilePath& targetImagePath) {
@@ -219,18 +212,16 @@ int RunElevatedConfigureDisplayMode(
 
     std::string screenshotError;
     Trace trace;
-    const double targetScale = HasExplicitDisplayScale(config.display.scale)
-        ? config.display.scale
-        : ComputeMonitorFittedScale(
-              config,
-              targetMonitor->rect.right - targetMonitor->rect.left,
-              targetMonitor->rect.bottom - targetMonitor->rect.top);
+    const double targetScale = HasExplicitDisplayScale(config.display.scale) ?
+        config.display.scale :
+        ComputeMonitorFittedScale(config,
+            targetMonitor->rect.right - targetMonitor->rect.left,
+            targetMonitor->rect.bottom - targetMonitor->rect.top);
     if (targetScale <= 0.0) {
         return 1;
     }
 
-    const bool imageSaved = SaveDumpScreenshot(
-        targetImagePath,
+    const bool imageSaved = SaveDumpScreenshot(targetImagePath,
         dump.snapshot,
         config,
         targetScale,

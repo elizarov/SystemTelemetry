@@ -17,8 +17,7 @@ class TestLayoutEditHost : public LayoutEditHost {
 public:
     TestLayoutEditHost() {
         config_.layout.structure.cards.name = "rows";
-        config_.layout.structure.cards.children = {
-            LayoutNodeConfig{.name = "card", .cardReference = true},
+        config_.layout.structure.cards.children = {LayoutNodeConfig{.name = "card", .cardReference = true},
             LayoutNodeConfig{.name = "card", .cardReference = true}};
     }
 
@@ -62,10 +61,8 @@ public:
     }
 
     std::optional<int> EvaluateLayoutWidgetExtentForWeights(
-        const LayoutEditLayoutTarget&,
-        const std::vector<int>&,
-        const LayoutEditWidgetIdentity&,
-        LayoutGuideAxis) override {
+        const LayoutEditLayoutTarget&, const std::vector<int>&, const LayoutEditWidgetIdentity&, LayoutGuideAxis)
+        override {
         return std::nullopt;
     }
 

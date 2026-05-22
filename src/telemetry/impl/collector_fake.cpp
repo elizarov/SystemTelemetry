@@ -211,8 +211,7 @@ double LastHistorySample(const std::vector<double>& samples) {
     return samples.empty() ? 0.0 : samples.back();
 }
 
-double PushSyntheticThroughputSample(
-    SystemSnapshot& snapshot,
+double PushSyntheticThroughputSample(SystemSnapshot& snapshot,
     const RetainedHistoryStore& retainedHistoryStore,
     RetainedHistoryKey key,
     uint64_t sampleTick,
@@ -222,8 +221,7 @@ double PushSyntheticThroughputSample(
     return value;
 }
 
-double SeedSyntheticThroughputHistory(
-    SystemSnapshot& snapshot,
+double SeedSyntheticThroughputHistory(SystemSnapshot& snapshot,
     const RetainedHistoryStore& retainedHistoryStore,
     RetainedHistoryKey key,
     const SyntheticThroughputSpec& spec) {
@@ -326,14 +324,12 @@ TelemetryDump BuildSyntheticTelemetryDump(uint64_t tick) {
     dump.boardProvider.driverLibrary = "Synthetic";
     AssignStringList(
         dump.boardProvider.requestedFanNames, kSyntheticRequestedFanNames, ARRAYSIZE(kSyntheticRequestedFanNames));
-    AssignStringList(
-        dump.boardProvider.requestedTemperatureNames,
+    AssignStringList(dump.boardProvider.requestedTemperatureNames,
         kSyntheticRequestedTemperatureNames,
         ARRAYSIZE(kSyntheticRequestedTemperatureNames));
     AssignStringList(
         dump.boardProvider.availableFanNames, kSyntheticAvailableFanNames, ARRAYSIZE(kSyntheticAvailableFanNames));
-    AssignStringList(
-        dump.boardProvider.availableTemperatureNames,
+    AssignStringList(dump.boardProvider.availableTemperatureNames,
         kSyntheticAvailableTemperatureNames,
         ARRAYSIZE(kSyntheticAvailableTemperatureNames));
     dump.boardProvider.fans = snapshot.boardFans;
@@ -559,9 +555,13 @@ FilePath ResolveFakePath(const FilePath& workingDirectory, const FilePath& confi
 
 class FakeTelemetryCollector : public TelemetryCollector {
 public:
-    FakeTelemetryCollector(FilePath fakePath, TelemetryDumpLoader loadFakeDump, bool liveSyntheticSource, Trace& trace)
-        : fakePath_(std::move(fakePath)), useSyntheticSource_(fakePath_.empty()), loadFakeDump_(loadFakeDump),
-          liveSyntheticSource_(liveSyntheticSource), trace_(trace) {}
+    FakeTelemetryCollector(
+        FilePath fakePath, TelemetryDumpLoader loadFakeDump, bool liveSyntheticSource, Trace& trace) :
+        fakePath_(std::move(fakePath)),
+        useSyntheticSource_(fakePath_.empty()),
+        loadFakeDump_(loadFakeDump),
+        liveSyntheticSource_(liveSyntheticSource),
+        trace_(trace) {}
 
     bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
@@ -569,8 +569,7 @@ public:
         }
         selectionSettings_ = settings.selection;
         if (useSyntheticSource_) {
-            trace_.WriteFmt(
-                TracePrefix::Fake,
+            trace_.WriteFmt(TracePrefix::Fake,
                 RES_STR("initialize_begin source=synthetic mode=%s"),
                 liveSyntheticSource_ ? "live" : "static");
         } else {
@@ -641,8 +640,7 @@ public:
                 UpdateSyntheticTelemetryDump(sourceDump_, tick, retainedHistoryStore_);
                 dump_ = sourceDump_;
                 RefreshSelectionsAndSnapshot();
-                trace_.WriteFmt(
-                    TracePrefix::Fake,
+                trace_.WriteFmt(TracePrefix::Fake,
                     RES_STR("load_done source=synthetic mode=live tick=%llu"),
                     static_cast<unsigned long long>(tick));
             }
@@ -707,8 +705,7 @@ private:
             dump_ = sourceDump_;
             RefreshSelectionsAndSnapshot();
             lastReload_ = std::chrono::steady_clock::now();
-            trace_.WriteFmt(
-                TracePrefix::Fake,
+            trace_.WriteFmt(TracePrefix::Fake,
                 RES_STR("load_done source=synthetic mode=%s tick=%llu"),
                 liveSyntheticSource_ ? "live" : "static",
                 static_cast<unsigned long long>(tick));
@@ -773,8 +770,7 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(
-    const FilePath& workingDirectory,
+std::unique_ptr<TelemetryCollector> CreateFakeTelemetryCollector(const FilePath& workingDirectory,
     const FilePath& configuredPath,
     TelemetryDumpLoader loadFakeDump,
     bool liveSyntheticSource,

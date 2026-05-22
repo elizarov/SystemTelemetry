@@ -20,11 +20,13 @@
 #include "util/text_format.h"
 #include "util/trace.h"
 
-DashboardRenderer::DashboardRenderer(Trace& trace)
-    : trace_(trace), renderer_(CreateRenderer()), layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
-      layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
-      layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()),
-      presentation_(std::make_unique<DashboardRenderThread>()) {
+DashboardRenderer::DashboardRenderer(Trace& trace) :
+    trace_(trace),
+    renderer_(CreateRenderer()),
+    layoutResolver_(std::make_unique<DashboardLayoutResolver>(*this)),
+    layoutEditOverlayRenderer_(std::make_unique<DashboardLayoutEditOverlayRenderer>(*this, *layoutResolver_)),
+    layerBitmapPool_(std::make_shared<DashboardLayerBitmapPool>()),
+    presentation_(std::make_unique<DashboardRenderThread>()) {
     presentation_->SetTrace(&trace_);
     presentation_->SetBitmapPool(layerBitmapPool_);
 }
@@ -73,8 +75,9 @@ long long RectArea(const RenderRect& rect) {
 
 class ScopedAnimationPresentationSuspension {
 public:
-    ScopedAnimationPresentationSuspension(DashboardRenderThread& presentation, bool active)
-        : presentation_(&presentation), active_(active) {
+    ScopedAnimationPresentationSuspension(DashboardRenderThread& presentation, bool active) :
+        presentation_(&presentation),
+        active_(active) {
         if (active_) {
             presentation_->SetAnimationPresentationSuspended(true);
         }
@@ -230,9 +233,8 @@ void DashboardRenderer::AddWidgetAnimation(WidgetAnimationPtr animation, WidgetA
         return;
     }
     WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
-        .push_back(
-            DashboardPresentationAnimation{
-                std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_});
+        .push_back(DashboardPresentationAnimation{
+            std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_});
 }
 
 int DashboardRenderer::WindowWidth() const {
@@ -260,8 +262,7 @@ void DashboardRenderer::BuildStaticEditableAnchors() {
     layoutResolver_->BuildStaticEditableAnchors(*this);
 }
 
-void DashboardRenderer::AddLayoutEditGuide(
-    const LayoutNodeConfig& node,
+void DashboardRenderer::AddLayoutEditGuide(const LayoutNodeConfig& node,
     const RenderRect& rect,
     const std::vector<RenderRect>& childRects,
     int gap,
@@ -273,8 +274,7 @@ void DashboardRenderer::AddLayoutEditGuide(
         *this, node, rect, childRects, gap, renderCardId, editCardId, nodePath, overlayOwners);
 }
 
-void DashboardRenderer::ResolveNodeWidgetsInternal(
-    const LayoutNodeConfig& node,
+void DashboardRenderer::ResolveNodeWidgetsInternal(const LayoutNodeConfig& node,
     const RenderRect& rect,
     std::vector<WidgetLayout>& widgets,
     std::vector<std::string>& cardReferenceStack,
@@ -283,8 +283,7 @@ void DashboardRenderer::ResolveNodeWidgetsInternal(
     const std::vector<size_t>& nodePath,
     bool instantiateWidgets) {
     std::vector<LayoutEditOverlayOwner> overlayOwners;
-    layoutResolver_->ResolveNodeWidgetsInternal(
-        *this,
+    layoutResolver_->ResolveNodeWidgetsInternal(*this,
         node,
         rect,
         widgets,
@@ -357,13 +356,13 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     preferredContentWidth =
         (std::max)(preferredContentWidth, Renderer().MeasureTextWidth(TextStyleId::Small, scaleText));
     const int contentWidth = (std::min)(maxContentWidth, preferredContentWidth);
-    const int hintHeight = Renderer()
-                               .MeasureTextBlock(
-                                   RenderRect{0, 0, contentWidth, WindowHeight()},
-                                   hintText,
-                                   TextStyleId::Small,
-                                   TextLayoutOptions::Wrapped())
-                               .textRect.Height();
+    const int hintHeight =
+        Renderer()
+            .MeasureTextBlock(RenderRect{0, 0, contentWidth, WindowHeight()},
+                hintText,
+                TextStyleId::Small,
+                TextLayoutOptions::Wrapped())
+            .textRect.Height();
     const int overlayWidth = contentWidth + padding * 2;
     const int overlayHeight = padding * 2 + titleHeight + lineGap + bodyHeight + lineGap + bodyHeight + lineGap +
         bodyHeight + lineGap + hintHeight;
@@ -373,8 +372,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     Renderer().DrawSolidRoundedRect(overlayRect, cornerRadius, RenderStroke::Solid(RenderColorId::Accent, borderWidth));
 
     int y = overlayRect.top + padding;
-    Renderer().DrawText(
-        RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + titleHeight},
+    Renderer().DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + titleHeight},
         titleText,
         TextStyleId::Label,
         RenderColorId::Accent,
@@ -382,8 +380,7 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     y += titleHeight + lineGap;
 
     const auto drawBodyLine = [&](const std::string& text, bool ellipsis = false) {
-        Renderer().DrawText(
-            RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + bodyHeight},
+        Renderer().DrawText(RenderRect{overlayRect.left + padding, y, overlayRect.right - padding, y + bodyHeight},
             text,
             TextStyleId::Small,
             RenderColorId::Foreground,
@@ -405,10 +402,10 @@ void DashboardRenderer::DrawResolvedWidget(const WidgetLayout& widget, const Met
     if (widget.widget == nullptr) {
         return;
     }
-    layoutResolver_->SetEditArtifactContext(
-        widget.overlayOwners,
-        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ? LayoutEditOverlayAffordanceLayer::Foreground
-                                                                      : LayoutEditOverlayAffordanceLayer::Background);
+    layoutResolver_->SetEditArtifactContext(widget.overlayOwners,
+        currentWidgetAnimationLayer_ == WidgetAnimationLayer::Overlay ?
+            LayoutEditOverlayAffordanceLayer::Foreground :
+            LayoutEditOverlayAffordanceLayer::Background);
     widget.widget->Draw(*this, widget, metrics);
     layoutResolver_->ResetEditArtifactContext();
 }
@@ -457,8 +454,9 @@ bool DashboardRenderer::DrawWindowInternal(
         if (presentationHwnd_ == nullptr) {
             return presentation_->PresentFrameSynchronously(std::move(frame));
         }
-        return waitForPresentation ? presentation_->PublishFrameAndWait(std::move(frame))
-                                   : presentation_->PublishFrame(std::move(frame));
+        return waitForPresentation ?
+            presentation_->PublishFrameAndWait(std::move(frame)) :
+            presentation_->PublishFrame(std::move(frame));
     }();
     if (!presented) {
         lastError_ = presentation_->LastError();
@@ -466,8 +464,7 @@ bool DashboardRenderer::DrawWindowInternal(
     return presented && lastError_.empty();
 }
 
-bool DashboardRenderer::BuildPresentationFrame(
-    const SystemSnapshot& snapshot,
+bool DashboardRenderer::BuildPresentationFrame(const SystemSnapshot& snapshot,
     const DashboardOverlayState& overlayState,
     DashboardPresentationFrame& frame,
     PresentationBuildOptions options) {
@@ -674,8 +671,7 @@ bool DashboardRenderer::CanReuseLiveLayerBitmaps(PresentationBuildOptions option
     return options.useLiveLayerBitmaps && layerBitmapPool_ != nullptr;
 }
 
-bool DashboardRenderer::DrawLayerBitmap(
-    RenderBitmap& bitmap,
+bool DashboardRenderer::DrawLayerBitmap(RenderBitmap& bitmap,
     int width,
     int height,
     RenderBitmapClear clear,
@@ -824,8 +820,9 @@ bool DashboardRenderer::SaveSnapshotPng(
         return false;
     }
     frame.animate = false;
-    const bool saved = renderer_->SavePng(
-        imagePath, frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
+    const bool saved = renderer_->SavePng(imagePath, frame.width, frame.height, [&] {
+        presentation_->DrawFrameForCurrentTarget(*renderer_, frame);
+    });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
@@ -881,8 +878,7 @@ void DashboardRenderer::DrawLayoutGuideSheetCard(
     const std::string& cardId, const RenderRect& sourceRect, const RenderRect& destRect, const MetricSource& metrics) {
     Renderer().PushClipRect(destRect.Inflate(ScaleLogical(4), ScaleLogical(4)));
     Renderer().PushTranslation(RenderPoint{destRect.left - sourceRect.left, destRect.top - sourceRect.top});
-    const auto cardIt = std::find_if(
-        layoutResolver_->resolvedLayout_.cards.begin(),
+    const auto cardIt = std::find_if(layoutResolver_->resolvedLayout_.cards.begin(),
         layoutResolver_->resolvedLayout_.cards.end(),
         [&](const auto& card) { return card.id == cardId; });
     if (cardIt != layoutResolver_->resolvedLayout_.cards.end()) {
@@ -895,8 +891,7 @@ void DashboardRenderer::DrawLayoutGuideSheetCard(
     Renderer().PopClipRect();
 }
 
-void DashboardRenderer::DrawLayoutGuideSheetOverlay(
-    const DashboardOverlayState& overlayState,
+void DashboardRenderer::DrawLayoutGuideSheetOverlay(const DashboardOverlayState& overlayState,
     const RenderRect& sourceRect,
     const RenderRect& destRect,
     const MetricSource& metrics) {
@@ -954,8 +949,7 @@ LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCard
         })) {
         const RenderRect titleTextRect =
             Renderer()
-                .MeasureTextBlock(
-                    artifacts.chromeLayout.titleRect,
+                .MeasureTextBlock(artifacts.chromeLayout.titleRect,
                     card->title,
                     TextStyleId::Title,
                     TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center))
@@ -982,8 +976,9 @@ bool DashboardRenderer::RenderSnapshotOffscreen(
         return false;
     }
     frame.animate = false;
-    renderer_->DrawOffscreen(
-        frame.width, frame.height, [&] { presentation_->DrawFrameForCurrentTarget(*renderer_, frame); });
+    renderer_->DrawOffscreen(frame.width, frame.height, [&] {
+        presentation_->DrawFrameForCurrentTarget(*renderer_, frame);
+    });
     if (!renderer_->LastError().empty()) {
         lastError_ = renderer_->LastError();
     }
@@ -1008,8 +1003,7 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
     for (const auto& target : layoutResolver_->containerChildReorderTargets_) {
         containerChildTargetCount += target.childRects.size();
     }
-    regions.Reserve(
-        layoutResolver_->resolvedLayout_.cards.size() * 4 + layoutResolver_->layoutEditGuides_.size() +
+    regions.Reserve(layoutResolver_->resolvedLayout_.cards.size() * 4 + layoutResolver_->layoutEditGuides_.size() +
         containerChildTargetCount + layoutResolver_->gapEditAnchors_.size() +
         layoutResolver_->widgetEditGuides_.size() +
         (layoutResolver_->staticEditableAnchorRegions_.size() + layoutResolver_->dynamicEditableAnchorRegions_.size()) *
@@ -1035,11 +1029,9 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
                 if (widget.widget == nullptr || !IsWidgetHoverable(widget.widgetClass)) {
                     continue;
                 }
-                appendRegion(
-                    widget.rect,
+                appendRegion(widget.rect,
                     LayoutEditActiveRegionKind::WidgetHover,
-                    LayoutEditWidgetRegion{
-                        LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+                    LayoutEditWidgetRegion{LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
                         widget.widgetClass,
                         widget.rect,
                         SupportsLayoutSimilarityIndicator(widget)});
@@ -1053,11 +1045,9 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
         for (const auto& target : layoutResolver_->containerChildReorderTargets_) {
             for (size_t childIndex = 0; childIndex < target.childRects.size(); ++childIndex) {
                 const RenderRect& childRect = target.childRects[childIndex];
-                appendRegion(
-                    childRect,
+                appendRegion(childRect,
                     LayoutEditActiveRegionKind::ContainerChildReorderTarget,
-                    LayoutEditContainerChildReorderRegion{
-                        target.renderCardId,
+                    LayoutEditContainerChildReorderRegion{target.renderCardId,
                         target.editCardId,
                         target.nodePath,
                         target.horizontal,
@@ -1074,29 +1064,28 @@ LayoutEditActiveRegions DashboardRenderer::CollectLayoutEditActiveRegions(
             appendRegion(guide.hitRect, LayoutEditActiveRegionKind::WidgetGuide, guide);
         }
 
-        const auto appendAnchorRegions = [&](const std::vector<LayoutEditAnchorRegion>& anchorRegions,
-                                             LayoutEditActiveRegionKind handleKind,
-                                             LayoutEditActiveRegionKind targetKind) {
-            for (const auto& region : anchorRegions) {
-                appendRegion(region.anchorHitRect, handleKind, region);
-                appendRegion(region.targetRect, targetKind, region);
-            }
-        };
-        appendAnchorRegions(
-            layoutResolver_->staticEditableAnchorRegions_,
+        const auto appendAnchorRegions =
+            [&](const std::vector<LayoutEditAnchorRegion>& anchorRegions,
+                LayoutEditActiveRegionKind handleKind,
+                LayoutEditActiveRegionKind targetKind) {
+                for (const auto& region : anchorRegions) {
+                    appendRegion(region.anchorHitRect, handleKind, region);
+                    appendRegion(region.targetRect, targetKind, region);
+                }
+            };
+        appendAnchorRegions(layoutResolver_->staticEditableAnchorRegions_,
             LayoutEditActiveRegionKind::StaticEditAnchorHandle,
             LayoutEditActiveRegionKind::StaticEditAnchorTarget);
-        appendAnchorRegions(
-            layoutResolver_->dynamicEditableAnchorRegions_,
+        appendAnchorRegions(layoutResolver_->dynamicEditableAnchorRegions_,
             LayoutEditActiveRegionKind::DynamicEditAnchorHandle,
             LayoutEditActiveRegionKind::DynamicEditAnchorTarget);
 
-        const auto appendColorRegions = [&](const std::vector<LayoutEditColorRegion>& colorRegions,
-                                            LayoutEditActiveRegionKind kind) {
-            for (const auto& region : colorRegions) {
-                appendRegion(region.targetRect, kind, region);
-            }
-        };
+        const auto appendColorRegions =
+            [&](const std::vector<LayoutEditColorRegion>& colorRegions, LayoutEditActiveRegionKind kind) {
+                for (const auto& region : colorRegions) {
+                    appendRegion(region.targetRect, kind, region);
+                }
+            };
         appendColorRegions(layoutResolver_->staticColorEditRegions_, LayoutEditActiveRegionKind::StaticColorTarget);
         appendColorRegions(layoutResolver_->dynamicColorEditRegions_, LayoutEditActiveRegionKind::DynamicColorTarget);
     }
@@ -1477,8 +1466,9 @@ void DashboardRenderer::WriteTraceFmt(ResourceStringId format, ...) const {
 }
 
 int DashboardRenderer::WidgetExtentForAxis(const WidgetLayout& widget, LayoutGuideAxis axis) const {
-    return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
-                                             : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
+    return axis == LayoutGuideAxis::Vertical ?
+        std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
+        std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 
 bool DashboardRenderer::IsWidgetAffectedByGuide(const WidgetLayout& widget, const LayoutEditGuide& guide) const {
@@ -1546,7 +1536,8 @@ bool DashboardRenderer::IsContainerNode(const LayoutNodeConfig& node) {
 }
 
 const LayoutCardConfig* DashboardRenderer::FindCardConfigById(const std::string& id) const {
-    const auto it = std::find_if(
-        config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) { return card.id == id; });
+    const auto it = std::find_if(config_.layout.cards.begin(), config_.layout.cards.end(), [&](const auto& card) {
+        return card.id == id;
+    });
     return it != config_.layout.cards.end() ? &(*it) : nullptr;
 }

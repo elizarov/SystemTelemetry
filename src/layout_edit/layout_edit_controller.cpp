@@ -29,8 +29,7 @@ const char* AxisName(LayoutGuideAxis axis) {
 }
 
 std::string DescribeLayoutGuide(const LayoutEditGuide& guide) {
-    std::string detail = FormatText(
-        "axis=%s separator=%zu path=%s",
+    std::string detail = FormatText("axis=%s separator=%zu path=%s",
         AxisName(guide.axis),
         guide.separatorIndex,
         FormatNodePath(guide.nodePath).c_str());
@@ -46,8 +45,7 @@ std::string DescribeWidgetParameter(LayoutEditParameter parameter) {
 }
 
 std::string DescribeWidgetGuide(const LayoutEditWidgetGuide& guide) {
-    std::string detail = FormatText(
-        "axis=%s parameter=%s guide_id=%d",
+    std::string detail = FormatText("axis=%s parameter=%s guide_id=%d",
         AxisName(guide.axis),
         DescribeWidgetParameter(guide.parameter).c_str(),
         guide.guideId);
@@ -60,11 +58,10 @@ std::string DescribeWidgetGuide(const LayoutEditWidgetGuide& guide) {
 }
 
 std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
-    const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome
-        ? " dashboard"
-        : FormatText(" card=%s", anchor.key.widget.renderCardId.c_str());
-    return FormatText(
-        "axis=%s parameter=%s path=%s%s",
+    const std::string scope = anchor.key.widget.kind == LayoutEditWidgetIdentity::Kind::DashboardChrome ?
+        " dashboard" :
+        FormatText(" card=%s", anchor.key.widget.renderCardId.c_str());
+    return FormatText("axis=%s parameter=%s path=%s%s",
         AxisName(anchor.axis),
         DescribeWidgetParameter(anchor.key.parameter).c_str(),
         FormatNodePath(anchor.key.nodePath).c_str(),
@@ -74,12 +71,15 @@ std::string DescribeGapEditAnchor(const LayoutEditGapAnchor& anchor) {
 std::string DescribeEditableAnchor(const LayoutEditAnchorKey& key) {
     const std::optional<LayoutEditParameter> parameter = LayoutEditAnchorParameter(key);
     const std::optional<LayoutMetricEditKey> metricKey = LayoutEditAnchorMetricKey(key);
-    const std::string subject = parameter.has_value()
-        ? FormatText("parameter=%s", DescribeWidgetParameter(*parameter).c_str())
-        : metricKey.has_value()                                   ? FormatText("metric=%s", metricKey->metricId.c_str())
-        : LayoutEditAnchorNodeFieldKey(key).has_value()           ? "node_field"
-        : LayoutEditAnchorContainerChildOrderKey(key).has_value() ? "container_child_reorder"
-                                                                  : "subject=unknown";
+    const std::string subject = parameter.has_value() ?
+        FormatText("parameter=%s", DescribeWidgetParameter(*parameter).c_str()) :
+        metricKey.has_value() ?
+        FormatText("metric=%s", metricKey->metricId.c_str()) :
+        LayoutEditAnchorNodeFieldKey(key).has_value() ?
+        "node_field" :
+        LayoutEditAnchorContainerChildOrderKey(key).has_value() ?
+        "container_child_reorder" :
+        "subject=unknown";
     std::string detail = FormatText("%s anchor_id=%d", subject.c_str(), key.anchorId);
     if (key.widget.kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
         AppendFormat(detail, " card=%s", key.widget.editCardId.c_str());
@@ -183,8 +183,7 @@ double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double valu
 
     const double minSegmentSweep = MinimumGaugeSegmentSweep(totalSweep, segmentCount);
     const double maxSegmentGap = (std::max)(0.0,
-                                            (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) /
-                                                static_cast<double>(segmentCount - 1));
+        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1));
     return std::clamp(value, 0.0, maxSegmentGap);
 }
 
@@ -194,9 +193,8 @@ double ClampDriveUsageActivitySegmentGapForCurrentConfig(const AppConfig& config
         return 0.0;
     }
 
-    const int rowContentHeight =
-        (std::max)(config.layout.fonts.label.size,
-                   (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
+    const int rowContentHeight = (std::max)(config.layout.fonts.label.size,
+        (std::max)(config.layout.fonts.smallText.size, config.layout.driveUsageList.barHeight));
     const int maxGap = (std::max)(0, (rowContentHeight - segmentCount) / (segmentCount - 1));
     return static_cast<double>(std::clamp((std::max)(0, static_cast<int>(std::lround(value))), 0, maxGap));
 }
@@ -227,7 +225,8 @@ LayoutEditHoverResolution LayoutEditHost::ResolveLayoutEditHover(RenderPoint cli
     return ::ResolveLayoutEditHover(CollectLayoutEditActiveRegions(), clientPoint);
 }
 
-LayoutEditController::LayoutEditController(LayoutEditHost& host) : host_(host) {}
+LayoutEditController::LayoutEditController(LayoutEditHost& host) :
+    host_(host) {}
 
 void LayoutEditController::StartSession() {
     host_.LayoutDashboardOverlayState().showLayoutEditGuides = true;
@@ -298,7 +297,7 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
 
     if (hoveredGapEditAnchor_.has_value() != nextHoveredGapAnchor.has_value() ||
         (hoveredGapEditAnchor_.has_value() && nextHoveredGapAnchor.has_value() &&
-         !MatchesGapEditAnchorKey(*hoveredGapEditAnchor_, *nextHoveredGapAnchor))) {
+            !MatchesGapEditAnchorKey(*hoveredGapEditAnchor_, *nextHoveredGapAnchor))) {
         hoveredGapEditAnchor_ = nextHoveredGapAnchor;
         overlayState.hoveredGapEditAnchor = hoveredGapEditAnchor_;
         hoverChanged = true;
@@ -307,14 +306,14 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     const std::optional<LayoutEditGapAnchor>& nextGapAnchorRegion = resolution.hoveredGapEditAnchorRegion;
     if (hoveredGapEditAnchorRegion_.has_value() != nextGapAnchorRegion.has_value() ||
         (hoveredGapEditAnchorRegion_.has_value() && nextGapAnchorRegion.has_value() &&
-         !MatchesGapEditAnchorKey(hoveredGapEditAnchorRegion_->key, nextGapAnchorRegion->key))) {
+            !MatchesGapEditAnchorKey(hoveredGapEditAnchorRegion_->key, nextGapAnchorRegion->key))) {
         hoveredGapEditAnchorRegion_ = nextGapAnchorRegion;
         hoverChanged = true;
     }
 
     if (hoveredEditableAnchor_.has_value() != nextHoveredAnchor.has_value() ||
         (hoveredEditableAnchor_.has_value() && nextHoveredAnchor.has_value() &&
-         !MatchesEditableAnchorKey(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
+            !MatchesEditableAnchorKey(*hoveredEditableAnchor_, *nextHoveredAnchor))) {
         hoveredEditableAnchor_ = nextHoveredAnchor;
         overlayState.hoveredEditableAnchor = hoveredEditableAnchor_;
         hoverChanged = true;
@@ -323,9 +322,9 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     const std::optional<LayoutEditWidgetGuide>& nextWidgetGuide = resolution.hoveredWidgetEditGuide;
     if (hoveredWidgetEditGuide_.has_value() != nextWidgetGuide.has_value() ||
         (hoveredWidgetEditGuide_.has_value() && nextWidgetGuide.has_value() &&
-         (hoveredWidgetEditGuide_->parameter != nextWidgetGuide->parameter ||
-          hoveredWidgetEditGuide_->guideId != nextWidgetGuide->guideId ||
-          !MatchesWidgetIdentity(hoveredWidgetEditGuide_->widget, nextWidgetGuide->widget)))) {
+            (hoveredWidgetEditGuide_->parameter != nextWidgetGuide->parameter ||
+                hoveredWidgetEditGuide_->guideId != nextWidgetGuide->guideId ||
+                !MatchesWidgetIdentity(hoveredWidgetEditGuide_->widget, nextWidgetGuide->widget)))) {
         hoveredWidgetEditGuide_ = nextWidgetGuide;
         hoverChanged = true;
     }
@@ -333,10 +332,10 @@ void LayoutEditController::RefreshHover(RenderPoint clientPoint) {
     const std::optional<LayoutEditGuide>& nextLayoutGuide = resolution.hoveredLayoutGuide;
     if (hoveredLayoutGuide_.has_value() != nextLayoutGuide.has_value() ||
         (hoveredLayoutGuide_.has_value() && nextLayoutGuide.has_value() &&
-         (hoveredLayoutGuide_->renderCardId != nextLayoutGuide->renderCardId ||
-          hoveredLayoutGuide_->editCardId != nextLayoutGuide->editCardId ||
-          hoveredLayoutGuide_->nodePath != nextLayoutGuide->nodePath ||
-          hoveredLayoutGuide_->separatorIndex != nextLayoutGuide->separatorIndex))) {
+            (hoveredLayoutGuide_->renderCardId != nextLayoutGuide->renderCardId ||
+                hoveredLayoutGuide_->editCardId != nextLayoutGuide->editCardId ||
+                hoveredLayoutGuide_->nodePath != nextLayoutGuide->nodePath ||
+                hoveredLayoutGuide_->separatorIndex != nextLayoutGuide->separatorIndex))) {
         hoveredLayoutGuide_ = nextLayoutGuide;
         overlayState.hoveredLayoutEditGuide = hoveredLayoutGuide_;
         hoverChanged = true;
@@ -367,8 +366,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
         if (region != nullptr) {
             if (const auto containerOrderKey = LayoutEditAnchorContainerChildOrderKey(region->key);
                 containerOrderKey.has_value()) {
-                const LayoutNodeConfig* node = FindGuideNode(
-                    host_.LayoutEditConfig(),
+                const LayoutNodeConfig* node = FindGuideNode(host_.LayoutEditConfig(),
                     LayoutEditLayoutTarget{containerOrderKey->editCardId, containerOrderKey->nodePath});
                 if (node == nullptr || (node->name != "rows" && node->name != "columns") || region->key.anchorId < 0 ||
                     region->key.anchorId >= static_cast<int>(node->children.size())) {
@@ -409,8 +407,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 const int rowHeight =
                     (std::max)(1, static_cast<int>(region->targetRect.bottom - region->targetRect.top));
                 const int rowTop = static_cast<int>(region->targetRect.top) - (region->key.anchorId * rowHeight);
-                activeMetricListReorderDrag_ = MetricListReorderDragState{
-                    region->key.widget,
+                activeMetricListReorderDrag_ = MetricListReorderDragState{region->key.widget,
                     metricRefs,
                     rowTop,
                     rowHeight,
@@ -428,8 +425,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
             }
             const double startDx = static_cast<double>(clientPoint.x - region->dragOrigin.x);
             const double startDy = static_cast<double>(clientPoint.y - region->dragOrigin.y);
-            activeAnchorEditDrag_ = AnchorEditDragState{
-                region->key,
+            activeAnchorEditDrag_ = AnchorEditDragState{region->key,
                 region->dragAxis,
                 region->dragMode,
                 region->dragOrigin,
@@ -658,12 +654,14 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
 
 bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     if (activeAnchorEditDrag_.has_value()) {
-        SetCursor(LoadCursorA(
-            nullptr,
-            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
-                : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both     ? IDC_SIZEALL
-                : activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical ? IDC_SIZEWE
-                                                                              : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr,
+            activeAnchorEditDrag_->dragMode == AnchorDragMode::RadialDistance ?
+                IDC_SIZEALL :
+                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Both ?
+                IDC_SIZEALL :
+                activeAnchorEditDrag_->dragAxis == AnchorDragAxis::Vertical ?
+                IDC_SIZEWE :
+                IDC_SIZENS));
         return true;
     }
     if (activeMetricListReorderDrag_.has_value()) {
@@ -681,11 +679,12 @@ bool LayoutEditController::HandleSetCursor(HWND hwnd) {
     }
     if (activeWidgetEditDrag_.has_value()) {
         const auto& guide = activeWidgetEditDrag_->guide;
-        SetCursor(LoadCursorA(
-            nullptr,
-            guide.angularDrag                             ? IDC_CROSS
-                : guide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                          : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr,
+            guide.angularDrag ?
+                IDC_CROSS :
+                guide.axis == LayoutGuideAxis::Vertical ?
+                IDC_SIZEWE :
+                IDC_SIZENS));
         return true;
     }
     if (activeLayoutDrag_.has_value()) {
@@ -744,10 +743,8 @@ bool LayoutEditController::CurrentTooltipTarget(TooltipTarget& target) {
 
     const LayoutEditActiveRegions regions = ActiveRegions();
     if (activeMetricListReorderDrag_.has_value()) {
-        const LayoutEditAnchorKey key{
-            activeMetricListReorderDrag_->widget,
-            LayoutNodeFieldEditKey{
-                activeMetricListReorderDrag_->widget.editCardId,
+        const LayoutEditAnchorKey key{activeMetricListReorderDrag_->widget,
+            LayoutNodeFieldEditKey{activeMetricListReorderDrag_->widget.editCardId,
                 activeMetricListReorderDrag_->widget.nodePath,
                 WidgetClass::MetricList,
                 LayoutNodeField::Parameter},
@@ -872,16 +869,13 @@ void LayoutEditController::SyncRendererInteractionState() {
         overlayState.activeEditableAnchor.reset();
     }
     if (activeMetricListReorderDrag_.has_value()) {
-        overlayState.activeEditableAnchor = LayoutEditAnchorKey{
-            activeMetricListReorderDrag_->widget,
-            LayoutNodeFieldEditKey{
-                activeMetricListReorderDrag_->widget.editCardId,
+        overlayState.activeEditableAnchor = LayoutEditAnchorKey{activeMetricListReorderDrag_->widget,
+            LayoutNodeFieldEditKey{activeMetricListReorderDrag_->widget.editCardId,
                 activeMetricListReorderDrag_->widget.nodePath,
                 WidgetClass::MetricList,
                 LayoutNodeField::Parameter},
             activeMetricListReorderDrag_->currentIndex};
-        overlayState.activeMetricListReorderDrag = MetricListReorderOverlayState{
-            activeMetricListReorderDrag_->widget,
+        overlayState.activeMetricListReorderDrag = MetricListReorderOverlayState{activeMetricListReorderDrag_->widget,
             activeMetricListReorderDrag_->currentIndex,
             activeMetricListReorderDrag_->mouseY,
             activeMetricListReorderDrag_->dragOffsetY};
@@ -889,8 +883,7 @@ void LayoutEditController::SyncRendererInteractionState() {
         overlayState.activeMetricListReorderDrag.reset();
     }
     if (activeContainerChildReorderDrag_.has_value()) {
-        overlayState.activeEditableAnchor = LayoutEditAnchorKey{
-            activeContainerChildReorderDrag_->widget,
+        overlayState.activeEditableAnchor = LayoutEditAnchorKey{activeContainerChildReorderDrag_->widget,
             activeContainerChildReorderDrag_->key,
             activeContainerChildReorderDrag_->currentIndex};
         overlayState.activeContainerChildReorderDrag = ContainerChildReorderOverlayState{
@@ -947,22 +940,25 @@ void LayoutEditController::SetCursorForPoint(RenderPoint clientPoint) {
         const LayoutEditAnchorRegion* region = FindEditableAnchorRegion(regions, *resolution.actionableAnchorHandle);
         const auto dragAxis = region != nullptr ? region->dragAxis : AnchorDragAxis::Vertical;
         const auto dragMode = region != nullptr ? region->dragMode : AnchorDragMode::AxisDelta;
-        SetCursor(LoadCursorA(
-            nullptr,
-            dragMode == AnchorDragMode::RadialDistance ? IDC_SIZEALL
-                : dragAxis == AnchorDragAxis::Both     ? IDC_SIZEALL
-                : dragAxis == AnchorDragAxis::Vertical ? IDC_SIZEWE
-                                                       : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr,
+            dragMode == AnchorDragMode::RadialDistance ?
+                IDC_SIZEALL :
+                dragAxis == AnchorDragAxis::Both ?
+                IDC_SIZEALL :
+                dragAxis == AnchorDragAxis::Vertical ?
+                IDC_SIZEWE :
+                IDC_SIZENS));
         return;
     }
 
     if (resolution.hoveredWidgetEditGuide.has_value()) {
         const LayoutEditWidgetGuide& widgetGuide = *resolution.hoveredWidgetEditGuide;
-        SetCursor(LoadCursorA(
-            nullptr,
-            widgetGuide.angularDrag                             ? IDC_CROSS
-                : widgetGuide.axis == LayoutGuideAxis::Vertical ? IDC_SIZEWE
-                                                                : IDC_SIZENS));
+        SetCursor(LoadCursorA(nullptr,
+            widgetGuide.angularDrag ?
+                IDC_CROSS :
+                widgetGuide.axis == LayoutGuideAxis::Vertical ?
+                IDC_SIZEWE :
+                IDC_SIZENS));
         return;
     }
 
@@ -1000,14 +996,13 @@ bool LayoutEditController::FindSnappedLayoutGuideWeights(LayoutDragState& drag, 
         const auto& widget = drag.snapCandidates[candidateIndex].widget;
         std::vector<layout_snap_solver::SnapCandidate> groupedCandidates;
         while (candidateIndex < drag.snapCandidates.size() &&
-               MatchesWidgetIdentity(drag.snapCandidates[candidateIndex].widget, widget)) {
+            MatchesWidgetIdentity(drag.snapCandidates[candidateIndex].widget, widget)) {
             const auto& candidate = drag.snapCandidates[candidateIndex];
-            groupedCandidates.push_back(
-                layout_snap_solver::SnapCandidate{
-                    candidate.targetExtent,
-                    candidate.startDistance,
-                    candidate.groupOrder,
-                });
+            groupedCandidates.push_back(layout_snap_solver::SnapCandidate{
+                candidate.targetExtent,
+                candidate.startDistance,
+                candidate.groupOrder,
+            });
             ++candidateIndex;
         }
 
@@ -1022,10 +1017,9 @@ bool LayoutEditController::FindSnappedLayoutGuideWeights(LayoutDragState& drag, 
                     attemptWeights[index] = firstWeight;
                     attemptWeights[index + 1] = combined - firstWeight;
                     ExtentCacheKey cacheKey{std::move(attemptWeights), widget};
-                    const auto cached = std::find_if(
-                        drag.extentCache.begin(), drag.extentCache.end(), [&](const ExtentCacheEntry& entry) {
-                            return entry.key == cacheKey;
-                        });
+                    const auto cached = std::find_if(drag.extentCache.begin(),
+                        drag.extentCache.end(),
+                        [&](const ExtentCacheEntry& entry) { return entry.key == cacheKey; });
                     if (cached != drag.extentCache.end()) {
                         if (cached->hasExtent) {
                             extent = cached->extent;

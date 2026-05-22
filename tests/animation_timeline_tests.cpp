@@ -28,8 +28,7 @@ ScalarFillSample ScalarTarget(double value, double peak) {
     return ScalarFillSample{value, peak};
 }
 
-ScalarFillSample ResolveScalar(
-    DashboardAnimationTimeline& timeline,
+ScalarFillSample ResolveScalar(DashboardAnimationTimeline& timeline,
     const AnimationDataKey& key,
     const ScalarFillSample& target,
     std::uint64_t targetVersion = 1) {
@@ -38,8 +37,7 @@ ScalarFillSample ResolveScalar(
     return ScalarFillSampleFromState(*sampled);
 }
 
-ThroughputChartSample ResolveThroughput(
-    DashboardAnimationTimeline& timeline,
+ThroughputChartSample ResolveThroughput(DashboardAnimationTimeline& timeline,
     const AnimationDataKey& key,
     const ThroughputChartSample& target,
     std::uint64_t targetVersion = 1) {

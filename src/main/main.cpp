@@ -63,9 +63,9 @@ std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& comma
     }
     // Size: reuse util/paths fixed-buffer capture instead of keeping a second vector-based path reader in main.
     DWORD exitCode = 1;
-    return RunElevatedSelfAndWait(nullptr, parameters, GetWorkingDirectory(), SW_SHOWNORMAL, &exitCode)
-        ? static_cast<int>(exitCode)
-        : 1;
+    return RunElevatedSelfAndWait(nullptr, parameters, GetWorkingDirectory(), SW_SHOWNORMAL, &exitCode) ?
+        static_cast<int>(exitCode) :
+        1;
 }
 
 }  // namespace
@@ -91,8 +91,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         const auto configureDisplayTarget = GetSwitchValue(commandLine, "/configure-display-target");
         const auto configureDisplayDump = GetSwitchValue(commandLine, "/configure-display-dump");
         const auto configureDisplayImageTarget = GetSwitchValue(commandLine, "/configure-display-image-target");
-        return RunElevatedConfigureDisplayMode(
-            FilePath(*configureDisplaySource),
+        return RunElevatedConfigureDisplayMode(FilePath(*configureDisplaySource),
             configureDisplayDump.has_value() ? FilePath(*configureDisplayDump) : FilePath{},
             configureDisplayTarget.has_value() ? FilePath(*configureDisplayTarget) : FilePath{},
             configureDisplayImageTarget.has_value() ? FilePath(*configureDisplayImageTarget) : FilePath{});

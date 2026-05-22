@@ -29,21 +29,18 @@ public:
     virtual void RegisterDynamicEditAnchor(LayoutEditAnchorRegistration registration) = 0;
     virtual void RegisterStaticCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) = 0;
     virtual void RegisterDynamicCornerEditAnchor(const LayoutEditAnchorKey& key, const RenderRect& targetRect) = 0;
-    virtual void RegisterStaticTextAnchor(
-        const RenderRect& rect,
+    virtual void RegisterStaticTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
         LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) = 0;
-    virtual void RegisterDynamicTextAnchor(
-        const TextLayoutResult& layoutResult,
+    virtual void RegisterDynamicTextAnchor(const TextLayoutResult& layoutResult,
         const LayoutEditAnchorBinding& editable,
         std::optional<LayoutEditParameter> colorParameter = std::nullopt,
         LayoutEditTargetOutline targetOutline = LayoutEditTargetOutline::Visible) = 0;
-    virtual void RegisterDynamicTextAnchor(
-        const RenderRect& rect,
+    virtual void RegisterDynamicTextAnchor(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         const TextLayoutOptions& options,

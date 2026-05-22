@@ -121,8 +121,7 @@ TEST(HardwareVendorSelection, MatchesNumberedGpuAdapterSelectionNameBeforePhysic
     firstAdapter.selectionName = names[0];
     secondAdapter.selectionName = names[1];
 
-    EXPECT_LT(
-        GpuAdapterSelectionMatchRank(firstAdapter, "AMD Radeon RX 6800 #2"),
+    EXPECT_LT(GpuAdapterSelectionMatchRank(firstAdapter, "AMD Radeon RX 6800 #2"),
         GpuAdapterSelectionMatchRank(secondAdapter, "AMD Radeon RX 6800 #2"));
     EXPECT_EQ(GpuAdapterSelectionName(secondAdapter), "AMD Radeon RX 6800 #2");
     EXPECT_EQ(secondAdapter.adapterName, "AMD Radeon RX 6800");

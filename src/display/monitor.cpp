@@ -55,8 +55,7 @@ double ResolveDisplayScale(const AppConfig& config, UINT dpi) {
 }
 
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale) {
-    return SIZE{
-        ScaleLogicalToPhysical(config.layout.structure.window.width, scale),
+    return SIZE{ScaleLogicalToPhysical(config.layout.structure.window.width, scale),
         ScaleLogicalToPhysical(config.layout.structure.window.height, scale)};
 }
 

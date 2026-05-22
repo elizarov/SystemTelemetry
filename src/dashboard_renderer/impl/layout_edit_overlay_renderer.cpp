@@ -24,8 +24,7 @@ RenderRect UnionRect(const RenderRect& left, const RenderRect& right) {
     if (right.IsEmpty()) {
         return left;
     }
-    return RenderRect{
-        (std::min)(left.left, right.left),
+    return RenderRect{(std::min)(left.left, right.left),
         (std::min)(left.top, right.top),
         (std::max)(left.right, right.right),
         (std::max)(left.bottom, right.bottom)};
@@ -126,8 +125,9 @@ std::vector<LayoutEditAnchorRegion> CollectRelatedEditableAnchorHighlights(
 }
 
 DashboardLayoutEditOverlayRenderer::DashboardLayoutEditOverlayRenderer(
-    DashboardRenderer& renderer, DashboardLayoutResolver& layoutResolver)
-    : renderer_(renderer), layoutResolver_(layoutResolver) {}
+    DashboardRenderer& renderer, DashboardLayoutResolver& layoutResolver) :
+    renderer_(renderer),
+    layoutResolver_(layoutResolver) {}
 
 void DashboardLayoutEditOverlayRenderer::Draw(const DashboardOverlayState& overlayState, const MetricSource& metrics) {
     DrawBackgroundAffordances(overlayState);
@@ -180,8 +180,7 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredWidgetHighlight(
     const std::vector<LayoutEditOverlayOwner> noOwners;
     const std::vector<LayoutEditOverlayOwner>& owners =
         hoveredRect->owners != nullptr ? *hoveredRect->owners : noOwners;
-    renderer_.Renderer().DrawSolidRect(
-        ApplyOverlayDragOffset(overlayState, hoveredRect->rect, owners),
+    renderer_.Renderer().DrawSolidRect(ApplyOverlayDragOffset(overlayState, hoveredRect->rect, owners),
         RenderStroke::Solid(RenderColorId::LayoutGuide));
 }
 
@@ -207,7 +206,7 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
     };
     const auto appendRelatedHighlights = [&](const LayoutEditAnchorRegion& source, bool active) {
         for (const auto& region : CollectRelatedEditableAnchorHighlights(
-                 layoutResolver_.staticEditableAnchorRegions_, layoutResolver_.dynamicEditableAnchorRegions_, source)) {
+                layoutResolver_.staticEditableAnchorRegions_, layoutResolver_.dynamicEditableAnchorRegions_, source)) {
             appendHighlight(region, active && MatchesEditableAnchorKey(region.key, source.key));
         }
     };
@@ -227,8 +226,8 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
                     std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
                 if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) ||
                     (special != nullptr && *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
-                     LayoutEditAnchorParameter(region.key).has_value() &&
-                     IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
+                        LayoutEditAnchorParameter(region.key).has_value() &&
+                        IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
                     appendHighlight(region, true);
                 }
             }
@@ -315,11 +314,10 @@ void DashboardLayoutEditOverlayRenderer::DrawHoveredEditableAnchorHighlight(
 
         const bool reorderShape =
             highlighted.shape == AnchorShape::VerticalReorder || highlighted.shape == AnchorShape::HorizontalReorder;
-        const int outlineWidth = reorderShape
-            ? (std::max)(1, renderer_.ScaleLogical(1))
-            : (activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
-        DrawLayoutEditAnchorShape(
-            renderer_.Renderer(),
+        const int outlineWidth = reorderShape ?
+            (std::max)(1, renderer_.ScaleLogical(1)) :
+            (activeEmphasis ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1)));
+        DrawLayoutEditAnchorShape(renderer_.Renderer(),
             highlighted.shape,
             highlighted.anchorRect,
             outlineColor,
@@ -350,9 +348,9 @@ std::optional<DashboardLayoutEditOverlayRenderer::OverlayAffordanceRect> Dashboa
                 card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
             if (MatchesCardChromeSelectionIdentity(*overlayState.hoveredEditableCard, cardIdentity) &&
                 !card.chromeLayout.titleRect.IsEmpty()) {
-                const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty()
-                    ? card.chromeLayout.titleRect
-                    : UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
+                const RenderRect titleRect = card.chromeLayout.iconRect.IsEmpty() ?
+                    card.chromeLayout.titleRect :
+                    UnionRect(card.chromeLayout.iconRect, card.chromeLayout.titleRect);
                 return OverlayAffordanceRect{titleRect, &card.chrome.overlayOwners, card.chrome.overlayLayer};
             }
         }
@@ -416,25 +414,26 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     const std::vector<LayoutEditOverlayOwner> noOwners;
     std::vector<RenderRect> selectedRects;
     bool drawDashboardBoundsOutline = false;
-    const auto appendRect = [&](const RenderRect& rect,
-                                const std::vector<LayoutEditOverlayOwner>& owners,
-                                LayoutEditOverlayAffordanceLayer artifactLayer) {
-        if (rect.IsEmpty()) {
-            return;
-        }
-        if (!ShouldDrawAffordanceLayer(artifactLayer, layer)) {
-            return;
-        }
-        const RenderRect adjustedRect = ApplyOverlayDragOffset(overlayState, rect, owners);
-        const auto existing =
-            std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
-                return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
-                    candidate.right == adjustedRect.right && candidate.bottom == adjustedRect.bottom;
-            });
-        if (existing == selectedRects.end()) {
-            selectedRects.push_back(adjustedRect);
-        }
-    };
+    const auto appendRect =
+        [&](const RenderRect& rect,
+            const std::vector<LayoutEditOverlayOwner>& owners,
+            LayoutEditOverlayAffordanceLayer artifactLayer) {
+            if (rect.IsEmpty()) {
+                return;
+            }
+            if (!ShouldDrawAffordanceLayer(artifactLayer, layer)) {
+                return;
+            }
+            const RenderRect adjustedRect = ApplyOverlayDragOffset(overlayState, rect, owners);
+            const auto existing =
+                std::find_if(selectedRects.begin(), selectedRects.end(), [&](const RenderRect& candidate) {
+                    return candidate.left == adjustedRect.left && candidate.top == adjustedRect.top &&
+                        candidate.right == adjustedRect.right && candidate.bottom == adjustedRect.bottom;
+                });
+            if (existing == selectedRects.end()) {
+                selectedRects.push_back(adjustedRect);
+            }
+        };
     const auto appendWidgetRectsForIdentity = [&](const LayoutEditWidgetIdentity& identity) {
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
@@ -477,8 +476,8 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
                 std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
             if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) ||
                 (special != nullptr && *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
-                 LayoutEditAnchorParameter(region.key).has_value() &&
-                 IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
+                    LayoutEditAnchorParameter(region.key).has_value() &&
+                    IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))) {
                 if (const auto parameter = LayoutEditAnchorParameter(region.key); parameter.has_value()) {
                     if (!SuppressAnchorTargetSelectionOutline(*parameter)) {
                         appendRect(region.targetRect, region.overlayOwners, region.overlayLayer);
@@ -498,8 +497,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         DrawDottedHighlightRect(rect, color, activeEmphasis);
     }
     if (drawDashboardBoundsOutline) {
-        DrawDottedAffordanceRect(
-            overlayState,
+        DrawDottedAffordanceRect(overlayState,
             layer,
             RenderRect{0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
             noOwners,
@@ -513,8 +511,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
         for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
             for (const auto& widget : card.widgets) {
                 if (widget.widget != nullptr && widget.widgetClass == *widgetClass) {
-                    DrawDottedAffordanceRect(
-                        overlayState,
+                    DrawDottedAffordanceRect(overlayState,
                         layer,
                         widget.rect,
                         widget.overlayOwners,
@@ -530,28 +527,28 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     if (const auto* widgetIdentity = std::get_if<LayoutEditWidgetIdentity>(&*overlayState.selectedTreeHighlight)) {
         if (widgetIdentity->kind == LayoutEditWidgetIdentity::Kind::CardChrome) {
             std::vector<OverlayAffordanceRect> embeddedInstanceRects;
-            const auto appendEmbeddedRect = [&](const RenderRect& rect,
-                                                const std::vector<LayoutEditOverlayOwner>* owners,
-                                                LayoutEditOverlayAffordanceLayer artifactLayer) {
-                if (rect.IsEmpty()) {
-                    return;
-                }
-                const auto existing = std::find_if(
-                    embeddedInstanceRects.begin(), embeddedInstanceRects.end(), [&](const auto& candidate) {
-                        return candidate.rect.left == rect.left && candidate.rect.top == rect.top &&
-                            candidate.rect.right == rect.right && candidate.rect.bottom == rect.bottom &&
-                            candidate.layer == artifactLayer;
-                    });
-                if (existing == embeddedInstanceRects.end()) {
-                    embeddedInstanceRects.push_back(OverlayAffordanceRect{rect, owners, artifactLayer});
-                }
-            };
+            const auto appendEmbeddedRect =
+                [&](const RenderRect& rect,
+                    const std::vector<LayoutEditOverlayOwner>* owners,
+                    LayoutEditOverlayAffordanceLayer artifactLayer) {
+                    if (rect.IsEmpty()) {
+                        return;
+                    }
+                    const auto existing = std::find_if(
+                        embeddedInstanceRects.begin(), embeddedInstanceRects.end(), [&](const auto& candidate) {
+                            return candidate.rect.left == rect.left && candidate.rect.top == rect.top &&
+                                candidate.rect.right == rect.right && candidate.rect.bottom == rect.bottom &&
+                                candidate.layer == artifactLayer;
+                        });
+                    if (existing == embeddedInstanceRects.end()) {
+                        embeddedInstanceRects.push_back(OverlayAffordanceRect{rect, owners, artifactLayer});
+                    }
+                };
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 const LayoutEditWidgetIdentity cardIdentity{
                     card.id, card.id, {}, LayoutEditWidgetIdentity::Kind::CardChrome};
                 if (MatchesCardChromeSelectionIdentity(*widgetIdentity, cardIdentity)) {
-                    DrawDottedAffordanceRect(
-                        overlayState,
+                    DrawDottedAffordanceRect(overlayState,
                         layer,
                         card.rect,
                         card.chrome.overlayOwners,
@@ -604,8 +601,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
     if (const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight)) {
         if (*special == LayoutEditSelectionHighlightSpecial::AllCards) {
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
-                DrawDottedAffordanceRect(
-                    overlayState,
+                DrawDottedAffordanceRect(overlayState,
                     layer,
                     card.rect,
                     card.chrome.overlayOwners,
@@ -619,8 +615,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             for (const auto& card : layoutResolver_.resolvedLayout_.cards) {
                 for (const auto& widget : card.widgets) {
                     if (widget.widget != nullptr && widget.widgetClass == WidgetClass::Text) {
-                        DrawDottedAffordanceRect(
-                            overlayState,
+                        DrawDottedAffordanceRect(overlayState,
                             layer,
                             widget.rect,
                             widget.overlayOwners,
@@ -632,8 +627,7 @@ void DashboardLayoutEditOverlayRenderer::DrawSelectedTreeNodeHighlight(
             }
         }
         if (*special == LayoutEditSelectionHighlightSpecial::DashboardBounds) {
-            DrawDottedAffordanceRect(
-                overlayState,
+            DrawDottedAffordanceRect(overlayState,
                 layer,
                 RenderRect{
                     0, 0, layoutResolver_.resolvedLayout_.windowWidth, layoutResolver_.resolvedLayout_.windowHeight},
@@ -706,16 +700,14 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutEditGuides(
         const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
         const RenderPoint start = ApplyOverlayDragOffset(
             overlayState, RenderPoint{guide.lineRect.left, guide.lineRect.top}, guide.overlayOwners);
-        const RenderPoint end = ApplyOverlayDragOffset(
-            overlayState,
-            guide.axis == LayoutGuideAxis::Vertical ? RenderPoint{guide.lineRect.left, guide.lineRect.bottom}
-                                                    : RenderPoint{guide.lineRect.right, guide.lineRect.top},
+        const RenderPoint end = ApplyOverlayDragOffset(overlayState,
+            guide.axis == LayoutGuideAxis::Vertical ?
+                RenderPoint{guide.lineRect.left, guide.lineRect.bottom} :
+                RenderPoint{guide.lineRect.right, guide.lineRect.top},
             guide.overlayOwners);
-        renderer_.Renderer().DrawSolidLine(
-            start,
+        renderer_.Renderer().DrawSolidLine(start,
             end,
-            RenderStroke::Solid(
-                color,
+            RenderStroke::Solid(color,
                 static_cast<float>(UseActiveEditEmphasis(overlayState, emphasized) ? activeLineWidth : lineWidth)));
     }
 }
@@ -769,8 +761,7 @@ void DashboardLayoutEditOverlayRenderer::DrawWidgetEditGuides(
             MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, guide);
         const bool emphasized = active || selected;
         const RenderColorId color = emphasized ? ActiveEditColor(overlayState) : RenderColorId::LayoutGuide;
-        renderer_.Renderer().DrawSolidLine(
-            ApplyOverlayDragOffset(overlayState, guide.drawStart, guide.overlayOwners),
+        renderer_.Renderer().DrawSolidLine(ApplyOverlayDragOffset(overlayState, guide.drawStart, guide.overlayOwners),
             ApplyOverlayDragOffset(overlayState, guide.drawEnd, guide.overlayOwners),
             RenderStroke::Solid(color, static_cast<float>(lineWidth)));
     }
@@ -844,21 +835,17 @@ void DashboardLayoutEditOverlayRenderer::DrawGapEditAnchors(
 
         renderer_.Renderer().DrawSolidLine(drawStart, drawEnd, RenderStroke::Solid(color, strokeWidth));
         if (anchor.axis == LayoutGuideAxis::Vertical) {
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{drawStart.x - capHalf, drawStart.y},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawStart.x - capHalf, drawStart.y},
                 RenderPoint{drawStart.x + capHalf, drawStart.y},
                 RenderStroke::Solid(color, strokeWidth));
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{drawEnd.x - capHalf, drawEnd.y},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawEnd.x - capHalf, drawEnd.y},
                 RenderPoint{drawEnd.x + capHalf, drawEnd.y},
                 RenderStroke::Solid(color, strokeWidth));
         } else {
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{drawStart.x, drawStart.y - capHalf},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawStart.x, drawStart.y - capHalf},
                 RenderPoint{drawStart.x, drawStart.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
-            renderer_.Renderer().DrawSolidLine(
-                RenderPoint{drawEnd.x, drawEnd.y - capHalf},
+            renderer_.Renderer().DrawSolidLine(RenderPoint{drawEnd.x, drawEnd.y - capHalf},
                 RenderPoint{drawEnd.x, drawEnd.y + capHalf},
                 RenderStroke::Solid(color, strokeWidth));
         }
@@ -878,9 +865,9 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
         return;
     }
     const int padding = std::max(1, renderer_.ScaleLogical(1));
-    const RenderRect outlineRect = outside
-        ? rect.Inflate(padding, padding)
-        : RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
+    const RenderRect outlineRect = outside ?
+        rect.Inflate(padding, padding) :
+        RenderRect{rect.left + padding, rect.top + padding, rect.right - padding, rect.bottom - padding};
     const RenderRect drawRect = outlineRect.IsEmpty() ? rect : outlineRect;
     const int strokeWidth =
         active ? (std::max)(2, renderer_.ScaleLogical(2)) : (std::max)(1, renderer_.ScaleLogical(1));
@@ -906,8 +893,7 @@ void DashboardLayoutEditOverlayRenderer::DrawDottedHighlightRect(
     drawVertical((std::max)(drawRect.left, drawRect.right - strokeWidth), drawRect.top, drawRect.bottom);
 }
 
-void DashboardLayoutEditOverlayRenderer::DrawDottedAffordanceRect(
-    const DashboardOverlayState& overlayState,
+void DashboardLayoutEditOverlayRenderer::DrawDottedAffordanceRect(const DashboardOverlayState& overlayState,
     LayoutEditOverlayAffordanceLayer layer,
     const RenderRect& rect,
     const std::vector<LayoutEditOverlayOwner>& owners,
@@ -1038,8 +1024,7 @@ void DashboardLayoutEditOverlayRenderer::DrawLayoutSimilarityIndicators(
             visible->exactTypeOrdinal = nextOrdinal++;
             // Perf: interactive drag traces intentionally drop renderer details, so avoid formatting them every paint.
             if (!renderer_.interactiveDragTraceActive_) {
-                renderer_.WriteTraceFmt(
-                    RES_STR("layout_similarity_group axis=\"%s\" class=%d extent=%d ordinal=%d"),
+                renderer_.WriteTraceFmt(RES_STR("layout_similarity_group axis=\"%s\" class=%d extent=%d ordinal=%d"),
                     axisLabel,
                     static_cast<int>(visible->type.widgetClass),
                     visible->type.extent,
@@ -1129,9 +1114,8 @@ std::optional<RenderPoint> DashboardLayoutEditOverlayRenderer::OverlayDragOffset
     const ContainerChildReorderOverlayState& drag = *overlayState.activeContainerChildReorderDrag;
     const auto matchesDrag = [&](const LayoutEditOverlayOwner& owner) {
         return owner.childIndex == drag.currentIndex &&
-            MatchesLayoutContainerEditKey(
-                   LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
-                   LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
+            MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},
+                LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath});
     };
     if (std::none_of(owners.begin(), owners.end(), matchesDrag)) {
         return std::nullopt;
@@ -1158,8 +1142,7 @@ std::optional<RenderPoint> DashboardLayoutEditOverlayRenderer::OverlayDragOffset
     return OverlayDragOffsetForOwners(overlayState, region.overlayOwners);
 }
 
-RenderRect DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(
-    const DashboardOverlayState& overlayState,
+RenderRect DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
     const RenderRect& rect,
     const std::vector<LayoutEditOverlayOwner>& owners) const {
     if (const auto offset = OverlayDragOffsetForOwners(overlayState, owners); offset.has_value()) {
@@ -1168,8 +1151,7 @@ RenderRect DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(
     return rect;
 }
 
-RenderPoint DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(
-    const DashboardOverlayState& overlayState,
+RenderPoint DashboardLayoutEditOverlayRenderer::ApplyOverlayDragOffset(const DashboardOverlayState& overlayState,
     RenderPoint point,
     const std::vector<LayoutEditOverlayOwner>& owners) const {
     if (const auto offset = OverlayDragOffsetForOwners(overlayState, owners); offset.has_value()) {
@@ -1224,13 +1206,10 @@ void DashboardLayoutEditOverlayRenderer::DrawContainerChildReorderOverlay(const 
             }
         }
     }
-    renderer_.Renderer().DrawSolidRect(
-        childRect,
-        RenderStroke::Dotted(
-            ActiveEditColor(*renderer_.activeOverlayState_),
-            static_cast<float>(
-                UseActiveEditEmphasis(*renderer_.activeOverlayState_, true)
-                    ? (std::max)(2, renderer_.ScaleLogical(2))
-                    : (std::max)(1, renderer_.ScaleLogical(1)))));
+    renderer_.Renderer().DrawSolidRect(childRect,
+        RenderStroke::Dotted(ActiveEditColor(*renderer_.activeOverlayState_),
+            static_cast<float>(UseActiveEditEmphasis(*renderer_.activeOverlayState_, true) ?
+                    (std::max)(2, renderer_.ScaleLogical(2)) :
+                    (std::max)(1, renderer_.ScaleLogical(1)))));
     renderer_.PopWidgetAnimationTranslation();
 }

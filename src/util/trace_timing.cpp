@@ -14,12 +14,17 @@ double Milliseconds(std::chrono::nanoseconds elapsed) {
 
 }  // namespace
 
-TraceTimingScope::TraceTimingScope(TraceTimingCollector& collector, const Trace& trace, const char* operation)
-    : collector_(&collector), trace_(&trace), operation_(operation), startedAt_(HighPrecisionTimer::Now()) {}
+TraceTimingScope::TraceTimingScope(TraceTimingCollector& collector, const Trace& trace, const char* operation) :
+    collector_(&collector),
+    trace_(&trace),
+    operation_(operation),
+    startedAt_(HighPrecisionTimer::Now()) {}
 
-TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept
-    : collector_(std::exchange(other.collector_, nullptr)), trace_(std::exchange(other.trace_, nullptr)),
-      operation_(std::exchange(other.operation_, nullptr)), startedAt_(std::exchange(other.startedAt_, 0)) {}
+TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept :
+    collector_(std::exchange(other.collector_, nullptr)),
+    trace_(std::exchange(other.trace_, nullptr)),
+    operation_(std::exchange(other.operation_, nullptr)),
+    startedAt_(std::exchange(other.startedAt_, 0)) {}
 
 TraceTimingScope& TraceTimingScope::operator=(TraceTimingScope&& other) noexcept {
     if (this != &other) {
@@ -48,7 +53,8 @@ void TraceTimingScope::Reset() {
     startedAt_ = 0;
 }
 
-TraceTimingCollector::TraceTimingCollector(std::chrono::seconds flushInterval) : flushInterval_(flushInterval) {}
+TraceTimingCollector::TraceTimingCollector(std::chrono::seconds flushInterval) :
+    flushInterval_(flushInterval) {}
 
 TraceTimingScope TraceTimingCollector::Measure(const Trace& trace, const char* operation) {
     if (!trace.Enabled(TracePrefix::Profile) || operation == nullptr) {
@@ -71,8 +77,9 @@ void TraceTimingCollector::Record(const Trace& trace, std::string_view operation
             lastFlushAt_ = now;
         }
 
-        auto found = std::find_if(
-            stats_.begin(), stats_.end(), [&](const OperationStats& stats) { return stats.operation == operation; });
+        auto found = std::find_if(stats_.begin(), stats_.end(), [&](const OperationStats& stats) {
+            return stats.operation == operation;
+        });
         if (found == stats_.end()) {
             OperationStats stats;
             stats.operation = std::string(operation);
@@ -137,8 +144,7 @@ void TraceTimingCollector::EmitSnapshot(
         const double averageMs = totalMs / static_cast<double>(entry.samples);
         const std::string totalText = FormatDoubleFixed(totalMs, 3);
         const std::string averageText = FormatDoubleFixed(averageMs, 3);
-        trace.WriteFmt(
-            TracePrefix::Profile,
+        trace.WriteFmt(TracePrefix::Profile,
             RES_STR("timing op=\"%s\" samples=%llu total_ms=%s avg_ms=%s interval_ms=%s"),
             entry.operation.c_str(),
             static_cast<unsigned long long>(entry.samples),

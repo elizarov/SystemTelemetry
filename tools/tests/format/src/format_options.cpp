@@ -1,9 +1,11 @@
 #include <windows.h>
 #include "zeta/thing.h"
 #include <vector>
+#include <string_view>
 #include "format_options.h"
 #include "vendor/library.h"
 #include <winsock2.h>
+#include <string>
 #include "Alpha/thing.h"
 #include <algorithm>
 #include <ws2tcpip.h>
@@ -43,6 +45,9 @@ unsigned shortBits : 1;
 unsigned muchLongerBits : 2;
 };
 
+enum class RuntimeConfigFieldValueKind{HexColor,Integer};
+struct RuntimeConfigFieldDescriptor{RuntimeConfigFieldValueKind kind;const char* key;int keyLength;};
+
 constexpr int kPrimaryFlag=1;
 constexpr int kSecondaryFlag=2;
 constexpr int kTertiaryFlag=4;
@@ -59,6 +64,19 @@ class BenchmarkLikeHost{
 
 int ShortNonEmpty(){return 1;}
 void EmptyFunction(){}
+
+std::string FormatNamedMenuLabel(std::string_view name,std::string_view description){
+return description.empty()?std::string(name):FormatText("%.*s - %.*s",static_cast<int>(name.size()),name.data(),static_cast<int>(description.size()),description.data());
+}
+
+const char* SelectRevertLabel(bool isFontsSection,bool isThemeSection,bool isLayoutSection,bool isMetricsSection){
+return isFontsSection?"Revert Font Changes":isThemeSection?"Revert Theme":isLayoutSection?"Revert Layout":isMetricsSection?"Revert Metrics":"Revert Field";
+}
+
+bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field,std::string_view name){
+if(field.kind==RuntimeConfigFieldValueKind::HexColor && std::string_view(field.key,field.keyLength)==name && field.keyLength>0){return true;}
+return false;
+}
 
 int ManyParameters(int * firstPointerWithLongName,int & firstReferenceWithLongName,int secondValueWithLongName,int thirdValueWithLongName,int fourthValueWithLongName,int fifthValueWithLongName,int sixthValueWithLongName){
 int localValueWithLongName=firstPointerWithLongName ? *firstPointerWithLongName:0;// trailing

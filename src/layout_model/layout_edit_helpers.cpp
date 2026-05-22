@@ -27,8 +27,7 @@ bool MatchesLayoutEditAnchorSubject(const LayoutEditAnchorKey& left, const Layou
     if (leftContainer == nullptr || rightContainer == nullptr) {
         return false;
     }
-    return MatchesLayoutContainerEditKey(
-        LayoutContainerEditKey{leftContainer->editCardId, leftContainer->nodePath},
+    return MatchesLayoutContainerEditKey(LayoutContainerEditKey{leftContainer->editCardId, leftContainer->nodePath},
         LayoutContainerEditKey{rightContainer->editCardId, rightContainer->nodePath});
 }
 
@@ -131,7 +130,7 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
     const auto* weightKey = std::get_if<LayoutWeightEditKey>(&focusKey);
     return weightKey != nullptr &&
         MatchesLayoutWeightEditKey(
-               *weightKey, LayoutWeightEditKey{guide.editCardId, guide.nodePath, guide.separatorIndex});
+            *weightKey, LayoutWeightEditKey{guide.editCardId, guide.nodePath, guide.separatorIndex});
 }
 
 bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutEditWidgetGuide& guide) {
@@ -165,7 +164,7 @@ bool MatchesLayoutEditFocusKey(const LayoutEditFocusKey& focusKey, const LayoutE
     const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
     return containerKey != nullptr && containerOrderKey != nullptr &&
         MatchesLayoutContainerEditKey(
-               *containerKey, LayoutContainerEditKey{containerOrderKey->editCardId, containerOrderKey->nodePath});
+            *containerKey, LayoutContainerEditKey{containerOrderKey->editCardId, containerOrderKey->nodePath});
 }
 
 bool MatchesLayoutEditSelectionHighlight(const LayoutEditSelectionHighlight& highlight, const LayoutEditGuide& guide) {
@@ -220,6 +219,7 @@ std::optional<LayoutNodeFieldEditKey> LayoutEditAnchorNodeFieldKey(const LayoutE
 
 std::optional<LayoutContainerChildOrderEditKey> LayoutEditAnchorContainerChildOrderKey(const LayoutEditAnchorKey& key) {
     const auto* containerOrderKey = std::get_if<LayoutContainerChildOrderEditKey>(&key.subject);
-    return containerOrderKey != nullptr ? std::optional<LayoutContainerChildOrderEditKey>(*containerOrderKey)
-                                        : std::nullopt;
+    return containerOrderKey != nullptr ?
+        std::optional<LayoutContainerChildOrderEditKey>(*containerOrderKey) :
+        std::nullopt;
 }

@@ -165,7 +165,7 @@ bool MatchesRegionHit(const LayoutEditActiveRegions& regions, const LayoutEditAc
 std::string RegionLabel(const LayoutEditActiveRegion& region) {
     std::ostringstream stream;
     stream << "kind=" << static_cast<int>(region.kind) << " box=(" << region.box.left << "," << region.box.top << ","
-           << region.box.right << "," << region.box.bottom << ")";
+            << region.box.right << "," << region.box.bottom << ")";
     if (IsAnchorHandleKind(region.kind) || IsAnchorTargetKind(region.kind)) {
         if (const auto* anchor = LayoutEditActiveRegionPayloadAs<LayoutEditAnchorRegion>(region)) {
             stream << " anchor_widget=" << anchor->key.widget.editCardId << " anchor_id=" << anchor->key.anchorId;
@@ -396,10 +396,9 @@ TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOver
 
     ASSERT_TRUE(clockRowAnchor.has_value());
     const LayoutEditAnchorRegion& clockRowAnchorValue = *clockRowAnchor;
-    const auto containerAnchor =
-        std::find_if(containerAnchors.begin(), containerAnchors.end(), [&](const auto& anchor) {
-            return anchor.targetRect.Contains(clockRowAnchorValue.anchorRect.Center());
-        });
+    const auto containerAnchor = std::find_if(containerAnchors.begin(),
+        containerAnchors.end(),
+        [&](const auto& anchor) { return anchor.targetRect.Contains(clockRowAnchorValue.anchorRect.Center()); });
     ASSERT_NE(containerAnchor, containerAnchors.end());
 
     EXPECT_FALSE(RectsOverlap(clockRowAnchorValue.anchorRect, containerAnchor->anchorRect));

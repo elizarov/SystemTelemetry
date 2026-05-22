@@ -182,8 +182,7 @@ bool ThroughputHasActiveChange(const ThroughputChartSample& start, const Through
     }
     const size_t outputCount = (std::max)(start.samples.size(), target.samples.size());
     for (size_t index = 0; index < outputCount; ++index) {
-        if (!DoublesEqual(
-                AlignedSampleValue(start.samples, index, outputCount),
+        if (!DoublesEqual(AlignedSampleValue(start.samples, index, outputCount),
                 AlignedSampleValue(target.samples, index, outputCount))) {
             return true;
         }
@@ -250,8 +249,7 @@ std::vector<double> ScrollSamplesForShift(
     return samples;
 }
 
-void ConfigureThroughputScroll(
-    std::vector<double>& scrollSamples,
+void ConfigureThroughputScroll(std::vector<double>& scrollSamples,
     double& targetPlotShiftSamples,
     const ThroughputChartSample& start,
     const ThroughputChartSample& target) {
@@ -278,8 +276,9 @@ void ConfigureThroughputScroll(
 
 class ScalarFillAnimationTransition final : public WidgetAnimationTransition {
 public:
-    ScalarFillAnimationTransition(ScalarFillSample start, ScalarFillSample target)
-        : start_(std::move(start)), target_(std::move(target)) {}
+    ScalarFillAnimationTransition(ScalarFillSample start, ScalarFillSample target) :
+        start_(std::move(start)),
+        target_(std::move(target)) {}
 
     WidgetAnimationStatePtr Sample(double progress) const override {
         if (progress >= 1.0) {
@@ -299,8 +298,9 @@ private:
 
 class ThroughputChartAnimationTransition final : public WidgetAnimationTransition {
 public:
-    ThroughputChartAnimationTransition(ThroughputChartSample start, ThroughputChartSample target)
-        : start_(std::move(start)), target_(std::move(target)) {
+    ThroughputChartAnimationTransition(ThroughputChartSample start, ThroughputChartSample target) :
+        start_(std::move(start)),
+        target_(std::move(target)) {
         ConfigureThroughputScroll(scrollSamples_, targetPlotShiftSamples_, start_, target_);
     }
 
@@ -318,8 +318,7 @@ public:
         } else {
             sample.samples.reserve(outputCount);
             for (size_t index = 0; index < outputCount; ++index) {
-                sample.samples.push_back(Lerp(
-                    AlignedSampleValue(start_.samples, index, outputCount),
+                sample.samples.push_back(Lerp(AlignedSampleValue(start_.samples, index, outputCount),
                     AlignedSampleValue(target_.samples, index, outputCount),
                     progress));
             }
@@ -348,8 +347,8 @@ private:
 
 }  // namespace
 
-ScalarFillAnimationState::ScalarFillAnimationState(ScalarFillSample sample)
-    : sample_(SanitizeScalar(std::move(sample))) {}
+ScalarFillAnimationState::ScalarFillAnimationState(ScalarFillSample sample) :
+    sample_(SanitizeScalar(std::move(sample))) {}
 
 const ScalarFillSample& ScalarFillAnimationState::Sample() const {
     return sample_;
@@ -390,8 +389,8 @@ const ScalarFillSample& ScalarFillSampleFromState(const WidgetAnimationState& st
     return static_cast<const ScalarFillAnimationState&>(state).Sample();
 }
 
-ThroughputChartAnimationState::ThroughputChartAnimationState(ThroughputChartSample sample)
-    : sample_(SanitizeThroughput(std::move(sample))) {}
+ThroughputChartAnimationState::ThroughputChartAnimationState(ThroughputChartSample sample) :
+    sample_(SanitizeThroughput(std::move(sample))) {}
 
 const ThroughputChartSample& ThroughputChartAnimationState::Sample() const {
     return sample_;

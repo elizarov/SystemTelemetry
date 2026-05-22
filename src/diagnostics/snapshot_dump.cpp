@@ -274,8 +274,7 @@ void WriteRetainedHistories(
         WriteDoubleArray(
             output, DumpKey(historyPrefix, ".throughput_live_samples"), histories[i].throughputLiveSamples);
         WriteDouble(output, DumpKey(historyPrefix, ".throughput_bucket_total"), histories[i].throughputBucketTotal, 6);
-        WriteInteger(
-            output,
+        WriteInteger(output,
             DumpKey(historyPrefix, ".throughput_bucket_sample_count"),
             histories[i].throughputBucketSampleCount);
     }
@@ -520,8 +519,7 @@ bool LoadNamedScalarMetrics(
     return true;
 }
 
-bool LoadRetainedHistories(
-    const DumpValues& values,
+bool LoadRetainedHistories(const DumpValues& values,
     const std::string& prefix,
     std::vector<RetainedHistorySeries>& field,
     std::string* error) {
@@ -541,8 +539,7 @@ bool LoadRetainedHistories(
                 values, DumpKey(historyPrefix, ".throughput_live_samples"), history.throughputLiveSamples, error) ||
             !LoadDouble(
                 values, DumpKey(historyPrefix, ".throughput_bucket_total"), history.throughputBucketTotal, error) ||
-            !LoadUnsigned(
-                values,
+            !LoadUnsigned(values,
                 DumpKey(historyPrefix, ".throughput_bucket_sample_count"),
                 history.throughputBucketSampleCount,
                 error)) {

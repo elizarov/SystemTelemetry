@@ -42,8 +42,11 @@ TelemetryUpdate CaptureTelemetryUpdate(const TelemetryCollector& collector) {
 
 class ThreadedTelemetryRuntime final : public TelemetryRuntime {
 public:
-    ThreadedTelemetryRuntime(std::unique_ptr<TelemetryCollector> collector, Trace& trace, TelemetryUpdateSink* callback)
-        : collector_(std::move(collector)), trace_(trace), callback_(callback) {}
+    ThreadedTelemetryRuntime(
+        std::unique_ptr<TelemetryCollector> collector, Trace& trace, TelemetryUpdateSink* callback) :
+        collector_(std::move(collector)),
+        trace_(trace),
+        callback_(callback) {}
 
     ~ThreadedTelemetryRuntime() override {
         Shutdown();
@@ -226,8 +229,7 @@ bool IsThroughputRetainedHistoryKey(RetainedHistoryKey key) {
     }
 }
 
-std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(
-    const TelemetryCollectorOptions& options,
+std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollectorOptions& options,
     const FilePath& workingDirectory,
     const TelemetrySettings& settings,
     Trace& trace,

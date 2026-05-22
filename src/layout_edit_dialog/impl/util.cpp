@@ -120,23 +120,19 @@ void SetSliderRange(HWND hwnd, int sliderId, int minValue, int maxValue, int pag
 }
 
 void SetLchSliderPositions(HWND hwnd, OklchColor lch) {
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(lch.l * 1000.0)), 0, 1000));
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
         TBM_SETPOS,
         TRUE,
-        std::clamp(
-            static_cast<int>(std::lround(lch.c * kLchChromaSliderScale)),
+        std::clamp(static_cast<int>(std::lround(lch.c * kLchChromaSliderScale)),
             0,
             static_cast<int>(std::lround(kLchChromaSliderMax * kLchChromaSliderScale))));
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
         TBM_SETPOS,
         TRUE,
@@ -144,20 +140,17 @@ void SetLchSliderPositions(HWND hwnd, OklchColor lch) {
 }
 
 void SetHsvSliderPositions(HWND hwnd, HsvColor hsv) {
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(hsv.h)), 0, 360));
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
         TBM_SETPOS,
         TRUE,
         std::clamp(static_cast<int>(std::lround(hsv.s * kHsvUnitSliderScale)), 0, 1000));
-    SendDlgItemMessageA(
-        hwnd,
+    SendDlgItemMessageA(hwnd,
         IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
         TBM_SETPOS,
         TRUE,
@@ -200,9 +193,9 @@ std::string FindConfiguredBoardMetricBinding(const AppConfig& config, const Layo
         return {};
     }
 
-    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature
-        ? config.layout.board.temperatureSensorNames
-        : config.layout.board.fanSensorNames;
+    const auto& bindings = target->kind == BoardMetricBindingKind::Temperature ?
+        config.layout.board.temperatureSensorNames :
+        config.layout.board.fanSensorNames;
     const auto it = bindings.find(target->logicalName);
     if (it != bindings.end() && !it->second.empty()) {
         return it->second;
@@ -351,8 +344,7 @@ void ConfigureColorSliders(HWND hwnd) {
     SetSliderRange(hwnd, IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_SLIDER, 0, 100, 10, 1);
     SetSliderRange(hwnd, IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_SLIDER, 0, 255, 16, 1);
     SetSliderRange(hwnd, IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER, 0, 1000, 100, 1);
-    SetSliderRange(
-        hwnd,
+    SetSliderRange(hwnd,
         IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
         0,
         static_cast<int>(std::lround(kLchChromaSliderMax * kLchChromaSliderScale)),
@@ -472,27 +464,23 @@ void SyncColorLchSliderFromEdit(HWND hwnd, int editId) {
     }
     switch (editId) {
         case IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_LIGHTNESS_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value * 1000.0)), 0, 1000));
             break;
         case IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_CHROMA_SLIDER,
                 TBM_SETPOS,
                 TRUE,
-                std::clamp(
-                    static_cast<int>(std::lround(*value * kLchChromaSliderScale)),
+                std::clamp(static_cast<int>(std::lround(*value * kLchChromaSliderScale)),
                     0,
                     static_cast<int>(std::lround(kLchChromaSliderMax * kLchChromaSliderScale))));
             break;
         case IDC_LAYOUT_EDIT_COLOR_LCH_HUE_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_LCH_HUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
@@ -508,24 +496,21 @@ void SyncColorHsvSliderFromEdit(HWND hwnd, int editId) {
     }
     switch (editId) {
         case IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_HUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value)), 0, 360));
             break;
         case IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER,
                 TBM_SETPOS,
                 TRUE,
                 std::clamp(static_cast<int>(std::lround(*value * kHsvUnitSliderScale)), 0, 1000));
             break;
         case IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_EDIT:
-            SendDlgItemMessageA(
-                hwnd,
+            SendDlgItemMessageA(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_VALUE_SLIDER,
                 TBM_SETPOS,
                 TRUE,
@@ -558,8 +543,7 @@ void SetColorHsvEditFromSlider(HWND hwnd, int sliderId) {
             SetDialogControlInteger(hwnd, IDC_LAYOUT_EDIT_COLOR_HSV_HUE_EDIT, position);
             break;
         case IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_SLIDER:
-            SetDialogControlRoundedDecimal(
-                hwnd,
+            SetDialogControlRoundedDecimal(hwnd,
                 IDC_LAYOUT_EDIT_COLOR_HSV_SATURATION_EDIT,
                 static_cast<double>(position) / kHsvUnitSliderScale,
                 3);
@@ -710,8 +694,7 @@ std::optional<std::pair<int, int>> FindWeightEditValues(const AppConfig& config,
     if (node == nullptr || key.separatorIndex + 1 >= node->children.size()) {
         return std::nullopt;
     }
-    return std::make_pair(
-        std::max(1, node->children[key.separatorIndex].weight),
+    return std::make_pair(std::max(1, node->children[key.separatorIndex].weight),
         std::max(1, node->children[key.separatorIndex + 1].weight));
 }
 

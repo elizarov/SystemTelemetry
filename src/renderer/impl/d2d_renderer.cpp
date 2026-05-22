@@ -79,8 +79,7 @@ public:
 
         if (d2dFactory_ == nullptr) {
             D2D1_FACTORY_OPTIONS options{};
-            const HRESULT hr = D2D1CreateFactory(
-                D2D1_FACTORY_TYPE_MULTI_THREADED,
+            const HRESULT hr = D2D1CreateFactory(D2D1_FACTORY_TYPE_MULTI_THREADED,
                 __uuidof(ID2D1Factory1),
                 &options,
                 reinterpret_cast<void**>(d2dFactory_.ReleaseAndGetAddressOf()));
@@ -104,8 +103,7 @@ public:
             };
             D3D_FEATURE_LEVEL createdFeatureLevel = D3D_FEATURE_LEVEL_10_0;
             const auto createDevice = [&](D3D_DRIVER_TYPE driverType, auto featureLevels) {
-                return D3D11CreateDevice(
-                    nullptr,
+                return D3D11CreateDevice(nullptr,
                     driverType,
                     nullptr,
                     D3D11_CREATE_DEVICE_BGRA_SUPPORT,
@@ -192,10 +190,13 @@ D2DSharedDevice& SharedD2DDevice() {
 
 class D2DRenderBitmapResource final : public RenderBitmapResource {
 public:
-    D2DRenderBitmapResource(Microsoft::WRL::ComPtr<IWICBitmap> bitmap, Microsoft::WRL::ComPtr<ID2D1RenderTarget> target)
-        : wicBitmap_(std::move(bitmap)), wicRenderTarget_(std::move(target)) {}
+    D2DRenderBitmapResource(
+        Microsoft::WRL::ComPtr<IWICBitmap> bitmap, Microsoft::WRL::ComPtr<ID2D1RenderTarget> target) :
+        wicBitmap_(std::move(bitmap)),
+        wicRenderTarget_(std::move(target)) {}
 
-    explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap) : targetBitmap_(std::move(bitmap)) {}
+    explicit D2DRenderBitmapResource(Microsoft::WRL::ComPtr<ID2D1Bitmap1> bitmap) :
+        targetBitmap_(std::move(bitmap)) {}
 
     const void* TypeToken() const override {
         return D2DRenderBitmapResourceTypeToken();
@@ -397,7 +398,8 @@ Microsoft::WRL::ComPtr<ID2D1Bitmap> CreatePanelIconAtlasMaskBitmap(
 
 }  // namespace
 
-D2DRenderer::D2DRenderer() : palette_(style_.colors, style_.layoutGuideSheet) {}
+D2DRenderer::D2DRenderer() :
+    palette_(style_.colors, style_.layoutGuideSheet) {}
 
 D2DRenderer::~D2DRenderer() {
     Shutdown();
@@ -530,9 +532,9 @@ bool D2DRenderer::DrawToBitmap(
 
     const UINT bitmapWidth = static_cast<UINT>(std::max(1, width));
     const UINT bitmapHeight = static_cast<UINT>(std::max(1, height));
-    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent
-        ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)
-        : palette_.Get(RenderColorId::Background).ToD2DColorF();
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ?
+        D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
+        palette_.Get(RenderColorId::Background).ToD2DColorF();
     Microsoft::WRL::ComPtr<IWICBitmap> bitmap;
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
     if (output.width == static_cast<int>(bitmapWidth) && output.height == static_cast<int>(bitmapHeight) &&
@@ -556,10 +558,8 @@ bool D2DRenderer::DrawToBitmap(
             return false;
         }
 
-        hr = d2dFactory_->CreateWicBitmapRenderTarget(
-            bitmap.Get(),
-            D2D1::RenderTargetProperties(
-                D2D1_RENDER_TARGET_TYPE_DEFAULT,
+        hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
+            D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
                 D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
                 96.0f,
                 96.0f),
@@ -603,8 +603,7 @@ bool D2DRenderer::DrawToLiveLayerBitmap(
         targetBitmap = resource->TargetBitmap();
     }
     if (targetBitmap == nullptr) {
-        const D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(
-            D2D1_BITMAP_OPTIONS_TARGET,
+        const D2D1_BITMAP_PROPERTIES1 properties = D2D1::BitmapProperties1(D2D1_BITMAP_OPTIONS_TARGET,
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
             96.0f,
             96.0f);
@@ -623,9 +622,9 @@ bool D2DRenderer::DrawToLiveLayerBitmap(
         d2dDeviceContext_->SetTarget(previousTarget.Get());
         return false;
     }
-    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent
-        ? D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f)
-        : palette_.Get(RenderColorId::Background).ToD2DColorF();
+    const D2D1_COLOR_F clearColor = clear == RenderBitmapClear::Transparent ?
+        D2D1::ColorF(0.0f, 0.0f, 0.0f, 0.0f) :
+        palette_.Get(RenderColorId::Background).ToD2DColorF();
     d2dActiveRenderTarget_->Clear(clearColor);
     draw();
     EndDirect2DDraw();
@@ -641,8 +640,7 @@ bool D2DRenderer::DrawToLiveLayerBitmap(
     return true;
 }
 
-bool D2DRenderer::DrawToWicBitmap(
-    int width,
+bool D2DRenderer::DrawToWicBitmap(int width,
     int height,
     const DrawCallback& draw,
     std::string_view errorPrefix,
@@ -662,10 +660,8 @@ bool D2DRenderer::DrawToWicBitmap(
     }
 
     Microsoft::WRL::ComPtr<ID2D1RenderTarget> bitmapRenderTarget;
-    hr = d2dFactory_->CreateWicBitmapRenderTarget(
-        bitmap.Get(),
-        D2D1::RenderTargetProperties(
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
+    hr = d2dFactory_->CreateWicBitmapRenderTarget(bitmap.Get(),
+        D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_PREMULTIPLIED),
             96.0f,
             96.0f),
@@ -707,8 +703,7 @@ TextLayoutResult D2DRenderer::MeasureTextBlock(
     return MeasureTextBlockD2D(rect, wideText, style, options, nullptr);
 }
 
-TextLayoutResult D2DRenderer::DrawTextBlock(
-    const RenderRect& rect,
+TextLayoutResult D2DRenderer::DrawTextBlock(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     RenderColorId color,
@@ -729,8 +724,7 @@ TextLayoutResult D2DRenderer::DrawTextBlock(
         return result;
     }
     const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
-    d2dActiveRenderTarget_->DrawText(
-        wideText.c_str(),
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
         static_cast<UINT32>(wideText.size()),
         textFormat,
         D2DRectFromRenderRect(rect),
@@ -739,8 +733,7 @@ TextLayoutResult D2DRenderer::DrawTextBlock(
     return result;
 }
 
-void D2DRenderer::DrawText(
-    const RenderRect& rect,
+void D2DRenderer::DrawText(const RenderRect& rect,
     const std::string& text,
     TextStyleId style,
     RenderColorId color,
@@ -759,8 +752,7 @@ void D2DRenderer::DrawText(
         return;
     }
     const D2D1_DRAW_TEXT_OPTIONS drawOptions = options.clip ? D2D1_DRAW_TEXT_OPTIONS_CLIP : D2D1_DRAW_TEXT_OPTIONS_NONE;
-    d2dActiveRenderTarget_->DrawText(
-        wideText.c_str(),
+    d2dActiveRenderTarget_->DrawText(wideText.c_str(),
         static_cast<UINT32>(wideText.size()),
         textFormat,
         D2DRectFromRenderRect(rect),
@@ -789,15 +781,13 @@ int D2DRenderer::MeasureTextWidth(TextStyleId style, std::string_view text) cons
         return 0;
     }
     const RenderRect measureRect{0, 0, 4096, 4096};
-    const int width = std::max(
-        0,
-        static_cast<int>(MeasureTextBlockD2D(
-                             measureRect,
-                             wideText,
-                             style,
-                             TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                             nullptr)
-                             .textRect.right));
+    const int width = std::max(0,
+        static_cast<int>(MeasureTextBlockD2D(measureRect,
+            wideText,
+            style,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+            nullptr)
+                .textRect.right));
     const_cast<RendererTextWidthCache&>(textWidthCache_).Store(style, text, width);
     return width;
 }
@@ -825,8 +815,7 @@ bool D2DRenderer::InitializeDirect2D() {
         d2dFactory_ = SharedD2DDevice().D2DFactory();
     }
     if (dwriteFactory_ == nullptr) {
-        const HRESULT hr = DWriteCreateFactory(
-            DWRITE_FACTORY_TYPE_SHARED,
+        const HRESULT hr = DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,
             __uuidof(IDWriteFactory),
             reinterpret_cast<IUnknown**>(dwriteFactory_.ReleaseAndGetAddressOf()));
         if (FAILED(hr) || dwriteFactory_ == nullptr) {
@@ -841,8 +830,7 @@ bool D2DRenderer::InitializeDirect2D() {
         d2dFactory_->CreateStrokeStyle(D2D1::StrokeStyleProperties(), nullptr, 0, d2dSolidStrokeStyle_.GetAddressOf());
     }
     if (d2dDashedStrokeStyle_ == nullptr) {
-        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(
-            D2D1_CAP_STYLE_ROUND,
+        const D2D1_STROKE_STYLE_PROPERTIES props = D2D1::StrokeStyleProperties(D2D1_CAP_STYLE_ROUND,
             D2D1_CAP_STYLE_ROUND,
             D2D1_CAP_STYLE_ROUND,
             D2D1_LINE_JOIN_ROUND,
@@ -940,16 +928,14 @@ bool D2DRenderer::EnsureWindowRenderTarget(int width, int height, bool retainCon
         DiscardWindowTarget("retain_mode_change");
     }
     if (d2dWindowRenderTarget_ == nullptr) {
-        const D2D1_RENDER_TARGET_PROPERTIES properties = D2D1::RenderTargetProperties(
-            D2D1_RENDER_TARGET_TYPE_DEFAULT,
+        const D2D1_RENDER_TARGET_PROPERTIES properties = D2D1::RenderTargetProperties(D2D1_RENDER_TARGET_TYPE_DEFAULT,
             D2D1::PixelFormat(DXGI_FORMAT_B8G8R8A8_UNORM, D2D1_ALPHA_MODE_IGNORE),
             96.0f,
             96.0f);
         const D2D1_PRESENT_OPTIONS presentOptions = static_cast<D2D1_PRESENT_OPTIONS>(
             (retainContents ? D2D1_PRESENT_OPTIONS_RETAIN_CONTENTS : D2D1_PRESENT_OPTIONS_NONE) |
             (d2dImmediatePresent_ ? D2D1_PRESENT_OPTIONS_IMMEDIATELY : D2D1_PRESENT_OPTIONS_NONE));
-        const HRESULT hr = d2dFactory_->CreateHwndRenderTarget(
-            properties,
+        const HRESULT hr = d2dFactory_->CreateHwndRenderTarget(properties,
             D2D1::HwndRenderTargetProperties(hwnd_, D2D1::SizeU(targetWidth, targetHeight), presentOptions),
             d2dWindowRenderTarget_.ReleaseAndGetAddressOf());
         if (FAILED(hr) || d2dWindowRenderTarget_ == nullptr) {
@@ -1266,10 +1252,8 @@ bool D2DRenderer::DrawBitmap(const RenderBitmap& bitmap, RenderPoint origin) {
     if (d2dBitmap == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawBitmap(
-        d2dBitmap.Get(),
-        D2D1::RectF(
-            static_cast<float>(origin.x),
+    d2dActiveRenderTarget_->DrawBitmap(d2dBitmap.Get(),
+        D2D1::RectF(static_cast<float>(origin.x),
             static_cast<float>(origin.y),
             static_cast<float>(origin.x + bitmap.width),
             static_cast<float>(origin.y + bitmap.height)),
@@ -1296,8 +1280,7 @@ bool D2DRenderer::DrawBitmapRegion(const RenderBitmap& bitmap, const RenderRect&
     }
     targetOrigin.x += clippedSource.left - sourceRect.left;
     targetOrigin.y += clippedSource.top - sourceRect.top;
-    const D2D1_RECT_F destinationRect = D2D1::RectF(
-        static_cast<float>(targetOrigin.x),
+    const D2D1_RECT_F destinationRect = D2D1::RectF(static_cast<float>(targetOrigin.x),
         static_cast<float>(targetOrigin.y),
         static_cast<float>(targetOrigin.x + clippedSource.Width()),
         static_cast<float>(targetOrigin.y + clippedSource.Height()));
@@ -1323,8 +1306,7 @@ bool D2DRenderer::DrawBitmapRegions(const RenderBitmap& bitmap, std::span<const 
         resource != nullptr ? resource->CachedD2DBitmapBrush(d2dActiveRenderTarget_) : nullptr;
     if (bitmapBrush == nullptr) {
         Microsoft::WRL::ComPtr<ID2D1BitmapBrush> createdBrush;
-        const HRESULT brushHr = d2dActiveRenderTarget_->CreateBitmapBrush(
-            d2dBitmap.Get(),
+        const HRESULT brushHr = d2dActiveRenderTarget_->CreateBitmapBrush(d2dBitmap.Get(),
             D2D1::BitmapBrushProperties(
                 D2D1_EXTEND_MODE_CLAMP, D2D1_EXTEND_MODE_CLAMP, D2D1_BITMAP_INTERPOLATION_MODE_NEAREST_NEIGHBOR),
             D2D1::BrushProperties(),
@@ -1378,8 +1360,7 @@ bool D2DRenderer::DrawIcon(std::string_view iconName, const RenderRect& rect) {
     if (panelIconAtlasMask_ == nullptr || brush == nullptr) {
         return false;
     }
-    const D2D1_RECT_F sourceRect = D2D1::RectF(
-        0.0f,
+    const D2D1_RECT_F sourceRect = D2D1::RectF(0.0f,
         static_cast<float>(atlasSlot * kPanelIconAtlasCellSize),
         static_cast<float>(kPanelIconAtlasCellSize),
         static_cast<float>((atlasSlot + 1) * kPanelIconAtlasCellSize));
@@ -1429,8 +1410,7 @@ bool D2DRenderer::FillSolidEllipse(const RenderRect& rect, RenderColorId color) 
     const float radiusX = static_cast<float>(rect.Width()) / 2.0f;
     const float radiusY = static_cast<float>(rect.Height()) / 2.0f;
     d2dActiveRenderTarget_->FillEllipse(
-        D2D1::Ellipse(
-            D2D1::Point2F(static_cast<float>(rect.left) + radiusX, static_cast<float>(rect.top) + radiusY),
+        D2D1::Ellipse(D2D1::Point2F(static_cast<float>(rect.left) + radiusX, static_cast<float>(rect.top) + radiusY),
             radiusX,
             radiusY),
         brush);
@@ -1474,8 +1454,7 @@ bool D2DRenderer::DrawSolidRect(const RenderRect& rect, const RenderStroke& stro
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawRectangle(
-        D2DRectFromRenderRect(rect),
+    d2dActiveRenderTarget_->DrawRectangle(D2DRectFromRenderRect(rect),
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -1509,8 +1488,7 @@ bool D2DRenderer::DrawSolidEllipse(const RenderRect& rect, const RenderStroke& s
     }
     const float radiusX = static_cast<float>((std::max)(1, rect.Width())) / 2.0f;
     const float radiusY = static_cast<float>((std::max)(1, rect.Height())) / 2.0f;
-    d2dActiveRenderTarget_->DrawEllipse(
-        D2D1::Ellipse(D2DPointFromRenderPoint(rect.Center()), radiusX, radiusY),
+    d2dActiveRenderTarget_->DrawEllipse(D2D1::Ellipse(D2DPointFromRenderPoint(rect.Center()), radiusX, radiusY),
         brush,
         (std::max)(1.0f, stroke.width),
         d2dSolidStrokeStyle_.Get());
@@ -1525,8 +1503,7 @@ bool D2DRenderer::DrawSolidLine(RenderPoint start, RenderPoint end, const Render
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawLine(
-        D2DPointFromRenderPoint(start),
+    d2dActiveRenderTarget_->DrawLine(D2DPointFromRenderPoint(start),
         D2DPointFromRenderPoint(end),
         brush,
         (std::max)(1.0f, stroke.width),
@@ -1599,8 +1576,7 @@ bool D2DRenderer::DrawD2DGeometry(ID2D1Geometry* geometry, const RenderStroke& s
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawGeometry(
-        geometry,
+    d2dActiveRenderTarget_->DrawGeometry(geometry,
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -1665,8 +1641,7 @@ bool D2DRenderer::DrawPolyline(std::span<const RenderPoint> points, const Render
     if (brush == nullptr) {
         return false;
     }
-    d2dActiveRenderTarget_->DrawGeometry(
-        geometry.Get(),
+    d2dActiveRenderTarget_->DrawGeometry(geometry.Get(),
         brush,
         (std::max)(1.0f, stroke.width),
         stroke.pattern == StrokePattern::Dotted ? d2dDashedStrokeStyle_.Get() : d2dSolidStrokeStyle_.Get());
@@ -1689,8 +1664,7 @@ bool D2DRenderer::CreateDWriteTextFormats() {
         fontConfig.size = ScaleLogical(fontConfig.size);
         const std::wstring face = WideFromText(fontConfig.face);
         Microsoft::WRL::ComPtr<IDWriteTextFormat> format;
-        const HRESULT hr = dwriteFactory_->CreateTextFormat(
-            face.c_str(),
+        const HRESULT hr = dwriteFactory_->CreateTextFormat(face.c_str(),
             nullptr,
             static_cast<DWRITE_FONT_WEIGHT>(fontConfig.weight),
             DWRITE_FONT_STYLE_NORMAL,
@@ -1720,8 +1694,7 @@ void D2DRenderer::ConfigureDWriteTextFormat(IDWriteTextFormat* format, const Tex
     format->SetWordWrapping(options.wrap ? DWRITE_WORD_WRAPPING_WRAP : DWRITE_WORD_WRAPPING_NO_WRAP);
 }
 
-TextLayoutResult D2DRenderer::MeasureTextBlockD2D(
-    const RenderRect& rect,
+TextLayoutResult D2DRenderer::MeasureTextBlockD2D(const RenderRect& rect,
     const std::wstring& wideText,
     TextStyleId style,
     const TextLayoutOptions& options,

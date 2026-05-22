@@ -25,7 +25,8 @@ void WriteTraceLine(std::FILE* output, const char* prefix, const char* text) {
 
 }  // namespace
 
-Trace::Trace(std::FILE* output) : output_(output) {}
+Trace::Trace(std::FILE* output) :
+    output_(output) {}
 
 void Trace::SetOutput(std::FILE* output) {
     if (output_ != nullptr && output_ != output) {
@@ -220,8 +221,7 @@ const char* Trace::BoolText(bool value) {
 std::string Trace::FormatTimestamp() {
     SYSTEMTIME localTime{};
     GetLocalTime(&localTime);
-    return FormatText(
-        "%04u-%02u-%02u %02u:%02u:%02u.%03u",
+    return FormatText("%04u-%02u-%02u %02u:%02u:%02u.%03u",
         localTime.wYear,
         localTime.wMonth,
         localTime.wDay,
@@ -239,8 +239,7 @@ void WriteRendererErrorTrace(Trace& trace, std::string_view stage, const std::st
     if (error.empty()) {
         return;
     }
-    trace.WriteFmt(
-        TracePrefix::Renderer,
+    trace.WriteFmt(TracePrefix::Renderer,
         RES_STR("error stage=\"%.*s\" detail=\"%s\""),
         static_cast<int>(stage.size()),
         stage.data(),

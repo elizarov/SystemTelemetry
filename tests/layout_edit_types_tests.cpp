@@ -294,14 +294,11 @@ TEST(LayoutEditTypes, PrioritizesMetricAndTitleAnchorsAboveGuides) {
     LayoutEditAnchorKey titleAnchor;
     titleAnchor.subject = LayoutCardTitleEditKey{"card-a"};
 
-    EXPECT_LT(
-        LayoutEditAnchorHitPriority(metricAnchor),
+    EXPECT_LT(LayoutEditAnchorHitPriority(metricAnchor),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::MetricListLabelWidth));
-    EXPECT_LT(
-        LayoutEditAnchorHitPriority(metricAnchor),
+    EXPECT_LT(LayoutEditAnchorHitPriority(metricAnchor),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::TextBottomGap));
-    EXPECT_LT(
-        LayoutEditAnchorHitPriority(titleAnchor),
+    EXPECT_LT(LayoutEditAnchorHitPriority(titleAnchor),
         GetLayoutEditParameterHitPriority(LayoutEditParameter::CardHeaderContentGap));
 }
 

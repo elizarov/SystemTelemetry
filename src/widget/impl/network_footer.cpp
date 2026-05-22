@@ -34,14 +34,12 @@ void NetworkFooterWidget::Draw(WidgetHost& renderer, const WidgetLayout& widget,
     }
 
     const std::string text = metrics.ResolveNetworkFooter();
-    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(
-        widget.rect,
+    const WidgetHost::TextLayoutResult textLayout = renderer.Renderer().DrawTextBlock(widget.rect,
         text,
         TextStyleId::Footer,
         RenderColorId::MutedText,
         TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Top, true, true));
-    renderer.EditArtifacts().RegisterDynamicTextAnchor(
-        textLayout,
+    renderer.EditArtifacts().RegisterDynamicTextAnchor(textLayout,
         renderer.MakeEditableTextBinding(
             widget, WidgetHost::LayoutEditParameter::FontFooter, 0, renderer.Config().layout.fonts.footer.size),
         WidgetHost::LayoutEditParameter::ColorMutedText);

@@ -82,8 +82,7 @@ const char* ExitSideName(LayoutGuideSheetExitSide side) {
 RenderPoint TransformPoint(RenderPoint point, const RenderRect& source, const RenderRect& dest) {
     const double scaleX = source.Width() == 0 ? 1.0 : static_cast<double>(dest.Width()) / source.Width();
     const double scaleY = source.Height() == 0 ? 1.0 : static_cast<double>(dest.Height()) / source.Height();
-    return RenderPoint{
-        dest.left + static_cast<int>((point.x - source.left) * scaleX + 0.5),
+    return RenderPoint{dest.left + static_cast<int>((point.x - source.left) * scaleX + 0.5),
         dest.top + static_cast<int>((point.y - source.top) * scaleY + 0.5)};
 }
 
@@ -111,8 +110,7 @@ RenderPoint ClosestEllipseBoundaryPoint(const RenderRect& rect, RenderPoint refe
     if (normalizedLength <= 0.0) {
         return RenderPoint{center.x, rect.top};
     }
-    return RenderPoint{
-        center.x + static_cast<int>(std::lround(dx / normalizedLength)),
+    return RenderPoint{center.x + static_cast<int>(std::lround(dx / normalizedLength)),
         center.y + static_cast<int>(std::lround(dy / normalizedLength))};
 }
 
@@ -189,8 +187,7 @@ inline constexpr size_t kMaxAdjacentOrderPasses = 20;
 inline constexpr int kLeaderCrossingScore = 100;
 inline constexpr int kTargetSafeZoneScore = 1;
 
-RenderPoint TargetAttachmentForCallout(
-    const LayoutGuideSheetPlacementCallout& callout,
+RenderPoint TargetAttachmentForCallout(const LayoutGuideSheetPlacementCallout& callout,
     const RenderRect& targetRect,
     RenderPoint bubbleAttachment,
     int gaugeRingThickness) {
@@ -242,8 +239,7 @@ int SideMembershipPenalty(const CardCalloutColumns& candidate, const CardCallout
     return penalty;
 }
 
-bool PlannedIndexLessByTargetX(
-    size_t lhs,
+bool PlannedIndexLessByTargetX(size_t lhs,
     size_t rhs,
     const std::vector<PlannedCallout>& plannedCallouts,
     const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
@@ -258,8 +254,7 @@ bool PlannedIndexLessByTargetX(
     return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
 }
 
-bool PlannedIndexLessByTargetY(
-    size_t lhs,
+bool PlannedIndexLessByTargetY(size_t lhs,
     size_t rhs,
     const std::vector<PlannedCallout>& plannedCallouts,
     const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
@@ -274,8 +269,7 @@ bool PlannedIndexLessByTargetY(
     return callouts[plannedCallouts[lhs].calloutIndex].order < callouts[plannedCallouts[rhs].calloutIndex].order;
 }
 
-void StableSortPlannedIndexesByTargetX(
-    std::vector<size_t>& plannedIndexes,
+void StableSortPlannedIndexesByTargetX(std::vector<size_t>& plannedIndexes,
     const std::vector<PlannedCallout>& plannedCallouts,
     const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
     // Size: callout lists are small; insertion sort avoids std::stable_sort template code.
@@ -290,8 +284,7 @@ void StableSortPlannedIndexesByTargetX(
     }
 }
 
-void StableSortPlannedIndexesByTargetY(
-    std::vector<size_t>& plannedIndexes,
+void StableSortPlannedIndexesByTargetY(std::vector<size_t>& plannedIndexes,
     const std::vector<PlannedCallout>& plannedCallouts,
     const std::vector<LayoutGuideSheetPlacementCallout>& callouts) {
     for (size_t i = 1; i < plannedIndexes.size(); ++i) {
@@ -343,11 +336,11 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             }
         }
         StableSortPlannedIndexesByTargetX(cardPlanned, plannedCallouts, callouts);
-        const size_t leftCount = cardPlanned.size() == 1
-            ? (plannedCallouts[cardPlanned.front()].target.Center().x < cardPlacements[cardIndex].sourceRect.Center().x
-                   ? 1
-                   : 0)
-            : cardPlanned.size() / 2;
+        const size_t leftCount = cardPlanned.size() == 1 ?
+            (plannedCallouts[cardPlanned.front()].target.Center().x < cardPlacements[cardIndex].sourceRect.Center().x ?
+                    1 :
+                    0) :
+            cardPlanned.size() / 2;
         plannedByCard[cardIndex].left.assign(cardPlanned.begin(), cardPlanned.begin() + leftCount);
         plannedByCard[cardIndex].right.assign(cardPlanned.begin() + leftCount, cardPlanned.end());
         StableSortPlannedIndexesByTargetY(plannedByCard[cardIndex].left, plannedCallouts, callouts);
@@ -373,154 +366,152 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
         return width;
     };
 
-    const auto computeBlockForColumns = [&](const CardCalloutColumns& columns,
-                                            const LayoutGuideSheetCardPlacement& placement) {
-        BlockLayout block;
-        block.itemHeight = placement.sourceRect.Height();
-        block.itemWidth = placement.sourceRect.Width();
-        block.leftWidth = widestBubbleWidthFor(columns.left);
-        block.rightWidth = widestBubbleWidthFor(columns.right);
-        const int topWidth = widestBubbleWidthFor(columns.top);
-        const int bottomWidth = widestBubbleWidthFor(columns.bottom);
-        const int topHeight = stackedHeight(columns.top);
-        const int bottomHeight = stackedHeight(columns.bottom);
-        const int topProtrusion = topHeight > 0 ? topHeight + style.calloutGap : 0;
-        const int bottomProtrusion = bottomHeight > 0 ? bottomHeight + style.calloutGap : 0;
-        block.itemX = block.leftWidth > 0 ? block.leftWidth + style.calloutGap : 0;
-        const int sideStackHeight = std::max(stackedHeight(columns.left), stackedHeight(columns.right));
-        const int sideAbove = std::max(0, (sideStackHeight - block.itemHeight) / 2);
-        const int sideBelow = std::max(0, sideStackHeight - block.itemHeight - sideAbove);
-        block.itemY = std::max(topProtrusion, sideAbove);
-        block.height = block.itemY + block.itemHeight + std::max(bottomProtrusion, sideBelow);
-        block.advanceHeight = block.height;
-        const int mainWidth =
-            block.itemX + block.itemWidth + (block.rightWidth > 0 ? style.calloutGap + block.rightWidth : 0);
-        int topX = block.itemX + (block.itemWidth - topWidth) / 2;
-        int bottomX = block.itemX + (block.itemWidth - bottomWidth) / 2;
-        const int minX = Min3Int(0, topX, bottomX);
-        const int maxX = Max3Int(mainWidth, topX + topWidth, bottomX + bottomWidth);
-        block.itemX -= minX;
-        block.width = maxX - minX;
-        return block;
-    };
+    const auto computeBlockForColumns =
+        [&](const CardCalloutColumns& columns, const LayoutGuideSheetCardPlacement& placement) {
+            BlockLayout block;
+            block.itemHeight = placement.sourceRect.Height();
+            block.itemWidth = placement.sourceRect.Width();
+            block.leftWidth = widestBubbleWidthFor(columns.left);
+            block.rightWidth = widestBubbleWidthFor(columns.right);
+            const int topWidth = widestBubbleWidthFor(columns.top);
+            const int bottomWidth = widestBubbleWidthFor(columns.bottom);
+            const int topHeight = stackedHeight(columns.top);
+            const int bottomHeight = stackedHeight(columns.bottom);
+            const int topProtrusion = topHeight > 0 ? topHeight + style.calloutGap : 0;
+            const int bottomProtrusion = bottomHeight > 0 ? bottomHeight + style.calloutGap : 0;
+            block.itemX = block.leftWidth > 0 ? block.leftWidth + style.calloutGap : 0;
+            const int sideStackHeight = std::max(stackedHeight(columns.left), stackedHeight(columns.right));
+            const int sideAbove = std::max(0, (sideStackHeight - block.itemHeight) / 2);
+            const int sideBelow = std::max(0, sideStackHeight - block.itemHeight - sideAbove);
+            block.itemY = std::max(topProtrusion, sideAbove);
+            block.height = block.itemY + block.itemHeight + std::max(bottomProtrusion, sideBelow);
+            block.advanceHeight = block.height;
+            const int mainWidth =
+                block.itemX + block.itemWidth + (block.rightWidth > 0 ? style.calloutGap + block.rightWidth : 0);
+            int topX = block.itemX + (block.itemWidth - topWidth) / 2;
+            int bottomX = block.itemX + (block.itemWidth - bottomWidth) / 2;
+            const int minX = Min3Int(0, topX, bottomX);
+            const int maxX = Max3Int(mainWidth, topX + topWidth, bottomX + bottomWidth);
+            block.itemX -= minX;
+            block.width = maxX - minX;
+            return block;
+        };
 
-    const auto appendTrialLeaders = [&](std::vector<TrialLeader>& leaders,
-                                        const std::vector<size_t>& plannedIndexes,
-                                        LayoutGuideSheetExitSide side,
-                                        const LayoutGuideSheetCardPlacement& placement,
-                                        const BlockLayout& block) {
-        const RenderRect cardRect{
-            block.itemX, block.itemY, block.itemX + block.itemWidth, block.itemY + block.itemHeight};
-        int y = cardRect.Center().y - stackedHeight(plannedIndexes) / 2;
-        for (const size_t plannedIndex : plannedIndexes) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            const LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
-            const int bubbleX = side == LayoutGuideSheetExitSide::Left
-                ? block.itemX - style.calloutGap - callout.bubbleRect.Width()
-                : block.itemX + block.itemWidth + style.calloutGap;
-            const RenderRect bubbleRect{
-                bubbleX, y, bubbleX + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
-            const RenderPoint bubbleAttachment{
-                side == LayoutGuideSheetExitSide::Left ? bubbleRect.right : bubbleRect.left, bubbleRect.Center().y};
-            const RenderRect targetRect = placement.overview
-                ? TransformRect(planned.target, placement.sourceRect, cardRect)
-                : OffsetRenderRect(
-                      planned.target,
-                      cardRect.left - placement.sourceRect.left,
-                      cardRect.top - placement.sourceRect.top);
-            const RenderPoint targetAttachment =
-                TargetAttachmentForCallout(callout, targetRect, bubbleAttachment, style.gaugeRingThickness);
-            leaders.push_back(
-                TrialLeader{
-                    plannedIndex,
+    const auto appendTrialLeaders =
+        [&](std::vector<TrialLeader>& leaders,
+            const std::vector<size_t>& plannedIndexes,
+            LayoutGuideSheetExitSide side,
+            const LayoutGuideSheetCardPlacement& placement,
+            const BlockLayout& block) {
+            const RenderRect cardRect{
+                block.itemX, block.itemY, block.itemX + block.itemWidth, block.itemY + block.itemHeight};
+            int y = cardRect.Center().y - stackedHeight(plannedIndexes) / 2;
+            for (const size_t plannedIndex : plannedIndexes) {
+                const PlannedCallout& planned = plannedCallouts[plannedIndex];
+                const LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
+                const int bubbleX = side == LayoutGuideSheetExitSide::Left ?
+                    block.itemX - style.calloutGap - callout.bubbleRect.Width() :
+                    block.itemX + block.itemWidth + style.calloutGap;
+                const RenderRect bubbleRect{
+                    bubbleX, y, bubbleX + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
+                const RenderPoint bubbleAttachment{
+                    side == LayoutGuideSheetExitSide::Left ? bubbleRect.right : bubbleRect.left, bubbleRect.Center().y};
+                const RenderRect targetRect = placement.overview ?
+                    TransformRect(planned.target, placement.sourceRect, cardRect) :
+                    OffsetRenderRect(planned.target,
+                        cardRect.left - placement.sourceRect.left,
+                        cardRect.top - placement.sourceRect.top);
+                const RenderPoint targetAttachment =
+                    TargetAttachmentForCallout(callout, targetRect, bubbleAttachment, style.gaugeRingThickness);
+                leaders.push_back(TrialLeader{plannedIndex,
                     targetAttachment,
                     bubbleAttachment,
                     TargetSafeRect(targetAttachment, style.targetSafeRadius)});
-            y = bubbleRect.bottom + style.rowGap;
-        }
-    };
+                y = bubbleRect.bottom + style.rowGap;
+            }
+        };
 
-    const auto appendTopBottomTrialLeaders = [&](std::vector<TrialLeader>& leaders,
-                                                 const std::vector<size_t>& plannedIndexes,
-                                                 LayoutGuideSheetExitSide side,
-                                                 const LayoutGuideSheetCardPlacement& placement,
-                                                 const BlockLayout& block) {
-        const RenderRect cardRect{
-            block.itemX, block.itemY, block.itemX + block.itemWidth, block.itemY + block.itemHeight};
-        for (const size_t plannedIndex : plannedIndexes) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            const LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
-            const int bubbleX = block.itemX + (block.itemWidth - callout.bubbleRect.Width()) / 2;
-            const int bubbleY = side == LayoutGuideSheetExitSide::Top
-                ? block.itemY - style.calloutGap - callout.bubbleRect.Height()
-                : block.itemY + block.itemHeight + style.calloutGap;
-            const RenderRect bubbleRect{
-                bubbleX, bubbleY, bubbleX + callout.bubbleRect.Width(), bubbleY + callout.bubbleRect.Height()};
-            const RenderPoint bubbleAttachment{
-                bubbleRect.Center().x, side == LayoutGuideSheetExitSide::Top ? bubbleRect.bottom : bubbleRect.top};
-            const RenderRect targetRect = placement.overview
-                ? TransformRect(planned.target, placement.sourceRect, cardRect)
-                : OffsetRenderRect(
-                      planned.target,
-                      cardRect.left - placement.sourceRect.left,
-                      cardRect.top - placement.sourceRect.top);
-            const RenderPoint targetAttachment =
-                TargetAttachmentForCallout(callout, targetRect, bubbleAttachment, style.gaugeRingThickness);
-            leaders.push_back(
-                TrialLeader{
-                    plannedIndex,
+    const auto appendTopBottomTrialLeaders =
+        [&](std::vector<TrialLeader>& leaders,
+            const std::vector<size_t>& plannedIndexes,
+            LayoutGuideSheetExitSide side,
+            const LayoutGuideSheetCardPlacement& placement,
+            const BlockLayout& block) {
+            const RenderRect cardRect{
+                block.itemX, block.itemY, block.itemX + block.itemWidth, block.itemY + block.itemHeight};
+            for (const size_t plannedIndex : plannedIndexes) {
+                const PlannedCallout& planned = plannedCallouts[plannedIndex];
+                const LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
+                const int bubbleX = block.itemX + (block.itemWidth - callout.bubbleRect.Width()) / 2;
+                const int bubbleY = side == LayoutGuideSheetExitSide::Top ?
+                    block.itemY - style.calloutGap - callout.bubbleRect.Height() :
+                    block.itemY + block.itemHeight + style.calloutGap;
+                const RenderRect bubbleRect{
+                    bubbleX, bubbleY, bubbleX + callout.bubbleRect.Width(), bubbleY + callout.bubbleRect.Height()};
+                const RenderPoint bubbleAttachment{
+                    bubbleRect.Center().x, side == LayoutGuideSheetExitSide::Top ? bubbleRect.bottom : bubbleRect.top};
+                const RenderRect targetRect = placement.overview ?
+                    TransformRect(planned.target, placement.sourceRect, cardRect) :
+                    OffsetRenderRect(planned.target,
+                        cardRect.left - placement.sourceRect.left,
+                        cardRect.top - placement.sourceRect.top);
+                const RenderPoint targetAttachment =
+                    TargetAttachmentForCallout(callout, targetRect, bubbleAttachment, style.gaugeRingThickness);
+                leaders.push_back(TrialLeader{plannedIndex,
                     targetAttachment,
                     bubbleAttachment,
                     TargetSafeRect(targetAttachment, style.targetSafeRadius)});
-        }
-    };
+            }
+        };
 
-    const auto collectLeaderScore = [&](const CardCalloutColumns& columns,
-                                        const LayoutGuideSheetCardPlacement& placement,
-                                        int stopAfter = (std::numeric_limits<int>::max)()) {
-        const BlockLayout block = computeBlockForColumns(columns, placement);
-        std::vector<TrialLeader> leaders;
-        leaders.reserve(columns.top.size() + columns.left.size() + columns.right.size() + columns.bottom.size());
-        appendTopBottomTrialLeaders(leaders, columns.top, LayoutGuideSheetExitSide::Top, placement, block);
-        appendTrialLeaders(leaders, columns.left, LayoutGuideSheetExitSide::Left, placement, block);
-        appendTrialLeaders(leaders, columns.right, LayoutGuideSheetExitSide::Right, placement, block);
-        appendTopBottomTrialLeaders(leaders, columns.bottom, LayoutGuideSheetExitSide::Bottom, placement, block);
+    const auto collectLeaderScore =
+        [&](const CardCalloutColumns& columns,
+            const LayoutGuideSheetCardPlacement& placement,
+            int stopAfter = (std::numeric_limits<int>::max)()) {
+            const BlockLayout block = computeBlockForColumns(columns, placement);
+            std::vector<TrialLeader> leaders;
+            leaders.reserve(columns.top.size() + columns.left.size() + columns.right.size() + columns.bottom.size());
+            appendTopBottomTrialLeaders(leaders, columns.top, LayoutGuideSheetExitSide::Top, placement, block);
+            appendTrialLeaders(leaders, columns.left, LayoutGuideSheetExitSide::Left, placement, block);
+            appendTrialLeaders(leaders, columns.right, LayoutGuideSheetExitSide::Right, placement, block);
+            appendTopBottomTrialLeaders(leaders, columns.bottom, LayoutGuideSheetExitSide::Bottom, placement, block);
 
-        LeaderScore score;
-        for (size_t i = 0; i < leaders.size(); ++i) {
-            for (size_t j = i + 1; j < leaders.size(); ++j) {
-                if (LeaderSegmentsIntersect(
-                        leaders[i].target, leaders[i].bubble, leaders[j].target, leaders[j].bubble)) {
-                    score.score += kLeaderCrossingScore;
-                    score.conflicts.push_back(LeaderConflict{leaders[i].plannedIndex, leaders[j].plannedIndex});
-                    if (score.score > stopAfter) {
-                        return score;
+            LeaderScore score;
+            for (size_t i = 0; i < leaders.size(); ++i) {
+                for (size_t j = i + 1; j < leaders.size(); ++j) {
+                    if (LeaderSegmentsIntersect(
+                            leaders[i].target, leaders[i].bubble, leaders[j].target, leaders[j].bubble)) {
+                        score.score += kLeaderCrossingScore;
+                        score.conflicts.push_back(LeaderConflict{leaders[i].plannedIndex, leaders[j].plannedIndex});
+                        if (score.score > stopAfter) {
+                            return score;
+                        }
                     }
-                }
-                if (SegmentIntersectsRect(leaders[i].target, leaders[i].bubble, leaders[j].targetSafeRect)) {
-                    score.score += kTargetSafeZoneScore;
-                    score.conflicts.push_back(LeaderConflict{leaders[i].plannedIndex, leaders[j].plannedIndex});
-                    if (score.score > stopAfter) {
-                        return score;
+                    if (SegmentIntersectsRect(leaders[i].target, leaders[i].bubble, leaders[j].targetSafeRect)) {
+                        score.score += kTargetSafeZoneScore;
+                        score.conflicts.push_back(LeaderConflict{leaders[i].plannedIndex, leaders[j].plannedIndex});
+                        if (score.score > stopAfter) {
+                            return score;
+                        }
                     }
-                }
-                if (SegmentIntersectsRect(leaders[j].target, leaders[j].bubble, leaders[i].targetSafeRect)) {
-                    score.score += kTargetSafeZoneScore;
-                    score.conflicts.push_back(LeaderConflict{leaders[j].plannedIndex, leaders[i].plannedIndex});
-                    if (score.score > stopAfter) {
-                        return score;
+                    if (SegmentIntersectsRect(leaders[j].target, leaders[j].bubble, leaders[i].targetSafeRect)) {
+                        score.score += kTargetSafeZoneScore;
+                        score.conflicts.push_back(LeaderConflict{leaders[j].plannedIndex, leaders[i].plannedIndex});
+                        if (score.score > stopAfter) {
+                            return score;
+                        }
                     }
                 }
             }
-        }
-        return score;
-    };
+            return score;
+        };
 
-    const auto countLeaderIntersections = [&](const CardCalloutColumns& columns,
-                                              const LayoutGuideSheetCardPlacement& placement,
-                                              int stopAfter = (std::numeric_limits<int>::max)()) {
-        return collectLeaderScore(columns, placement, stopAfter).score;
-    };
+    const auto countLeaderIntersections =
+        [&](const CardCalloutColumns& columns,
+            const LayoutGuideSheetCardPlacement& placement,
+            int stopAfter = (std::numeric_limits<int>::max)()) {
+            return collectLeaderScore(columns, placement, stopAfter).score;
+        };
 
     const auto placementPenalty = [&](const CardCalloutColumns& columns, const CardCalloutColumns& preferred) {
         return SideMembershipPenalty(columns, preferred) + OrderPenalty(columns.left, preferred.left) +
@@ -547,8 +538,7 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
             size_t index = 0;
             bool found = false;
         };
-        const LayoutGuideSheetExitSide sides[]{
-            LayoutGuideSheetExitSide::Top,
+        const LayoutGuideSheetExitSide sides[]{LayoutGuideSheetExitSide::Top,
             LayoutGuideSheetExitSide::Left,
             LayoutGuideSheetExitSide::Right,
             LayoutGuideSheetExitSide::Bottom};
@@ -600,115 +590,90 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
         }
     };
 
-    const auto optimizeByConflictSwaps = [&](CardCalloutColumns& columns,
-                                             const CardCalloutColumns& preferred,
-                                             const LayoutGuideSheetCardPlacement& placement) {
-        size_t passes = 0;
-        for (; passes < kMaxAdjacentOrderPasses; ++passes) {
-            const LeaderScore current = collectLeaderScore(columns, placement);
-            if (current.score == 0 || current.conflicts.empty()) {
-                return passes;
-            }
-
-            CardCalloutColumns bestColumns = columns;
-            int bestScore = current.score;
-            int bestPenalty = placementPenalty(columns, preferred);
-
-            const auto consider = [&](const CardCalloutColumns& candidate) {
-                const int score = countLeaderIntersections(candidate, placement, bestScore);
-                const int penalty = placementPenalty(candidate, preferred);
-                if (score < bestScore || (score == bestScore && penalty < bestPenalty)) {
-                    bestScore = score;
-                    bestPenalty = penalty;
-                    bestColumns = candidate;
+    const auto optimizeByConflictSwaps =
+        [&](CardCalloutColumns& columns,
+            const CardCalloutColumns& preferred,
+            const LayoutGuideSheetCardPlacement& placement) {
+            size_t passes = 0;
+            for (; passes < kMaxAdjacentOrderPasses; ++passes) {
+                const LeaderScore current = collectLeaderScore(columns, placement);
+                if (current.score == 0 || current.conflicts.empty()) {
+                    return passes;
                 }
-            };
 
-            const auto considerNeighborSwaps = [&](size_t plannedIndex) {
-                const auto location = findPlannedIndex(columns, plannedIndex);
-                if (!location.found) {
-                    return;
-                }
-                const std::vector<size_t>& stack = stackForSide(columns, location.side);
-                if (location.index > 0) {
-                    CardCalloutColumns candidate = columns;
-                    swapPlannedIndexes(candidate, plannedIndex, stack[location.index - 1]);
-                    consider(candidate);
-                }
-                if (location.index + 1 < stack.size()) {
-                    CardCalloutColumns candidate = columns;
-                    swapPlannedIndexes(candidate, plannedIndex, stack[location.index + 1]);
-                    consider(candidate);
-                }
-            };
+                CardCalloutColumns bestColumns = columns;
+                int bestScore = current.score;
+                int bestPenalty = placementPenalty(columns, preferred);
 
-            const auto considerSwapsWithPlacedCallouts = [&](size_t plannedIndex) {
-                const LayoutGuideSheetExitSide sides[]{
-                    LayoutGuideSheetExitSide::Top,
-                    LayoutGuideSheetExitSide::Left,
-                    LayoutGuideSheetExitSide::Right,
-                    LayoutGuideSheetExitSide::Bottom};
-                for (const LayoutGuideSheetExitSide side : sides) {
-                    const std::vector<size_t>& stack = stackForSide(columns, side);
-                    for (const size_t other : stack) {
-                        CardCalloutColumns candidate = columns;
-                        if (swapPlannedIndexes(candidate, plannedIndex, other)) {
-                            consider(candidate);
-                        }
+                const auto consider = [&](const CardCalloutColumns& candidate) {
+                    const int score = countLeaderIntersections(candidate, placement, bestScore);
+                    const int penalty = placementPenalty(candidate, preferred);
+                    if (score < bestScore || (score == bestScore && penalty < bestPenalty)) {
+                        bestScore = score;
+                        bestPenalty = penalty;
+                        bestColumns = candidate;
                     }
-                }
-            };
+                };
 
-            const auto considerSideMoves = [&](size_t plannedIndex) {
-                const LayoutGuideSheetExitSide sides[]{LayoutGuideSheetExitSide::Left, LayoutGuideSheetExitSide::Right};
-                const auto originalLocation = findPlannedIndex(columns, plannedIndex);
-                if (!originalLocation.found) {
-                    return;
-                }
-                const bool fromSide = originalLocation.side == LayoutGuideSheetExitSide::Left ||
-                    originalLocation.side == LayoutGuideSheetExitSide::Right;
-                for (const LayoutGuideSheetExitSide side : sides) {
-                    const std::vector<size_t>& stack = stackForSide(columns, side);
-                    for (size_t insertAt = 0; insertAt <= stack.size(); ++insertAt) {
-                        if (!fromSide) {
-                            continue;
-                        }
-                        if (side == originalLocation.side &&
-                            (insertAt == originalLocation.index || insertAt == originalLocation.index + 1)) {
-                            continue;
-                        }
+                const auto considerNeighborSwaps = [&](size_t plannedIndex) {
+                    const auto location = findPlannedIndex(columns, plannedIndex);
+                    if (!location.found) {
+                        return;
+                    }
+                    const std::vector<size_t>& stack = stackForSide(columns, location.side);
+                    if (location.index > 0) {
                         CardCalloutColumns candidate = columns;
-                        if (!removePlannedIndex(candidate, plannedIndex)) {
-                            continue;
-                        }
-                        size_t adjustedInsertAt = insertAt;
-                        if (side == originalLocation.side && adjustedInsertAt > originalLocation.index) {
-                            --adjustedInsertAt;
-                        }
-                        std::vector<size_t>& candidateStack = stackForSide(candidate, side);
-                        adjustedInsertAt = std::min(adjustedInsertAt, candidateStack.size());
-                        candidateStack.insert(
-                            candidateStack.begin() + static_cast<std::ptrdiff_t>(adjustedInsertAt), plannedIndex);
+                        swapPlannedIndexes(candidate, plannedIndex, stack[location.index - 1]);
                         consider(candidate);
                     }
-                }
-                if (fromSide) {
-                    return;
-                }
-                for (const LayoutGuideSheetExitSide side : sides) {
-                    const std::vector<size_t>& stack = stackForSide(columns, side);
-                    for (size_t replacementIndex = 0; replacementIndex < stack.size(); ++replacementIndex) {
-                        for (size_t insertAt = 0; insertAt <= stack.size(); ++insertAt) {
+                    if (location.index + 1 < stack.size()) {
+                        CardCalloutColumns candidate = columns;
+                        swapPlannedIndexes(candidate, plannedIndex, stack[location.index + 1]);
+                        consider(candidate);
+                    }
+                };
+
+                const auto considerSwapsWithPlacedCallouts = [&](size_t plannedIndex) {
+                    const LayoutGuideSheetExitSide sides[]{LayoutGuideSheetExitSide::Top,
+                        LayoutGuideSheetExitSide::Left,
+                        LayoutGuideSheetExitSide::Right,
+                        LayoutGuideSheetExitSide::Bottom};
+                    for (const LayoutGuideSheetExitSide side : sides) {
+                        const std::vector<size_t>& stack = stackForSide(columns, side);
+                        for (const size_t other : stack) {
                             CardCalloutColumns candidate = columns;
-                            const size_t replacement = stack[replacementIndex];
-                            if (!removePlannedIndex(candidate, plannedIndex) ||
-                                !removePlannedIndex(candidate, replacement)) {
+                            if (swapPlannedIndexes(candidate, plannedIndex, other)) {
+                                consider(candidate);
+                            }
+                        }
+                    }
+                };
+
+                const auto considerSideMoves = [&](size_t plannedIndex) {
+                    const LayoutGuideSheetExitSide sides[]{
+                        LayoutGuideSheetExitSide::Left, LayoutGuideSheetExitSide::Right};
+                    const auto originalLocation = findPlannedIndex(columns, plannedIndex);
+                    if (!originalLocation.found) {
+                        return;
+                    }
+                    const bool fromSide = originalLocation.side == LayoutGuideSheetExitSide::Left ||
+                        originalLocation.side == LayoutGuideSheetExitSide::Right;
+                    for (const LayoutGuideSheetExitSide side : sides) {
+                        const std::vector<size_t>& stack = stackForSide(columns, side);
+                        for (size_t insertAt = 0; insertAt <= stack.size(); ++insertAt) {
+                            if (!fromSide) {
                                 continue;
                             }
-                            std::vector<size_t>& promotedStack = stackForSide(candidate, originalLocation.side);
-                            promotedStack.push_back(replacement);
+                            if (side == originalLocation.side &&
+                                (insertAt == originalLocation.index || insertAt == originalLocation.index + 1)) {
+                                continue;
+                            }
+                            CardCalloutColumns candidate = columns;
+                            if (!removePlannedIndex(candidate, plannedIndex)) {
+                                continue;
+                            }
                             size_t adjustedInsertAt = insertAt;
-                            if (adjustedInsertAt > replacementIndex) {
+                            if (side == originalLocation.side && adjustedInsertAt > originalLocation.index) {
                                 --adjustedInsertAt;
                             }
                             std::vector<size_t>& candidateStack = stackForSide(candidate, side);
@@ -718,30 +683,57 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                             consider(candidate);
                         }
                     }
-                }
-            };
+                    if (fromSide) {
+                        return;
+                    }
+                    for (const LayoutGuideSheetExitSide side : sides) {
+                        const std::vector<size_t>& stack = stackForSide(columns, side);
+                        for (size_t replacementIndex = 0; replacementIndex < stack.size(); ++replacementIndex) {
+                            for (size_t insertAt = 0; insertAt <= stack.size(); ++insertAt) {
+                                CardCalloutColumns candidate = columns;
+                                const size_t replacement = stack[replacementIndex];
+                                if (!removePlannedIndex(candidate, plannedIndex) ||
+                                    !removePlannedIndex(candidate, replacement)) {
+                                    continue;
+                                }
+                                std::vector<size_t>& promotedStack = stackForSide(candidate, originalLocation.side);
+                                promotedStack.push_back(replacement);
+                                size_t adjustedInsertAt = insertAt;
+                                if (adjustedInsertAt > replacementIndex) {
+                                    --adjustedInsertAt;
+                                }
+                                std::vector<size_t>& candidateStack = stackForSide(candidate, side);
+                                adjustedInsertAt = std::min(adjustedInsertAt, candidateStack.size());
+                                candidateStack.insert(
+                                    candidateStack.begin() + static_cast<std::ptrdiff_t>(adjustedInsertAt),
+                                    plannedIndex);
+                                consider(candidate);
+                            }
+                        }
+                    }
+                };
 
-            for (const LeaderConflict& conflict : current.conflicts) {
-                CardCalloutColumns candidate = columns;
-                if (swapPlannedIndexes(candidate, conflict.first, conflict.second)) {
-                    consider(candidate);
+                for (const LeaderConflict& conflict : current.conflicts) {
+                    CardCalloutColumns candidate = columns;
+                    if (swapPlannedIndexes(candidate, conflict.first, conflict.second)) {
+                        consider(candidate);
+                    }
+                    considerNeighborSwaps(conflict.first);
+                    considerNeighborSwaps(conflict.second);
+                    considerSwapsWithPlacedCallouts(conflict.first);
+                    considerSwapsWithPlacedCallouts(conflict.second);
+                    considerSideMoves(conflict.first);
+                    considerSideMoves(conflict.second);
                 }
-                considerNeighborSwaps(conflict.first);
-                considerNeighborSwaps(conflict.second);
-                considerSwapsWithPlacedCallouts(conflict.first);
-                considerSwapsWithPlacedCallouts(conflict.second);
-                considerSideMoves(conflict.first);
-                considerSideMoves(conflict.second);
-            }
 
-            if (bestScore > current.score ||
-                (bestScore == current.score && bestPenalty >= placementPenalty(columns, preferred))) {
-                return passes;
+                if (bestScore > current.score ||
+                    (bestScore == current.score && bestPenalty >= placementPenalty(columns, preferred))) {
+                    return passes;
+                }
+                columns = std::move(bestColumns);
             }
-            columns = std::move(bestColumns);
-        }
-        return passes;
-    };
+            return passes;
+        };
 
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
         const CardCalloutColumns preferredSplit = plannedByCard[cardIndex];
@@ -752,55 +744,56 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
         plannedByCard[cardIndex] = std::move(columns);
     }
 
-    const auto sideStackRect = [&](const std::vector<size_t>& plannedIndexes,
-                                   LayoutGuideSheetExitSide side,
-                                   const BlockLayout& block) {
-        if (plannedIndexes.empty()) {
-            return RenderRect{};
-        }
-        const int height = stackedHeight(plannedIndexes);
-        const int top = block.itemY + block.itemHeight / 2 - height / 2;
-        if (side == LayoutGuideSheetExitSide::Left) {
-            return RenderRect{
-                block.itemX - style.calloutGap - block.leftWidth, top, block.itemX - style.calloutGap, top + height};
-        }
-        return RenderRect{
-            block.itemX + block.itemWidth + style.calloutGap,
-            top,
-            block.itemX + block.itemWidth + style.calloutGap + block.rightWidth,
-            top + height};
-    };
+    const auto sideStackRect =
+        [&](const std::vector<size_t>& plannedIndexes, LayoutGuideSheetExitSide side, const BlockLayout& block) {
+            if (plannedIndexes.empty()) {
+                return RenderRect{};
+            }
+            const int height = stackedHeight(plannedIndexes);
+            const int top = block.itemY + block.itemHeight / 2 - height / 2;
+            if (side == LayoutGuideSheetExitSide::Left) {
+                return RenderRect{block.itemX - style.calloutGap - block.leftWidth,
+                    top,
+                    block.itemX - style.calloutGap,
+                    top + height};
+            }
+            return RenderRect{block.itemX + block.itemWidth + style.calloutGap,
+                top,
+                block.itemX + block.itemWidth + style.calloutGap + block.rightWidth,
+                top + height};
+        };
 
     const auto topBottomBubbleRect = [&](size_t plannedIndex, LayoutGuideSheetExitSide side, const BlockLayout& block) {
         const LayoutGuideSheetPlacementCallout& callout = callouts[plannedCallouts[plannedIndex].calloutIndex];
         const int x = block.itemX + (block.itemWidth - callout.bubbleRect.Width()) / 2;
-        const int y = side == LayoutGuideSheetExitSide::Top
-            ? block.itemY - style.calloutGap - callout.bubbleRect.Height()
-            : block.itemY + block.itemHeight + style.calloutGap;
+        const int y = side == LayoutGuideSheetExitSide::Top ?
+            block.itemY - style.calloutGap - callout.bubbleRect.Height() :
+            block.itemY + block.itemHeight + style.calloutGap;
         return RenderRect{x, y, x + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
     };
 
-    const auto constrainTopBottomIfNeeded = [&](const std::vector<size_t>& plannedIndexes,
-                                                LayoutGuideSheetExitSide side,
-                                                const CardCalloutColumns& columns,
-                                                const BlockLayout& block) {
-        bool changed = false;
-        const RenderRect leftStack = sideStackRect(columns.left, LayoutGuideSheetExitSide::Left, block);
-        const RenderRect rightStack = sideStackRect(columns.right, LayoutGuideSheetExitSide::Right, block);
-        for (const size_t plannedIndex : plannedIndexes) {
-            LayoutGuideSheetPlacementCallout& callout = callouts[plannedCallouts[plannedIndex].calloutIndex];
-            if (callout.bubbleRect.Width() <= block.itemWidth) {
-                continue;
+    const auto constrainTopBottomIfNeeded =
+        [&](const std::vector<size_t>& plannedIndexes,
+            LayoutGuideSheetExitSide side,
+            const CardCalloutColumns& columns,
+            const BlockLayout& block) {
+            bool changed = false;
+            const RenderRect leftStack = sideStackRect(columns.left, LayoutGuideSheetExitSide::Left, block);
+            const RenderRect rightStack = sideStackRect(columns.right, LayoutGuideSheetExitSide::Right, block);
+            for (const size_t plannedIndex : plannedIndexes) {
+                LayoutGuideSheetPlacementCallout& callout = callouts[plannedCallouts[plannedIndex].calloutIndex];
+                if (callout.bubbleRect.Width() <= block.itemWidth) {
+                    continue;
+                }
+                const RenderRect bubble = topBottomBubbleRect(plannedIndex, side, block);
+                if (!RectsOverlap(bubble, leftStack) && !RectsOverlap(bubble, rightStack)) {
+                    continue;
+                }
+                constrainCalloutWidth(callout, std::max(1, block.itemWidth));
+                changed = true;
             }
-            const RenderRect bubble = topBottomBubbleRect(plannedIndex, side, block);
-            if (!RectsOverlap(bubble, leftStack) && !RectsOverlap(bubble, rightStack)) {
-                continue;
-            }
-            constrainCalloutWidth(callout, std::max(1, block.itemWidth));
-            changed = true;
-        }
-        return changed;
-    };
+            return changed;
+        };
 
     for (size_t pass = 0; pass < 3; ++pass) {
         bool changed = false;
@@ -810,11 +803,11 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                 constrainTopBottomIfNeeded(
                     plannedByCard[cardIndex].top, LayoutGuideSheetExitSide::Top, plannedByCard[cardIndex], block) ||
                 changed;
-            changed = constrainTopBottomIfNeeded(
-                          plannedByCard[cardIndex].bottom,
-                          LayoutGuideSheetExitSide::Bottom,
-                          plannedByCard[cardIndex],
-                          block) ||
+            changed =
+                constrainTopBottomIfNeeded(plannedByCard[cardIndex].bottom,
+                    LayoutGuideSheetExitSide::Bottom,
+                    plannedByCard[cardIndex],
+                    block) ||
                 changed;
         }
         if (!changed) {
@@ -828,64 +821,63 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
         contentWidth = std::max(contentWidth, blocks[cardIndex].width);
     }
 
-    const auto placeSide = [&](const std::vector<size_t>& plannedIndexes,
-                               LayoutGuideSheetExitSide side,
-                               const RenderRect& cardRect,
-                               const BlockLayout& block) {
-        int y = cardRect.Center().y - stackedHeight(plannedIndexes) / 2;
-        for (const size_t plannedIndex : plannedIndexes) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
-            const int x = side == LayoutGuideSheetExitSide::Left
-                ? block.itemX - style.calloutGap - callout.bubbleRect.Width()
-                : block.itemX + block.itemWidth + style.calloutGap;
-            callout.bubbleRect = RenderRect{x, y, x + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
-            callout.exitSide = side;
-            callout.bubbleAttachment = RenderPoint{
-                side == LayoutGuideSheetExitSide::Left ? callout.bubbleRect.right : callout.bubbleRect.left,
-                callout.bubbleRect.Center().y};
-            const int dx = cardRect.left - cardPlacements[planned.cardIndex].sourceRect.left;
-            const int dy = cardRect.top - cardPlacements[planned.cardIndex].sourceRect.top;
-            const RenderRect targetRect = cardPlacements[planned.cardIndex].overview
-                ? TransformRect(
-                      planned.target,
-                      cardPlacements[planned.cardIndex].sourceRect,
-                      cardPlacements[planned.cardIndex].destRect)
-                : OffsetRenderRect(planned.target, dx, dy);
-            callout.targetAttachment =
-                TargetAttachmentForCallout(callout, targetRect, callout.bubbleAttachment, style.gaugeRingThickness);
-            y = callout.bubbleRect.bottom + style.rowGap;
-        }
-    };
+    const auto placeSide =
+        [&](const std::vector<size_t>& plannedIndexes,
+            LayoutGuideSheetExitSide side,
+            const RenderRect& cardRect,
+            const BlockLayout& block) {
+            int y = cardRect.Center().y - stackedHeight(plannedIndexes) / 2;
+            for (const size_t plannedIndex : plannedIndexes) {
+                const PlannedCallout& planned = plannedCallouts[plannedIndex];
+                LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
+                const int x = side == LayoutGuideSheetExitSide::Left ?
+                    block.itemX - style.calloutGap - callout.bubbleRect.Width() :
+                    block.itemX + block.itemWidth + style.calloutGap;
+                callout.bubbleRect = RenderRect{x, y, x + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
+                callout.exitSide = side;
+                callout.bubbleAttachment = RenderPoint{
+                    side == LayoutGuideSheetExitSide::Left ? callout.bubbleRect.right : callout.bubbleRect.left,
+                    callout.bubbleRect.Center().y};
+                const int dx = cardRect.left - cardPlacements[planned.cardIndex].sourceRect.left;
+                const int dy = cardRect.top - cardPlacements[planned.cardIndex].sourceRect.top;
+                const RenderRect targetRect = cardPlacements[planned.cardIndex].overview ?
+                    TransformRect(planned.target,
+                        cardPlacements[planned.cardIndex].sourceRect,
+                        cardPlacements[planned.cardIndex].destRect) :
+                    OffsetRenderRect(planned.target, dx, dy);
+                callout.targetAttachment =
+                    TargetAttachmentForCallout(callout, targetRect, callout.bubbleAttachment, style.gaugeRingThickness);
+                y = callout.bubbleRect.bottom + style.rowGap;
+            }
+        };
 
-    const auto placeTopBottom = [&](const std::vector<size_t>& plannedIndexes,
-                                    LayoutGuideSheetExitSide side,
-                                    const RenderRect& cardRect,
-                                    const BlockLayout& block) {
-        for (const size_t plannedIndex : plannedIndexes) {
-            const PlannedCallout& planned = plannedCallouts[plannedIndex];
-            LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
-            const int x = block.itemX + (block.itemWidth - callout.bubbleRect.Width()) / 2;
-            const int y = side == LayoutGuideSheetExitSide::Top
-                ? block.itemY - style.calloutGap - callout.bubbleRect.Height()
-                : block.itemY + block.itemHeight + style.calloutGap;
-            callout.bubbleRect = RenderRect{x, y, x + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
-            callout.exitSide = side;
-            callout.bubbleAttachment = RenderPoint{
-                callout.bubbleRect.Center().x,
-                side == LayoutGuideSheetExitSide::Top ? callout.bubbleRect.bottom : callout.bubbleRect.top};
-            const int dx = cardRect.left - cardPlacements[planned.cardIndex].sourceRect.left;
-            const int dy = cardRect.top - cardPlacements[planned.cardIndex].sourceRect.top;
-            const RenderRect targetRect = cardPlacements[planned.cardIndex].overview
-                ? TransformRect(
-                      planned.target,
-                      cardPlacements[planned.cardIndex].sourceRect,
-                      cardPlacements[planned.cardIndex].destRect)
-                : OffsetRenderRect(planned.target, dx, dy);
-            callout.targetAttachment =
-                TargetAttachmentForCallout(callout, targetRect, callout.bubbleAttachment, style.gaugeRingThickness);
-        }
-    };
+    const auto placeTopBottom =
+        [&](const std::vector<size_t>& plannedIndexes,
+            LayoutGuideSheetExitSide side,
+            const RenderRect& cardRect,
+            const BlockLayout& block) {
+            for (const size_t plannedIndex : plannedIndexes) {
+                const PlannedCallout& planned = plannedCallouts[plannedIndex];
+                LayoutGuideSheetPlacementCallout& callout = callouts[planned.calloutIndex];
+                const int x = block.itemX + (block.itemWidth - callout.bubbleRect.Width()) / 2;
+                const int y = side == LayoutGuideSheetExitSide::Top ?
+                    block.itemY - style.calloutGap - callout.bubbleRect.Height() :
+                    block.itemY + block.itemHeight + style.calloutGap;
+                callout.bubbleRect = RenderRect{x, y, x + callout.bubbleRect.Width(), y + callout.bubbleRect.Height()};
+                callout.exitSide = side;
+                callout.bubbleAttachment = RenderPoint{callout.bubbleRect.Center().x,
+                    side == LayoutGuideSheetExitSide::Top ? callout.bubbleRect.bottom : callout.bubbleRect.top};
+                const int dx = cardRect.left - cardPlacements[planned.cardIndex].sourceRect.left;
+                const int dy = cardRect.top - cardPlacements[planned.cardIndex].sourceRect.top;
+                const RenderRect targetRect = cardPlacements[planned.cardIndex].overview ?
+                    TransformRect(planned.target,
+                        cardPlacements[planned.cardIndex].sourceRect,
+                        cardPlacements[planned.cardIndex].destRect) :
+                    OffsetRenderRect(planned.target, dx, dy);
+                callout.targetAttachment =
+                    TargetAttachmentForCallout(callout, targetRect, callout.bubbleAttachment, style.gaugeRingThickness);
+            }
+        };
 
     for (size_t cardIndex = 0; cardIndex < cardPlacements.size(); ++cardIndex) {
         LayoutGuideSheetCardPlacement& placement = cardPlacements[cardIndex];
@@ -941,49 +933,47 @@ LayoutGuideSheetPlacementResult PlaceLayoutGuideSheetCallouts(
                 }
                 return callout.sourceCardId;
             };
-            const auto recordIntersection = [&](const char* kind,
-                                                size_t firstIndex,
-                                                size_t secondIndex,
-                                                LayoutGuideSheetExitSide firstSide,
-                                                LayoutGuideSheetExitSide secondSide) {
-                const std::string_view cardId = sourceCardId();
-                const std::string_view firstKey = calloutKey(firstIndex);
-                const std::string_view secondKey = calloutKey(secondIndex);
-                traceDetails->push_back(FormatText(
-                    ResourceStringText(RES_STR(
-                        "intersection_card=\"%.*s\" intersection_kind=\"%s\" first_side=\"%s\" "
-                        "first_callout=\"%.*s\" second_side=\"%s\" second_callout=\"%.*s\"")),
-                    static_cast<int>(cardId.size()),
-                    cardId.data(),
-                    kind,
-                    ExitSideName(firstSide),
-                    static_cast<int>(firstKey.size()),
-                    firstKey.data(),
-                    ExitSideName(secondSide),
-                    static_cast<int>(secondKey.size()),
-                    secondKey.data()));
-            };
+            const auto recordIntersection =
+                [&](const char* kind,
+                    size_t firstIndex,
+                    size_t secondIndex,
+                    LayoutGuideSheetExitSide firstSide,
+                    LayoutGuideSheetExitSide secondSide) {
+                    const std::string_view cardId = sourceCardId();
+                    const std::string_view firstKey = calloutKey(firstIndex);
+                    const std::string_view secondKey = calloutKey(secondIndex);
+                    traceDetails->push_back(FormatText(
+                        ResourceStringText(RES_STR(
+                            "intersection_card=\"%.*s\" intersection_kind=\"%s\" first_side=\"%s\" "
+                            "first_callout=\"%.*s\" second_side=\"%s\" second_callout=\"%.*s\"")),
+                        static_cast<int>(cardId.size()),
+                        cardId.data(),
+                        kind,
+                        ExitSideName(firstSide),
+                        static_cast<int>(firstKey.size()),
+                        firstKey.data(),
+                        ExitSideName(secondSide),
+                        static_cast<int>(secondKey.size()),
+                        secondKey.data()));
+                };
             for (size_t leaderIndex : leaders) {
                 const LayoutGuideSheetPlacementCallout& leader = callouts[leaderIndex];
                 if (callout.sourceCardId != leader.sourceCardId) {
                     continue;
                 }
-                if (LeaderSegmentsIntersect(
-                        callout.targetAttachment,
+                if (LeaderSegmentsIntersect(callout.targetAttachment,
                         callout.bubbleAttachment,
                         leader.targetAttachment,
                         leader.bubbleAttachment)) {
                     recordIntersection("leader_cross", calloutIndex, leaderIndex, callout.exitSide, leader.exitSide);
                 }
-                if (SegmentIntersectsRect(
-                        callout.targetAttachment,
+                if (SegmentIntersectsRect(callout.targetAttachment,
                         callout.bubbleAttachment,
                         TargetSafeRect(leader.targetAttachment, style.targetSafeRadius))) {
                     recordIntersection(
                         "target_safe_zone", calloutIndex, leaderIndex, callout.exitSide, leader.exitSide);
                 }
-                if (SegmentIntersectsRect(
-                        leader.targetAttachment,
+                if (SegmentIntersectsRect(leader.targetAttachment,
                         leader.bubbleAttachment,
                         TargetSafeRect(callout.targetAttachment, style.targetSafeRadius))) {
                     recordIntersection(

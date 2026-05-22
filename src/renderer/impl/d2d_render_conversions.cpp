@@ -7,8 +7,7 @@ D2D1_POINT_2F D2DPointFromRenderPoint(RenderPoint point) {
 }
 
 D2D1_RECT_F D2DRectFromRenderRect(const RenderRect& rect) {
-    return D2D1::RectF(
-        static_cast<float>(rect.left),
+    return D2D1::RectF(static_cast<float>(rect.left),
         static_cast<float>(rect.top),
         static_cast<float>(rect.right),
         static_cast<float>(rect.bottom));
@@ -37,25 +36,21 @@ void AddArcSegments(ID2D1GeometrySink* sink, const RenderPathArc& arc, D2D1_POIN
     while (std::abs(remaining) > 180.0) {
         const double chunk = remaining > 0.0 ? 180.0 : -180.0;
         const double end = start + chunk;
-        sink->AddArc(
-            D2D1::ArcSegment(
-                ArcPoint(arc, end),
-                D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
-                0.0f,
-                ArcSweepDirection(chunk),
-                D2D1_ARC_SIZE_SMALL));
+        sink->AddArc(D2D1::ArcSegment(ArcPoint(arc, end),
+            D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
+            0.0f,
+            ArcSweepDirection(chunk),
+            D2D1_ARC_SIZE_SMALL));
         start = end;
         remaining -= chunk;
     }
 
     if (remaining != 0.0) {
-        sink->AddArc(
-            D2D1::ArcSegment(
-                endPoint,
-                D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
-                0.0f,
-                ArcSweepDirection(remaining),
-                std::abs(remaining) > 180.0 ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
+        sink->AddArc(D2D1::ArcSegment(endPoint,
+            D2D1::SizeF(static_cast<float>(arc.radiusX), static_cast<float>(arc.radiusY)),
+            0.0f,
+            ArcSweepDirection(remaining),
+            std::abs(remaining) > 180.0 ? D2D1_ARC_SIZE_LARGE : D2D1_ARC_SIZE_SMALL));
     }
 }
 

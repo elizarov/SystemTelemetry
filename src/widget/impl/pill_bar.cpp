@@ -25,7 +25,9 @@ void FillPill(Renderer& renderer, const RenderRect& rect, RenderColorId color) {
 
 class WidgetPillBarAnimation final : public WidgetAnimation {
 public:
-    WidgetPillBarAnimation(AnimationDataKey key, RenderRect rect) : key_(std::move(key)), rect_(rect) {}
+    WidgetPillBarAnimation(AnimationDataKey key, RenderRect rect) :
+        key_(std::move(key)),
+        rect_(rect) {}
 
     const AnimationDataKey& Key() const override {
         return key_;

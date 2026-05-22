@@ -83,8 +83,9 @@ long long RectArea(const RenderRect& rect) {
 }
 
 int WidgetExtentForAxis(const LayoutEditWidgetRegion& widget, LayoutGuideAxis axis) {
-    return axis == LayoutGuideAxis::Vertical ? std::max(0, static_cast<int>(widget.rect.right - widget.rect.left))
-                                             : std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
+    return axis == LayoutGuideAxis::Vertical ?
+        std::max(0, static_cast<int>(widget.rect.right - widget.rect.left)) :
+        std::max(0, static_cast<int>(widget.rect.bottom - widget.rect.top));
 }
 
 bool IsWidgetAffectedByGuide(const LayoutEditWidgetRegion& widget, const LayoutEditGuide& guide) {
@@ -95,8 +96,7 @@ bool IsWidgetAffectedByGuide(const LayoutEditWidgetRegion& widget, const LayoutE
         widget.rect.right <= guide.containerRect.right && widget.rect.bottom <= guide.containerRect.bottom;
 }
 
-bool MatchesSimilarityRepresentative(
-    const LayoutEditWidgetRegion& candidate,
+bool MatchesSimilarityRepresentative(const LayoutEditWidgetRegion& candidate,
     LayoutGuideAxis axis,
     const std::string& cardId,
     WidgetClass widgetClass,
@@ -113,8 +113,7 @@ bool MatchesSimilarityRepresentative(
     return candidate.rect.top == edgeStart && candidate.rect.bottom == edgeEnd;
 }
 
-bool HasPriorTargetType(
-    const std::vector<LayoutEditWidgetRegion>& widgets,
+bool HasPriorTargetType(const std::vector<LayoutEditWidgetRegion>& widgets,
     size_t targetIndex,
     const LayoutEditWidgetIdentity& affectedWidget,
     WidgetClass widgetClass,
@@ -476,14 +475,13 @@ std::vector<LayoutGuideSnapCandidate> CollectLayoutGuideSnapCandidates(
             if (HasPriorTargetType(allWidgets, i, affected.widget, target.widgetClass, guide.axis, targetExtent)) {
                 continue;
             }
-            candidates.push_back(
-                LayoutGuideSnapCandidate{
-                    affected.widget,
-                    targetExtent,
-                    startExtent,
-                    std::abs(targetExtent - startExtent),
-                    i,
-                });
+            candidates.push_back(LayoutGuideSnapCandidate{
+                affected.widget,
+                targetExtent,
+                startExtent,
+                std::abs(targetExtent - startExtent),
+                i,
+            });
         }
     }
 

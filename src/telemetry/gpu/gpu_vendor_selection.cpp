@@ -33,22 +33,20 @@ bool GpuAdapterStableOrderLess(const GpuAdapterInfo& lhs, const GpuAdapterInfo& 
         return lhsHasPciAddress;
     }
     const auto descriptorOrder = [](const GpuAdapterInfo& left, const GpuAdapterInfo& right) {
-        return std::tie(
-                   left.vendorId,
-                   left.deviceId,
-                   left.subSysId,
-                   left.revision,
-                   left.dedicatedVideoMemoryBytes,
-                   left.adapterIndex,
-                   left.adapterName) <
-            std::tie(
-                   right.vendorId,
-                   right.deviceId,
-                   right.subSysId,
-                   right.revision,
-                   right.dedicatedVideoMemoryBytes,
-                   right.adapterIndex,
-                   right.adapterName);
+        return std::tie(left.vendorId,
+                    left.deviceId,
+                    left.subSysId,
+                    left.revision,
+                    left.dedicatedVideoMemoryBytes,
+                    left.adapterIndex,
+                    left.adapterName) <
+            std::tie(right.vendorId,
+                right.deviceId,
+                right.subSysId,
+                right.revision,
+                right.dedicatedVideoMemoryBytes,
+                right.adapterIndex,
+                right.adapterName);
     };
     if (lhsHasPciAddress && rhsHasPciAddress) {
         const auto lhsPci = std::tie(lhs.pciDomain, lhs.pciBus, lhs.pciDevice, lhs.pciFunction);

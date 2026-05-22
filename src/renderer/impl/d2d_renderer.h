@@ -43,18 +43,14 @@ public:
     int ScaleLogical(int value) const override;
     int MeasureTextWidth(TextStyleId style, std::string_view text) const override;
     TextLayoutResult MeasureTextBlock(
-        const RenderRect& rect,
-        const std::string& text,
-        TextStyleId style,
-        const TextLayoutOptions& options) const override;
-    void DrawText(
-        const RenderRect& rect,
+        const RenderRect& rect, const std::string& text, TextStyleId style, const TextLayoutOptions& options)
+        const override;
+    void DrawText(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
         const TextLayoutOptions& options) const override;
-    TextLayoutResult DrawTextBlock(
-        const RenderRect& rect,
+    TextLayoutResult DrawTextBlock(const RenderRect& rect,
         const std::string& text,
         TextStyleId style,
         RenderColorId color,
@@ -103,8 +99,7 @@ private:
     void EndDirect2DDraw();
     bool BeginWindowDraw(int width, int height, bool retainContents);
     void EndWindowDraw();
-    bool DrawToWicBitmap(
-        int width,
+    bool DrawToWicBitmap(int width,
         int height,
         const DrawCallback& draw,
         std::string_view errorPrefix,
@@ -114,8 +109,7 @@ private:
     IDWriteTextFormat* DWriteTextFormat(TextStyleId style) const;
     bool CreateDWriteTextFormats();
     void ConfigureDWriteTextFormat(IDWriteTextFormat* format, const TextLayoutOptions& options) const;
-    TextLayoutResult MeasureTextBlockD2D(
-        const RenderRect& rect,
+    TextLayoutResult MeasureTextBlockD2D(const RenderRect& rect,
         const std::wstring& wideText,
         TextStyleId style,
         const TextLayoutOptions& options,

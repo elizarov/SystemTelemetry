@@ -15,11 +15,11 @@ namespace {
 
 bool IsMetricListOrderButtonId(int controlId) {
     return (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE &&
-            controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + 100) ||
+                controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + 100) ||
         (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE &&
-         controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) ||
+            controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) ||
         (controlId >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE &&
-         controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + 100);
+            controlId < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DELETE_BASE + 100);
 }
 
 bool IsDialogComboBoxControl(HWND hwnd, int controlId) {
@@ -158,8 +158,7 @@ INT_PTR DrawMetricListOrderButton(const DRAWITEMSTRUCT* draw) {
     if (draw->CtlID >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE &&
         draw->CtlID < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_UP_BASE + 100) {
         DrawCenteredFilledTriangle(draw->hDC, content, true);
-    } else if (
-        draw->CtlID >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE &&
+    } else if (draw->CtlID >= IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE &&
         draw->CtlID < IDC_LAYOUT_EDIT_METRIC_LIST_ROW_DOWN_BASE + 100) {
         DrawCenteredFilledTriangle(draw->hDC, content, false);
     } else {
@@ -188,9 +187,11 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 notify->code == TCN_SELCHANGE) {
                 if (state != nullptr) {
                     const int selectedTab = TabCtrl_GetCurSel(notify->hwndFrom);
-                    state->colorEditViewMode = selectedTab == 1 ? ColorEditViewMode::Lch
-                        : selectedTab == 2                      ? ColorEditViewMode::Hsv
-                                                                : ColorEditViewMode::Rgb;
+                    state->colorEditViewMode = selectedTab == 1 ?
+                        ColorEditViewMode::Lch :
+                        selectedTab == 2 ?
+                        ColorEditViewMode::Hsv :
+                        ColorEditViewMode::Rgb;
                     if (const auto color = ReadColorDialogValue(hwnd); color.has_value()) {
                         state->updatingControls = true;
                         SetColorDialogLch(hwnd, *color);
@@ -237,10 +238,10 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
-                 (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
+                    (HIWORD(wParam) == CBN_SELCHANGE || HIWORD(wParam) == CBN_EDITCHANGE)) ||
                 ((LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_SIZE_EDIT ||
-                  LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
-                 HIWORD(wParam) == EN_CHANGE)) {
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_WEIGHT_EDIT) &&
+                    HIWORD(wParam) == EN_CHANGE)) {
                 if (LOWORD(wParam) == IDC_LAYOUT_EDIT_FONT_FACE_EDIT &&
                     CurrentLayoutEditEditorKind(state) == LayoutEditEditorKind::GlobalFontFamily) {
                     PreviewSelectedGlobalFontFamily(state, hwnd, HIWORD(wParam));
@@ -262,15 +263,15 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BASE_COMBO ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_TARGET_COMBO) &&
                 HIWORD(wParam) == CBN_SELCHANGE) {
                 PreviewSelectedColor(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ROTATE_CHECK ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_CHECK ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_CHECK ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_CHECK) &&
                 HIWORD(wParam) == BN_CLICKED) {
                 RefreshSelectedColorDerivedControls(state, hwnd);
                 PreviewSelectedColor(state, hwnd);
@@ -278,8 +279,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ROTATE_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_MIX_AMOUNT_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_DERIVED_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 if (state != nullptr && !state->updatingControls) {
                     SyncDerivedColorSliderFromEdit(hwnd, LOWORD(wParam));
@@ -308,9 +309,9 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_RED_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 if (const auto* channel = FindColorDialogControlsByEditId(LOWORD(wParam));
                     channel != nullptr && state != nullptr && !state->updatingControls) {
@@ -360,15 +361,15 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_FIRST_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_WEIGHT_SECOND_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 PreviewSelectedWeights(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
                 return handled(TRUE);
             }
             if ((LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_SCALE_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT ||
-                 LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT) &&
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_UNIT_EDIT ||
+                    LOWORD(wParam) == IDC_LAYOUT_EDIT_METRIC_LABEL_EDIT) &&
                 HIWORD(wParam) == EN_CHANGE) {
                 PreviewSelectedMetric(state, hwnd);
                 RefreshLayoutEditValidationState(state, hwnd);
@@ -416,10 +417,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         RGB((currentColor >> 24) & 0xFFu, (currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu);
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
-                    state->dialog->Host().TraceLayoutEditDialogEvent(
-                        "picker_open",
-                        BuildTraceNodeDetail(
-                            state->selectedNode,
+                    state->dialog->Host().TraceLayoutEditDialogEvent("picker_open",
+                        BuildTraceNodeDetail(state->selectedNode,
                             " current=%s",
                             QuoteTraceText(FormatTraceColorHex(currentColor)).c_str()));
                     if (ChooseColorA(&chooseColor) == TRUE) {
@@ -427,10 +426,8 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
                             (GetGValue(chooseColor.rgbResult) << 16) | (GetBValue(chooseColor.rgbResult) << 8) |
                             currentAlpha;
-                        state->dialog->Host().TraceLayoutEditDialogEvent(
-                            "picker_return",
-                            BuildTraceNodeDetail(
-                                state->selectedNode,
+                        state->dialog->Host().TraceLayoutEditDialogEvent("picker_return",
+                            BuildTraceNodeDetail(state->selectedNode,
                                 " accepted=\"true\" chosen=%s",
                                 QuoteTraceText(FormatTraceColorHex(nextColor)).c_str()));
                         SetSelectedDialogColor(state, hwnd, nextColor);

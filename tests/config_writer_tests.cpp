@@ -47,16 +47,12 @@ TEST(ConfigWriter, FullExportDoesNotInventEmptyHeaderKeysForHeaderlessCards) {
     const std::string sectionText =
         "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\n[card.time]";
     EXPECT_THAT(output, testing::HasSubstr(sectionText));
-    EXPECT_THAT(
-        output,
-        testing::Not(
-            testing::HasSubstr(
-                "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\ntitle = ")));
-    EXPECT_THAT(
-        output,
-        testing::Not(
-            testing::HasSubstr(
-                "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = ")));
+    EXPECT_THAT(output,
+        testing::Not(testing::HasSubstr(
+            "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\ntitle = ")));
+    EXPECT_THAT(output,
+        testing::Not(testing::HasSubstr(
+            "[card.storage_usage]\r\nlayout = rows(drive_usage_list,vertical_spring)\r\n\r\nicon = ")));
 }
 
 TEST(ConfigWriter, MinimalSavePersistsResolvedStorageDrivesAgainstEmptySourceConfig) {
@@ -104,21 +100,21 @@ TEST(ConfigWriter, MinimalSaveInsertsMissingGpuSectionWithKeyBeforeSectionSepara
     AppConfig currentConfig = compareConfig;
     currentConfig.gpu.adapterName = "NVIDIA GeForce RTX 4070 Laptop GPU";
 
-    const std::string initialText = "[display]\r\n"
-                                    "monitor_name = TL160ADMP03-0\r\n"
-                                    "position = 258,117\r\n"
-                                    "scale = 2\r\n"
-                                    "\r\n"
-                                    "[network]\r\n"
-                                    "adapter_name = Wi-Fi\r\n"
-                                    "\r\n"
-                                    "[storage]\r\n"
-                                    "drives = C\r\n";
+    const std::string initialText =
+        "[display]\r\n"
+        "monitor_name = TL160ADMP03-0\r\n"
+        "position = 258,117\r\n"
+        "scale = 2\r\n"
+        "\r\n"
+        "[network]\r\n"
+        "adapter_name = Wi-Fi\r\n"
+        "\r\n"
+        "[storage]\r\n"
+        "drives = C\r\n";
 
     const std::string output = BuildSavedConfigText(initialText, currentConfig, &compareConfig);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "[display]\r\n"
             "monitor_name = TL160ADMP03-0\r\n"
@@ -252,15 +248,13 @@ TEST(ConfigWriter, FullExportWritesThemeSections) {
     const std::string output = BuildSavedConfigText(
         ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "[display]\r\n"
             "monitor_name = \r\n"
             "layout = 5x3\r\n"
             "theme = dark_cyan\r\n"));
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "[theme.dark_cyan]\r\n"
             "description = Black, white, cyan\r\n"
@@ -289,8 +283,7 @@ TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
 
 TEST(ConfigWriter, FullExportOmitsRuntimePlaceholderMetricDefinition) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
-    config.layout.metrics.definitions.insert(
-        config.layout.metrics.definitions.begin(),
+    config.layout.metrics.definitions.insert(config.layout.metrics.definitions.begin(),
         MetricDefinitionConfig{"nothing", MetricDisplayStyle::Scalar, false, 1.0, "", "Nothing Override"});
 
     const std::string output = BuildSavedConfigText(
@@ -310,8 +303,7 @@ TEST(ConfigWriter, MinimalSavePersistsChangedMetricDefinition) {
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "gpu.temp = 100,\xC2\xB0"
             "C,Core Temp\r\n"));
@@ -327,8 +319,7 @@ TEST(ConfigWriter, SerializedMetricStyleComesFromMetadataInsteadOfStructValue) {
     const std::string output = BuildSavedConfigText(
         ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "gpu.temp = 100,\xC2\xB0"
             "C,Temp\r\n"));
@@ -340,8 +331,7 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughGeneratedSectionTable) {
     AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 
-    const auto it = std::find_if(
-        currentConfig.layout.layouts.begin(),
+    const auto it = std::find_if(currentConfig.layout.layouts.begin(),
         currentConfig.layout.layouts.end(),
         [](const LayoutSectionConfig& layout) { return layout.name == "3x5"; });
     ASSERT_NE(it, currentConfig.layout.layouts.end());
@@ -354,8 +344,7 @@ TEST(ConfigWriter, SavesNamedLayoutSectionChangesThroughGeneratedSectionTable) {
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "[layout.3x5]\r\n"
             "description = Portrait Test\r\n"
@@ -367,18 +356,16 @@ TEST(ConfigWriter, SavesNamedThemeSectionChangesThroughGeneratedSectionTable) {
     AppConfig compareConfig = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     AppConfig currentConfig = compareConfig;
 
-    const auto it = std::find_if(
-        currentConfig.layout.themes.begin(), currentConfig.layout.themes.end(), [](const ThemeConfig& theme) {
-            return theme.name == "dark_cyan";
-        });
+    const auto it = std::find_if(currentConfig.layout.themes.begin(),
+        currentConfig.layout.themes.end(),
+        [](const ThemeConfig& theme) { return theme.name == "dark_cyan"; });
     ASSERT_NE(it, currentConfig.layout.themes.end());
     it->description = "Test theme description";
     it->accent = ColorConfig::FromRgba(0x123456FFu);
 
     const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
 
-    EXPECT_THAT(
-        output,
+    EXPECT_THAT(output,
         testing::HasSubstr(
             "[theme.dark_cyan]\r\n"
             "description = Test theme description\r\n"));

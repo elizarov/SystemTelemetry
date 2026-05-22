@@ -50,8 +50,8 @@ enum class RuntimeConfigSectionCodec : std::uint8_t {
 using RuntimeConfigDynamicItemVisitor = void (*)(void* context, std::string_view key, const void* item);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig & config, std::string_view key);
 using RuntimeConfigFindDynamicItem = const void* (*)(const AppConfig& config, std::string_view key);
-using RuntimeConfigForEachDynamicItem =
-    void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
+using RuntimeConfigForEachDynamicItem = void (*)(
+    const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 
 struct RuntimeConfigDynamicSectionCallbacks {
     RuntimeConfigEnsureDynamicItem ensure = nullptr;

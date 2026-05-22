@@ -69,8 +69,7 @@ private:
     void UpdateRendererScale(double scale);
     double ResolveCurrentDisplayScale(UINT dpi) const;
     bool IsLayoutEditMode() const;
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
-        const LayoutEditLayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis) override;
