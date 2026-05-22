@@ -7,7 +7,6 @@
 #include <string_view>
 
 #include "config/config_primitives.h"
-#include "util/scale.h"
 
 struct AppConfig;
 struct DisplayConfig;

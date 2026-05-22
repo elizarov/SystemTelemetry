@@ -15,7 +15,6 @@
 #include "dashboard/dashboard_titlebar.h"
 #include "dashboard/dashboard_tooltip.h"
 #include "dashboard/dashboard_window_chrome.h"
-#include "display/constants.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_trace_session.h"
