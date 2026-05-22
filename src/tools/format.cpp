@@ -2066,7 +2066,7 @@ private:
         if (prev == "{" && IsLambdaBodyOpenToken(tokens, prevIndex)) {
             return true;
         }
-        if ((prev == "," || prev == ";") && current != ")" && current != "]") {
+        if ((prev == "," || prev == ";") && current != ")" && current != "]" && current != ";") {
             return true;
         }
         if ((current == "++" || current == "--") && prev == ")") {

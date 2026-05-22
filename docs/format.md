@@ -115,7 +115,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
 - Do not insert a visual-padding space before braced initializer braces: `Widget widget{config};`.
 - Put one space after commas, and no space before commas.
-- Put one space after semicolons that separate `for` header parts, and no space before semicolons.
+- Put one space after semicolons that separate non-empty `for` header parts, and no space before semicolons. Empty forever-loop headers stay compact: `for (;;)`.
 - Put no space before a statement-terminating semicolon.
 - Put spaces around assignment, comparison, arithmetic, bitwise, logical, and compound-assignment binary operators, including assignment to an empty braced value: `const Context& context = {};`.
 - Treat `operator` plus a following symbolic operator as one composite function name, with no spaces inside the name or before the parameter list: `operator==(...)`, `operator&(...)`, and `operator[](...)`.

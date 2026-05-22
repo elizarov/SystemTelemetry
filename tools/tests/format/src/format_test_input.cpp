@@ -309,6 +309,7 @@ if(values!=nullptr){values[0]=count;}while(count>0){--count;}
 
 for(int outer=0;outer<count;++outer){if(values[outer]%2==0)values[outer]+=outer;else{values[outer]-=outer;}}
 int index=0;
+for(;;){break;}
 while(index<count){values[index]+=index;++index;}
 do{--index;}while(index>0);
 }

@@ -545,6 +545,9 @@ void ControlFlowVariety(int* values, int count) {
         }
     }
     int index = 0;
+    for (;;) {
+        break;
+    }
     while (index < count) {
         values[index] += index;
         ++index;
