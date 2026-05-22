@@ -8,8 +8,9 @@
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace, bool synchronousProviderSamples) {
     (void)trace;
+    (void)synchronousProviderSamples;
     return nullptr;
 }
 

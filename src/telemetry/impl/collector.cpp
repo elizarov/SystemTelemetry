@@ -9,5 +9,5 @@ std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
         return CreateFakeTelemetryCollector(
             workingDirectory, options.fakePath, options.loadFakeDump, options.liveFake, trace);
     }
-    return CreateRealTelemetryCollector(trace);
+    return CreateRealTelemetryCollector(trace, options.synchronousProviderSamples);
 }

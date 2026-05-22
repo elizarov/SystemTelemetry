@@ -110,7 +110,9 @@ bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
 void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
-    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_);
+    BoardVendorTelemetryProviderOptions providerOptions;
+    providerOptions.synchronousSamples = state.synchronousProviderSamples_;
+    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_, providerOptions);
     if (state.board_.provider != nullptr) {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_initialize_begin"));
         if (state.board_.provider->Initialize(settings)) {

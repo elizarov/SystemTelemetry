@@ -87,7 +87,7 @@ struct RealTelemetryCollectorState {
         std::chrono::steady_clock::time_point previousTick{};
     };
 
-    explicit RealTelemetryCollectorState(Trace& trace);
+    RealTelemetryCollectorState(Trace& trace, bool synchronousProviderSamples);
     ~RealTelemetryCollectorState();
 
     TelemetrySettings settings_;
@@ -101,4 +101,5 @@ struct RealTelemetryCollectorState {
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     Trace& trace_;
+    bool synchronousProviderSamples_ = false;
 };

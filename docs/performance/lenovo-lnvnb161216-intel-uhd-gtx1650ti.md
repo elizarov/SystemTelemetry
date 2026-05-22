@@ -23,25 +23,24 @@ Ranges use direct `build\CaseDashBenchmarks.exe` runs unless a note says otherwi
 | `layout-switch 240 2` | `switch_loop` about `8.89-11.78 ms` | `switch_apply` about `1.48-2.04 ms`, `dialog_refresh` about `0.33-0.43 ms`, `switch_paint` about `7.03-9.26 ms`. |
 | `mouse-hover 240 2` | `hover_loop` about `1.50-1.53 ms` | `hover_hit_test` about `0.38-0.44 ms`; repaint is about `1.07-1.13 ms`. |
 | `theme-change 240 2` | `theme_loop` about `5.38-6.73 ms` | `dashboard_config` about `1.25-1.57 ms`, `theme_preview` about `0.44-0.48 ms`, `theme_paint` about `3.26-4.16 ms`. |
-| `update-telemetry 240 2`, non-elevated default | `update_loop` about `5.54-5.82 ms` | `telemetry_update` about `2.53-2.63 ms`, `paint_draw` about `3.01-3.18 ms`; provider paths that require elevation report unavailable quickly. |
-| `update-telemetry 240 2`, elevated default Intel GPU | `update_loop` about `21.1-25.6 ms` | `telemetry_update` about `17.5-21.2 ms`, `paint_draw` about `3.6-4.4 ms`; Lenovo board sensors are the dominant added cost. |
-| `update-telemetry 240 2`, elevated no board sensor rows | `update_loop` about `3.93-5.17 ms` | `telemetry_update` about `1.28-1.55 ms`, `paint_draw` about `2.65-3.62 ms`; this diagnostic variant isolates the provider baseline without Lenovo temperature or fan requests. |
-| `update-telemetry 240 2`, elevated NVIDIA selected without board sensor rows | `update_loop` about `5.25 ms` | `telemetry_update` about `2.33 ms`, `paint_draw` about `2.92 ms`; NVIDIA NVML/NVAPI is modest when Lenovo board collection is absent. |
-| `update-telemetry 240 2`, elevated NVIDIA selected with default board rows | `update_loop` about `31.0 ms` | `telemetry_update` about `25.6 ms`, `paint_draw` about `5.4 ms`; board collection plus dGPU provider work is the slowest current shape. |
+| `telemetry-init 1 2`, synchronous provider samples | `iteration_loop` about `8.7-15.0 s` | `collector_initialize` carries nearly all cost; `collector_destroy` stays about `1-4 ms` after synchronous provider sampling keeps Lenovo work out of teardown. |
+| `update-telemetry 20 2`, non-elevated default with synchronous provider samples | `update_loop` about `41.9 ms` | `telemetry_update` about `38.3 ms`, `paint_draw` about `3.6 ms`; initialization is not included in the loop line. |
+| `update-telemetry 20 2`, profiled elevated default Intel GPU with synchronous provider samples | `update_loop` about `61.0 ms` under xperf | `telemetry_update` about `57.4 ms`, `paint_draw` about `3.6 ms`; the profile still shows initialization samples, so treat this as hotspot attribution rather than a repeatable direct baseline. |
+| Elevated no-board and NVIDIA `update-telemetry` variants | Needs refresh | Previous ranges predate synchronous provider samples in the benchmark and are no longer comparable. |
 
 ## Current Bottlenecks
 
-- Elevated telemetry is Lenovo board-provider bound. Removing board temperature and fan rows drops elevated `telemetry_update` from roughly `17.5-23 ms` to `1.3-1.6 ms`, while removing only `gpu.fps` does not materially change the default board-heavy result.
+- Elevated telemetry remains Lenovo board-provider bound, but the no-board and NVIDIA overlay variants need fresh baselines after the benchmark switched to synchronous provider samples.
 - The expensive Lenovo shape is the Hardware Scan temperature path plus GameZone WMI fan fallback. Do not hide that cost with benchmark-only retry delays or provider-sample caches; any fix needs to reduce the real per-sample Hardware Scan or WMI work.
 - Presented FPS is not the dominant default elevated bottleneck on this machine. The provider is now demand-driven by the runtime config, so layouts that omit `gpu.fps` do not start the service/local ETW Presented FPS path.
-- Intel Level Zero is cheap enough once Lenovo board rows are removed. Selecting the NVIDIA adapter without board rows raises telemetry from about `1.3-1.5 ms` to about `2.3 ms`, mostly from NVML/NVAPI provider work.
-- Initialization is visibly provider-shaped. The non-elevated trace initializes CPU PDH and adapter/provider selection in hundreds of milliseconds, while elevated Lenovo runs additionally load or query the Lenovo diagnostics stack. Keeping the CaseDash service installed and running should move Lenovo board sampling out of the dashboard process.
+- Intel Level Zero is cheap compared with Lenovo board collection once board rows are removed, but its exact current range needs refresh under synchronous provider samples.
+- Telemetry initialization is provider-shaped. With benchmark synchronous provider samples enabled, `collector_initialize` takes about `8.7-15.0 s`; xperf attributes the CPU samples to CLR/JIT, Lenovo certificate validation through WinTrust and crypto modules, CPU PDH counter setup, and Intel Level Zero/GPU adapter selection under `RealTelemetryCollector::Initialize`.
 - Render-side benchmarks are slower than the Gigabyte desktop baseline. Direct2D, DirectWrite, text shaping, and the Intel/NVIDIA laptop display-driver stack dominate repaint-heavy paths after app-side hit testing, snap, apply, and config work stay small.
 - Daemon-backed config overlays must use absolute paths. Relative overlay paths can resolve from the elevated daemon working directory and silently fall back to the embedded config.
 
 ## Further Research Directions
 
-- For Lenovo telemetry, compare default elevated direct runs against the same branch with `CashDashService` installed and running. If service-backed board samples collapse the dashboard-process cost, keep Lenovo Hardware Scan out of the dashboard process whenever possible.
+- For Lenovo telemetry, compare default elevated direct runs and `telemetry-init` against the same branch with `CashDashService` installed and running. If service-backed board samples collapse dashboard-process initialization or refresh cost, keep Lenovo Hardware Scan out of the dashboard process whenever possible.
 - If direct elevated Lenovo board collection must remain, investigate moving direct Hardware Scan capture into a helper process or reducing the per-sample Hardware Scan/WMI work. The current in-process diagnostics stack is too expensive for benchmark bursts and likely causes visible startup noise.
 - Add finer provider-phase timing for `UpdateBoardMetrics`, `UpdateGpuMetrics`, and PDH collectors when the flat xperf summary is too coarse; the current call-tree export shows kernel, PDH, COM, CLR, Direct2D, and DirectWrite time but under-symbolizes the vendor leaves.
 - Use absolute, ASCII/no-BOM overlay files for elevated daemon benchmark variants until config parsing grows BOM-tolerant section handling.

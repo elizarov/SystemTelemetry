@@ -4,4 +4,4 @@
 
 #include "telemetry/impl/collector.h"
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace);
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace, bool synchronousProviderSamples);

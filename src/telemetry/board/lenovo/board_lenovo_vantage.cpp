@@ -843,8 +843,9 @@ BoardVendorTelemetrySample CreateRawLenovoSampleFromSnapshot(
 
 class LenovoHardwareScanBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    LenovoHardwareScanBoardTelemetryProvider(Trace& trace, BoardVendorInfo info)
-        : trace_(trace), info_(std::move(info)) {}
+    LenovoHardwareScanBoardTelemetryProvider(
+        Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options)
+        : trace_(trace), info_(std::move(info)), synchronousSamples_(options.synchronousSamples) {}
 
     ~LenovoHardwareScanBoardTelemetryProvider() override {
         if (pendingDirectSnapshot_.valid()) {
@@ -925,6 +926,9 @@ public:
         if (!initialized_ || !hardwareScanDirectory_.has_value()) {
             return sample;
         }
+        if (synchronousSamples_) {
+            return SampleSynchronously();
+        }
 
         std::string serviceDiagnostics;
         CompletePendingServiceSnapshot(serviceDiagnostics);
@@ -995,6 +999,46 @@ public:
     }
 
 private:
+    BoardVendorTelemetrySample SampleSynchronously() {
+        BoardVendorTelemetrySample sample = CreateBaseSample();
+
+        std::string directDiagnostics;
+        LenovoHardwareScanSnapshot directSnapshot;
+        if (HasRequestedHardwareScanModule(captureOptions_)) {
+            trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("direct_snapshot_refresh_started"));
+            directSnapshot =
+                CaptureLenovoHardwareScanSensors(trace_, runtime_, *hardwareScanDirectory_, captureOptions_);
+            directDiagnostics = directSnapshot.diagnostics;
+            if (directSnapshot.success) {
+                AppendGameZoneFans(directSnapshot);
+                ApplySnapshotToSample(directSnapshot, sample);
+                return sample;
+            }
+        } else {
+            directDiagnostics =
+                ResourceStringText(RES_STR("No Lenovo Hardware Scan temperature modules were requested."));
+        }
+
+        std::string gameZoneDiagnostics;
+        LenovoHardwareScanSnapshot gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
+            gameZoneSnapshot.diagnostics = FormatText(
+                RES_STR("Lenovo GameZone WMI fan query active. service=\"%s\" direct=\"%s\" gamezone=\"%s\""),
+                "disabled=synchronous",
+                directDiagnostics.c_str(),
+                gameZoneSnapshot.diagnostics.c_str());
+            ApplySnapshotToSample(gameZoneSnapshot, sample);
+            return sample;
+        }
+
+        diagnostics_ = FormatText(RES_STR("Lenovo Hardware Scan unavailable. service=\"%s\" direct=\"%s\""),
+            "disabled=synchronous",
+            directDiagnostics.c_str());
+        AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        return sample;
+    }
+
     BoardVendorTelemetrySample CreateBaseSample() const {
         BoardVendorTelemetrySample sample;
         sample.providerName = kLenovoProviderName;
@@ -1299,6 +1343,7 @@ private:
     bool hasCachedServiceSnapshot_ = false;
     bool hasCachedDirectSnapshot_ = false;
     bool processElevated_ = IsCurrentProcessElevated();
+    bool synchronousSamples_ = false;
     bool initialized_ = false;
 };
 
@@ -1333,6 +1378,7 @@ BoardVendorTelemetrySample CaptureLenovoHardwareScanServiceSample(Trace& trace, 
     return CreateRawLenovoSampleFromSnapshot(info, snapshot);
 }
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateLenovoBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) {
-    return std::make_unique<LenovoHardwareScanBoardTelemetryProvider>(trace, std::move(info));
+std::unique_ptr<BoardVendorTelemetryProvider> CreateLenovoBoardTelemetryProvider(
+    Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
+    return std::make_unique<LenovoHardwareScanBoardTelemetryProvider>(trace, std::move(info), options);
 }
