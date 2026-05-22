@@ -209,6 +209,7 @@ The formatter decides wrapping in this order:
 - Never split a group partially. A comma list, operator chain, declaration parameter list, or control header is either fully compact or fully split.
 - Never choose an empty delimiter pair as a wrapping target. Empty calls, empty braced values, and empty template argument lists stay compact, and the formatter breaks the nearest non-empty owning structure instead.
 - Never split inside a function-pointer declarator group such as `(*)`. If the full function-pointer type does not fit, split the following parameter list instead.
+- Never split inside a parenthesized callee group such as `(std::max)`. If the call does not fit, split the following argument list instead.
 - Treat an end-of-line comment attached to one element of a list or chain as a forced split for the whole owning list or chain.
 - If a line has no legal wrappable group because the overflow is inside an unbreakable token, string literal, numeric constant, or preserved comment, allow that line to exceed the configured line width.
 

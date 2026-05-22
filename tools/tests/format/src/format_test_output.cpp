@@ -195,6 +195,14 @@ HBITMAP CreateBitmap(BITMAPINFOHEADER header) {
     return colorBitmap;
 }
 
+double MaxSegmentGap(double totalSweep, double minSegmentSweep, int segmentCount) {
+    const double maxSegmentGap = (std::max)(
+        0.0,
+        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1)
+    );
+    return maxSegmentGap;
+}
+
 bool HasIdentifier(std::string identifier) {
     return !identifier.empty();
 }

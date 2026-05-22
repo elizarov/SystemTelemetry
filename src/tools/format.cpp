@@ -2205,6 +2205,10 @@ private:
             const std::string& text = tokens[index].text;
             if (IsGroupOpen(text) && depth == 0) {
                 if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
+                    if (IsParenthesizedCalleeGroup(tokens, index, *close)) {
+                        UpdateDepth(tokens[index], depth);
+                        continue;
+                    }
                     return GroupPair{index, *close};
                 }
             }
@@ -2220,7 +2224,9 @@ private:
             if (IsGroupOpen(text) && depth == 0) {
                 if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
                     if (
-                        !IsEmptyGroupPair(tokens, index, *close) && !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
+                        !IsEmptyGroupPair(tokens, index, *close) &&
+                        !IsParenthesizedCalleeGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
                         return GroupPair{index, *close};
                     }
@@ -2229,6 +2235,17 @@ private:
             UpdateDepth(tokens[index], depth);
         }
         return std::nullopt;
+    }
+
+    bool IsParenthesizedCalleeGroup(const std::vector<Token>& tokens, size_t open, size_t close) const {
+        if (open >= tokens.size() || tokens[open].text != "(") {
+            return false;
+        }
+        if (IsFunctionPointerDeclaratorGroupOpen(tokens, open)) {
+            return false;
+        }
+        const size_t next = NextSignificantIndex(tokens, close + 1);
+        return next < tokens.size() && tokens[next].text == "(";
     }
 
     bool IsEmptyGroupPair(const std::vector<Token>& tokens, size_t open, size_t close) const {
