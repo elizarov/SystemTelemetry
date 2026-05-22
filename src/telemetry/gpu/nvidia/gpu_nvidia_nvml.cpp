@@ -23,6 +23,7 @@ using NvmlReturn = int;
 constexpr NvmlReturn kNvmlSuccess = 0;
 constexpr unsigned int kNvmlTemperatureGpu = 0;
 constexpr unsigned int kNvmlClockGraphics = 0;
+constexpr int kNvmlTransientFailureBackoffSamples = 1;
 constexpr char kNvidiaMlLibraryName[] = "nvidia-ml.dll";
 constexpr char kNvmlLibraryName[] = "nvml.dll";
 
@@ -287,9 +288,10 @@ public:
             totalVramGb_ = static_cast<double>(memory.total) / (1024.0 * 1024.0 * 1024.0);
         }
 
+        fanRpmSupported_ = DetectFanSpeedRpm();
         diagnostics_ = FormatText(RES_STR("NVML GPU=%s fan_rpm_supported=%s native_fps_supported=no"),
             gpuName_.c_str(),
-            HasFanSpeedRpm() ? "yes" : "no");
+            fanRpmSupported_ ? "yes" : "no");
         fpsProvider_ = CreatePresentedFpsProvider(trace_);
         if (fpsProvider_ != nullptr && fpsProvider_->Initialize()) {
             fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
@@ -310,15 +312,16 @@ public:
 
     GpuVendorTelemetrySample Sample() override {
         trace_.Write(TracePrefix::NvidiaNvml, RES_STR("sample_begin"));
-        GpuVendorTelemetrySample sample;
-        sample.providerName = "NVIDIA NVML";
-        sample.name = gpuName_;
-        sample.totalVramGb = totalVramGb_;
-        sample.diagnostics = diagnostics_;
+        GpuVendorTelemetrySample sample = CreateBaseSample();
 
         if (!initialized_ || device_ == nullptr) {
             sample.available = false;
             return sample;
+        }
+
+        if (nvmlTransientBackoffSamples_ > 0 && hasCachedSample_) {
+            --nvmlTransientBackoffSamples_;
+            return CachedSample("transient NVML backoff");
         }
 
         bool hasAnyMetric = false;
@@ -334,6 +337,16 @@ public:
         if (result == kNvmlSuccess) {
             sample.loadPercent = static_cast<double>(utilization.gpu);
             hasAnyMetric = true;
+        } else {
+            // Some laptop NVML stacks make the next clock query stall after this transient failure.
+            if (hasCachedSample_) {
+                nvmlTransientBackoffSamples_ = kNvmlTransientFailureBackoffSamples;
+                return CachedSample(FormatText("NVML utilization failed: %s", nvml_.ResultText(result).c_str()));
+            }
+            sample.diagnostics = FormatText(
+                "%s nvml=\"utilization failed: %s\"", sample.diagnostics.c_str(), nvml_.ResultText(result).c_str());
+            sample.available = false;
+            return sample;
         }
 
         unsigned int temperatureC = 0;
@@ -380,8 +393,9 @@ public:
         }
 
         unsigned int fanRpm = 0;
-        const std::optional<NvmlReturn> fanResult = nvml_.FanSpeedRpm(device_, fanRpm);
-        if (fanResult.has_value()) {
+        const std::optional<NvmlReturn> fanResult =
+            fanRpmSupported_ ? nvml_.FanSpeedRpm(device_, fanRpm) : std::nullopt;
+        if (fanRpmSupported_ && fanResult.has_value()) {
             if (trace_.Enabled(TracePrefix::NvidiaNvml)) {
                 trace_.WriteFmt(TracePrefix::NvidiaNvml,
                     RES_STR("get_fan_rpm result=\"%s\" value=%u"),
@@ -423,10 +437,38 @@ public:
             RES_STR("sample_done available=%s diagnostics=\"%s\""),
             Trace::BoolText(sample.available),
             sample.diagnostics.c_str());
+        if (sample.available) {
+            cachedSample_ = sample;
+            hasCachedSample_ = true;
+            nvmlTransientBackoffSamples_ = 0;
+        }
         return sample;
     }
 
 private:
+    GpuVendorTelemetrySample CreateBaseSample() const {
+        GpuVendorTelemetrySample sample;
+        sample.providerName = "NVIDIA NVML";
+        sample.name = gpuName_;
+        sample.totalVramGb = totalVramGb_;
+        sample.diagnostics = diagnostics_;
+        return sample;
+    }
+
+    GpuVendorTelemetrySample CachedSample(const std::string& reason) const {
+        GpuVendorTelemetrySample sample = cachedSample_;
+        sample.providerName = "NVIDIA NVML";
+        if (sample.name.has_value() && sample.name->empty()) {
+            sample.name = gpuName_;
+        }
+        AppendFormat(sample.diagnostics, " nvml_cached=\"%s\"", reason.c_str());
+        trace_.WriteFmt(TracePrefix::NvidiaNvml,
+            RES_STR("sample_cached reason=\"%s\" available=%s"),
+            reason.c_str(),
+            Trace::BoolText(sample.available));
+        return sample;
+    }
+
     bool SelectDevice(unsigned int deviceCount) {
         int bestRank = -1;
         NvmlDevice bestDevice = nullptr;
@@ -491,7 +533,7 @@ private:
         return true;
     }
 
-    bool HasFanSpeedRpm() const {
+    bool DetectFanSpeedRpm() const {
         unsigned int fanRpm = 0;
         const std::optional<NvmlReturn> result = device_ != nullptr ? nvml_.FanSpeedRpm(device_, fanRpm) : std::nullopt;
         return result.has_value() && *result == kNvmlSuccess;
@@ -506,6 +548,10 @@ private:
     std::string fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider not initialized."));
     std::optional<double> totalVramGb_;
     std::unique_ptr<FpsTelemetryProvider> fpsProvider_;
+    GpuVendorTelemetrySample cachedSample_;
+    int nvmlTransientBackoffSamples_ = 0;
+    bool hasCachedSample_ = false;
+    bool fanRpmSupported_ = false;
     bool initialized_ = false;
 };
 
