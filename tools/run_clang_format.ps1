@@ -16,6 +16,20 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$formatStarted = [System.Diagnostics.Stopwatch]::StartNew()
+
+function Format-Elapsed {
+    param(
+        [System.TimeSpan]$Elapsed
+    )
+
+    $seconds = $Elapsed.TotalSeconds
+    if ($seconds -lt 1.0) {
+        return ("{0}ms" -f [int][Math]::Round($seconds * 1000.0))
+    }
+
+    return [string]::Format([System.Globalization.CultureInfo]::InvariantCulture, '{0:0.000}s', $seconds)
+}
 
 function Get-RelativeRepoPath {
     param(
@@ -508,7 +522,15 @@ if ($failed) {
 }
 
 if ($Mode -eq 'fix') {
-    Write-Host ("Formatted {0} {1} file{2}." -f $files.Count, $Scope, $(if ($files.Count -eq 1) { '' } else { 's' }))
+    Write-Host ("Formatted {0} {1} file{2} in {3}." -f `
+            $files.Count,
+            $Scope,
+            $(if ($files.Count -eq 1) { '' } else { 's' }),
+            (Format-Elapsed -Elapsed $formatStarted.Elapsed))
 } else {
-    Write-Host ("Checked {0} {1} file{2}. Formatting is up to date." -f $files.Count, $Scope, $(if ($files.Count -eq 1) { '' } else { 's' }))
+    Write-Host ("Checked {0} {1} file{2} in {3}. Formatting is up to date." -f `
+            $files.Count,
+            $Scope,
+            $(if ($files.Count -eq 1) { '' } else { 's' }),
+            (Format-Elapsed -Elapsed $formatStarted.Elapsed))
 }

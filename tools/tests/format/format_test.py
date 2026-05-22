@@ -121,6 +121,10 @@ class FormatCommandTests(unittest.TestCase):
             check_result.returncode,
             msg=f"stdout:\n{check_result.stdout}\n\nstderr:\n{check_result.stderr}",
         )
+        self.assertRegex(
+            check_result.stdout,
+            r"Checked 1 all file in (?:\d+ms|\d+\.\d{3}s)\. Formatting is up to date\.\s*$",
+        )
 
     def test_golden_fixture_uses_project_indentation_constraints(self) -> None:
         golden_text = read_fixture(GOLDEN_FIXTURE)
