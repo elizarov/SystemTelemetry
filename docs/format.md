@@ -123,7 +123,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Treat destructor `~` plus the following type name as one composite function name, but keep declaration specifiers separated from it: `virtual ~Widget() = default;`.
 - Do not put a space between a C-style cast and the expression it prefixes: `(void)StopServiceIfRunning(...)` and `(int)value`.
 - Do not put spaces between unary operators and their operands: `!ready`, `++index`, `value--`, `*ptr`, `&value`, `-value`, and `+value`.
-- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `const Type&`, `Type&& value`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
+- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `const Type&`, `Type&& value`, `virtual State& Method() = 0`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
 - Treat `&&` as a logical binary operator with spaces when it follows an expression, including qualified enum values: `field.kind == ValueKind::HexColor && IsNamedColor(name)`.
 - Do not treat a preceding parenthesized or bracketed expression as a type for pointer or reference spacing. Multiplication and bitwise-and after such expressions keep binary-operator spaces: `(to.l - from.l) * amount` and `values[index] & mask`.
 - Put spaces around ternary `?` and `:`.

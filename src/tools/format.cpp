@@ -2372,6 +2372,7 @@ private:
             "struct",
             "typename",
             "unsigned",
+            "virtual",
             "volatile"
         };
         return std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);

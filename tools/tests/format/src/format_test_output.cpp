@@ -69,6 +69,7 @@ public:
         std::string_view filter,
         std::string_view defaultExtension
     ) const = 0;
+    virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
 };
 
 class DialogRedrawScope {
