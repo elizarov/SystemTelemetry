@@ -634,6 +634,7 @@ add_executable(CaseDashTests
     tests/widget_class_tests.cpp
     tests/font_anchor_tests.cpp
     tests/metric_list_widget_tests.cpp
+    tests/drive_usage_list_widget_tests.cpp
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp

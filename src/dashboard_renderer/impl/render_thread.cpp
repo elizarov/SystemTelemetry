@@ -29,11 +29,24 @@ RenderRect ClipRectToSurface(RenderRect rect, int width, int height) {
     return rect;
 }
 
-RenderRect AnimationClipBounds(const WidgetAnimation& animation, RenderPoint translation, int width, int height) {
-    return ClipRectToSurface(
-        OffsetRect(animation.DirtyBounds(), translation).Inflate(kAnimationDirtyPadding, kAnimationDirtyPadding),
-        width,
-        height);
+RenderRect IntersectRects(const RenderRect& left, const RenderRect& right) {
+    return RenderRect{(std::max)(left.left, right.left),
+        (std::max)(left.top, right.top),
+        (std::min)(left.right, right.right),
+        (std::min)(left.bottom, right.bottom)};
+}
+
+RenderRect AnimationClipBounds(const WidgetAnimation& animation,
+    RenderPoint translation,
+    const std::optional<RenderRect>& hardClip,
+    int width,
+    int height) {
+    RenderRect bounds =
+        OffsetRect(animation.DirtyBounds(), translation).Inflate(kAnimationDirtyPadding, kAnimationDirtyPadding);
+    if (hardClip.has_value()) {
+        bounds = IntersectRects(bounds, OffsetRect(*hardClip, translation));
+    }
+    return ClipRectToSurface(bounds, width, height);
 }
 
 const char* BoolText(bool value) {
@@ -558,7 +571,8 @@ void DashboardRenderThread::DrawAnimations(Renderer& renderer,
         if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
-        const RenderRect clipRect = AnimationClipBounds(*animation, command.translation, width, height);
+        const RenderRect clipRect =
+            AnimationClipBounds(*animation, command.translation, command.clipRect, width, height);
         if (clipRect.IsEmpty()) {
             continue;
         }
@@ -617,7 +631,7 @@ void DashboardRenderThread::AppendPreparedDirtyAnimations(DashboardAnimationTime
         if (animation == nullptr || command.targetState == nullptr) {
             continue;
         }
-        RenderRect bounds = AnimationClipBounds(*animation, command.translation, width, height);
+        RenderRect bounds = AnimationClipBounds(*animation, command.translation, command.clipRect, width, height);
         if (bounds.IsEmpty()) {
             continue;
         }
