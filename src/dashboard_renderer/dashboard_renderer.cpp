@@ -338,8 +338,9 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const bool isResize = overlayState.mode == DashboardPlacementOverlayMode::Resize;
     const std::string titleText = isResize ? "Resize Mode" : "Move Mode";
     const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
-    const std::string scaleText = FormatText("Display scale: %s%%",
-        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.displayScale) * 100.0, 1).c_str());
+    const std::string scaleText = FormatText("Scale: %s%%, monitor default: %s%%",
+        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.displayScale) * 100.0, 1).c_str(),
+        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.monitorDefaultScale) * 100.0, 1).c_str());
     const std::string positionSizeText = FormatText("Pos: %d,%d; Size: %dx%d",
         overlayState.relativePosition.x,
         overlayState.relativePosition.y,

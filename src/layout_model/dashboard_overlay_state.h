@@ -24,6 +24,7 @@ struct DashboardMoveOverlayState {
     std::string monitorName;
     RenderPoint relativePosition{};
     double displayScale = 1.0;
+    double monitorDefaultScale = 1.0;
 };
 
 struct DashboardOverlayState {

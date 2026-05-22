@@ -1971,6 +1971,7 @@ void DashboardApp::SyncDashboardMoveOverlayState() {
         placementInteractionMode_ == PlacementInteractionMode::Resize
             ? CurrentRenderScale()
             : ResolveDisplayScale(controller_.State().config.display.scale, movePlacementInfo_.dpi);
+    overlayState.monitorDefaultScale = ScaleFromDpi(movePlacementInfo_.dpi);
 }
 
 HWND DashboardApp::WindowHandle() const {
