@@ -126,3 +126,70 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
     }
     return geometry;
 }
+
+DashboardTitlebarControlLayout ResolveDashboardTitlebarControlLayout(
+    const RECT& clientRect, const DashboardTitlebarControlMetrics& metrics) {
+    DashboardTitlebarControlLayout layout;
+    if (!IsRectUsable(clientRect) || metrics.buttonWidth <= 0 || metrics.gap < 0 || metrics.padding < 0 ||
+        metrics.comboHeight <= 0) {
+        return layout;
+    }
+
+    const int clientWidth = RectWidth(clientRect);
+    const int buttonWidth = std::min(metrics.buttonWidth, clientWidth);
+    layout.closeRect = RECT{clientRect.right - buttonWidth, clientRect.top, clientRect.right, clientRect.bottom};
+
+    if (clientRect.left + buttonWidth + metrics.gap <= layout.closeRect.left) {
+        layout.appMenuRect = RECT{clientRect.left, clientRect.top, clientRect.left + buttonWidth, clientRect.bottom};
+    }
+
+    const LONG leftLimit = IsRectUsable(layout.appMenuRect) ? layout.appMenuRect.right + metrics.gap : clientRect.left;
+    LONG right = layout.closeRect.left - metrics.gap;
+    const auto remainingWidth = [&]() { return static_cast<int>(right - leftLimit); };
+    const auto placeButton = [&](RECT& rect) {
+        if (remainingWidth() < buttonWidth) {
+            return false;
+        }
+        rect = RECT{right - buttonWidth, clientRect.top, right, clientRect.bottom};
+        right = rect.left - metrics.gap;
+        return true;
+    };
+    const auto placeCombo = [&](RECT& rect, int minWidth, int desiredWidth) {
+        if (minWidth <= 0 || desiredWidth <= 0 || remainingWidth() < minWidth) {
+            return false;
+        }
+        const int width = std::min(desiredWidth, remainingWidth());
+        const int height = std::min(RectHeight(clientRect), metrics.comboHeight);
+        const int top = clientRect.top + std::max(0, (RectHeight(clientRect) - height) / 2);
+        rect = RECT{right - width, top, right, top + height};
+        right = rect.left - metrics.gap;
+        return true;
+    };
+
+    placeButton(layout.displayRect);
+    if (IsRectUsable(layout.displayRect)) {
+        placeButton(layout.editLayoutRect);
+    }
+    if (IsRectUsable(layout.editLayoutRect)) {
+        placeCombo(layout.layoutComboRect, metrics.layoutComboMinWidth, metrics.layoutComboDesiredWidth);
+    }
+    if (IsRectUsable(layout.layoutComboRect)) {
+        placeCombo(layout.themeComboRect, metrics.themeComboMinWidth, metrics.themeComboDesiredWidth);
+    }
+
+    LONG controlsLeft = layout.closeRect.left;
+    const RECT* controls[] = {
+        &layout.displayRect, &layout.editLayoutRect, &layout.layoutComboRect, &layout.themeComboRect};
+    for (const RECT* control : controls) {
+        if (IsRectUsable(*control)) {
+            controlsLeft = std::min(controlsLeft, control->left);
+        }
+    }
+    const LONG titleLeft =
+        IsRectUsable(layout.appMenuRect) ? layout.appMenuRect.right + metrics.gap : clientRect.left + metrics.padding;
+    const LONG titleRight = controlsLeft - metrics.padding;
+    if (titleRight > titleLeft) {
+        layout.titleTextRect = RECT{titleLeft, clientRect.top, titleRight, clientRect.bottom};
+    }
+    return layout;
+}

@@ -94,7 +94,7 @@ struct BgraPixel {
     BYTE blue = 0;
     BYTE green = 0;
     BYTE red = 0;
-    BYTE alpha = 0;
+    BYTE alpha = 255;
 };
 
 BOOL AppendMenuText(HMENU menu, UINT flags, UINT_PTR id, std::string_view text) {
@@ -169,15 +169,22 @@ int ResolveNativeMenuBitmapSize(UINT dpi) {
     return std::max(1, std::min(preferred, std::max(1, rowHeight - verticalInset)));
 }
 
-BgraPixel PremultipliedPixel(COLORREF color, BYTE alpha) {
-    const auto premultiply = [alpha](BYTE channel) {
-        return static_cast<BYTE>((static_cast<int>(channel) * static_cast<int>(alpha) + 127) / 255);
+COLORREF BlendColor(COLORREF foreground, COLORREF background, int foregroundPercent) {
+    const int clampedPercent = std::clamp(foregroundPercent, 0, 100);
+    const int backgroundPercent = 100 - clampedPercent;
+    const auto blendChannel = [&](int foregroundChannel, int backgroundChannel) {
+        return static_cast<BYTE>((foregroundChannel * clampedPercent + backgroundChannel * backgroundPercent) / 100);
     };
-    return BgraPixel{
-        premultiply(GetBValue(color)), premultiply(GetGValue(color)), premultiply(GetRValue(color)), alpha};
+    return RGB(blendChannel(GetRValue(foreground), GetRValue(background)),
+        blendChannel(GetGValue(foreground), GetGValue(background)),
+        blendChannel(GetBValue(foreground), GetBValue(background)));
 }
 
-void PaintBitmapRect(BgraPixel* pixels, int width, int height, RECT rect, COLORREF color, BYTE alpha) {
+BgraPixel OpaquePixel(COLORREF color) {
+    return BgraPixel{GetBValue(color), GetGValue(color), GetRValue(color), 255};
+}
+
+void PaintBitmapRect(BgraPixel* pixels, int width, int height, RECT rect, COLORREF color) {
     if (pixels == nullptr || width <= 0 || height <= 0) {
         return;
     }
@@ -189,7 +196,7 @@ void PaintBitmapRect(BgraPixel* pixels, int width, int height, RECT rect, COLORR
         return;
     }
 
-    const BgraPixel pixel = PremultipliedPixel(color, alpha);
+    const BgraPixel pixel = OpaquePixel(color);
     for (int y = rect.top; y < rect.bottom; ++y) {
         BgraPixel* row = pixels + y * width;
         for (int x = rect.left; x < rect.right; ++x) {
@@ -198,17 +205,13 @@ void PaintBitmapRect(BgraPixel* pixels, int width, int height, RECT rect, COLORR
     }
 }
 
-void PaintBitmapRectOutline(
-    BgraPixel* pixels, int width, int height, const RECT& rect, int thickness, COLORREF color, BYTE alpha) {
+void PaintBitmapRectOutline(BgraPixel* pixels, int width, int height, const RECT& rect, int thickness, COLORREF color) {
     const int lineThickness = std::max(1, thickness);
+    PaintBitmapRect(pixels, width, height, RECT{rect.left, rect.top, rect.right, rect.top + lineThickness}, color);
     PaintBitmapRect(
-        pixels, width, height, RECT{rect.left, rect.top, rect.right, rect.top + lineThickness}, color, alpha);
-    PaintBitmapRect(
-        pixels, width, height, RECT{rect.left, rect.bottom - lineThickness, rect.right, rect.bottom}, color, alpha);
-    PaintBitmapRect(
-        pixels, width, height, RECT{rect.left, rect.top, rect.left + lineThickness, rect.bottom}, color, alpha);
-    PaintBitmapRect(
-        pixels, width, height, RECT{rect.right - lineThickness, rect.top, rect.right, rect.bottom}, color, alpha);
+        pixels, width, height, RECT{rect.left, rect.bottom - lineThickness, rect.right, rect.bottom}, color);
+    PaintBitmapRect(pixels, width, height, RECT{rect.left, rect.top, rect.left + lineThickness, rect.bottom}, color);
+    PaintBitmapRect(pixels, width, height, RECT{rect.right - lineThickness, rect.top, rect.right, rect.bottom}, color);
 }
 
 void PaintDisplayPlacementSchematicBitmap(BgraPixel* pixels, int bitmapSize, const DisplayMenuOption& option) {
@@ -220,14 +223,17 @@ void PaintDisplayPlacementSchematicBitmap(BgraPixel* pixels, int bitmapSize, con
         return;
     }
 
-    const COLORREF fillColor = GetSysColor(COLOR_HIGHLIGHT);
-    const COLORREF lineColor = GetSysColor(COLOR_MENUTEXT);
-    PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.caseDashRect, fillColor, 96);
+    const COLORREF backgroundColor = GetSysColor(COLOR_MENU);
+    const COLORREF textColor = GetSysColor(COLOR_MENUTEXT);
+    const COLORREF fillColor = BlendColor(GetSysColor(COLOR_HIGHLIGHT), backgroundColor, 32);
+    const COLORREF outlineColor = BlendColor(textColor, backgroundColor, 75);
+    const COLORREF dividerColor = BlendColor(textColor, backgroundColor, 82);
+    PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.caseDashRect, fillColor);
     if (geometry.hasDivider) {
-        PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.dividerRect, lineColor, 175);
+        PaintBitmapRect(pixels, bitmapSize, bitmapSize, geometry.dividerRect, dividerColor);
     }
     PaintBitmapRectOutline(
-        pixels, bitmapSize, bitmapSize, geometry.displayRect, std::max(1, bitmapSize / 14), lineColor, 220);
+        pixels, bitmapSize, bitmapSize, geometry.displayRect, std::max(1, bitmapSize / 14), outlineColor);
 }
 
 HBITMAP CreateDisplayPlacementMenuBitmap(const DisplayMenuOption& option, UINT dpi) {
@@ -236,27 +242,22 @@ HBITMAP CreateDisplayPlacementMenuBitmap(const DisplayMenuOption& option, UINT d
         return nullptr;
     }
 
-    BITMAPV5HEADER header{};
-    header.bV5Size = sizeof(header);
-    header.bV5Width = bitmapSize;
-    header.bV5Height = -bitmapSize;
-    header.bV5Planes = 1;
-    header.bV5BitCount = 32;
-    header.bV5Compression = BI_BITFIELDS;
-    header.bV5RedMask = 0x00FF0000;
-    header.bV5GreenMask = 0x0000FF00;
-    header.bV5BlueMask = 0x000000FF;
-    header.bV5AlphaMask = 0xFF000000;
+    BITMAPINFO header{};
+    header.bmiHeader.biSize = sizeof(header.bmiHeader);
+    header.bmiHeader.biWidth = bitmapSize;
+    header.bmiHeader.biHeight = -bitmapSize;
+    header.bmiHeader.biPlanes = 1;
+    header.bmiHeader.biBitCount = 32;
+    header.bmiHeader.biCompression = BI_RGB;
 
     void* bits = nullptr;
-    HBITMAP bitmap =
-        CreateDIBSection(nullptr, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
+    HBITMAP bitmap = CreateDIBSection(nullptr, &header, DIB_RGB_COLORS, &bits, nullptr, 0);
     if (bitmap == nullptr || bits == nullptr) {
         return nullptr;
     }
 
     auto* pixels = static_cast<BgraPixel*>(bits);
-    std::fill(pixels, pixels + bitmapSize * bitmapSize, BgraPixel{});
+    std::fill(pixels, pixels + bitmapSize * bitmapSize, OpaquePixel(GetSysColor(COLOR_MENU)));
     PaintDisplayPlacementSchematicBitmap(pixels, bitmapSize, option);
     return bitmap;
 }

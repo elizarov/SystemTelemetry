@@ -880,6 +880,18 @@ void DashboardController::UpdateConfigFromMovePlacement(DashboardShellHost& shel
     TraceDisplayPositionUpdate(shell.TraceLog(), "move_complete", previousDisplay, state_.config.display, &placement);
 }
 
+void DashboardController::UpdateConfigFromResizePlacement(DashboardShellHost& shell) {
+    const double targetScale = RoundDisplayScale(shell.CurrentRenderScale());
+    const MonitorPlacementInfo placement = shell.GetWindowPlacementInfoForScale(targetScale);
+    const DisplayConfig previousDisplay = state_.config.display;
+    const DisplayConfig nextDisplay = BuildResizePlacementDisplayConfig(previousDisplay, placement, targetScale);
+    if (nextDisplay == previousDisplay) {
+        return;
+    }
+    state_.config.display = nextDisplay;
+    TraceDisplayPositionUpdate(shell.TraceLog(), "resize_complete", previousDisplay, state_.config.display, &placement);
+}
+
 bool DashboardController::SaveCurrentConfig(DashboardShellHost& shell) {
     const FilePath configPath = GetRuntimeConfigPath();
     AppConfig config = BuildCurrentConfigForSaving();

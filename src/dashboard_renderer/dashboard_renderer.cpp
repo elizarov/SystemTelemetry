@@ -335,13 +335,15 @@ void DashboardRenderer::DrawMoveOverlay(const DashboardMoveOverlayState& overlay
     const int titleHeight = (std::max)(1, Renderer().TextMetrics().label);
     const int bodyHeight = (std::max)(1, Renderer().TextMetrics().smallText);
 
-    const std::string titleText = "Move Mode";
+    const bool isResize = overlayState.mode == DashboardPlacementOverlayMode::Resize;
+    const std::string titleText = isResize ? "Resize Mode" : "Move Mode";
     const std::string monitorText = FormatText("Monitor: %s", overlayState.monitorName.c_str());
     const std::string positionText =
         FormatText("Pos: x=%d y=%d", overlayState.relativePosition.x, overlayState.relativePosition.y);
     const std::string scaleText = FormatText("Display scale: %s%%",
-        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.monitorScale) * 100.0, 1).c_str());
-    const std::string hintText = overlayState.placeOnRelease ? "Release to place" : "Left-click to place";
+        FormatDoubleFixedTrimmed(RoundDisplayScale(overlayState.displayScale) * 100.0, 1).c_str());
+    const std::string hintText =
+        isResize ? "Release to resize" : (overlayState.placeOnRelease ? "Release to place" : "Left-click to place");
 
     const int minContentWidth = ScaleLogical(220);
     const int maxContentWidth = (std::max)(minContentWidth, WindowWidth() - margin * 2 - padding * 2);

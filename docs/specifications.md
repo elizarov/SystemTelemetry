@@ -79,6 +79,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Double-clicking the tray icon performs `Bring to Front`.
 - The tray menu shows `Bring to Front` as its default action.
 - Move mode keeps the dashboard attached to the pointer until placement completes, clamps the active pointer offset inside the current dashboard bounds after DPI or size changes, and overlays the current monitor name, display scale percentage, and logical relative coordinates inside the same frame as the dashboard. Completing move mode updates the live display monitor and logical position once, so later layout or theme changes keep the placed position.
+- Dragging the invisible lower-right dashboard corner resizes the dashboard while preserving the active layout aspect ratio. Resize mode uses the same placement overlay as move mode with a `Resize Mode` title, stores the rounded explicit display scale plus monitor and logical position once when the pointer is released, and leaves the saved wallpaper value unchanged.
 - The `Layout` submenu lists configured named layouts, marks the active layout, applies a new selection immediately, and repaints the dashboard before any modeless `Edit Configuration` window refresh work runs.
 - The `Theme` and `Layout` submenus list configured named sections as `name - description` when a description is configured, mark the active entry, apply a new selection immediately, and repaint the dashboard before any modeless `Edit Configuration` window refresh work runs. The `Theme` submenu appears immediately before `Layout`.
 - The `Scale` submenu changes scale immediately.
@@ -95,6 +96,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - Leaving the dashboard, titlebar, or virtual titlebar band hides the strip unless a titlebar control dropdown, titlebar menu, close action, or titlebar move interaction is in progress.
 - The left side of the titlebar shows a small CaseDash icon button before the `CaseDash` title; left-clicking it opens the same full menu as right-clicking the dashboard.
 - Right-aligned titlebar controls appear left to right as a theme dropdown, a layout dropdown, an edit-layout button, a display setup button, and a close button.
+- As titlebar width shrinks, existing titlebar controls are repositioned and hidden without recreating native dropdown HWNDs. The titlebar drops the theme dropdown, layout dropdown, edit-layout button, and display setup button in that order; the close button remains visible, and the app icon hides only when it would collide with the close button.
 - Hovering a titlebar control shows a localized tooltip for that control without rebuilding the titlebar or interrupting layout-edit dashboard tooltip transitions.
 - The layout dropdown is a native Windows dropdown, shows layout names only, reflects the active layout, and applies a new layout through the same behavior as the `Layout` submenu.
 - The theme dropdown is a native Windows dropdown, shows theme names with spaces such as `dark cyan`, reflects the active theme, and applies a new theme through the same behavior as the `Theme` submenu.

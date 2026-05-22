@@ -211,6 +211,55 @@ TEST(DisplayPlacementSchematic, LeftAndRightUseFittedLayoutWidthRatio) {
     ExpectRect(rightGeometry.dividerRect, 64, 0, 65, 100);
 }
 
+TEST(DisplayAspectResize, DiagonalExtentReturnsRoundedScale) {
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{1600, 900}), 1.0, 0.000001);
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{3000, 1000}, POINT{999, 333}), 0.333, 0.000001);
+}
+
+TEST(DisplayAspectResize, HorizontalAndVerticalDragsPreserveAspectByProjection) {
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{2000, 900}), 1.190, 0.000001);
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{1600, 1200}), 1.080, 0.000001);
+}
+
+TEST(DisplayAspectResize, ClampsToSupportedScaleRange) {
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{100000, 100000}), 16.0, 0.000001);
+    EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{-100, -100}), 0.1, 0.000001);
+}
+
+TEST(DisplayResizeConfiguration, UpdatesPlacementAndPreservesWallpaper) {
+    DisplayConfig display;
+    display.monitorName = "Old";
+    display.wallpaper = "keep.png";
+    display.position = LogicalPointConfig{2, 3};
+    display.scale = 1.0;
+    MonitorPlacementInfo placement;
+    placement.deviceName = "DISPLAY1";
+    placement.configMonitorName = "Panel";
+    placement.relativePosition = POINT{10, 20};
+
+    const DisplayConfig updated = BuildResizePlacementDisplayConfig(display, placement, 1.23456);
+
+    EXPECT_EQ(updated.monitorName, "Panel");
+    EXPECT_EQ(updated.position, (LogicalPointConfig{10, 20}));
+    EXPECT_NEAR(updated.scale, 1.235, 0.000001);
+    EXPECT_EQ(updated.wallpaper, "keep.png");
+}
+
+TEST(DisplayResizeConfiguration, FallsBackToDeviceNameAndDetectsNoOp) {
+    DisplayConfig display;
+    display.monitorName = "DISPLAY1";
+    display.wallpaper = "keep.png";
+    display.position = LogicalPointConfig{10, 20};
+    display.scale = 1.235;
+    MonitorPlacementInfo placement;
+    placement.deviceName = "DISPLAY1";
+    placement.relativePosition = POINT{10, 20};
+
+    const DisplayConfig updated = BuildResizePlacementDisplayConfig(display, placement, 1.235);
+
+    EXPECT_EQ(updated, display);
+}
+
 TEST(DisplayConfiguration, FullscreenConfigWritesWallpaper) {
     const AppConfig config = MakeDisplayConfig(1600, 900);
     DisplayMenuOption options[1]{};

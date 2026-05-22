@@ -54,6 +54,7 @@ public:
     // handoff and marshal any UI work back to the UI thread.
     virtual void EnqueueTelemetryUpdate(const TelemetryUpdate& update) = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
+    virtual MonitorPlacementInfo GetWindowPlacementInfoForScale(double scale) const = 0;
     virtual std::optional<FilePath> PromptDiagnosticsSavePath(
         std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const = 0;
     virtual void ShowError(std::string_view message) const = 0;
@@ -120,6 +121,7 @@ public:
         LayoutGuideAxis axis);
     AppConfig BuildCurrentConfigForSaving() const;
     void UpdateConfigFromMovePlacement(DashboardShellHost& shell);
+    void UpdateConfigFromResizePlacement(DashboardShellHost& shell);
     bool SaveCurrentConfig(DashboardShellHost& shell);
 
 private:

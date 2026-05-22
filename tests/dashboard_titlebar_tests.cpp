@@ -1,3 +1,4 @@
+#include <array>
 #include <gtest/gtest.h>
 
 #include "dashboard/dashboard_titlebar.h"
@@ -10,6 +11,37 @@ void ExpectRect(const RECT& rect, int left, int top, int right, int bottom) {
     EXPECT_EQ(rect.top, top);
     EXPECT_EQ(rect.right, right);
     EXPECT_EQ(rect.bottom, bottom);
+}
+
+bool RectUsable(const RECT& rect) {
+    return rect.right > rect.left && rect.bottom > rect.top;
+}
+
+void ExpectNoOverlappingControlRects(const DashboardTitlebarControlLayout& layout) {
+    const std::array<RECT, 7> rects{layout.appMenuRect,
+        layout.themeComboRect,
+        layout.layoutComboRect,
+        layout.editLayoutRect,
+        layout.displayRect,
+        layout.closeRect,
+        layout.titleTextRect};
+    for (size_t i = 0; i < rects.size(); ++i) {
+        if (!RectUsable(rects[i])) {
+            continue;
+        }
+        for (size_t j = i + 1; j < rects.size(); ++j) {
+            if (!RectUsable(rects[j])) {
+                continue;
+            }
+            RECT intersection{};
+            EXPECT_FALSE(IntersectRect(&intersection, &rects[i], &rects[j]))
+                << "rect " << i << " overlapped rect " << j;
+        }
+    }
+}
+
+DashboardTitlebarControlMetrics TestControlMetrics() {
+    return DashboardTitlebarControlMetrics{36, 6, 8, 22, 58, 78, 76, 112};
 }
 
 }  // namespace
@@ -133,6 +165,70 @@ TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
     EXPECT_EQ(result.captionColor, E_HANDLE);
     EXPECT_EQ(result.textColor, E_HANDLE);
     EXPECT_EQ(result.darkMode, E_HANDLE);
+}
+
+TEST(DashboardTitlebarControlLayout, FullWidthShowsAllControls) {
+    const DashboardTitlebarControlLayout layout =
+        ResolveDashboardTitlebarControlLayout(RECT{0, 0, 422, 32}, TestControlMetrics());
+
+    EXPECT_TRUE(RectUsable(layout.appMenuRect));
+    EXPECT_TRUE(RectUsable(layout.themeComboRect));
+    EXPECT_TRUE(RectUsable(layout.layoutComboRect));
+    EXPECT_TRUE(RectUsable(layout.editLayoutRect));
+    EXPECT_TRUE(RectUsable(layout.displayRect));
+    EXPECT_TRUE(RectUsable(layout.closeRect));
+    EXPECT_TRUE(RectUsable(layout.titleTextRect));
+    EXPECT_LT(layout.themeComboRect.left, layout.layoutComboRect.left);
+    EXPECT_LT(layout.layoutComboRect.left, layout.editLayoutRect.left);
+    EXPECT_LT(layout.editLayoutRect.left, layout.displayRect.left);
+    EXPECT_LT(layout.displayRect.left, layout.closeRect.left);
+    ExpectNoOverlappingControlRects(layout);
+}
+
+TEST(DashboardTitlebarControlLayout, DropsControlsFromThemeThroughDisplay) {
+    const DashboardTitlebarControlMetrics metrics = TestControlMetrics();
+
+    const DashboardTitlebarControlLayout noTheme = ResolveDashboardTitlebarControlLayout(RECT{0, 0, 310, 32}, metrics);
+    EXPECT_FALSE(RectUsable(noTheme.themeComboRect));
+    EXPECT_TRUE(RectUsable(noTheme.layoutComboRect));
+    EXPECT_TRUE(RectUsable(noTheme.editLayoutRect));
+    EXPECT_TRUE(RectUsable(noTheme.displayRect));
+    EXPECT_TRUE(RectUsable(noTheme.closeRect));
+    ExpectNoOverlappingControlRects(noTheme);
+
+    const DashboardTitlebarControlLayout noLayout = ResolveDashboardTitlebarControlLayout(RECT{0, 0, 220, 32}, metrics);
+    EXPECT_FALSE(RectUsable(noLayout.themeComboRect));
+    EXPECT_FALSE(RectUsable(noLayout.layoutComboRect));
+    EXPECT_TRUE(RectUsable(noLayout.editLayoutRect));
+    EXPECT_TRUE(RectUsable(noLayout.displayRect));
+    EXPECT_TRUE(RectUsable(noLayout.closeRect));
+    ExpectNoOverlappingControlRects(noLayout);
+
+    const DashboardTitlebarControlLayout noEdit = ResolveDashboardTitlebarControlLayout(RECT{0, 0, 125, 32}, metrics);
+    EXPECT_FALSE(RectUsable(noEdit.themeComboRect));
+    EXPECT_FALSE(RectUsable(noEdit.layoutComboRect));
+    EXPECT_FALSE(RectUsable(noEdit.editLayoutRect));
+    EXPECT_TRUE(RectUsable(noEdit.displayRect));
+    EXPECT_TRUE(RectUsable(noEdit.closeRect));
+    ExpectNoOverlappingControlRects(noEdit);
+
+    const DashboardTitlebarControlLayout noDisplay =
+        ResolveDashboardTitlebarControlLayout(RECT{0, 0, 100, 32}, metrics);
+    EXPECT_FALSE(RectUsable(noDisplay.themeComboRect));
+    EXPECT_FALSE(RectUsable(noDisplay.layoutComboRect));
+    EXPECT_FALSE(RectUsable(noDisplay.editLayoutRect));
+    EXPECT_FALSE(RectUsable(noDisplay.displayRect));
+    EXPECT_TRUE(RectUsable(noDisplay.closeRect));
+    ExpectNoOverlappingControlRects(noDisplay);
+}
+
+TEST(DashboardTitlebarControlLayout, CloseWinsWhenAppMenuWouldCollide) {
+    const DashboardTitlebarControlLayout layout =
+        ResolveDashboardTitlebarControlLayout(RECT{0, 0, 70, 32}, TestControlMetrics());
+
+    EXPECT_FALSE(RectUsable(layout.appMenuRect));
+    EXPECT_TRUE(RectUsable(layout.closeRect));
+    ExpectNoOverlappingControlRects(layout);
 }
 
 TEST(DashboardTitlebarTooltip, ResolvesControlKeys) {

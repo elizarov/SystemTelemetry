@@ -53,6 +53,7 @@ public:
     void RedrawShellNow() override;
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
+    MonitorPlacementInfo GetWindowPlacementInfoForScale(double scale) const override;
     std::optional<FilePath> PromptDiagnosticsSavePath(
         std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const override;
     void ShowError(std::string_view message) const override;
@@ -72,6 +73,12 @@ private:
         None,
         LayoutEdit,
         Titlebar,
+    };
+
+    enum class PlacementInteractionMode {
+        None,
+        Move,
+        Resize,
     };
 
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
@@ -96,8 +103,10 @@ private:
         LayoutGuideAxis axis) override;
     void StartMoveMode();
     void StartMoveModeAt(POINT cursorAnchorClientPoint);
+    void StartResizeModeAt(POINT cursorClientPoint);
     void StopMoveMode();
     void UpdateMoveTracking();
+    void UpdateResizeTracking();
     void SyncDashboardMoveOverlayState();
     bool CreateDashboardTooltip();
     void DestroyDashboardTooltip();
@@ -149,9 +158,11 @@ private:
     int NativeTitlebarComboClosedHeight(HWND combo) const;
     int NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const;
     void PositionNativeTitlebarCombo(HWND combo, const RECT& closedRect);
+    DashboardTitlebarControlLayout NativeTitlebarControlLayout() const;
     RECT NativeTitlebarLayoutComboRect() const;
     RECT NativeTitlebarThemeComboRect() const;
     RECT NativeTitlebarButtonRect(NativeTitlebarButton button) const;
+    RECT NativeTitlebarButtonRect(NativeTitlebarButton button, const DashboardTitlebarControlLayout& layout) const;
     void PopulateNativeTitlebarCombo(HWND combo,
         const std::vector<std::string>& values,
         std::string_view selected,
@@ -161,8 +172,12 @@ private:
     std::vector<std::string> NativeTitlebarThemeNames() const;
     std::optional<size_t> NativeTitlebarComboSelectionIndex(HWND combo) const;
     NativeTitlebarButton HitTestNativeTitlebarButton(POINT clientPoint) const;
+    NativeTitlebarButton HitTestNativeTitlebarButton(
+        POINT clientPoint, const DashboardTitlebarControlLayout& layout) const;
     void PaintNativeTitlebar(HDC hdc) const;
     void PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const;
+    void PaintNativeTitlebarButton(
+        HDC hdc, NativeTitlebarButton button, const DashboardTitlebarControlLayout& layout) const;
     void RefreshNativeTitlebarChrome();
     void InvalidateNativeTitlebar() const;
     void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
@@ -178,6 +193,8 @@ private:
         bool placeOnRelease,
         bool keepNativeTitlebarDuringMove);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
+    RECT DashboardResizeHandleRect() const;
+    bool IsDashboardResizeHandlePoint(RenderPoint clientPoint) const;
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -225,6 +242,9 @@ private:
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
     POINT moveCursorAnchorClientPoint_{};
+    POINT resizeAnchorScreenPoint_{};
+    POINT resizeCursorBottomRightOffset_{};
+    PlacementInteractionMode placementInteractionMode_ = PlacementInteractionMode::None;
     bool hasMoveCursorAnchorClientPoint_ = false;
     bool clampMoveCursorAnchorClientPoint_ = true;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
@@ -244,6 +264,9 @@ private:
     bool nativeTitlebarHoverTimerActive_ = false;
     bool nativeTitlebarControlsVisible_ = false;
     bool nativeTitlebarComboDropdownOpen_ = false;
+    HWND nativeTitlebarOpenComboHwnd_ = nullptr;
+    DashboardTitlebarControlLayout nativeTitlebarLastControlLayout_{};
+    bool nativeTitlebarLastControlLayoutValid_ = false;
     DashboardTitlebarTooltipControl nativeTitlebarTooltipControl_ = DashboardTitlebarTooltipControl::None;
     RECT nativeTitlebarTooltipRect_{};
     bool nativeTitlebarTooltipRectValid_ = false;

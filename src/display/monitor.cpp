@@ -18,6 +18,8 @@ struct MonitorIdentity {
 };
 
 constexpr double kMonitorFitEpsilon = 0.0001;
+constexpr double kMinimumInteractiveResizeScale = 0.1;
+constexpr double kMaximumInteractiveResizeScale = 16.0;
 constexpr char kShcoreDllName[] = "Shcore.dll";
 
 int RectWidth(const RECT& rect) {
@@ -136,6 +138,29 @@ double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LON
         return 0.0;
     }
     return std::abs(widthScale - heightScale) <= kMonitorFitEpsilon ? RoundDisplayScale(widthScale) : 0.0;
+}
+
+double ComputeAspectResizeScale(SIZE layoutLogicalSize, POINT physicalExtent) {
+    if (layoutLogicalSize.cx <= 0 || layoutLogicalSize.cy <= 0) {
+        return 1.0;
+    }
+
+    const double layoutWidth = static_cast<double>(layoutLogicalSize.cx);
+    const double layoutHeight = static_cast<double>(layoutLogicalSize.cy);
+    const double scale =
+        (static_cast<double>(physicalExtent.x) * layoutWidth + static_cast<double>(physicalExtent.y) * layoutHeight) /
+        (layoutWidth * layoutWidth + layoutHeight * layoutHeight);
+    return RoundDisplayScale(std::clamp(scale, kMinimumInteractiveResizeScale, kMaximumInteractiveResizeScale));
+}
+
+DisplayConfig BuildResizePlacementDisplayConfig(
+    const DisplayConfig& display, const MonitorPlacementInfo& placement, double targetScale) {
+    DisplayConfig result = display;
+    result.monitorName = !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
+    result.position.x = placement.relativePosition.x;
+    result.position.y = placement.relativePosition.y;
+    result.scale = RoundDisplayScale(targetScale);
+    return result;
 }
 
 DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(

@@ -9,6 +9,7 @@
 #include "util/scale.h"
 
 struct AppConfig;
+struct DisplayConfig;
 
 struct MonitorPlacementInfo {
     std::string deviceName;
@@ -67,6 +68,9 @@ double ResolveDisplayScale(const AppConfig& config, UINT dpi);
 SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale);
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
+double ComputeAspectResizeScale(SIZE layoutLogicalSize, POINT physicalExtent);
+DisplayConfig BuildResizePlacementDisplayConfig(
+    const DisplayConfig& display, const MonitorPlacementInfo& placement, double targetScale);
 DisplayPlacementSchematicGeometry ComputeDisplayPlacementSchematicGeometry(
     const DisplayMenuOption& option, const RECT& bounds);
 std::string SimplifyDeviceName(const std::string& deviceName);
