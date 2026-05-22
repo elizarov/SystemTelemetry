@@ -339,8 +339,8 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
             }
             while (literalIndex < static_cast<int>(text.size()) &&
                    (text[static_cast<size_t>(literalIndex)] == ' ' || text[static_cast<size_t>(literalIndex)] == '\t' ||
-                       text[static_cast<size_t>(literalIndex)] == '\r' ||
-                       text[static_cast<size_t>(literalIndex)] == '\n')) {
+                    text[static_cast<size_t>(literalIndex)] == '\r' ||
+                    text[static_cast<size_t>(literalIndex)] == '\n')) {
                 ++literalIndex;
             }
             if (literalIndex < static_cast<int>(text.size()) &&
@@ -382,7 +382,8 @@ public:
         : context_(std::move(context)), roots_(ConfigStrings(config, "roots")),
           headerSuffixes_(RequireSuffixGroup(
               context_.suffixGroups, "architecture.header_suffix_group", config.At("header_suffix_group").AsString())),
-          implementationSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+          implementationSuffixes_(RequireSuffixGroup(
+              context_.suffixGroups,
               "architecture.implementation_suffix_group",
               config.At("implementation_suffix_group").AsString())),
           headerSuffix_(*headerSuffixes_.begin()), implementationSuffix_(*implementationSuffixes_.begin()) {
@@ -499,10 +500,11 @@ private:
             const int line =
                 static_cast<int>(std::count(record.strippedText.begin(), record.strippedText.begin() + brace, '\n')) +
                 1;
-            violations_.push_back({record.relative + ":" + std::to_string(line),
-                "header-body",
-                "Function body for " + name +
-                    " appears in a header; move non-template logic to a matching .cpp file."});
+            violations_.push_back(
+                {record.relative + ":" + std::to_string(line),
+                 "header-body",
+                 "Function body for " + name +
+                     " appears in a header; move non-template logic to a matching .cpp file."});
             brace = record.strippedText.find('{', brace + 1);
         }
     }
@@ -516,10 +518,11 @@ private:
         if (cppWithoutHeaderAllowlist_.find(record.relative) == cppWithoutHeaderAllowlist_.end()) {
             const std::string expected = PairedHeaderForCpp(record.relative);
             if (!FileExists(JoinPath(context_.projectRoot, expected))) {
-                violations_.push_back({record.relative + ":1",
-                    "missing-header",
-                    record.relative + " has no matching header " + expected +
-                        "; add one or allowlist the translation unit."});
+                violations_.push_back(
+                    {record.relative + ":1",
+                     "missing-header",
+                     record.relative + " has no matching header " + expected +
+                         "; add one or allowlist the translation unit."});
             }
         }
 
@@ -557,10 +560,11 @@ private:
             if (definition.relpath == expectedCpp) {
                 continue;
             }
-            violations_.push_back({definition.relpath + ":" + std::to_string(definition.line),
-                "impl-mismatch",
-                definition.name + " is declared from " + ownerHeader + " but implemented in " + definition.relpath +
-                    "; expected " + expectedCpp + "."});
+            violations_.push_back(
+                {definition.relpath + ":" + std::to_string(definition.line),
+                 "impl-mismatch",
+                 definition.name + " is declared from " + ownerHeader + " but implemented in " + definition.relpath +
+                     "; expected " + expectedCpp + "."});
         }
     }
 
@@ -629,11 +633,12 @@ public:
             if (NormalizeInclude(include.text) == expected) {
                 continue;
             }
-            violations_.push_back({record.relative + ":" + std::to_string(include.line),
-                "include-style",
-                "Project header \"" + include.text + "\" resolves to " +
-                    RelativePath(resolved->first, context_.projectRoot) + "; use \"" + expected + "\" from the " +
-                    resolved->second + " include root instead of a relative or local shorthand path."});
+            violations_.push_back(
+                {record.relative + ":" + std::to_string(include.line),
+                 "include-style",
+                 "Project header \"" + include.text + "\" resolves to " +
+                     RelativePath(resolved->first, context_.projectRoot) + "; use \"" + expected + "\" from the " +
+                     resolved->second + " include root instead of a relative or local shorthand path."});
         }
     }
 
@@ -770,12 +775,14 @@ public:
           sourceRoot_(AbsolutePath(JoinPath(context_.projectRoot, sourceRootName_))),
           suffixes_(RequireSuffixGroup(
               context_.suffixGroups, "source_dependencies.suffix_group", config.At("suffix_group").AsString())),
-          headerSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+          headerSuffixes_(RequireSuffixGroup(
+              context_.suffixGroups,
               "source_dependencies.header_suffix_group",
               config.At("header_suffix_group").AsString())),
-          largeSourceFileLocThreshold_(config.Find("large_source_file_loc_threshold") != nullptr
-                                           ? config.At("large_source_file_loc_threshold").AsInt()
-                                           : 1000),
+          largeSourceFileLocThreshold_(
+              config.Find("large_source_file_loc_threshold") != nullptr
+                  ? config.At("large_source_file_loc_threshold").AsInt()
+                  : 1000),
           packageEncapsulationMessage_(config.At("package_encapsulation_message").AsString()),
           packageDependencyMessage_(config.At("package_dependency_message").AsString()) {
         const std::vector<std::string> universalPackageDependencies =
@@ -965,16 +972,18 @@ private:
             if (sourcePackage == targetPackage) {
                 continue;
             }
-            findings.push_back({source + " -> " + target,
-                "package-encapsulation",
-                FormatTemplate(packageEncapsulationMessage_,
-                    {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"target_package", targetPackage},
-                        {"target_package_root", sourceRootName_ + "/" + targetPackage},
-                    })});
+            findings.push_back(
+                {source + " -> " + target,
+                 "package-encapsulation",
+                 FormatTemplate(
+                     packageEncapsulationMessage_,
+                     {
+                         {"source", source},
+                         {"target", target},
+                         {"source_package", sourcePackage},
+                         {"target_package", targetPackage},
+                         {"target_package_root", sourceRootName_ + "/" + targetPackage},
+                     })});
         }
         return findings;
     }
@@ -1001,18 +1010,20 @@ private:
             if (targetPackage == sourcePackage || allowed->second.find(targetPackage) != allowed->second.end()) {
                 continue;
             }
-            findings.push_back({source + " -> " + target,
-                "package-dependency-" + sourcePackage,
-                FormatTemplate(packageDependencyMessage_,
-                    {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"target_package", targetPackage},
-                        {"allowed_dependencies",
-                            FormatAllowedPackageDependencies(
-                                sourcePackage, allowed->second, universalPackageDependencies_)},
-                    })});
+            findings.push_back(
+                {source + " -> " + target,
+                 "package-dependency-" + sourcePackage,
+                 FormatTemplate(
+                     packageDependencyMessage_,
+                     {
+                         {"source", source},
+                         {"target", target},
+                         {"source_package", sourcePackage},
+                         {"target_package", targetPackage},
+                         {"allowed_dependencies",
+                          FormatAllowedPackageDependencies(
+                              sourcePackage, allowed->second, universalPackageDependencies_)},
+                     })});
         }
         return findings;
     }
@@ -1038,15 +1049,17 @@ private:
                 }
                 allowedPackages += package;
             }
-            findings.push_back({source + " -> " + target,
-                external->second.violationKind,
-                FormatTemplate(external->second.violationMessage,
-                    {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"allowed_packages", allowedPackages},
-                    })});
+            findings.push_back(
+                {source + " -> " + target,
+                 external->second.violationKind,
+                 FormatTemplate(
+                     external->second.violationMessage,
+                     {
+                         {"source", source},
+                         {"target", target},
+                         {"source_package", sourcePackage},
+                         {"allowed_packages", allowedPackages},
+                     })});
         }
         return findings;
     }
@@ -1171,8 +1184,9 @@ private:
             }
             const auto summary = summaries.find(package);
             const int totalLoc = summary == summaries.end() ? 0 : summary->second.TotalLoc();
-            lines.push_back("  " + std::to_string(index + 1) + ". " + FormatCount(totalLoc) + " LOC: " + package +
-                            " -> " + dependencies);
+            lines.push_back(
+                "  " + std::to_string(index + 1) + ". " + FormatCount(totalLoc) + " LOC: " + package + " -> " +
+                dependencies);
         }
         return lines;
     }
@@ -1219,7 +1233,7 @@ bool LineCouldMatchRule(const LineRule& rule, const std::string& line) {
     }
     if (Contains(rule.patternText, "condition_variable")) {
         return Contains(line, "condition_variable") || Contains(line, "jthread") || Contains(line, "mutex") ||
-               Contains(line, "shared_mutex") || Contains(line, "thread") || Contains(line, "timed_mutex");
+            Contains(line, "shared_mutex") || Contains(line, "thread") || Contains(line, "timed_mutex");
     }
     if (Contains(rule.patternText, "#\\s*(?:if")) {
         return StartsWith(Trim(line), "#");
@@ -1270,9 +1284,10 @@ public:
                                 continue;
                             }
                         }
-                        violations_.push_back({record.relative + ":" + std::to_string(index + 1),
-                            rule.kind,
-                            FormatRuleMessage(rule.message, match)});
+                        violations_.push_back(
+                            {record.relative + ":" + std::to_string(index + 1),
+                             rule.kind,
+                             FormatRuleMessage(rule.message, match)});
                         if (rule.captureGroup < 0) {
                             break;
                         }
@@ -1285,9 +1300,10 @@ public:
         }
 
         for (int line : FindUndocumentedWideLiteralLines(record.text)) {
-            violations_.push_back({record.relative + ":" + std::to_string(line),
-                "source-policy",
-                FormatRuleMessage(wideLiteralMessage_, {})});
+            violations_.push_back(
+                {record.relative + ":" + std::to_string(line),
+                 "source-policy",
+                 FormatRuleMessage(wideLiteralMessage_, {})});
         }
     }
 
