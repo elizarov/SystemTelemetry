@@ -247,6 +247,9 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             info.deviceId = desc.DeviceId;
             info.subSysId = desc.SubSysId;
             info.revision = desc.Revision;
+            info.hasAdapterLuid = true;
+            info.adapterLuidHighPart = static_cast<std::uint32_t>(desc.AdapterLuid.HighPart);
+            info.adapterLuidLowPart = static_cast<std::uint32_t>(desc.AdapterLuid.LowPart);
             PopulateAdapterPciAddress(info, desc.AdapterLuid);
             const GpuVendor vendor = SelectGpuVendor(info);
             const std::optional<size_t> duplicateIndex = FindDuplicateGpuAdapterIndex(adapters, info);
@@ -284,12 +287,15 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             trace.WriteFmt(TracePrefix::GpuVendor,
                 RES_STR(
                     "adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
-                    "pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
+                    "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
+                    "name=\"%s\""),
                 adapterIndex,
                 desc.VendorId,
                 desc.DeviceId,
                 desc.SubSysId,
                 desc.Revision,
+                static_cast<unsigned int>(info.adapterLuidHighPart),
+                static_cast<unsigned int>(info.adapterLuidLowPart),
                 info.pciDomain,
                 info.pciBus,
                 info.pciDevice,
@@ -344,12 +350,14 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
         const GpuVendor vendor = SelectGpuVendor(*selection.selectedAdapter);
         trace.WriteFmt(TracePrefix::GpuVendor,
             RES_STR("adapter_selected index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
-                    "pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""),
+                    "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""),
             selection.selectedAdapter->adapterIndex,
             selection.selectedAdapter->vendorId,
             selection.selectedAdapter->deviceId,
             selection.selectedAdapter->subSysId,
             selection.selectedAdapter->revision,
+            static_cast<unsigned int>(selection.selectedAdapter->adapterLuidHighPart),
+            static_cast<unsigned int>(selection.selectedAdapter->adapterLuidLowPart),
             selection.selectedAdapter->pciDomain,
             selection.selectedAdapter->pciBus,
             selection.selectedAdapter->pciDevice,

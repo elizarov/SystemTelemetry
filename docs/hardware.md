@@ -42,7 +42,7 @@ Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics command
 ## Adding Hardware Support
 
 - Provider selection stays split into three steps: extract adapter identity, map vendor information to the vendor enum, and create the matching provider with the full adapter identity.
-- GPU extraction reads the selected unique non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, PCI bus address when Windows reports a usable address, adapter index, dedicated-memory size, raw adapter name, and derived selection name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and raw adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
+- GPU extraction reads the selected unique non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, DXGI adapter LUID, PCI bus address when Windows reports a usable address, adapter index, dedicated-memory size, raw adapter name, and derived selection name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and raw adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
 - Board extraction reads baseboard registry strings into `BoardVendorInfo`, including manufacturer and product.
 - Vendor mapping lives in `src/telemetry/gpu/gpu_vendor_selection.*` and `src/telemetry/board/board_vendor_selection.*`; provider factories instantiate modules only after that mapping returns a supported enum value.
 - Each added GPU or board hardware module extends `tests/hardware_vendor_selection_tests.cpp` with a known-machine fixture from hardware that has actually run CaseDash. Record the GPU vendor id and adapter string for GPU support, the board manufacturer and product strings for board support, and the expected vendor enum values.
@@ -89,7 +89,7 @@ Troubleshooting:
 
 - Supported hardware family: NVIDIA GPU telemetry.
 - Runtime dependency: NVIDIA display driver with NVML available.
-- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses the Windows GPU Engine counters because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI when the dGPU is powered; when NVAPI reports `GPU not powered`, the clock value is unavailable for that sample instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
+- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses Windows GPU Engine counters filtered to the selected DXGI adapter LUID because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI when the dGPU is powered; when NVAPI reports `GPU not powered`, the clock value is unavailable for that sample instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because NVML has no native game-FPS metric.
 - Trace output can include `nvidia_nvml:*` provider details, including NVAPI clock-selection markers, and `unsupported_gpu` fallback markers.
 
