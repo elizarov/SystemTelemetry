@@ -707,6 +707,8 @@ void DashboardApp::StopNativeTitlebarHoverTimer() {
         KillTimer(hwnd_, kTitlebarHoverTimerId);
     }
     nativeTitlebarHoverTimerActive_ = false;
+    nativeTitlebarHidePending_ = false;
+    nativeTitlebarHideDeadlineMs_ = 0;
 }
 
 bool DashboardApp::CreateNativeTitlebarProbe() {
@@ -743,6 +745,8 @@ void DashboardApp::DestroyNativeTitlebarProbe() {
         titlebarHoverProbeHwnd_ = nullptr;
     }
     nativeTitlebarHoverInside_ = false;
+    nativeTitlebarHidePending_ = false;
+    nativeTitlebarHideDeadlineMs_ = 0;
     nativeTitlebarProbeVisible_ = false;
     nativeTitlebarProbeRectValid_ = false;
 }
@@ -902,6 +906,8 @@ void DashboardApp::ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry)
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardVisibleTitlebarStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = true;
+    nativeTitlebarHidePending_ = false;
+    nativeTitlebarHideDeadlineMs_ = 0;
     RefreshNativeTitlebarChrome();
     if (nativeTitlebarProbeVisible_) {
         ShowWindow(titlebarHoverProbeHwnd_, SW_HIDE);
@@ -933,6 +939,8 @@ void DashboardApp::HideNativeTitlebar() {
         (currentStyle & ~static_cast<LONG_PTR>(kDashboardTitlebarStyleMask)) | kDashboardHiddenWindowStyle;
     SetWindowLongPtrA(hwnd_, GWL_STYLE, nextStyle);
     nativeTitlebarVisible_ = false;
+    nativeTitlebarHidePending_ = false;
+    nativeTitlebarHideDeadlineMs_ = 0;
     RefreshNativeTitlebarChrome();
     HideTitlebarTooltip();
     ShowNativeTitlebarControls(false);
@@ -1630,6 +1638,8 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     if (cursorInsideHoverArea) {
         const bool enteredHoverArea = !nativeTitlebarHoverInside_;
         nativeTitlebarHoverInside_ = true;
+        nativeTitlebarHidePending_ = false;
+        nativeTitlebarHideDeadlineMs_ = 0;
 
         // The probe window and child controls are expensive visual state; keep them stable while the pointer stays
         // inside the combined dashboard/titlebar area.
@@ -1658,6 +1668,16 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
 
     if (nativeTitlebarHoverInside_ || nativeTitlebarVisible_) {
         nativeTitlebarHoverInside_ = false;
+        HideTitlebarTooltip("titlebar_hide_pending");
+        ResetNativeTitlebarButtonState();
+        if (!nativeTitlebarHidePending_) {
+            nativeTitlebarHidePending_ = true;
+            nativeTitlebarHideDeadlineMs_ = GetTickCount64() + kTitlebarHideDelayMs;
+        }
+        if (GetTickCount64() < nativeTitlebarHideDeadlineMs_) {
+            StartNativeTitlebarHoverTimer();
+            return;
+        }
         HideNativeTitlebar();
     }
     StopNativeTitlebarHoverTimer();

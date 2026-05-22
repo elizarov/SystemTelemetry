@@ -266,6 +266,8 @@ private:
     int nativeTitlebarProbeRegionHeight_ = 0;
     bool nativeTitlebarHoverInside_ = false;
     bool nativeTitlebarHoverTimerActive_ = false;
+    bool nativeTitlebarHidePending_ = false;
+    ULONGLONG nativeTitlebarHideDeadlineMs_ = 0;
     bool nativeTitlebarControlsVisible_ = false;
     bool nativeTitlebarComboDropdownOpen_ = false;
     HWND nativeTitlebarOpenComboHwnd_ = nullptr;

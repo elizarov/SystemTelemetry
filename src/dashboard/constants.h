@@ -12,6 +12,7 @@ inline constexpr UINT kPlacementTimerMs = 2000;
 inline constexpr UINT kAnimationFrameTimerMs = 16;
 inline constexpr UINT kBringToFrontRetryTimerMs = 250;
 inline constexpr UINT kTitlebarHoverTimerMs = 80;
+inline constexpr UINT kTitlebarHideDelayMs = 500;
 inline constexpr UINT kTrayMessage = WM_APP + 1;
 inline constexpr UINT kTelemetryUpdateMessage = WM_APP + 2;
 inline constexpr UINT kCommandMove = 1001;
