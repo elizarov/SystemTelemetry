@@ -34,7 +34,8 @@ class LayoutEditWidgetIdentity {};
 
 namespace std_fixture {
 
-template <typename T> class vector {};
+template <typename T>
+class vector {};
 
 class string {};
 
@@ -124,6 +125,16 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
 
 struct ColorConfig {};
+
+template <typename UpdateKeyFn>
+void SaveBoardSectionDifferences(
+    const BoardConfig& board,
+    const BoardConfig* compareBoard,
+    const std::string& sectionName,
+    UpdateKeyFn& updateKey
+) {
+    updateKey(board, compareBoard, sectionName);
+}
 
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);

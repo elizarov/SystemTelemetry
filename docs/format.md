@@ -276,7 +276,7 @@ int value =
 
 ## Declaration And Control Headers
 
-Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
+Template prefixes are always emitted on their own line before the declaration they introduce. Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
 
 ```cpp
 void func(int x) {
@@ -294,6 +294,16 @@ void declaredLong(
     longTypeA veryLongA,
     longTypeB veryLongB
 );
+
+template <typename UpdateKeyFn>
+void SaveBoardSectionDifferences(
+    const BoardConfig& board,
+    const BoardConfig* compareBoard,
+    const std::string& sectionName,
+    UpdateKeyFn& updateKey
+) {
+    updateKey(board, compareBoard, sectionName);
+}
 ```
 
 Constructor initializer lists follow the same compact-or-fully-split rule. A short constructor initializer list stays with the declaration. A long constructor initializer list keeps `) :` on the header line, then emits each initializer on its own structural line indented one level deeper. For a non-empty body, the opening body brace is emitted on its own line after the initializer list. Empty bodies keep `{}` compact.

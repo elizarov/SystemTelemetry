@@ -1283,6 +1283,9 @@ private:
             }
             return {};
         }
+        if (IsTemplateDeclarationPrefix(tokens)) {
+            return FormatTemplateDeclaration(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
         std::string inlineText = prefix + FormatInline(tokens);
         AppendSuffix(inlineText, suffix);
         if (!ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
@@ -1337,6 +1340,42 @@ private:
             return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
         }
         return {Indent(indentLevel) + inlineText};
+    }
+
+    bool IsTemplateDeclarationPrefix(const std::vector<Token>& tokens) const {
+        if (tokens.empty() || tokens.front().text != "template") {
+            return false;
+        }
+        const size_t open = NextSignificantIndex(tokens, 1);
+        return open < tokens.size() && tokens[open].text == "<" && IsTemplateAngleOpen(tokens, open);
+    }
+
+    std::vector<std::string> FormatTemplateDeclaration(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        const size_t open = NextSignificantIndex(tokens, 1);
+        const std::optional<size_t> close = FindTemplateAngleClose(tokens, open);
+        if (!close) {
+            std::string inlineText = prefix + FormatInline(tokens);
+            AppendSuffix(inlineText, suffix);
+            return {Indent(indentLevel) + inlineText};
+        }
+        std::vector<Token> templatePrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1));
+        std::vector<Token> declaration(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + prefix + FormatInline(templatePrefix));
+        if (declaration.empty()) {
+            if (!suffix.empty()) {
+                AppendSuffix(lines.back(), suffix);
+            }
+            return lines;
+        }
+        std::vector<std::string> declarationLines = FormatRange(declaration, indentLevel, {}, std::move(suffix));
+        lines.insert(lines.end(), declarationLines.begin(), declarationLines.end());
+        return lines;
     }
 
     bool CanKeepCallRhsCompactOnContinuation(
