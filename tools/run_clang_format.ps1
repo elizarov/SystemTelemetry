@@ -316,38 +316,48 @@ function Format-ProjectText {
         --$contentLineCount
     }
 
-    $formattedLines = [System.Collections.Generic.List[string]]::new()
-    $pendingTernaryValueIndent = $null
+    $mergedLines = [System.Collections.Generic.List[string]]::new()
     for ($i = 0; $i -lt $contentLineCount; ++$i) {
         $line = $lines[$i]
         $line = [regex]::Replace($line, '(\S) {2,}\?', '$1 ?')
         $line = Normalize-LeadingIndent -Line $line
-        $ternaryMatch = [regex]::Match($line, '^(\s*)(.+?)\s+\?\s+(.+?)\s+:\s*$')
-        if ($ternaryMatch.Success -and -not $line.TrimStart().StartsWith('//')) {
-            $indent = $ternaryMatch.Groups[1].Value
-            $condition = $ternaryMatch.Groups[2].Value.TrimEnd()
-            $value = $ternaryMatch.Groups[3].Value.Trim()
-            $valueIndentLength = $indent.Length + 4
-            if ($null -ne $pendingTernaryValueIndent -and $indent.Length -eq $pendingTernaryValueIndent) {
-                $valueIndentLength = $indent.Length
+
+        if ($line.TrimEnd().EndsWith('?') -and -not $line.TrimStart().StartsWith('//') -and ($i + 1) -lt $contentLineCount) {
+            $nextLine = [regex]::Replace($lines[$i + 1], '(\S) {2,}\?', '$1 ?')
+            $nextLine = Normalize-LeadingIndent -Line $nextLine
+            if ($nextLine.TrimEnd().EndsWith(':') -and -not $nextLine.TrimStart().StartsWith('//')) {
+                $joinedLine = $line.TrimEnd() + ' ' + $nextLine.Trim()
+                if ($joinedLine.Length -le 120) {
+                    $mergedLines.Add($joinedLine)
+                    ++$i
+                    continue
+                }
             }
-            $formattedLines.Add($indent + $condition + ' ?')
-            $formattedLines.Add((' ' * $valueIndentLength) + $value + ' :')
-            $pendingTernaryValueIndent = $valueIndentLength
-            continue
         }
 
-        if ($null -ne $pendingTernaryValueIndent -and $line.Trim().Length -gt 0) {
+        $mergedLines.Add($line)
+    }
+
+    $formattedLines = [System.Collections.Generic.List[string]]::new()
+    $activeTernaryContinuationIndent = $null
+    foreach ($line in $mergedLines) {
+        if ($null -ne $activeTernaryContinuationIndent -and $line.Trim().Length -gt 0) {
             $leadingSpaceCount = Get-LeadingSpaceCount -Line $line
-            if ($leadingSpaceCount -gt $pendingTernaryValueIndent) {
-                $line = (' ' * $pendingTernaryValueIndent) + $line.TrimStart()
+            if ($leadingSpaceCount -lt $activeTernaryContinuationIndent) {
+                $activeTernaryContinuationIndent = $null
+            } elseif ($leadingSpaceCount -gt $activeTernaryContinuationIndent) {
+                $line = (' ' * $activeTernaryContinuationIndent) + $line.TrimStart()
             }
-            $pendingTernaryValueIndent = $null
         }
 
         $formattedLines.Add($line)
         if ($line.TrimEnd().EndsWith(':') -and $line.Contains('?')) {
-            $pendingTernaryValueIndent = Get-LeadingSpaceCount -Line $line
+            if ($null -eq $activeTernaryContinuationIndent) {
+                $activeTernaryContinuationIndent = Get-LeadingSpaceCount -Line $line
+                $activeTernaryContinuationIndent += 4
+            }
+        } elseif ($null -ne $activeTernaryContinuationIndent -and $line.Trim().Length -gt 0) {
+            $activeTernaryContinuationIndent = $null
         }
     }
 
