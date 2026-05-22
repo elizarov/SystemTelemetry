@@ -306,6 +306,18 @@ constexpr FormatTableRow kFormatRows[] = {
     {"gamma.metric.row", 500, 600, kSecondaryFlag}
 };
 
+constexpr FormatTableRow kInitializerChainRows[] = {
+    {
+        "chain.metric.row.with.extra.detail",
+        100,
+        200,
+        firstInitializerFlagWithVeryLongName |
+            secondInitializerFlagWithVeryLongName |
+            thirdInitializerFlagWithVeryLongName |
+            fourthInitializerFlagWithVeryLongName
+    }
+};
+
 int kAlignedAssignment = 1;
 int kMuchLongerAlignedAssignment = 2;
 int kTrailingComment = 1;  // short
@@ -372,6 +384,22 @@ bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_vi
         return true;
     }
     return false;
+}
+
+void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
+    TraceLayoutEditUiEventFmt(
+        TracePrefix::LayoutEditUi,
+        "wm_capturechanged",
+        "new_owner=\"%s\" handled=\"%s\"",
+        reinterpret_cast<HWND>(lParam) == nullptr ? "none" :
+            (reinterpret_cast<HWND>(lParam) == hwnd ? "dashboard" : "other"),
+        firstValueWithLongName +
+            secondValueWithLongName +
+            thirdValueWithLongName +
+            fourthValueWithLongName +
+            fifthValueWithLongName,
+        handled ? "true" : "false"
+    );
 }
 
 int ManyParameters(

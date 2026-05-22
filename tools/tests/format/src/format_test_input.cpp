@@ -207,6 +207,7 @@ constexpr int kTertiaryFlag=4;
 constexpr std::string_view kRuntimePlaceholderMetricId="nothing";
 const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{std::string(kRuntimePlaceholderMetricId),MetricDisplayStyle::Scalar,false,1.0,"","Nothing",};
 constexpr FormatTableRow kFormatRows[]={{"alpha.metric.row.with.extra.detail.and.column.limit.coverage",100,200,kPrimaryFlag | kSecondaryFlag | kTertiaryFlag},{"beta.metric.row.with.extra.detail",300,400,kPrimaryFlag | kTertiaryFlag},{"gamma.metric.row",500,600,kSecondaryFlag}};
+constexpr FormatTableRow kInitializerChainRows[]={{"chain.metric.row.with.extra.detail",100,200,firstInitializerFlagWithVeryLongName | secondInitializerFlagWithVeryLongName | thirdInitializerFlagWithVeryLongName | fourthInitializerFlagWithVeryLongName}};
 
 int kAlignedAssignment=1;
 int kMuchLongerAlignedAssignment=2;
@@ -246,6 +247,10 @@ return sectionStart;
 bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field,std::string_view name){
 if(field.kind==RuntimeConfigFieldValueKind::HexColor && std::string_view(field.key,field.keyLength)==name && field.keyLength>0){return true;}
 return false;
+}
+
+void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
+TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }
 
 int ManyParameters(int * firstPointerWithLongName,int & firstReferenceWithLongName,int secondValueWithLongName,int thirdValueWithLongName,int fourthValueWithLongName,int fifthValueWithLongName,int sixthValueWithLongName){
