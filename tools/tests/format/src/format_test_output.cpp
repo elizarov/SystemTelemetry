@@ -439,6 +439,17 @@ bool ConfigureDisplayGuard(
     return false;
 }
 
+void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState) {
+    WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
+        .push_back(
+            DashboardPresentationAnimation{
+                std::move(animation),
+                std::move(targetState),
+                currentWidgetAnimationTranslation_
+            }
+        );
+}
+
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
     TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditUi,

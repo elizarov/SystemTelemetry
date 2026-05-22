@@ -1409,6 +1409,9 @@ private:
         if (CanSplitOperatorChain(tokens)) {
             return FormatOperatorChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains);
         }
+        if (std::optional<size_t> memberAccess = FindTopLevelMemberAccess(tokens)) {
+            return FormatMemberAccessChain(tokens, *memberAccess, indentLevel, std::move(prefix), std::move(suffix));
+        }
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(tokens)) {
             return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
         }
@@ -1712,6 +1715,28 @@ private:
         std::string closeLine = FormatInline(suffixTokens);
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::vector<std::string> FormatMemberAccessChain(
+        const std::vector<Token>& tokens,
+        size_t memberAccess,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<Token> receiver(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(memberAccess));
+        std::vector<Token> member(tokens.begin() + static_cast<std::ptrdiff_t>(memberAccess), tokens.end());
+        std::vector<std::string> lines;
+        std::string receiverLine = prefix + FormatInline(receiver);
+        if (Fits(indentLevel, receiverLine)) {
+            lines.push_back(Indent(indentLevel) + receiverLine);
+        } else {
+            std::vector<std::string> receiverLines = FormatRange(receiver, indentLevel, std::move(prefix), {});
+            lines.insert(lines.end(), receiverLines.begin(), receiverLines.end());
+        }
+        std::vector<std::string> memberLines = FormatRange(member, indentLevel + 1, {}, std::move(suffix));
+        lines.insert(lines.end(), memberLines.begin(), memberLines.end());
         return lines;
     }
 
@@ -2354,6 +2379,38 @@ private:
             UpdateDepth(token, depth);
         }
         return std::nullopt;
+    }
+
+    std::optional<size_t> FindTopLevelMemberAccess(const std::vector<Token>& tokens) const {
+        int depth = 0;
+        for (size_t index = 1; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            if (depth == 0 && IsMemberAccessOperator(token.text) && IsMemberAccessSplitPoint(tokens, index)) {
+                return index;
+            }
+            UpdateDepth(token, depth);
+        }
+        return std::nullopt;
+    }
+
+    bool IsMemberAccessSplitPoint(const std::vector<Token>& tokens, size_t index) const {
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
+        const size_t next = NextSignificantIndex(tokens, index + 1);
+        return previous &&
+            next < tokens.size() &&
+            tokens[next].kind == TokenKind::Word &&
+            HasTopLevelGroupBefore(tokens, index);
+    }
+
+    bool HasTopLevelGroupBefore(const std::vector<Token>& tokens, size_t before) const {
+        int depth = 0;
+        for (size_t index = 0; index < before; ++index) {
+            if (depth == 0 && IsGroupOpen(tokens[index].text)) {
+                return true;
+            }
+            UpdateDepth(tokens[index], depth);
+        }
+        return false;
     }
 
     std::optional<GroupPair> FindFirstGroupPair(const std::vector<Token>& tokens) const {
@@ -3238,6 +3295,10 @@ private:
             ":"
         };
         return std::find(std::begin(kOperators), std::end(kOperators), text) != std::end(kOperators);
+    }
+
+    static bool IsMemberAccessOperator(std::string_view text) {
+        return text == "." || text == "->" || text == ".*" || text == "->*";
     }
 
     std::vector<std::string> outputLines_;

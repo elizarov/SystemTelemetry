@@ -279,6 +279,10 @@ if(!::ConfigureDisplay(updatedConfig,state.telemetryUpdate.dump,option.fittedSca
 return false;
 }
 
+void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState){
+WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
+}
+
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }

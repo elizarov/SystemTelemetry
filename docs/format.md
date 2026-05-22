@@ -209,6 +209,7 @@ The formatter decides wrapping in this order:
 - If the compact form overflows, split the outermost wrappable group that owns the overflowing line.
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
 - When a child expression inside any split comma list must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, and similar list elements.
+- Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression.
 - Never split a group partially. A comma list, operator chain, declaration parameter list, or control header is either fully compact or fully split.
 - Never choose an empty delimiter pair as a wrapping target. Empty calls, empty braced values, and empty template argument lists stay compact, and the formatter breaks the nearest non-empty owning structure instead.
 - Never split inside a function-pointer declarator group such as `(*)`. If the full function-pointer type does not fit, split the following parameter list instead.
