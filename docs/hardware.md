@@ -26,9 +26,9 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - On hybrid laptops, the integrated adapter can be the first DXGI adapter even when a discrete GPU is also installed; selecting a different adapter in the dashboard devices menu recreates the matching vendor provider for that adapter.
 - The displayed GPU product name uses the selected DXGI adapter description when available; provider diagnostics can still include lower-level runtime device names.
 - Vendor GPU providers match their runtime device handle to the selected DXGI adapter by PCI identity when the driver API exposes enough detail, then fall back to provider name matching.
-- Board telemetry selects the supported hardware provider from the baseboard manufacturer.
+- Board telemetry selects the supported hardware provider from the baseboard manufacturer only when the runtime layout requests at least one board-backed temperature or fan metric.
 - Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
-- Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
+- Layout metric references are the source of truth for requested logical board metrics. Runtime layouts that omit board-backed metric ids do not instantiate a board provider. The `[board]` mapping connects logical names to provider-specific sensor names.
 - Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; the system binding also accepts motherboard or board sensor names. Otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric. The CPU board temperature binding is requested by `gpu.temp` as the Intel fallback source.
 - The CaseDash service IPC exposes `presented_fps_sample` for FPS and `board_sensors_sample` for board providers that need LocalSystem access to hardware interfaces.
 

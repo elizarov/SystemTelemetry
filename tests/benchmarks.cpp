@@ -25,6 +25,7 @@
 #include "layout_edit_dialog/theme_preview.h"
 #include "layout_guide_sheet/layout_guide_sheet.h"
 #include "layout_model/layout_edit_service.h"
+#include "telemetry/board/lenovo/board_lenovo_vantage.h"
 #include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
@@ -38,6 +39,7 @@
     X(EditLayout, "edit-layout")                                                                                       \
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
+    X(LenovoGameZone, "lenovo-gamezone")                                                                               \
     X(MouseHover, "mouse-hover")                                                                                       \
     X(SnapshotHandoff, "snapshot-handoff")                                                                             \
     X(TelemetryInit, "telemetry-init")                                                                                 \
@@ -202,7 +204,9 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     }
 
     BenchmarkCommandLine commandLine{*parsedBenchmark};
-    if (commandLine.benchmark == Benchmark::TelemetryInit) {
+    if (commandLine.benchmark == Benchmark::LenovoGameZone) {
+        commandLine.iterations = 5;
+    } else if (commandLine.benchmark == Benchmark::TelemetryInit) {
         commandLine.iterations = 2;
     }
     int nextArgument = 2;
@@ -696,6 +700,12 @@ struct TelemetryInitBenchTotals {
     size_t lastNetworkAdapterCandidates = 0;
     size_t lastStorageDriveCandidates = 0;
     bool succeeded = true;
+};
+
+struct LenovoGameZoneBenchTotals {
+    BenchResult loop;
+    PhaseStats sample;
+    BoardVendorTelemetrySample lastSample;
 };
 
 class AnimationBenchmarkRenderWorker {
@@ -1207,6 +1217,48 @@ void PrintTelemetryInitBenchResult(const TelemetryInitBenchTotals& totals) {
     PrintPhaseResult("collector_destroy", totals.collectorDestroy);
 }
 
+LenovoGameZoneBenchTotals RunLenovoGameZoneBenchmark(size_t iterations, Trace& trace) {
+    LenovoGameZoneBenchTotals totals{};
+    if (iterations == 0) {
+        return totals;
+    }
+
+    const BoardVendorInfo info = ExtractBoardVendorInfo();
+    const auto start = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const auto sampleStart = Clock::now();
+        totals.lastSample = CaptureLenovoGameZoneWmiSensorSample(trace, info);
+        RecordPhase(totals.sample, Clock::now() - sampleStart);
+    }
+    totals.loop.total = Clock::now() - start;
+    totals.loop.perIteration = totals.loop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+void PrintNamedScalarMetrics(const char* label, const std::vector<NamedScalarMetric>& metrics) {
+    std::cout << std::left << std::setw(18) << label << " count=" << metrics.size() << "\n";
+    for (const NamedScalarMetric& metric : metrics) {
+        std::cout << std::left << std::setw(18) << label << " name=\"" << metric.name << "\" value=";
+        if (metric.metric.value.has_value()) {
+            std::cout << std::fixed << std::setprecision(2) << *metric.metric.value;
+        } else {
+            std::cout << "N/A";
+        }
+        std::cout << " unit=\"" << EnumToString(metric.metric.unit) << "\"\n";
+    }
+}
+
+void PrintLenovoGameZoneBenchResult(const LenovoGameZoneBenchTotals& totals) {
+    PrintBenchLoopResult("gamezone_loop", totals.loop);
+    PrintPhaseResult("gamezone_sample", totals.sample);
+    const BoardVendorTelemetrySample& sample = totals.lastSample;
+    std::cout << std::left << std::setw(18) << "gamezone_result" << " available=" << (sample.available ? "yes" : "no")
+              << " provider=\"" << sample.providerName << "\" driver=\"" << sample.driverLibrary << "\" diagnostics=\""
+              << sample.diagnostics << "\"\n";
+    PrintNamedScalarMetrics("temperature", sample.temperatures);
+    PrintNamedScalarMetrics("fan", sample.fans);
+}
+
 LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
     DashboardRenderer& renderer, const SystemSnapshot& snapshot, size_t iterations) {
     LayoutGuideSheetBenchTotals totals{};
@@ -1543,6 +1595,14 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
     return 0;
 }
 
+int RunLenovoGameZoneBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    std::cout << "lenovo_gamezone_benchmark iterations=" << iterations << " render_scale_ignored=" << renderScale
+              << "\n";
+    const LenovoGameZoneBenchTotals totals = RunLenovoGameZoneBenchmark(iterations, trace);
+    PrintLenovoGameZoneBenchResult(totals);
+    return 0;
+}
+
 int RunUpdateTelemetryBenchmarkCommand(
     size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
     const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
@@ -1612,6 +1672,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunLayoutGuideSheetBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LayoutSwitch:
             return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::LenovoGameZone:
+            return RunLenovoGameZoneBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::MouseHover:
             return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::SnapshotHandoff:

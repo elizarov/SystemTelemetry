@@ -45,6 +45,8 @@ constexpr wchar_t kWmiDataProperty[] = L"Data";                      // WMI prop
 constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";             // WMI method names are UTF-16 BSTRs.
 constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";           // WMI method names are UTF-16 BSTRs.
 constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";           // WMI method names are UTF-16 BSTRs.
+constexpr wchar_t kGetCpuTempMethod[] = L"GetCPUTemp";               // WMI method names are UTF-16 BSTRs.
+constexpr wchar_t kGetGpuTempMethod[] = L"GetGPUTemp";               // WMI method names are UTF-16 BSTRs.
 
 struct LenovoHardwareScanSnapshot {
     bool success = false;
@@ -178,6 +180,10 @@ std::string FormatHresult(HRESULT value) {
 
 bool IsSaneRpm(double value) {
     return value > 0.0 && value < 30000.0;
+}
+
+bool IsSaneCelsius(double value) {
+    return value > 0.0 && value <= 125.0;
 }
 
 bool HasAvailableFanReading(const LenovoHardwareScanSnapshot& snapshot) {
@@ -363,6 +369,17 @@ void AddLenovoGameZoneFanReading(
     }
 }
 
+std::string FormatOptionalUInt32(std::optional<std::uint32_t> value) {
+    return value.has_value() ? FormatText("%lu", static_cast<unsigned long>(*value)) : std::string("N/A");
+}
+
+void AddLenovoGameZoneTemperatureReading(
+    std::vector<BoardSensorReading>& temperatures, const char* title, std::optional<std::uint32_t> celsius) {
+    if (celsius.has_value() && IsSaneCelsius(static_cast<double>(*celsius))) {
+        temperatures.push_back(BoardSensorReading{title, static_cast<double>(*celsius)});
+    }
+}
+
 void AddLenovoGameZoneFanReadings(std::vector<BoardSensorReading>& fans,
     std::optional<std::uint32_t> fanCount,
     std::optional<std::uint32_t> fan1,
@@ -385,7 +402,7 @@ void AddLenovoGameZoneFanReadings(std::vector<BoardSensorReading>& fans,
     AddLenovoGameZoneFanReading(fans, "GPU Fan", fan2);
 }
 
-LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
+LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool includeTemperatures, bool includeFans) {
     LenovoHardwareScanSnapshot snapshot;
     const ComApartment com;
     if (!com.Ready()) {
@@ -482,6 +499,11 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
     }
 
     int instanceCount = 0;
+    std::optional<std::uint32_t> lastCpuTemperature;
+    std::optional<std::uint32_t> lastGpuTemperature;
+    std::optional<std::uint32_t> lastFanCount;
+    std::optional<std::uint32_t> lastFan1;
+    std::optional<std::uint32_t> lastFan2;
     for (;;) {
         ComObject<IWbemClassObject> instance;
         ULONG returned = 0;
@@ -509,26 +531,56 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
             RES_STR("gamezone_wmi_instance path=\"%s\""),
             TextFromWide(*objectPath).c_str());
 
-        const std::optional<std::uint32_t> fanCount =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFanCountMethod);
-        const std::optional<std::uint32_t> fan1 =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan1SpeedMethod);
-        const std::optional<std::uint32_t> fan2 =
-            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan2SpeedMethod);
-        AddLenovoGameZoneFanReadings(snapshot.fans, fanCount, fan1, fan2);
+        if (includeTemperatures) {
+            const std::optional<std::uint32_t> cpuTemperature =
+                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetCpuTempMethod);
+            const std::optional<std::uint32_t> gpuTemperature =
+                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetGpuTempMethod);
+            lastCpuTemperature = cpuTemperature;
+            lastGpuTemperature = gpuTemperature;
+            AddLenovoGameZoneTemperatureReading(snapshot.temperatures, "CPU Temperature", cpuTemperature);
+            AddLenovoGameZoneTemperatureReading(snapshot.temperatures, "GPU Temperature", gpuTemperature);
+        }
+
+        if (includeFans) {
+            const std::optional<std::uint32_t> fanCount =
+                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFanCountMethod);
+            const std::optional<std::uint32_t> fan1 =
+                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan1SpeedMethod);
+            const std::optional<std::uint32_t> fan2 =
+                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan2SpeedMethod);
+            lastFanCount = fanCount;
+            lastFan1 = fan1;
+            lastFan2 = fan2;
+            AddLenovoGameZoneFanReadings(snapshot.fans, fanCount, fan1, fan2);
+        }
     }
 
     snapshot.success = true;
     snapshot.diagnostics =
-        FormatText(RES_STR("Lenovo GameZone WMI fan query completed. instance_count=%d fan_count=%zu"),
+        FormatText(RES_STR("Lenovo GameZone WMI sensor query completed. instance_count=%d temperature_count=%zu "
+                           "fan_count=%zu cpu_temp_raw=%s gpu_temp_raw=%s fan_count_raw=%s fan1_raw=%s fan2_raw=%s"),
             instanceCount,
-            snapshot.fans.size());
+            snapshot.temperatures.size(),
+            snapshot.fans.size(),
+            FormatOptionalUInt32(lastCpuTemperature).c_str(),
+            FormatOptionalUInt32(lastGpuTemperature).c_str(),
+            FormatOptionalUInt32(lastFanCount).c_str(),
+            FormatOptionalUInt32(lastFan1).c_str(),
+            FormatOptionalUInt32(lastFan2).c_str());
     trace.WriteFmt(TracePrefix::LenovoHardwareScan,
-        RES_STR("gamezone_wmi_done instance_count=%d fan_count=%zu fan_names=\"%s\""),
+        RES_STR("gamezone_wmi_done instance_count=%d temperature_count=%zu fan_count=%zu temperature_names=\"%s\" "
+                "fan_names=\"%s\""),
         instanceCount,
+        snapshot.temperatures.size(),
         snapshot.fans.size(),
+        JoinNames(ExtractBoardSensorNames(snapshot.temperatures)).c_str(),
         JoinNames(ExtractBoardSensorNames(snapshot.fans)).c_str());
     return snapshot;
+}
+
+LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
+    return CaptureLenovoGameZoneWmiSensors(trace, false, true);
 }
 
 void AppendDiagnosticsSuffix(std::string& diagnostics, const char* label, const std::string& suffix) {
@@ -1348,6 +1400,28 @@ private:
 };
 
 }  // namespace
+
+BoardVendorTelemetrySample CaptureLenovoGameZoneWmiSensorSample(Trace& trace, BoardVendorInfo info) {
+    BoardVendorTelemetrySample sample;
+    sample.providerName = kLenovoProviderName;
+    sample.boardManufacturer = info.manufacturer;
+    sample.boardProduct = info.product;
+    sample.driverLibrary = "Lenovo GameZone WMI";
+    if (SelectBoardVendor(info) != BoardVendor::Lenovo) {
+        sample.diagnostics =
+            ResourceStringText(RES_STR("No Lenovo GameZone WMI provider matches the baseboard manufacturer."));
+        return sample;
+    }
+
+    const LenovoHardwareScanSnapshot snapshot = CaptureLenovoGameZoneWmiSensors(trace, true, true);
+    sample.diagnostics = snapshot.diagnostics;
+    sample.availableFanNames = ExtractBoardSensorNames(snapshot.fans);
+    sample.availableTemperatureNames = ExtractBoardSensorNames(snapshot.temperatures);
+    sample.fans = CreateRawMetrics(snapshot.fans, ScalarMetricUnit::Rpm);
+    sample.temperatures = CreateRawMetrics(snapshot.temperatures, ScalarMetricUnit::Celsius);
+    sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
+    return sample;
+}
 
 BoardVendorTelemetrySample CaptureLenovoHardwareScanServiceSample(Trace& trace, BoardVendorInfo info) {
     if (SelectBoardVendor(info) != BoardVendor::Lenovo) {
