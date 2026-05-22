@@ -311,9 +311,28 @@ std::optional<DisplayPlacementTarget> ComputeDisplayPlacementTarget(
         return std::nullopt;
     }
 
-    const int left = monitor.rect.left + ScaleLogicalToPhysical(target.position.x, target.targetScale);
-    const int top = monitor.rect.top + ScaleLogicalToPhysical(target.position.y, target.targetScale);
-    target.targetClientRect = RECT{left, top, left + target.targetSize.cx, top + target.targetSize.cy};
+    switch (mode) {
+        case DisplayPlacementMode::FullScreen:
+        case DisplayPlacementMode::Top:
+        case DisplayPlacementMode::Left: {
+            const int left = monitor.rect.left + ScaleLogicalToPhysical(target.position.x, target.targetScale);
+            const int top = monitor.rect.top + ScaleLogicalToPhysical(target.position.y, target.targetScale);
+            target.targetClientRect = RECT{left, top, left + target.targetSize.cx, top + target.targetSize.cy};
+            break;
+        }
+        case DisplayPlacementMode::Bottom:
+            target.targetClientRect = RECT{monitor.rect.left,
+                monitor.rect.bottom - target.targetSize.cy,
+                monitor.rect.left + target.targetSize.cx,
+                monitor.rect.bottom};
+            break;
+        case DisplayPlacementMode::Right:
+            target.targetClientRect = RECT{monitor.rect.right - target.targetSize.cx,
+                monitor.rect.top,
+                monitor.rect.right,
+                monitor.rect.top + target.targetSize.cy};
+            break;
+    }
     return target;
 }
 

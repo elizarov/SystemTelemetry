@@ -162,6 +162,28 @@ TEST(DisplayMenuOptions, NarrowerLayoutYieldsLeftAndRightOptions) {
     EXPECT_FALSE(options[1].writesWallpaper);
 }
 
+TEST(DisplayMenuOptions, RightAndBottomTargetsAnchorToPhysicalMonitorEdge) {
+    const AppConfig portraitConfig = MakeDisplayConfig(480, 800);
+    const DisplayMenuMonitorInfo landscapeMonitor{"Panel", "Panel", MakeRect(3840, 2160), USER_DEFAULT_SCREEN_DPI};
+    const std::optional<DisplayPlacementTarget> rightTarget =
+        ComputeDisplayPlacementTarget(portraitConfig, landscapeMonitor, DisplayPlacementMode::Right);
+
+    ASSERT_TRUE(rightTarget.has_value());
+    EXPECT_EQ(rightTarget->position, (LogicalPointConfig{942, 0}));
+    EXPECT_EQ(ScaleLogicalToPhysical(rightTarget->position.x, rightTarget->targetScale), 2543);
+    ExpectRect(rightTarget->targetClientRect, 2544, 0, 3840, 2160);
+
+    const AppConfig landscapeConfig = MakeDisplayConfig(800, 480);
+    const DisplayMenuMonitorInfo portraitMonitor{"Panel", "Panel", MakeRect(2160, 3840), USER_DEFAULT_SCREEN_DPI};
+    const std::optional<DisplayPlacementTarget> bottomTarget =
+        ComputeDisplayPlacementTarget(landscapeConfig, portraitMonitor, DisplayPlacementMode::Bottom);
+
+    ASSERT_TRUE(bottomTarget.has_value());
+    EXPECT_EQ(bottomTarget->position, (LogicalPointConfig{0, 942}));
+    EXPECT_EQ(ScaleLogicalToPhysical(bottomTarget->position.y, bottomTarget->targetScale), 2543);
+    ExpectRect(bottomTarget->targetClientRect, 0, 2544, 2160, 3840);
+}
+
 TEST(DisplayMenuCheckmark, FullscreenCommittedConfigRequiresExpectedWallpaper) {
     const TargetMonitorInfo monitor = MakeTargetMonitor(1920, 1080);
     const AppConfig liveConfig = MakeDisplayConfig(1600, 900);

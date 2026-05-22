@@ -593,8 +593,21 @@ void DashboardApp::ApplyConfigPlacement() {
         return;
     }
 
-    const SIZE targetSize = ComputeWindowSizeForScale(config, targetScale);
-    const RECT targetClientRect{left, top, left + targetSize.cx, top + targetSize.cy};
+    const std::optional<DisplayPlacementTarget> configuredPlacementTarget = ResolveConfiguredDisplayPlacementTarget();
+    if (configuredPlacementTarget.has_value()) {
+        // Right and bottom edge placements can lose a pixel if reconstructed from rounded logical coordinates.
+        targetDpi = configuredPlacementTarget->dpi;
+        targetScale = configuredPlacementTarget->targetScale;
+        targetMonitorRect = configuredPlacementTarget->monitorRect;
+        left = configuredPlacementTarget->targetClientRect.left;
+        top = configuredPlacementTarget->targetClientRect.top;
+    }
+
+    const SIZE targetSize = configuredPlacementTarget.has_value() ? configuredPlacementTarget->targetSize
+                                                                  : ComputeWindowSizeForScale(config, targetScale);
+    const RECT targetClientRect = configuredPlacementTarget.has_value()
+                                      ? configuredPlacementTarget->targetClientRect
+                                      : RECT{left, top, left + targetSize.cx, top + targetSize.cy};
     if (nativeTitlebarVisible_) {
         if (!IsRectUsable(targetMonitorRect)) {
             targetMonitorRect = GetMonitorPlacementForRect(targetClientRect, config.display.scale).monitorRect;
@@ -843,7 +856,10 @@ void DashboardApp::UpdateAutohideFromCursor() {
 }
 
 void DashboardApp::SetAutohideTopmost(bool topmost) {
-    if (hwnd_ == nullptr || autohideTopmost_ == topmost) {
+    if (hwnd_ == nullptr) {
+        return;
+    }
+    if (!topmost && !autohideTopmost_) {
         return;
     }
     SetWindowPos(hwnd_, topmost ? HWND_TOPMOST : HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE);
@@ -873,6 +889,7 @@ void DashboardApp::ShowAutohideDrawer(bool forceAnimation) {
     } else if (!IsWindowVisible(hwnd_)) {
         ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     }
+    SetAutohideTopmost(true);
     autohideClosePending_ = false;
     autohideCloseDeadlineMs_ = 0;
     InvalidateRect(hwnd_, nullptr, FALSE);
@@ -2362,6 +2379,53 @@ void DashboardApp::StartResizeModeFromNativeTitlebar(POINT screenPoint, DisplayR
     StartResizeModeAt(clientPoint, corner);
 }
 
+std::optional<DisplayPlacementTarget> DashboardApp::ResolveConfiguredDisplayPlacementTarget() const {
+    const AppConfig& config = controller_.State().config;
+    const std::optional<TargetMonitorInfo> monitor = FindTargetMonitor(config.display.monitorName);
+    if (!monitor.has_value()) {
+        return std::nullopt;
+    }
+
+    const DisplayMenuMonitorInfo monitorInfo{
+        config.display.monitorName, config.display.monitorName, monitor->rect, monitor->dpi};
+    const auto configMatchesTarget = [&config](const DisplayPlacementTarget& target) {
+        return AreScalesEqual(ResolveDisplayScale(config.display.scale, target.dpi), target.targetScale) &&
+               config.display.position == target.position;
+    };
+
+    if (config.display.autohide.empty()) {
+        const std::optional<DisplayPlacementTarget> fullscreenTarget =
+            ComputeDisplayPlacementTarget(config, monitorInfo, DisplayPlacementMode::FullScreen);
+        if (fullscreenTarget.has_value() && configMatchesTarget(*fullscreenTarget)) {
+            return fullscreenTarget;
+        }
+        return std::nullopt;
+    }
+
+    const std::optional<DisplayPlacementMode> autohideMode =
+        DisplayPlacementModeFromAutohideValue(config.display.autohide);
+    if (!autohideMode.has_value() || !IsEdgeDisplayPlacementMode(*autohideMode)) {
+        return std::nullopt;
+    }
+
+    const std::optional<DisplayPlacementTarget> edgeTarget =
+        ComputeDisplayPlacementTarget(config, monitorInfo, *autohideMode);
+    if (edgeTarget.has_value() && configMatchesTarget(*edgeTarget)) {
+        return edgeTarget;
+    }
+    return std::nullopt;
+}
+
+bool DashboardApp::IsDashboardAtConfiguredDisplayPlacement() const {
+    const std::optional<DisplayPlacementTarget> configuredTarget = ResolveConfiguredDisplayPlacementTarget();
+    return configuredTarget.has_value() &&
+           DisplayPlacementTargetMatchesRect(*configuredTarget, DashboardClientScreenRect());
+}
+
+bool DashboardApp::CanUseDashboardResizeHandles() const {
+    return !IsDashboardAtConfiguredDisplayPlacement();
+}
+
 RECT DashboardApp::DashboardResizeHandleRect(DisplayResizeCorner corner) const {
     const int width = WindowWidth();
     const int height = WindowHeight();
@@ -2384,6 +2448,10 @@ RECT DashboardApp::DashboardResizeHandleRect(DisplayResizeCorner corner) const {
 }
 
 std::optional<DisplayResizeCorner> DashboardApp::HitTestDashboardResizeHandle(RenderPoint clientPoint) const {
+    if (!CanUseDashboardResizeHandles()) {
+        return std::nullopt;
+    }
+
     const POINT point{clientPoint.x, clientPoint.y};
     const DisplayResizeCorner corners[] = {DisplayResizeCorner::TopLeft,
         DisplayResizeCorner::TopRight,
@@ -2399,7 +2467,7 @@ std::optional<DisplayResizeCorner> DashboardApp::HitTestDashboardResizeHandle(Re
 }
 
 std::optional<DisplayResizeCorner> DashboardApp::HitTestNativeTitlebarResizeHandle(POINT clientPoint) const {
-    if (titlebarHoverProbeHwnd_ == nullptr) {
+    if (titlebarHoverProbeHwnd_ == nullptr || !CanUseDashboardResizeHandles()) {
         return std::nullopt;
     }
 

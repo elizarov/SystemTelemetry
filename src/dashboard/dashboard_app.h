@@ -212,6 +212,9 @@ private:
         bool keepNativeTitlebarDuringMove);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
     void StartResizeModeFromNativeTitlebar(POINT screenPoint, DisplayResizeCorner corner);
+    std::optional<DisplayPlacementTarget> ResolveConfiguredDisplayPlacementTarget() const;
+    bool IsDashboardAtConfiguredDisplayPlacement() const;
+    bool CanUseDashboardResizeHandles() const;
     RECT DashboardResizeHandleRect(DisplayResizeCorner corner) const;
     std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
     std::optional<DisplayResizeCorner> HitTestNativeTitlebarResizeHandle(POINT clientPoint) const;
