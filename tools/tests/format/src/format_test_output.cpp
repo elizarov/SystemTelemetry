@@ -71,6 +71,12 @@ public:
     ) const = 0;
 };
 
+class DialogRedrawScope {
+public:
+    DialogRedrawScope(const DialogRedrawScope&) = delete;
+    DialogRedrawScope& operator=(const DialogRedrawScope&) = delete;
+};
+
 __declspec(noinline) bool DashboardController::FinishConfigMutation(
     DashboardShellHost& shell,
     bool refreshThemedIcons

@@ -2209,7 +2209,7 @@ private:
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
             const Token& token = tokens[index];
-            if (depth == 0 && IsAssignmentOperator(token.text)) {
+            if (depth == 0 && IsAssignmentOperator(token.text) && !IsOperatorFunctionNameToken(tokens, index)) {
                 return index;
             }
             UpdateDepth(token, depth);
@@ -2556,10 +2556,15 @@ private:
         const bool beforeDeclaratorName = next->kind == TokenKind::Word;
         const bool beforeTemplateClose = next->text == ">" && IsTemplateAngleClose(tokens, nextIndex);
         const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
+        const bool beforeUnnamedDeclaratorEnd = next->text == ")" || next->text == "," || next->text == "=";
         const bool beforeFunctionPointerDeclarator =
             tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
         const bool beforeDeclarator =
-            beforeDeclaratorName || beforeTemplateClose || beforeStructuredBinding || beforeFunctionPointerDeclarator;
+            beforeDeclaratorName ||
+            beforeTemplateClose ||
+            beforeStructuredBinding ||
+            beforeUnnamedDeclaratorEnd ||
+            beforeFunctionPointerDeclarator;
         return beforeDeclarator &&
             IsLikelyTypeBeforePointer(tokens, index) &&
             IsLikelyDeclaratorContextBeforePointer(tokens, index);

@@ -50,6 +50,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Insert one empty line between neighboring declarations of different kinds. Fields, methods, `class` declarations, `struct` declarations, `enum` declarations, namespace declarations, and macro definitions are separate kinds. Consecutive single-line fields and consecutive macro definitions may stay grouped.
 - Separate a multi-line field declaration from neighboring declarations with one empty line, even when the neighbors are also fields.
 - Separate fields from neighboring methods by one empty line, including empty inline method definitions, defaulted or deleted method declarations, pure virtual declarations, and method declarations without bodies. Trailing comments on fields do not change the separation rule.
+- Keep consecutive method declarations in one method group without a structural blank line, including constructors, destructors, conversion functions, and operator overloads ending in `= default`, `= delete`, or `= 0`.
 - Apply declaration-separation blank lines only in declaration scopes: top level, namespaces, classes, structs, and enums. Function, method, and lambda bodies are executable scopes and do not get declaration-separation blank lines.
 - Insert required structural blank lines even when the source omits them. Preserve optional source blank-line separators only where the separator rule allows them.
 - Put block-opening braces for code blocks at the end of the introducing line, then line break immediately after the brace.
@@ -120,7 +121,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Treat `operator` plus a following symbolic operator as one composite function name, with no spaces inside the name or before the parameter list: `operator==(...)`, `operator&(...)`, and `operator[](...)`.
 - Treat destructor `~` plus the following type name as one composite function name, but keep declaration specifiers separated from it: `virtual ~Widget() = default;`.
 - Do not put spaces between unary operators and their operands: `!ready`, `++index`, `value--`, `*ptr`, `&value`, `-value`, and `+value`.
-- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `Type&& value`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
+- Format pointer and reference declarators left-bound to the type: `Type* value`, `const Type& value`, `const Type&`, `Type&& value`, `const auto& [name, value]`, `void* (*callback)(...)`, `bool (*predicate)(...)`, and `reinterpret_cast<ColorConfig*>(address)`.
 - Treat `&&` as a logical binary operator with spaces when it follows an expression, including qualified enum values: `field.kind == ValueKind::HexColor && IsNamedColor(name)`.
 - Do not treat a preceding parenthesized or bracketed expression as a type for pointer or reference spacing. Multiplication and bitwise-and after such expressions keep binary-operator spaces: `(to.l - from.l) * amount` and `values[index] & mask`.
 - Put spaces around ternary `?` and `:`.

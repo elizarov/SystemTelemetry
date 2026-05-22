@@ -52,6 +52,12 @@ virtual~DashboardShellHost()=default;
 virtual std::optional<FilePath> PromptDiagnosticsSavePath(std::string_view defaultFileName,std::string_view filter,std::string_view defaultExtension) const=0;
 };
 
+class DialogRedrawScope{
+public:
+DialogRedrawScope(const DialogRedrawScope &)=delete;
+DialogRedrawScope& operator=(const DialogRedrawScope &)=delete;
+};
+
 __declspec(noinline) bool DashboardController::FinishConfigMutation(DashboardShellHost& shell,bool refreshThemedIcons){
 return refreshThemedIcons;
 }
