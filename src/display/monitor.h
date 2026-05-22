@@ -35,6 +35,13 @@ enum class DisplayPlacementMode {
     Right,
 };
 
+enum class DisplayResizeCorner {
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+};
+
 struct DisplayMenuMonitorInfo {
     std::string displayName;
     std::string configMonitorName;
@@ -83,6 +90,11 @@ struct DisplayWallpaperOwner {
     RECT monitorRect{};
 };
 
+struct DisplayAspectResizeTarget {
+    double targetScale = 1.0;
+    RECT targetClientRect{};
+};
+
 bool RectsEqual(const RECT& lhs, const RECT& rhs);
 UINT GetMonitorDpi(HMONITOR monitor);
 double ResolveDisplayScale(const AppConfig& config, UINT dpi);
@@ -90,6 +102,8 @@ SIZE ComputeWindowSizeForScale(const AppConfig& config, double scale);
 SIZE ComputeWindowSizeForDpi(const AppConfig& config, UINT dpi);
 double ComputeMonitorFittedScale(const AppConfig& config, LONG monitorWidth, LONG monitorHeight);
 double ComputeAspectResizeScale(SIZE layoutLogicalSize, POINT physicalExtent);
+DisplayAspectResizeTarget ComputeAspectResizeDragTarget(
+    SIZE layoutLogicalSize, DisplayResizeCorner corner, POINT anchorScreenPoint, POINT draggedCornerScreenPoint);
 DisplayConfig BuildResizePlacementDisplayConfig(
     const DisplayConfig& display, const MonitorPlacementInfo& placement, double targetScale);
 const char* DisplayPlacementModeAutohideValue(DisplayPlacementMode mode);

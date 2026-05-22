@@ -431,6 +431,37 @@ TEST(DisplayAspectResize, ClampsToSupportedScaleRange) {
     EXPECT_NEAR(ComputeAspectResizeScale(SIZE{1600, 900}, POINT{-100, -100}), 0.1, 0.000001);
 }
 
+TEST(DisplayAspectResize, DragTargetAnchorsOppositeCornerForEveryCorner) {
+    const SIZE layoutSize{1600, 900};
+
+    const struct {
+        DisplayResizeCorner corner;
+        POINT anchor;
+        POINT dragged;
+    } cases[] = {
+        {DisplayResizeCorner::TopLeft, POINT{1700, 1100}, POINT{100, 200}},
+        {DisplayResizeCorner::TopRight, POINT{100, 1100}, POINT{1700, 200}},
+        {DisplayResizeCorner::BottomLeft, POINT{1700, 200}, POINT{100, 1100}},
+        {DisplayResizeCorner::BottomRight, POINT{100, 200}, POINT{1700, 1100}},
+    };
+
+    for (const auto& testCase : cases) {
+        const DisplayAspectResizeTarget target =
+            ComputeAspectResizeDragTarget(layoutSize, testCase.corner, testCase.anchor, testCase.dragged);
+
+        EXPECT_NEAR(target.targetScale, 1.0, 0.000001);
+        ExpectRect(target.targetClientRect, 100, 200, 1700, 1100);
+    }
+}
+
+TEST(DisplayAspectResize, DragTargetClampsWithoutMovingOppositeCorner) {
+    const DisplayAspectResizeTarget target = ComputeAspectResizeDragTarget(
+        SIZE{1600, 900}, DisplayResizeCorner::TopLeft, POINT{1000, 1000}, POINT{1200, 1200});
+
+    EXPECT_NEAR(target.targetScale, 0.1, 0.000001);
+    ExpectRect(target.targetClientRect, 840, 910, 1000, 1000);
+}
+
 TEST(DisplayResizeConfiguration, UpdatesPlacementAndPreservesWallpaper) {
     DisplayConfig display;
     display.monitorName = "Old";

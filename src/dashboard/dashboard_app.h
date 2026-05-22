@@ -104,7 +104,7 @@ private:
         LayoutGuideAxis axis) override;
     void StartMoveMode();
     void StartMoveModeAt(POINT cursorAnchorClientPoint);
-    void StartResizeModeAt(POINT cursorClientPoint);
+    void StartResizeModeAt(POINT cursorClientPoint, DisplayResizeCorner corner);
     void StopMoveMode();
     void UpdateMoveTracking();
     void UpdateResizeTracking();
@@ -211,8 +211,8 @@ private:
         bool placeOnRelease,
         bool keepNativeTitlebarDuringMove);
     void StartMoveModeFromNativeTitlebar(POINT screenPoint);
-    RECT DashboardResizeHandleRect() const;
-    bool IsDashboardResizeHandlePoint(RenderPoint clientPoint) const;
+    RECT DashboardResizeHandleRect(DisplayResizeCorner corner) const;
+    std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -261,7 +261,8 @@ private:
     int layoutEditModalUiDepth_ = 0;
     POINT moveCursorAnchorClientPoint_{};
     POINT resizeAnchorScreenPoint_{};
-    POINT resizeCursorBottomRightOffset_{};
+    POINT resizeDraggedCornerCursorOffset_{};
+    DisplayResizeCorner resizeCorner_ = DisplayResizeCorner::BottomRight;
     PlacementInteractionMode placementInteractionMode_ = PlacementInteractionMode::None;
     bool hasMoveCursorAnchorClientPoint_ = false;
     bool clampMoveCursorAnchorClientPoint_ = true;

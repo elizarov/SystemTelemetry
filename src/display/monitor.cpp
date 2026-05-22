@@ -39,6 +39,14 @@ bool IsRectEmptyOrInvalid(const RECT& rect) {
     return RectWidth(rect) <= 0 || RectHeight(rect) <= 0;
 }
 
+bool ResizeCornerMovesRight(DisplayResizeCorner corner) {
+    return corner == DisplayResizeCorner::TopRight || corner == DisplayResizeCorner::BottomRight;
+}
+
+bool ResizeCornerMovesDown(DisplayResizeCorner corner) {
+    return corner == DisplayResizeCorner::BottomLeft || corner == DisplayResizeCorner::BottomRight;
+}
+
 RECT FitRectToAspectRatio(const RECT& bounds, int sourceWidth, int sourceHeight) {
     if (IsRectEmptyOrInvalid(bounds) || sourceWidth <= 0 || sourceHeight <= 0) {
         return {};
@@ -168,6 +176,27 @@ double ComputeAspectResizeScale(SIZE layoutLogicalSize, POINT physicalExtent) {
         (static_cast<double>(physicalExtent.x) * layoutWidth + static_cast<double>(physicalExtent.y) * layoutHeight) /
         (layoutWidth * layoutWidth + layoutHeight * layoutHeight);
     return RoundDisplayScale(std::clamp(scale, kMinimumInteractiveResizeScale, kMaximumInteractiveResizeScale));
+}
+
+DisplayAspectResizeTarget ComputeAspectResizeDragTarget(
+    SIZE layoutLogicalSize, DisplayResizeCorner corner, POINT anchorScreenPoint, POINT draggedCornerScreenPoint) {
+    const bool movesRight = ResizeCornerMovesRight(corner);
+    const bool movesDown = ResizeCornerMovesDown(corner);
+    const POINT physicalExtent{movesRight ? draggedCornerScreenPoint.x - anchorScreenPoint.x
+                                          : anchorScreenPoint.x - draggedCornerScreenPoint.x,
+        movesDown ? draggedCornerScreenPoint.y - anchorScreenPoint.y
+                  : anchorScreenPoint.y - draggedCornerScreenPoint.y};
+    const double targetScale = ComputeAspectResizeScale(layoutLogicalSize, physicalExtent);
+    const SIZE targetSize{ScaleLogicalToPhysical(layoutLogicalSize.cx, targetScale),
+        ScaleLogicalToPhysical(layoutLogicalSize.cy, targetScale)};
+
+    DisplayAspectResizeTarget target;
+    target.targetScale = targetScale;
+    target.targetClientRect.left = movesRight ? anchorScreenPoint.x : anchorScreenPoint.x - targetSize.cx;
+    target.targetClientRect.right = movesRight ? anchorScreenPoint.x + targetSize.cx : anchorScreenPoint.x;
+    target.targetClientRect.top = movesDown ? anchorScreenPoint.y : anchorScreenPoint.y - targetSize.cy;
+    target.targetClientRect.bottom = movesDown ? anchorScreenPoint.y + targetSize.cy : anchorScreenPoint.y;
+    return target;
 }
 
 DisplayConfig BuildResizePlacementDisplayConfig(

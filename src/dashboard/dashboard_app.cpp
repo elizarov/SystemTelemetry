@@ -67,6 +67,46 @@ bool IsRectUsable(const RECT& rect) {
     return RectWidth(rect) > 0 && RectHeight(rect) > 0;
 }
 
+POINT ResizeDraggedCornerPoint(const RECT& rect, DisplayResizeCorner corner) {
+    switch (corner) {
+        case DisplayResizeCorner::TopLeft:
+            return POINT{rect.left, rect.top};
+        case DisplayResizeCorner::TopRight:
+            return POINT{rect.right, rect.top};
+        case DisplayResizeCorner::BottomLeft:
+            return POINT{rect.left, rect.bottom};
+        case DisplayResizeCorner::BottomRight:
+            return POINT{rect.right, rect.bottom};
+    }
+    return POINT{rect.right, rect.bottom};
+}
+
+POINT ResizeOppositeCornerPoint(const RECT& rect, DisplayResizeCorner corner) {
+    switch (corner) {
+        case DisplayResizeCorner::TopLeft:
+            return POINT{rect.right, rect.bottom};
+        case DisplayResizeCorner::TopRight:
+            return POINT{rect.left, rect.bottom};
+        case DisplayResizeCorner::BottomLeft:
+            return POINT{rect.right, rect.top};
+        case DisplayResizeCorner::BottomRight:
+            return POINT{rect.left, rect.top};
+    }
+    return POINT{rect.left, rect.top};
+}
+
+const char* ResizeCursorName(DisplayResizeCorner corner) {
+    switch (corner) {
+        case DisplayResizeCorner::TopLeft:
+        case DisplayResizeCorner::BottomRight:
+            return IDC_SIZENWSE;
+        case DisplayResizeCorner::TopRight:
+        case DisplayResizeCorner::BottomLeft:
+            return IDC_SIZENESW;
+    }
+    return IDC_SIZENWSE;
+}
+
 DWORD AutohideOpenAnimationDirection(DisplayPlacementMode mode) {
     switch (mode) {
         case DisplayPlacementMode::Top:
@@ -2234,7 +2274,7 @@ void DashboardApp::StartMoveModeAt(POINT cursorAnchorClientPoint) {
     StartMoveMode(true, cursorAnchorClientPoint, true, false, false);
 }
 
-void DashboardApp::StartResizeModeAt(POINT cursorClientPoint) {
+void DashboardApp::StartResizeModeAt(POINT cursorClientPoint, DisplayResizeCorner corner) {
     if (hwnd_ == nullptr || shellUi_ == nullptr || shellUi_->IsLayoutEditModalUiActive()) {
         return;
     }
@@ -2248,9 +2288,11 @@ void DashboardApp::StartResizeModeAt(POINT cursorClientPoint) {
     POINT cursorScreenPoint = cursorClientPoint;
     ClientToScreen(hwnd_, &cursorScreenPoint);
     const RECT clientRect = DashboardClientScreenRect();
-    resizeAnchorScreenPoint_ = POINT{clientRect.left, clientRect.top};
-    resizeCursorBottomRightOffset_ =
-        POINT{clientRect.right - cursorScreenPoint.x, clientRect.bottom - cursorScreenPoint.y};
+    const POINT draggedCornerScreenPoint = ResizeDraggedCornerPoint(clientRect, corner);
+    resizeAnchorScreenPoint_ = ResizeOppositeCornerPoint(clientRect, corner);
+    resizeDraggedCornerCursorOffset_ =
+        POINT{draggedCornerScreenPoint.x - cursorScreenPoint.x, draggedCornerScreenPoint.y - cursorScreenPoint.y};
+    resizeCorner_ = corner;
     movePlacementInfo_ = GetMonitorPlacementForRect(clientRect, CurrentRenderScale());
     placementInteractionMode_ = PlacementInteractionMode::Resize;
     hasMoveCursorAnchorClientPoint_ = false;
@@ -2285,7 +2327,8 @@ void DashboardApp::StartMoveMode(bool hasCursorAnchorClientPoint,
     nativeTitlebarDragMoveActive_ = keepVisibleTitlebarDuringMove && nativeTitlebarVisible_;
     placementInteractionMode_ = PlacementInteractionMode::Move;
     resizeAnchorScreenPoint_ = {};
-    resizeCursorBottomRightOffset_ = {};
+    resizeDraggedCornerCursorOffset_ = {};
+    resizeCorner_ = DisplayResizeCorner::BottomRight;
     controller_.State().isMoving = true;
     StopNativeTitlebarHoverTimer();
     if (nativeTitlebarDragMoveActive_) {
@@ -2305,7 +2348,7 @@ void DashboardApp::StartMoveModeFromNativeTitlebar(POINT screenPoint) {
     StartMoveMode(true, clientPoint, false, true, true);
 }
 
-RECT DashboardApp::DashboardResizeHandleRect() const {
+RECT DashboardApp::DashboardResizeHandleRect(DisplayResizeCorner corner) const {
     const int width = WindowWidth();
     const int height = WindowHeight();
     if (width <= 0 || height <= 0) {
@@ -2313,13 +2356,32 @@ RECT DashboardApp::DashboardResizeHandleRect() const {
     }
 
     const int hitSize = std::max(12, ScaleLogicalToPhysical(kDashboardResizeHandleLogical, CurrentWindowDpi()));
-    return RECT{std::max(0, width - hitSize), std::max(0, height - hitSize), width, height};
+    switch (corner) {
+        case DisplayResizeCorner::TopLeft:
+            return RECT{0, 0, std::min(width, hitSize), std::min(height, hitSize)};
+        case DisplayResizeCorner::TopRight:
+            return RECT{std::max(0, width - hitSize), 0, width, std::min(height, hitSize)};
+        case DisplayResizeCorner::BottomLeft:
+            return RECT{0, std::max(0, height - hitSize), std::min(width, hitSize), height};
+        case DisplayResizeCorner::BottomRight:
+            return RECT{std::max(0, width - hitSize), std::max(0, height - hitSize), width, height};
+    }
+    return {};
 }
 
-bool DashboardApp::IsDashboardResizeHandlePoint(RenderPoint clientPoint) const {
-    const RECT handleRect = DashboardResizeHandleRect();
+std::optional<DisplayResizeCorner> DashboardApp::HitTestDashboardResizeHandle(RenderPoint clientPoint) const {
     const POINT point{clientPoint.x, clientPoint.y};
-    return IsRectUsable(handleRect) && PtInRect(&handleRect, point) != FALSE;
+    const DisplayResizeCorner corners[] = {DisplayResizeCorner::TopLeft,
+        DisplayResizeCorner::TopRight,
+        DisplayResizeCorner::BottomLeft,
+        DisplayResizeCorner::BottomRight};
+    for (const DisplayResizeCorner corner : corners) {
+        const RECT handleRect = DashboardResizeHandleRect(corner);
+        if (IsRectUsable(handleRect) && PtInRect(&handleRect, point) != FALSE) {
+            return corner;
+        }
+    }
+    return std::nullopt;
 }
 
 void DashboardApp::StopMoveMode() {
@@ -2334,7 +2396,8 @@ void DashboardApp::StopMoveMode() {
     stopMoveModeWhenLeftButtonReleased_ = false;
     nativeTitlebarDragMoveActive_ = false;
     resizeAnchorScreenPoint_ = {};
-    resizeCursorBottomRightOffset_ = {};
+    resizeDraggedCornerCursorOffset_ = {};
+    resizeCorner_ = DisplayResizeCorner::BottomRight;
     if (mode == PlacementInteractionMode::Resize) {
         controller_.UpdateConfigFromResizePlacement(*this);
     } else {
@@ -2406,27 +2469,21 @@ void DashboardApp::UpdateResizeTracking() {
         return;
     }
 
-    const POINT targetBottomRight{
-        cursor.x + resizeCursorBottomRightOffset_.x, cursor.y + resizeCursorBottomRightOffset_.y};
-    const POINT physicalExtent{
-        targetBottomRight.x - resizeAnchorScreenPoint_.x, targetBottomRight.y - resizeAnchorScreenPoint_.y};
+    const POINT targetDraggedCorner{
+        cursor.x + resizeDraggedCornerCursorOffset_.x, cursor.y + resizeDraggedCornerCursorOffset_.y};
     const LogicalSizeConfig& window = controller_.State().config.layout.structure.window;
-    const double targetScale = ComputeAspectResizeScale(SIZE{window.width, window.height}, physicalExtent);
-    UpdateRendererScale(targetScale);
-    const SIZE targetSize = ComputeWindowSizeForScale(controller_.State().config, targetScale);
-    movePlacementInfo_ = GetMonitorPlacementForRect(RECT{resizeAnchorScreenPoint_.x,
-                                                        resizeAnchorScreenPoint_.y,
-                                                        resizeAnchorScreenPoint_.x + targetSize.cx,
-                                                        resizeAnchorScreenPoint_.y + targetSize.cy},
-        targetScale);
+    const DisplayAspectResizeTarget target = ComputeAspectResizeDragTarget(
+        SIZE{window.width, window.height}, resizeCorner_, resizeAnchorScreenPoint_, targetDraggedCorner);
+    UpdateRendererScale(target.targetScale);
+    movePlacementInfo_ = GetMonitorPlacementForRect(target.targetClientRect, target.targetScale);
     SyncDashboardMoveOverlayState();
-    SetDashboardWindowGeometry(resizeAnchorScreenPoint_.x,
-        resizeAnchorScreenPoint_.y,
-        targetSize.cx,
-        targetSize.cy,
+    SetDashboardWindowGeometry(target.targetClientRect.left,
+        target.targetClientRect.top,
+        RectWidth(target.targetClientRect),
+        RectHeight(target.targetClientRect),
         SWP_NOACTIVATE | SWP_NOZORDER,
         "interactive_resize");
-    movePlacementInfo_ = GetMonitorPlacementForRect(DashboardClientScreenRect(), targetScale);
+    movePlacementInfo_ = GetMonitorPlacementForRect(DashboardClientScreenRect(), target.targetScale);
     SyncDashboardMoveOverlayState();
 }
 
@@ -3144,8 +3201,9 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             UpdateNativeTitlebarHoverFromCursor();
             if (!state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 const RenderPoint clientPoint{GET_X_LPARAM(lParam), GET_Y_LPARAM(lParam)};
-                if (IsDashboardResizeHandlePoint(clientPoint)) {
-                    StartResizeModeAt(POINT{clientPoint.x, clientPoint.y});
+                const std::optional<DisplayResizeCorner> resizeCorner = HitTestDashboardResizeHandle(clientPoint);
+                if (resizeCorner.has_value()) {
+                    StartResizeModeAt(POINT{clientPoint.x, clientPoint.y}, *resizeCorner);
                     return 0;
                 }
             }
@@ -3308,14 +3366,16 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             if (LOWORD(lParam) == HTCLIENT) {
                 POINT screenPoint{};
                 if (placementInteractionMode_ == PlacementInteractionMode::Resize) {
-                    SetCursor(LoadCursorA(nullptr, IDC_SIZENWSE));
+                    SetCursor(LoadCursorA(nullptr, ResizeCursorName(resizeCorner_)));
                     return TRUE;
                 }
                 if (!state.isMoving && !shellUi_->IsLayoutEditModalUiActive() && GetCursorPos(&screenPoint)) {
                     POINT clientPoint = screenPoint;
                     ScreenToClient(hwnd_, &clientPoint);
-                    if (IsDashboardResizeHandlePoint(RenderPoint{clientPoint.x, clientPoint.y})) {
-                        SetCursor(LoadCursorA(nullptr, IDC_SIZENWSE));
+                    const std::optional<DisplayResizeCorner> resizeCorner =
+                        HitTestDashboardResizeHandle(RenderPoint{clientPoint.x, clientPoint.y});
+                    if (resizeCorner.has_value()) {
+                        SetCursor(LoadCursorA(nullptr, ResizeCursorName(*resizeCorner)));
                         return TRUE;
                     }
                 }
