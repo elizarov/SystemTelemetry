@@ -713,15 +713,13 @@ private:
             return;
         }
         EmitLine(Indent() + "{");
-        blockStack_.push_back(
-            {
-                BlockKind::Other,
-                true,
-                previousDeclarationKind_,
-                previousDeclarationWasMultilineField_,
-                caseBodyIndentLevel_
-            }
-        );
+        blockStack_.push_back({
+            BlockKind::Other,
+            true,
+            previousDeclarationKind_,
+            previousDeclarationWasMultilineField_,
+            caseBodyIndentLevel_
+        });
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationWasMultilineField_ = false;
         ++indentLevel_;
@@ -763,15 +761,13 @@ private:
         ClearPending();
         NoteDeclarationKind(declarationKind);
         const bool indentsBody = blockKind != BlockKind::NamespaceDeclaration;
-        blockStack_.push_back(
-            {
-                blockKind,
-                indentsBody,
-                previousDeclarationKind_,
-                previousDeclarationWasMultilineField_,
-                caseBodyIndentLevel_
-            }
-        );
+        blockStack_.push_back({
+            blockKind,
+            indentsBody,
+            previousDeclarationKind_,
+            previousDeclarationWasMultilineField_,
+            caseBodyIndentLevel_
+        });
         if (blockKind == BlockKind::SwitchStatement) {
             caseBodyIndentLevel_ = -1;
         }
@@ -1210,15 +1206,13 @@ private:
         if (!outputLines_.empty()) {
             outputLines_.back() = TrimRight(std::move(outputLines_.back())) + " {";
         }
-        blockStack_.push_back(
-            {
-                BlockKind::CaseScope,
-                true,
-                previousDeclarationKind_,
-                previousDeclarationWasMultilineField_,
-                caseBodyIndentLevel_
-            }
-        );
+        blockStack_.push_back({
+            BlockKind::CaseScope,
+            true,
+            previousDeclarationKind_,
+            previousDeclarationWasMultilineField_,
+            caseBodyIndentLevel_
+        });
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationWasMultilineField_ = false;
         justEmittedCaseLabel_ = false;
@@ -1588,10 +1582,9 @@ private:
         }
         if (!header.empty() && header.front().text == "[") {
             if (std::optional<size_t> captureClose = FindMatchingClose(header, 0)) {
-                std::vector<Token> captureInner(
-                    header.begin() + 1,
-                    header.begin() + static_cast<std::ptrdiff_t>(*captureClose)
-                );
+                std::vector<Token> captureInner(header.begin() + 1, header.begin() + static_cast<std::ptrdiff_t>(
+                    *captureClose
+                ));
                 if (ContainsTopLevelSeparator(captureInner, ',')) {
                     std::vector<std::string> lines;
                     lines.push_back(Indent(indentLevel) + prefix + "[");
@@ -1680,10 +1673,18 @@ private:
         )) {
             return *combined;
         }
-        std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
-        );
+        if (std::optional < std::vector < std::string >> combined = TryFormatCombinedSingleNestedGroup(
+            tokens,
+            group,
+            indentLevel,
+            prefix,
+            suffix
+        )) {
+            return *combined;
+        }
+        std::vector<Token> firstLineTokens(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(
+            group.open + 1
+        ));
         std::vector<Token> inner(
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
@@ -1713,6 +1714,66 @@ private:
             }
         }
         std::string closeLine = FormatInline(suffixTokens);
+        AppendSuffix(closeLine, suffix);
+        lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::optional <
+    std::vector <
+    std::string >> TryFormatCombinedSingleNestedGroup(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        std::vector<Token> outerPrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        const std::optional<GroupPair> nested = FindFirstWrappableGroupPair(inner);
+        if (!nested || IsEmptyGroupPair(inner, nested->open, nested->close)) {
+            return std::nullopt;
+        }
+        if (NextSignificantIndex(inner, nested->close + 1) < inner.size()) {
+            return std::nullopt;
+        }
+        std::vector<Token> nestedPrefix(inner.begin(), inner.begin() + static_cast<std::ptrdiff_t>(nested->open + 1));
+        std::string firstLine = std::string(prefix) + FormatInline(outerPrefix) + FormatInline(nestedPrefix);
+        if (!Fits(indentLevel, firstLine)) {
+            return std::nullopt;
+        }
+        std::vector<Token> nestedInner(
+            inner.begin() + static_cast<std::ptrdiff_t>(nested->open + 1),
+            inner.begin() + static_cast<std::ptrdiff_t>(nested->close)
+        );
+        std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + firstLine);
+        std::vector < std::vector < Token >> elements = SplitTopLevel(nestedInner, ',');
+        if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
+            std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
+            lines.insert(lines.end(), childLines.begin(), childLines.end());
+        } else {
+            for (size_t index = 0; index < elements.size(); ++index) {
+                if (elements[index].empty()) {
+                    continue;
+                }
+                std::string elementSuffix;
+                if (index + 1 < elements.size()) {
+                    elementSuffix = ",";
+                }
+                std::vector<std::string> elementLines =
+                    FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                lines.insert(lines.end(), elementLines.begin(), elementLines.end());
+            }
+        }
+        std::vector<Token> closeTokens;
+        closeTokens.push_back(inner[nested->close]);
+        closeTokens.insert(closeTokens.end(), suffixTokens.begin(), suffixTokens.end());
+        std::string closeLine = FormatInline(closeTokens);
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
@@ -1767,10 +1828,9 @@ private:
         if (NextSignificantIndex(condition, nested->close + 1) < condition.size()) {
             return std::nullopt;
         }
-        std::vector<Token> nestedPrefix(
-            condition.begin(),
-            condition.begin() + static_cast<std::ptrdiff_t>(nested->open + 1)
-        );
+        std::vector<Token> nestedPrefix(condition.begin(), condition.begin() + static_cast<std::ptrdiff_t>(
+            nested->open + 1
+        ));
         std::string firstLine = std::string(prefix) + FormatInline(controlPrefix) + FormatInline(nestedPrefix);
         if (!Fits(indentLevel, firstLine)) {
             return std::nullopt;
@@ -2738,10 +2798,9 @@ private:
     }
 
     bool IsPointerOrReferenceDeclarator(const std::vector<Token>& tokens, size_t index) const {
-        if (
-            index >= tokens.size() ||
-            (tokens[index].text != "*" && tokens[index].text != "&" && tokens[index].text != "&&")
-        ) {
+        if (index >= tokens.size() || (
+            tokens[index].text != "*" && tokens[index].text != "&" && tokens[index].text != "&&"
+        )) {
             return false;
         }
         const size_t nextIndex = NextSignificantIndex(tokens, index + 1);
@@ -3640,22 +3699,19 @@ bool IsInsideRootOrRoot(const std::string& root, const std::string& path) {
 }
 
 std::vector<std::string> GetAllFiles(const std::string& root) {
-    const std::optional < std::vector < std::string >> files = RunGit(
-        root,
-        {
-            "-c",
-            "core.quotepath=off",
-            "-c",
-            "core.safecrlf=false",
-            "ls-files",
-            "--cached",
-            "--others",
-            "--exclude-standard",
-            "--",
-            "*.cpp",
-            "*.h"
-        }
-    );
+    const std::optional < std::vector < std::string >> files = RunGit(root, {
+        "-c",
+        "core.quotepath=off",
+        "-c",
+        "core.safecrlf=false",
+        "ls-files",
+        "--cached",
+        "--others",
+        "--exclude-standard",
+        "--",
+        "*.cpp",
+        "*.h"
+    });
     if (!files) {
         return {};
     }
@@ -3675,12 +3731,10 @@ std::vector<std::string> GetChangedFiles(const std::string& root) {
         )) {
             paths.insert(paths.end(), changed->begin(), changed->end());
         }
-    } else if (
-        std::optional < std::vector < std::string >> staged = RunGit(
-            root,
-            {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "--", "*.cpp", "*.h"}
-        )
-    ) {
+    } else if (std::optional < std::vector < std::string >> staged = RunGit(
+        root,
+        {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "--", "*.cpp", "*.h"}
+    )) {
         paths.insert(paths.end(), staged->begin(), staged->end());
     }
     if (std::optional < std::vector < std::string >> untracked = RunGit(
