@@ -98,6 +98,143 @@ DWORD AutohideCloseAnimationDirection(DisplayPlacementMode mode) {
     return 0;
 }
 
+void ForceOpaqueBitmapAlpha(void* bits, int width, int height) {
+    if (bits == nullptr || width <= 0 || height <= 0) {
+        return;
+    }
+    auto* pixels = static_cast<DWORD*>(bits);
+    const int pixelCount = width * height;
+    for (int i = 0; i < pixelCount; ++i) {
+        pixels[i] |= 0xFF000000u;
+    }
+}
+
+HBITMAP CreateTopDownBgraBitmap(int width, int height, void** bits) {
+    if (bits == nullptr || width <= 0 || height <= 0) {
+        return nullptr;
+    }
+
+    BITMAPINFO info{};
+    info.bmiHeader.biSize = sizeof(info.bmiHeader);
+    info.bmiHeader.biWidth = width;
+    info.bmiHeader.biHeight = -height;
+    info.bmiHeader.biPlanes = 1;
+    info.bmiHeader.biBitCount = 32;
+    info.bmiHeader.biCompression = BI_RGB;
+    return CreateDIBSection(nullptr, &info, DIB_RGB_COLORS, bits, nullptr, 0);
+}
+
+HBITMAP CaptureScreenRectBitmap(const RECT& rect) {
+    const int width = RectWidth(rect);
+    const int height = RectHeight(rect);
+    if (width <= 0 || height <= 0) {
+        return nullptr;
+    }
+
+    void* bits = nullptr;
+    HBITMAP bitmap = CreateTopDownBgraBitmap(width, height, &bits);
+    if (bitmap == nullptr || bits == nullptr) {
+        if (bitmap != nullptr) {
+            DeleteObject(bitmap);
+        }
+        return nullptr;
+    }
+
+    HDC screenDc = GetDC(nullptr);
+    HDC memoryDc = screenDc != nullptr ? CreateCompatibleDC(screenDc) : nullptr;
+    if (screenDc == nullptr || memoryDc == nullptr) {
+        if (memoryDc != nullptr) {
+            DeleteDC(memoryDc);
+        }
+        if (screenDc != nullptr) {
+            ReleaseDC(nullptr, screenDc);
+        }
+        DeleteObject(bitmap);
+        return nullptr;
+    }
+
+    HGDIOBJ previousBitmap = SelectObject(memoryDc, bitmap);
+    const BOOL copied = BitBlt(memoryDc, 0, 0, width, height, screenDc, rect.left, rect.top, SRCCOPY | CAPTUREBLT);
+    SelectObject(memoryDc, previousBitmap);
+    DeleteDC(memoryDc);
+    ReleaseDC(nullptr, screenDc);
+    if (copied == FALSE) {
+        DeleteObject(bitmap);
+        return nullptr;
+    }
+
+    ForceOpaqueBitmapAlpha(bits, width, height);
+    return bitmap;
+}
+
+HBITMAP CopyBitmapHandle(HBITMAP bitmap, SIZE size) {
+    if (bitmap == nullptr || size.cx <= 0 || size.cy <= 0) {
+        return nullptr;
+    }
+    return static_cast<HBITMAP>(CopyImage(bitmap, IMAGE_BITMAP, size.cx, size.cy, LR_CREATEDIBSECTION));
+}
+
+HWND CreateAutohideSnapshotWindow(const RECT& rect, HBITMAP bitmap) {
+    const int width = RectWidth(rect);
+    const int height = RectHeight(rect);
+    if (bitmap == nullptr || width <= 0 || height <= 0) {
+        return nullptr;
+    }
+
+    HWND snapshotHwnd = CreateWindowExA(WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST,
+        "STATIC",
+        "",
+        WS_POPUP,
+        rect.left,
+        rect.top,
+        width,
+        height,
+        nullptr,
+        nullptr,
+        GetModuleHandleA(nullptr),
+        nullptr);
+    if (snapshotHwnd == nullptr) {
+        return nullptr;
+    }
+
+    HDC screenDc = GetDC(nullptr);
+    HDC memoryDc = screenDc != nullptr ? CreateCompatibleDC(screenDc) : nullptr;
+    if (screenDc == nullptr || memoryDc == nullptr) {
+        if (memoryDc != nullptr) {
+            DeleteDC(memoryDc);
+        }
+        if (screenDc != nullptr) {
+            ReleaseDC(nullptr, screenDc);
+        }
+        DestroyWindow(snapshotHwnd);
+        return nullptr;
+    }
+
+    HGDIOBJ previousBitmap = SelectObject(memoryDc, bitmap);
+    POINT destination{rect.left, rect.top};
+    SIZE size{width, height};
+    POINT source{};
+    BLENDFUNCTION blend{AC_SRC_OVER, 0, 255, AC_SRC_ALPHA};
+    const BOOL updated =
+        UpdateLayeredWindow(snapshotHwnd, screenDc, &destination, &size, memoryDc, &source, 0, &blend, ULW_ALPHA);
+    SelectObject(memoryDc, previousBitmap);
+    DeleteDC(memoryDc);
+    ReleaseDC(nullptr, screenDc);
+    if (updated == FALSE) {
+        DestroyWindow(snapshotHwnd);
+        return nullptr;
+    }
+
+    SetWindowPos(snapshotHwnd,
+        HWND_TOPMOST,
+        rect.left,
+        rect.top,
+        width,
+        height,
+        SWP_NOACTIVATE | SWP_NOOWNERZORDER | SWP_NOREDRAW);
+    return snapshotHwnd;
+}
+
 bool TitlebarRectsEqual(const RECT& left, const RECT& right) {
     return left.left == right.left && left.top == right.top && left.right == right.right && left.bottom == right.bottom;
 }
@@ -581,6 +718,7 @@ void DashboardApp::SyncAutohideState() {
             autohideHidden_ = false;
         }
         SetAutohideTopmost(false);
+        ClearAutohideSnapshot();
         return;
     }
 
@@ -679,15 +817,15 @@ void DashboardApp::ShowAutohideDrawer(bool forceAnimation) {
     HideNativeTitlebar();
     SetAutohideTopmost(true);
     if (forceAnimation && !autohideHidden_) {
+        RefreshAutohideSnapshot();
         ShowWindow(hwnd_, SW_HIDE);
         autohideHidden_ = true;
     }
     if (autohideHidden_) {
         autohideAnimating_ = true;
-        const DWORD direction = AutohideOpenAnimationDirection(autohideMode_);
-        const BOOL animated = AnimateWindow(hwnd_, kAutohideAnimationDurationMs, AW_SLIDE | direction);
+        const bool animated = AnimateAutohideSnapshot(true);
         autohideAnimating_ = false;
-        if (animated == FALSE) {
+        if (!animated) {
             ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
         }
         autohideHidden_ = false;
@@ -706,16 +844,82 @@ void DashboardApp::HideAutohideDrawer() {
 
     HideNativeTitlebar();
     SetAutohideTopmost(true);
+    RefreshAutohideSnapshot();
     autohideAnimating_ = true;
-    const DWORD direction = AutohideCloseAnimationDirection(autohideMode_);
-    const BOOL animated = AnimateWindow(hwnd_, kAutohideAnimationDurationMs, AW_HIDE | AW_SLIDE | direction);
+    const bool animated = AnimateAutohideSnapshot(false);
     autohideAnimating_ = false;
-    if (animated == FALSE) {
+    if (!animated) {
         ShowWindow(hwnd_, SW_HIDE);
     }
     autohideHidden_ = true;
     autohideClosePending_ = false;
     autohideCloseDeadlineMs_ = 0;
+}
+
+bool DashboardApp::RefreshAutohideSnapshot() {
+    if (hwnd_ == nullptr || !IsWindowVisible(hwnd_)) {
+        return autohideSnapshotBitmap_ != nullptr;
+    }
+
+    RedrawDashboardSurfaceSynchronously();
+    const RECT rect = DashboardClientScreenRect();
+    HBITMAP bitmap = CaptureScreenRectBitmap(rect);
+    if (bitmap == nullptr) {
+        return autohideSnapshotBitmap_ != nullptr;
+    }
+
+    ClearAutohideSnapshot();
+    autohideSnapshotBitmap_ = bitmap;
+    autohideSnapshotSize_ = SIZE{RectWidth(rect), RectHeight(rect)};
+    return true;
+}
+
+void DashboardApp::ClearAutohideSnapshot() {
+    if (autohideSnapshotBitmap_ != nullptr) {
+        DeleteObject(autohideSnapshotBitmap_);
+        autohideSnapshotBitmap_ = nullptr;
+    }
+    autohideSnapshotSize_ = {};
+}
+
+bool DashboardApp::AnimateAutohideSnapshot(bool show) {
+    if (hwnd_ == nullptr || !autohideEligible_) {
+        return false;
+    }
+
+    const RECT snapshotRect = DashboardClientScreenRect();
+    if (RectWidth(snapshotRect) != autohideSnapshotSize_.cx || RectHeight(snapshotRect) != autohideSnapshotSize_.cy) {
+        return false;
+    }
+
+    HBITMAP bitmap = CopyBitmapHandle(autohideSnapshotBitmap_, autohideSnapshotSize_);
+    if (bitmap == nullptr) {
+        return false;
+    }
+
+    HWND snapshotHwnd = CreateAutohideSnapshotWindow(snapshotRect, bitmap);
+    if (snapshotHwnd == nullptr) {
+        DeleteObject(bitmap);
+        return false;
+    }
+
+    BOOL animated = FALSE;
+    if (show) {
+        ShowWindow(snapshotHwnd, SW_HIDE);
+        animated = AnimateWindow(
+            snapshotHwnd, kAutohideAnimationDurationMs, AW_SLIDE | AutohideOpenAnimationDirection(autohideMode_));
+        ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
+    } else {
+        ShowWindow(snapshotHwnd, SW_SHOWNOACTIVATE);
+        ShowWindow(hwnd_, SW_HIDE);
+        animated = AnimateWindow(snapshotHwnd,
+            kAutohideAnimationDurationMs,
+            AW_HIDE | AW_SLIDE | AutohideCloseAnimationDirection(autohideMode_));
+    }
+
+    DestroyWindow(snapshotHwnd);
+    DeleteObject(bitmap);
+    return animated != FALSE;
 }
 
 bool DashboardApp::AutohideCursorInTriggerBand(POINT screenPoint) const {
@@ -3218,6 +3422,7 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             RemoveTrayIcon();
             ReleaseFonts();
+            ClearAutohideSnapshot();
             {
                 HICON largeIcon = appIconLarge_;
                 HICON smallIcon = appIconSmall_;

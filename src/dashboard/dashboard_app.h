@@ -145,6 +145,9 @@ private:
     void SetAutohideTopmost(bool topmost);
     void ShowAutohideDrawer(bool forceAnimation);
     void HideAutohideDrawer();
+    bool RefreshAutohideSnapshot();
+    void ClearAutohideSnapshot();
+    bool AnimateAutohideSnapshot(bool show);
     bool AutohideCursorInTriggerBand(POINT screenPoint) const;
     bool AutohideCursorInDashboard(POINT screenPoint) const;
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
@@ -274,6 +277,8 @@ private:
     DisplayPlacementMode autohideMode_ = DisplayPlacementMode::FullScreen;
     RECT autohideMonitorRect_{};
     RECT autohideTargetClientRect_{};
+    HBITMAP autohideSnapshotBitmap_ = nullptr;
+    SIZE autohideSnapshotSize_{};
     HWND titlebarHoverProbeHwnd_ = nullptr;
     HWND titlebarLayoutComboHwnd_ = nullptr;
     HWND titlebarThemeComboHwnd_ = nullptr;
