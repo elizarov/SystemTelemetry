@@ -256,6 +256,10 @@ int UnarySigns(int value) {
     return value - -negative + +positive + (-negative) + (+positive);
 }
 
+void DiscardServiceResult(Service& service) {
+    (void)StopServiceIfRunning(service.Get());
+}
+
 void StructuredBindingLoop(const BoardSelections& resolvedSelections) {
     for (const auto& [logicalName, sensorName] : resolvedSelections.boardFanSensorNames) {
         Use(logicalName, sensorName);

@@ -1929,6 +1929,9 @@ private:
         if (IsBinaryOperatorLike(current) || IsBinaryOperatorLike(prev)) {
             return true;
         }
+        if (prev == ")" && IsCStyleCastCloseBeforeExpression(tokens, prevIndex)) {
+            return false;
+        }
         if ((prev == ")" || prev == "]") && (token.kind == TokenKind::Word || token.kind == TokenKind::StringLiteral)) {
             return true;
         }
@@ -1999,17 +2002,71 @@ private:
             prev == "return";
     }
 
+    bool IsCStyleCastCloseBeforeExpression(const std::vector<Token>& tokens, size_t close) const {
+        if (close >= tokens.size() || tokens[close].text != ")") {
+            return false;
+        }
+        const std::optional<size_t> open = FindMatchingOpen(tokens, close);
+        if (!open || !IsLikelyCStyleCastType(tokens, *open, close)) {
+            return false;
+        }
+        const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
+        if (!beforeOpen) {
+            return true;
+        }
+        const std::string& before = tokens[*beforeOpen].text;
+        return before != ")" && before != "]" && before != "}";
+    }
+
+    bool IsLikelyCStyleCastType(const std::vector<Token>& tokens, size_t open, size_t close) const {
+        if (open + 1 >= close) {
+            return false;
+        }
+        size_t last = open;
+        for (size_t index = open + 1; index < close; ++index) {
+            const Token& token = tokens[index];
+            if (token.kind == TokenKind::Newline) {
+                continue;
+            }
+            if (
+                token.kind != TokenKind::Word &&
+                token.text != "::" &&
+                token.text != "*" &&
+                token.text != "&" &&
+                token.text != "&&" &&
+                token.text != "<" &&
+                token.text != ">" &&
+                token.text != ","
+            ) {
+                return false;
+            }
+            last = index;
+        }
+        if (last == open) {
+            return false;
+        }
+        return IsLikelyTypeNameToken(tokens, last) ||
+            (
+                (tokens[last].text == "*" || tokens[last].text == "&" || tokens[last].text == "&&") &&
+                    IsLikelyTypeBeforePointer(tokens, last)
+            );
+    }
+
     bool IsLikelyTypeBeforePointer(const std::vector<Token>& tokens, size_t index) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
         if (!previous) {
             return false;
         }
-        const Token& token = tokens[*previous];
-        if (token.text == ">" && IsTemplateAngleClose(tokens, *previous)) {
+        return IsLikelyTypeNameToken(tokens, *previous);
+    }
+
+    bool IsLikelyTypeNameToken(const std::vector<Token>& tokens, size_t index) const {
+        const Token& token = tokens[index];
+        if (token.text == ">" && IsTemplateAngleClose(tokens, index)) {
             return true;
         }
         if (token.text == ")") {
-            return IsDecltypeCloseBeforePointer(tokens, *previous);
+            return IsDecltypeCloseBeforePointer(tokens, index);
         }
         if (token.text == "]") {
             return false;
@@ -2040,7 +2097,7 @@ private:
         if (!token.text.empty() && token.text.front() >= 'A' && token.text.front() <= 'Z') {
             return true;
         }
-        const std::optional<size_t> beforeType = PreviousNonNewlineIndex(tokens, *previous);
+        const std::optional<size_t> beforeType = PreviousNonNewlineIndex(tokens, index);
         return beforeType && tokens[*beforeType].text == "::";
     }
 
