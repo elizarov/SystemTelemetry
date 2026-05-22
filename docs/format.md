@@ -114,7 +114,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
-- Do not insert a visual-padding space before braced initializer braces: `Widget widget{config};`.
+- Do not insert a visual-padding space before braced initializer braces or braced constructor calls: `Widget widget{config};` and `std::string_view{}`.
 - Put one space after commas, and no space before commas.
 - Put one space after semicolons that separate non-empty `for` header parts, and no space before semicolons. Empty forever-loop headers stay compact: `for (;;)`.
 - Put no space before a statement-terminating semicolon.

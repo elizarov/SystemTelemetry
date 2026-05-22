@@ -147,6 +147,11 @@ ColorConfig EmptyColor(){
 return{};
 }
 
+std::string_view LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key){
+const LayoutNodeFieldEditDescriptor* descriptor=FindLayoutNodeFieldEditDescriptor(key);
+return descriptor!=nullptr?FindLocalizedText(descriptor->titleKey):std::string_view {};
+}
+
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions,bool bringToFrontOnRun):renderer_(trace_),diagnosticsOptions_(diagnosticsOptions),layoutEditController_(*this),shellUi_(std::make_unique<DashboardShellUi>(*this)),bringToFrontOnRun_(bringToFrontOnRun){
 renderer_.SetLiveAnimationEnabled(true);
 }

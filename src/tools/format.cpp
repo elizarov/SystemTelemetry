@@ -2957,10 +2957,40 @@ private:
         ) {
             return true;
         }
+        if (IsBracedConstructorExpressionOpen()) {
+            return false;
+        }
         if (ContainsTopLevelAssignment(pendingTokens_)) {
             return false;
         }
         return EndsWithMatchingParen(pendingTokens_) || ContainsTopLevelToken(pendingTokens_, ")");
+    }
+
+    bool IsBracedConstructorExpressionOpen() const {
+        if (pendingTokens_.empty()) {
+            return false;
+        }
+        const std::optional<size_t> last = PreviousNonNewlineIndex(pendingTokens_, pendingTokens_.size());
+        if (!last || !IsLikelyTypeNameToken(pendingTokens_, *last)) {
+            return false;
+        }
+        const std::string& first = pendingTokens_.front().text;
+        if (first == "return" || first == "co_return" || first == "throw") {
+            return true;
+        }
+        const std::optional<size_t> beforeType = PreviousNonNewlineIndex(pendingTokens_, *last);
+        if (!beforeType) {
+            return false;
+        }
+        const std::string& previous = pendingTokens_[*beforeType].text;
+        return previous == "?" ||
+            previous == ":" ||
+            previous == "(" ||
+            previous == "[" ||
+            previous == "{" ||
+            previous == "," ||
+            previous == "=" ||
+            IsBinaryOperatorLike(previous);
     }
 
     BlockKind ClassifyBlock(const std::vector<Token>& tokens) const {
