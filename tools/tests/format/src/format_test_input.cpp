@@ -162,6 +162,10 @@ ColorConfig& MutableColorField(void* owner,const RuntimeConfigFieldDescriptor& f
 return *reinterpret_cast<ColorConfig *>(static_cast<char *>(owner)+field.offset);
 }
 
+void StartLenovoSnapshot(void * contextPtr){
+std::unique_ptr<LenovoServiceSnapshotThreadContext> context(static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr));
+}
+
 HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_){
 return DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown * *>(dwriteFactory_.ReleaseAndGetAddressOf()));
 }

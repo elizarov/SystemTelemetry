@@ -1787,6 +1787,14 @@ private:
         if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
         }
+        if (std::optional<std::vector<std::string>> declarationLines = TryFormatSplitDirectInitializedDeclaration(
+            tokens,
+            indentLevel,
+            prefix,
+            suffix
+        )) {
+            return *declarationLines;
+        }
         if (owner && owner->kind == SplitOwnerKind::MemberAccess) {
             if (std::optional<GroupPair> group = FindPreferredCallChainArgumentGroup(tokens, indentLevel, prefix)) {
                 return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
@@ -2572,6 +2580,95 @@ private:
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatSplitDirectInitializedDeclaration(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        if (
+            IsDeclarationContext() ||
+            HasOriginalBlankSeparator(tokens) ||
+            ShouldForceSplit(tokens) ||
+            ContainsTopLevelAssignment(tokens)
+        ) {
+            return std::nullopt;
+        }
+        const std::optional<GroupPair> initializer = FindDirectInitializerGroup(tokens);
+        if (!initializer) {
+            return std::nullopt;
+        }
+        const std::optional<size_t> declarator = PreviousNonNewlineIndex(tokens, initializer->open);
+        if (!declarator || *declarator == 0 || tokens[*declarator].kind != TokenKind::Word) {
+            return std::nullopt;
+        }
+        if (!IsLikelyDeclarationTypeBeforeName(tokens, *declarator)) {
+            return std::nullopt;
+        }
+
+        std::vector<Token> typeTokens(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*declarator));
+        std::vector<Token> declaratorTokens(tokens.begin() + static_cast<std::ptrdiff_t>(*declarator), tokens.end());
+        std::string typeLine = std::string(prefix) + FormatInline(typeTokens);
+        if (!ContainsLongTypeComponent(typeTokens)) {
+            return std::nullopt;
+        }
+        if (static_cast<int>(typeLine.size()) < config_.columnLimit / 3) {
+            return std::nullopt;
+        }
+        if (!Fits(indentLevel, typeLine)) {
+            return std::nullopt;
+        }
+        std::string declaratorLine = FormatInline(declaratorTokens);
+        AppendSuffix(declaratorLine, suffix);
+        if (!Fits(indentLevel + 1, declaratorLine)) {
+            return std::nullopt;
+        }
+        return std::vector<std::string>{Indent(indentLevel) + typeLine, Indent(indentLevel + 1) + declaratorLine};
+    }
+
+    bool ContainsLongTypeComponent(const std::vector<Token>& tokens) const {
+        for (const Token& token : tokens) {
+            if (token.kind == TokenKind::Word && static_cast<int>(token.text.size()) >= config_.columnLimit / 4) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    std::optional<GroupPair> FindDirectInitializerGroup(const std::vector<Token>& tokens) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (depth == 0 && tokens[index].text == "(" && !IsFunctionPointerDeclaratorGroupOpen(tokens, index)) {
+                const std::optional<size_t> close = FindMatchingClose(tokens, index);
+                if (!close) {
+                    return std::nullopt;
+                }
+                const size_t next = NextSignificantIndex(tokens, *close + 1);
+                if (next < tokens.size() && tokens[next].text == ";") {
+                    const size_t afterSemicolon = NextSignificantIndex(tokens, next + 1);
+                    if (afterSemicolon >= tokens.size()) {
+                        return GroupPair{index, *close};
+                    }
+                }
+                index = *close;
+                continue;
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return std::nullopt;
+    }
+
+    bool IsLikelyDeclarationTypeBeforeName(const std::vector<Token>& tokens, size_t nameIndex) const {
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, nameIndex);
+        if (!previous) {
+            return false;
+        }
+        if (IsPointerOrReferenceDeclaratorToken(tokens[*previous].text)) {
+            return IsPointerOrReferenceDeclarator(tokens, *previous) && IsLikelyTypeBeforePointer(tokens, *previous);
+        }
+        return IsLikelyTypeNameToken(tokens, *previous);
     }
 
     std::optional<GroupPair> FindPreferredCallChainArgumentGroup(
