@@ -100,6 +100,12 @@ stats.selectedCards,
 stats.callouts);
 }
 
+void WriteLongTraceStringFragments(TraceLog& trace,const char* adapterName){
+trace.WriteFmt(TracePrefix::GpuVendor,RES_STR("adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "
+"luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
+"name=\"%s\""),adapterIndex,adapterName);
+}
+
 struct OklabColor{
 double l;
 double a;

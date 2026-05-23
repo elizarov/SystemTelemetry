@@ -1756,6 +1756,7 @@ private:
         ConstructorInitializer,
         OperatorChain,
         MemberAccess,
+        StringLiteralSequence,
         Group,
     };
 
@@ -1782,7 +1783,7 @@ private:
         if (owner && owner->kind == SplitOwnerKind::TemplateDeclaration) {
             return FormatTemplateDeclaration(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
-        std::string inlineText = prefix + FormatInline(tokens);
+        std::string inlineText = prefix + FormatInline(tokens, InlineBudget(indentLevel, prefix, suffix));
         AppendSuffix(inlineText, suffix);
         if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
@@ -1845,6 +1846,9 @@ private:
         if (std::optional<size_t> memberAccess = FindTopLevelMemberAccess(tokens)) {
             return SplitOwner{SplitOwnerKind::MemberAccess, *memberAccess};
         }
+        if (IsStringLiteralSequence(tokens)) {
+            return SplitOwner{SplitOwnerKind::StringLiteralSequence};
+        }
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(tokens)) {
             return SplitOwner{SplitOwnerKind::Group, 0, *group};
         }
@@ -1891,10 +1895,12 @@ private:
                 );
             case SplitOwnerKind::MemberAccess:
                 return FormatMemberAccessChain(tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
+            case SplitOwnerKind::StringLiteralSequence:
+                return FormatStringLiteralSequence(tokens, indentLevel, std::move(prefix), std::move(suffix));
             case SplitOwnerKind::Group:
                 return FormatSplitGroup(tokens, owner.group, indentLevel, std::move(prefix), std::move(suffix));
         }
-        std::string inlineText = prefix + FormatInline(tokens);
+        std::string inlineText = prefix + FormatInline(tokens, InlineBudget(indentLevel, prefix, suffix));
         AppendSuffix(inlineText, suffix);
         return {Indent(indentLevel) + inlineText};
     }
@@ -2671,6 +2677,41 @@ private:
         return IsLikelyTypeNameToken(tokens, *previous);
     }
 
+    bool IsStringLiteralSequence(const std::vector<Token>& tokens) const {
+        int literalCount = 0;
+        for (const Token& token : tokens) {
+            if (token.kind == TokenKind::Newline) {
+                continue;
+            }
+            if (token.kind != TokenKind::StringLiteral) {
+                return false;
+            }
+            ++literalCount;
+        }
+        return literalCount > 1;
+    }
+
+    std::vector<std::string> FormatStringLiteralSequence(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<std::string> lines;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            if (token.kind != TokenKind::StringLiteral) {
+                continue;
+            }
+            std::string line = lines.empty() ? prefix + token.text : token.text;
+            if (NextSignificantIndex(tokens, index + 1) >= tokens.size()) {
+                AppendSuffix(line, suffix);
+            }
+            lines.push_back(Indent(indentLevel) + line);
+        }
+        return lines;
+    }
+
     std::optional<GroupPair> FindPreferredCallChainArgumentGroup(
         const std::vector<Token>& tokens,
         int indentLevel,
@@ -3054,7 +3095,7 @@ private:
         return result;
     }
 
-    std::string FormatInline(const std::vector<Token>& tokens) const {
+    std::string FormatInline(const std::vector<Token>& tokens, std::optional<size_t> maxLength = std::nullopt) const {
         std::string result;
         std::optional<Token> previous;
         std::optional<std::string> trailingStringLiteral;
@@ -3078,7 +3119,7 @@ private:
                 previous &&
                 previous->kind == TokenKind::StringLiteral &&
                 trailingStringLiteral &&
-                TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index)
+                TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index, maxLength)
             ) {
                 previous = Token{TokenKind::StringLiteral, *trailingStringLiteral};
                 continue;
@@ -3102,7 +3143,8 @@ private:
         std::string& trailingLiteral,
         std::string_view currentLiteral,
         const std::vector<Token>& tokens,
-        size_t index
+        size_t index,
+        std::optional<size_t> maxLength
     ) const {
         if (
             !CanConcatenateStringLiteralText(trailingLiteral, currentLiteral) ||
@@ -3110,8 +3152,13 @@ private:
         ) {
             return false;
         }
-        result.pop_back();
-        result.append(currentLiteral.substr(1));
+        std::string candidate = result;
+        candidate.pop_back();
+        candidate.append(currentLiteral.substr(1));
+        if (maxLength && candidate.size() > *maxLength) {
+            return false;
+        }
+        result = std::move(candidate);
         trailingLiteral.pop_back();
         trailingLiteral.append(currentLiteral.substr(1));
         return true;
@@ -3580,6 +3627,15 @@ private:
 
     bool Fits(int indentLevel, std::string_view text) const {
         return static_cast<int>(indentLevel * config_.indentWidth + text.size()) <= config_.columnLimit;
+    }
+
+    std::optional<size_t> InlineBudget(int indentLevel, std::string_view prefix, std::string_view suffix) const {
+        const int usedWidth =
+            indentLevel * config_.indentWidth + static_cast<int>(prefix.size()) + static_cast<int>(suffix.size());
+        if (usedWidth >= config_.columnLimit) {
+            return 0;
+        }
+        return static_cast<size_t>(config_.columnLimit - usedWidth);
     }
 
     std::string Indent() const {
