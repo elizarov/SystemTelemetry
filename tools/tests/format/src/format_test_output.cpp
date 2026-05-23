@@ -214,6 +214,7 @@ struct LongTemplateParameterHost {};
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
 using ZesDriver = void*;
+using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 
 using LayoutEditActiveRegionPayload = std::variant<

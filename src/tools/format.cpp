@@ -3481,6 +3481,9 @@ private:
         if (token.kind != TokenKind::Word) {
             return false;
         }
+        if (IsCallingConventionToken(token.text)) {
+            return true;
+        }
         static constexpr std::string_view kTypeWords[] = {
             "auto",
             "bool",
@@ -3506,6 +3509,19 @@ private:
         }
         const std::optional<size_t> beforeType = PreviousNonNewlineIndex(tokens, index);
         return beforeType && tokens[*beforeType].text == "::";
+    }
+
+    static bool IsCallingConventionToken(std::string_view text) {
+        static constexpr std::string_view kCallingConventionTokens[] = {
+            "__cdecl",
+            "__clrcall",
+            "__fastcall",
+            "__stdcall",
+            "__thiscall",
+            "__vectorcall"
+        };
+        return std::find(std::begin(kCallingConventionTokens), std::end(kCallingConventionTokens), text) !=
+            std::end(kCallingConventionTokens);
     }
 
     bool IsDecltypeCloseBeforePointer(const std::vector<Token>& tokens, size_t closeIndex) const {
