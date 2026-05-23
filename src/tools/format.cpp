@@ -168,6 +168,14 @@ bool IsDigit(char ch) {
     return ch >= '0' && ch <= '9';
 }
 
+bool IsHexDigit(char ch) {
+    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
+}
+
+bool IsOctalDigit(char ch) {
+    return ch >= '0' && ch <= '7';
+}
+
 bool IsSpaceButNotNewline(char ch) {
     return ch == ' ' || ch == '\t' || ch == '\f' || ch == '\v';
 }
@@ -2838,6 +2846,7 @@ private:
     std::string FormatInline(const std::vector<Token>& tokens) const {
         std::string result;
         std::optional<Token> previous;
+        std::optional<std::string> trailingStringLiteral;
         for (size_t index = 0; index < tokens.size(); ++index) {
             const Token& token = tokens[index];
             if (token.kind == TokenKind::Newline) {
@@ -2850,6 +2859,17 @@ private:
                 }
                 result += TrimRight(TrimLeft(token.text));
                 previous = token;
+                trailingStringLiteral.reset();
+                continue;
+            }
+            if (
+                token.kind == TokenKind::StringLiteral &&
+                previous &&
+                previous->kind == TokenKind::StringLiteral &&
+                trailingStringLiteral &&
+                TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index)
+            ) {
+                previous = Token{TokenKind::StringLiteral, *trailingStringLiteral};
                 continue;
             }
             if (previous && NeedsSpaceBefore(tokens, index, *previous)) {
@@ -2857,8 +2877,98 @@ private:
             }
             result += token.text;
             previous = token;
+            if (token.kind == TokenKind::StringLiteral) {
+                trailingStringLiteral = token.text;
+            } else {
+                trailingStringLiteral.reset();
+            }
         }
         return result;
+    }
+
+    bool TryAppendConcatenatedStringLiteral(
+        std::string& result,
+        std::string& trailingLiteral,
+        std::string_view currentLiteral,
+        const std::vector<Token>& tokens,
+        size_t index
+    ) const {
+        if (
+            !CanConcatenateStringLiteralText(trailingLiteral, currentLiteral) ||
+            HasUserDefinedLiteralSuffix(tokens, index)
+        ) {
+            return false;
+        }
+        result.pop_back();
+        result.append(currentLiteral.substr(1));
+        trailingLiteral.pop_back();
+        trailingLiteral.append(currentLiteral.substr(1));
+        return true;
+    }
+
+    bool CanConcatenateStringLiteralText(std::string_view previousLiteral, std::string_view currentLiteral) const {
+        if (!IsOrdinaryStringLiteralText(previousLiteral) || !IsOrdinaryStringLiteralText(currentLiteral)) {
+            return false;
+        }
+        const std::string_view previousContent = StringLiteralContent(previousLiteral);
+        const std::string_view currentContent = StringLiteralContent(currentLiteral);
+        if (currentContent.empty()) {
+            return true;
+        }
+        return !HasTrailingExpandableEscape(previousContent, currentContent.front());
+    }
+
+    static bool IsOrdinaryStringLiteralText(std::string_view literal) {
+        return literal.size() >= 2 && literal.front() == '"' && literal.back() == '"';
+    }
+
+    static std::string_view StringLiteralContent(std::string_view literal) {
+        return literal.substr(1, literal.size() - 2);
+    }
+
+    bool HasTrailingExpandableEscape(std::string_view content, char nextChar) const {
+        for (size_t index = 0; index < content.size();) {
+            if (content[index] != '\\') {
+                ++index;
+                continue;
+            }
+            const size_t escapeStart = index;
+            ++index;
+            if (index >= content.size()) {
+                return true;
+            }
+            if (content[index] == 'x') {
+                ++index;
+                while (index < content.size() && IsHexDigit(content[index])) {
+                    ++index;
+                }
+                if (index == content.size()) {
+                    return IsHexDigit(nextChar);
+                }
+                continue;
+            }
+            if (IsOctalDigit(content[index])) {
+                int digitCount = 0;
+                while (index < content.size() && digitCount < 3 && IsOctalDigit(content[index])) {
+                    ++index;
+                    ++digitCount;
+                }
+                if (index == content.size()) {
+                    return digitCount < 3 && IsOctalDigit(nextChar);
+                }
+                continue;
+            }
+            ++index;
+            if (index == content.size() && escapeStart + 1 == content.size()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool HasUserDefinedLiteralSuffix(const std::vector<Token>& tokens, size_t stringLiteralIndex) const {
+        const size_t next = NextSignificantIndex(tokens, stringLiteralIndex + 1);
+        return next < tokens.size() && tokens[next].kind == TokenKind::Word;
     }
 
     bool NeedsSpaceBefore(const std::vector<Token>& tokens, size_t index, const Token& previous) const {

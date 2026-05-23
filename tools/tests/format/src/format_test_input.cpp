@@ -90,6 +90,14 @@ text[2]=kHex[(alpha >> 4)&0x0Fu];
 text[3]=kHex[alpha&0x0Fu];
 }
 
+void WriteTraceStringFragments(TraceLog& trace){
+trace.WriteFmt(TracePrefix::Diagnostics,
+RES_STR("layout_guide_sheet stats selected_cards=%zu "
+"callouts=%zu"),
+stats.selectedCards,
+stats.callouts);
+}
+
 struct OklabColor{
 double l;
 double a;
