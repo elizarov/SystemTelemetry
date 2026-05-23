@@ -152,7 +152,7 @@ OklchColor NormalizeOklch(
 
 enum class RuntimeConfigFieldValueKind {
     HexColor,
-    Integer
+    Integer,
 };
 
 enum class ValueFormat : std::uint8_t {
@@ -160,7 +160,11 @@ enum class ValueFormat : std::uint8_t {
     Integer,
     FloatingPoint,
     ColorHex,
-    FontSpec
+    FontSpec,
+};
+
+enum RuntimeMode {
+    Default,
 };
 
 struct RuntimeConfigFieldDescriptor {

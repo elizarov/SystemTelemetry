@@ -128,6 +128,7 @@ enum class ValueFormat : std::uint8_t {
     String, Integer, FloatingPoint, ColorHex, FontSpec,
 };
 
+enum RuntimeMode{Default};
 
 struct RuntimeConfigFieldDescriptor{RuntimeConfigFieldValueKind kind;const char* key;int keyLength;};
 

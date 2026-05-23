@@ -38,14 +38,14 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Do not increase indentation for namespace bodies. A namespace declaration owns braces and blank-line grouping, but declarations inside it stay at the same indentation level as the namespace declaration.
 - Separate namespace opening lines and namespace closing braces from neighboring declarations with one empty line.
 - Remove trailing whitespace from every line, including comment-only and trailing-comment lines.
-- Preserve the source token sequence except for formatter-owned structural changes: include sorting, trailing-comma removal, inserting required control-statement braces, and safely concatenating adjacent ordinary string literals that relayout places on one line. Outside those formatter-owned changes, the formatter only changes spaces and line breaks.
+- Preserve the source token sequence except for formatter-owned structural changes: include sorting, trailing-comma normalization, inserting required control-statement braces, and safely concatenating adjacent ordinary string literals that relayout places on one line. Outside those formatter-owned changes, the formatter only changes spaces and line breaks.
 - Preserve one source blank line when it separates already closed declarations or statements at the same structural level, including inside function, method, and lambda bodies. Multiple source blank lines collapse to one. Blank lines at the beginning of a block, class, struct, enum, namespace, or immediately before its closing brace are not preserved.
 - Never vertically align tokens, comments, assignments, parameters, ternary arms, or consecutive declarations.
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
 - Do not break string literals, character literals, numeric constants, or comments only to satisfy the line width.
 - Preserve comments in place. The formatter may change spaces and line breaks around comments, and may trim trailing whitespace from comment lines, but it does not move comments across code tokens or reflow comment text.
 - Keep a `//` comment that starts on the line after a declaration as a standalone comment line. Only a `//` comment that is physically on the same source line as a statement or declaration may become that line's trailing comment.
-- Remove trailing commas from comma-separated lists in both single-line and multi-line layouts.
+- Remove trailing commas from comma-separated lists in both single-line and multi-line layouts, except enum bodies.
 - Insert one empty line between top-level logical groups such as classes, free functions, namespace-level declarations, and method implementations.
 - Insert one empty line between neighboring `class`, `struct`, and `enum class` declarations and their sibling declarations. Non-empty function definitions are also separated from neighboring declarations by one empty line.
 - Insert one empty line between neighboring declarations of different kinds. Fields, methods, `class` declarations, `struct` declarations, `enum` declarations, namespace declarations, and macro definitions are separate kinds. Consecutive single-line fields and consecutive macro definitions may stay grouped.
@@ -59,7 +59,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Keep empty braces as `{}`.
 - Treat empty delimiter pairs as atomic text. The formatter never breaks inside empty `()`, empty `{}`, or empty `<>`; it breaks an owning expression or chain instead.
 - Do not force a line break after an initializer-list opening brace unless the initializer list itself wraps.
-- Format enum bodies as structural comma lists with one top-level enumerator per line. The closing brace stays on its own line, and source trailing commas are removed.
+- Format enum bodies as structural comma lists with one top-level enumerator per line. The closing brace stays on its own line, and the final enumerator always has a trailing comma.
 - When a class, struct, or enum body is followed by a declarator for the type just declared, keep the declarator attached to the closing brace as one declaration: `struct Context { ... } context{...};`.
 - Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, and only the `while` that closes a do-while statement stay on the same line as the closing brace. A separate `while` statement after an `if` block starts on its own line.
 - Line break after each statement-terminating semicolon.

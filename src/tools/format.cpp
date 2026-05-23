@@ -28,13 +28,13 @@ constexpr int kDefaultContinuationIndentWidth = 4;
 
 enum class Mode {
     Check,
-    Fix
+    Fix,
 };
 
 enum class Scope {
     All,
     Changed,
-    Path
+    Path,
 };
 
 enum class TokenKind {
@@ -46,7 +46,7 @@ enum class TokenKind {
     BlockComment,
     Preprocessor,
     Symbol,
-    Newline
+    Newline,
 };
 
 struct Options {
@@ -957,7 +957,7 @@ private:
         NamespaceDeclaration,
         EnumDeclaration,
         TypeDeclaration,
-        FunctionDefinition
+        FunctionDefinition,
     };
 
     enum class DeclarationKind {
@@ -966,7 +966,7 @@ private:
         MacroDefinition,
         Method,
         NamespaceDeclaration,
-        TypeDeclaration
+        TypeDeclaration,
     };
 
     struct BlockState {
@@ -1573,18 +1573,14 @@ private:
     void EmitEnumEnumerators(const std::vector<Token>& tokens) {
         std::vector<std::vector<Token>> elements = SplitTopLevel(tokens, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(tokens, ',')) {
-            EmitFormatted(tokens, {});
+            EmitFormatted(tokens, ",");
             return;
         }
         for (size_t index = 0; index < elements.size(); ++index) {
             if (elements[index].empty()) {
                 continue;
             }
-            std::string elementSuffix;
-            if (index + 1 < elements.size()) {
-                elementSuffix = ",";
-            }
-            for (std::string& line : FormatRange(elements[index], indentLevel_, {}, elementSuffix)) {
+            for (std::string& line : FormatRange(elements[index], indentLevel_, {}, ",")) {
                 EmitLine(std::move(line));
             }
         }
@@ -1751,7 +1747,7 @@ private:
         Relational,
         Shift,
         Additive,
-        Multiplicative
+        Multiplicative,
     };
 
     enum class SplitOwnerKind {
@@ -1761,7 +1757,7 @@ private:
         ConstructorInitializer,
         OperatorChain,
         MemberAccess,
-        Group
+        Group,
     };
 
     struct SplitOwner {
