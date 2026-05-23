@@ -1,0 +1,13 @@
+# Hardware Dependency Interface 
+
+The goal is to be able to test all hardware integration only any machine via abstracted hardware interfaces that are covered by mock tests which can run anywhere. In order to achive it, we crate interface for every machine-dependent operations that casedash perform via windows on vendor api. The scope of this interface covers gpu, boards, and fps telemetry that are interconnected and hardware-depended. Other parts of telemetry are not covered, because it contains generic code that can be tested anywhere.
+
+So, there is an interface for each library that declares all methods from this library that are used by casedash. If libary is dynamically loaded, then then the loading is also abstracted in the same interface by Load method that shall be called first and return status code. The interface exists for for native and managed libraries (in which case they are managed interface). 
+
+During normal operation, the interface is trivially implemented by forwarding calls directly to the corresponding library and returning result. No processing of parameters or results. In trace mode, each interface implementation traces all calls. Note, that existing telemetry code has adhoc tracing around some of those calls and all this adhock tracing has to removed and moved into new architecture where all calls are consitently traced.
+
+For tests, those interfaces are completely mocked. The mocking infrastructure provide ability to inject data that totally mimics the results returned by actual machines during telemetry intializatio and data collection, so the whole path from creating telemetry (and figuring out what hardware the machine has and which implementation to create) to metrics collection can be excercised by a test running on any machine. 
+
+For source-code placement, the hardware interfaces are going to live inside telemetry/impl or inside telemetry/gpu|board/vendor/impl (for vendor-specific interfaces) and are going to be consistent named hdi_{module}.h with a factory method (that takes trace as parameter) and hid_{module}.cpp implementation that contains direct tracing implementations.
+
+For tests, there is going to be tests/hid directory that contains basic infrastructure and tests/hid/{hardware} directory that contain mocks and test for specific hardware configurations (that same ones that have performance records in docs performance). The test will mock the harware interface and test the telemetry data parsing logic in various hardware-specific mode (e.g. some hardware have multiple gpus or might have awake/sleeping gpu), asserting what kind of resulting data telemetry metrics contain.
