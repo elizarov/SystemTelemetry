@@ -68,6 +68,8 @@ Each feature item uses short copy and, where useful, a small cropped screenshot 
 
 The hardware section gives visitors a concise support overview with one-line provider mentions and sends them to [docs/hardware.md](hardware.md) for the canonical supported-provider list, runtime requirements, provider-specific telemetry behavior, and troubleshooting details.
 
+The hardware grid mentions AMD, Intel, NVIDIA, Presented FPS, ASUS, MSI, Gigabyte, and Lenovo in the same order as the website source.
+
 ## Layout Section
 
 The layout section introduces layout selection and layout-edit mode from an end-user perspective.

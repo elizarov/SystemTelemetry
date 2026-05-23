@@ -212,6 +212,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | ASUS System Control Interface ATKACPI | ASUS board telemetry through the `\\.\ATKACPI` device. |
 | MSI Center SDK | MSI board telemetry through MSI Center SDK. |
 | Gigabyte SIV | Gigabyte board telemetry through Gigabyte SIV assemblies. |
+| Lenovo Diagnostics Driver | Lenovo board CPU temperature telemetry through the Lenovo diagnostics driver and fan telemetry through Lenovo GameZone WMI. |
 
 ## Diagnostics Terms
 
