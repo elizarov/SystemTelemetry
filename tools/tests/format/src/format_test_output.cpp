@@ -938,6 +938,15 @@ void ControlFlowVariety(int* values, int count) {
     } while (index > 0);
 }
 
+void TryFinallyCleanup() {
+    const auto originalDirectory = Environment::CurrentDirectory;
+    try {
+        RunWithTemporaryDirectory();
+    } finally {
+        Environment::CurrentDirectory = originalDirectory;
+    }
+}
+
 void LongComment() {
     // This deliberately long comment should remain as one physical line because ReflowComments is false even though it is beyond the configured column limit for the fixture.
 }

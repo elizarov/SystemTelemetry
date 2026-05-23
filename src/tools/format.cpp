@@ -1230,6 +1230,7 @@ private:
             (
                 tokens[next].text == "else" ||
                 tokens[next].text == "catch" ||
+                tokens[next].text == "finally" ||
                 (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
             )
         ) {
@@ -3592,7 +3593,7 @@ private:
             return true;
         }
         const std::string& previousText = tokens[*previous].text;
-        if (previousText == "else" || previousText == "try" || previousText == "do") {
+        if (previousText == "else" || previousText == "try" || previousText == "finally" || previousText == "do") {
             return true;
         }
         if (previousText != ")") {
@@ -4154,6 +4155,7 @@ private:
             first == "switch" ||
             first == "catch" ||
             first == "try" ||
+            first == "finally" ||
             first == "do" ||
             first == "else"
         ) {
@@ -4308,6 +4310,7 @@ private:
             first == "switch" ||
             first == "catch" ||
             first == "try" ||
+            first == "finally" ||
             first == "do" ||
             first == "else"
         ) {

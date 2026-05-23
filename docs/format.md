@@ -61,7 +61,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Do not force a line break after an initializer-list opening brace unless the initializer list itself wraps.
 - Format enum bodies as structural comma lists with one top-level enumerator per line. The closing brace stays on its own line, and the final enumerator always has a trailing comma.
 - When a class, struct, or enum body is followed by a declarator for the type just declared, keep the declarator attached to the closing brace as one declaration: `struct Context { ... } context{...};`.
-- Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, and only the `while` that closes a do-while statement stay on the same line as the closing brace. A separate `while` statement after an `if` block starts on its own line.
+- Line break after a code-block closing brace, except that same-statement continuation forms such as `else`, `catch`, `finally`, and only the `while` that closes a do-while statement stay on the same line as the closing brace. A separate `while` statement after an `if` block starts on its own line.
 - Line break after each statement-terminating semicolon.
 - Keep preprocessor directives at column zero. Macro continuation backslashes, spaces before continuation backslashes, and continuation newlines are formatter-owned layout. For multi-line macro definitions, normalize the replacement list as code, collapse it onto one indented continuation line when it fits, and insert continuation backslashes only on emitted macro lines that continue onto another emitted macro line.
 - Put one empty line after `#pragma once` before the next include, preprocessor directive, comment, or declaration.
@@ -76,14 +76,14 @@ Namespaces are grouping syntax, not indentation syntax. The formatter keeps name
 
 ```cpp
 namespace app {
-    
+
 class Widget {
 public:
     void Paint();
 };
 
 namespace detail {
-    
+
 void Helper();
 
 }
@@ -113,7 +113,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Do not put spaces just inside parentheses, brackets, template angle brackets, or one-line initializer braces: `(value)`, `items[index]`, `std::vector<int>`, and `{a, b}`.
 - Treat template and cast angle brackets as delimiter syntax, not comparison operators: `template <typename T>`, `std::vector<int>`, `std::vector<std::pair<std::string, std::string>>`, and `static_cast<int>(value)`.
 - Keep empty braces as `{}` with no inner space.
-- Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
+- Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, `catch`, and `finally`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
 - Put a space between `auto` and the opening bracket of a structured binding: `auto [name, value] = pair;`.
 - Do not put a space between a string or character literal prefix and its literal: `L"text"`, `u8"text"`, and `L'x'`.
@@ -424,6 +424,12 @@ if (
 try {
     // code
 } catch (const std::exception& exception) {
+    // code
+}
+
+try {
+    // code
+} finally {
     // code
 }
 
