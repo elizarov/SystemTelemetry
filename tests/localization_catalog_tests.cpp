@@ -39,6 +39,30 @@ TEST(LocalizationCatalog, LooksUpResourceStringKeys) {
     EXPECT_STREQ(FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), "Failed to reload config.ini.");
 }
 
+TEST(LocalizationCatalog, DefinesTextForTitlebarTooltipKeys) {
+    const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
+    std::ifstream input(catalogPath.string(), std::ios::binary);
+    ASSERT_TRUE(input.is_open()) << "failed to open " << catalogPath.string();
+
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    const LocalizationCatalogMap catalog = ParseLocalizationCatalog(buffer.str());
+
+    const std::vector<std::string> keys = {
+        "titlebar.app_menu",
+        "titlebar.layout",
+        "titlebar.theme",
+        "titlebar.edit_layout",
+        "titlebar.display",
+        "titlebar.close",
+    };
+    for (const std::string& key : keys) {
+        const auto it = catalog.find(key);
+        ASSERT_TRUE(it != catalog.end()) << "missing localization key: " << key;
+        EXPECT_FALSE(it->second.empty()) << "empty localization text for key: " << key;
+    }
+}
+
 TEST(LocalizationCatalog, DefinesTextForAllSupportedTooltipKeys) {
     const FilePath catalogPath = FilePath(CASEDASH_SOURCE_DIR) / "resources" / "localization.ini";
     std::ifstream input(catalogPath.string(), std::ios::binary);

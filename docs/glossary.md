@@ -34,7 +34,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | dashboard UI | The normal interactive shell with popup menus, tray icon, telemetry updates, and rendering. |
 | tray icon | The notification-area icon exposing the same menu action set as the dashboard menu. |
 | popup menu | The right-click dashboard or tray menu. |
-| move mode | The pointer-attached placement mode that overlays monitor name, effective scale, and relative coordinates. |
+| move mode | The pointer-attached placement mode that overlays monitor name, display scale percentage, and relative coordinates. |
 | runtime config | The loaded embedded config plus the executable-side config overlay and any live in-memory edits. |
 | embedded template | The `resources/config.ini` defaults compiled into the executable. |
 | executable-side config | The `config.ini` file beside `CaseDash.exe`. |
@@ -43,8 +43,12 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | explicit scale override | A configured render scale that replaces monitor DPI-derived scale. |
 | target monitor | The configured display selected by `[display] monitor_name`. |
 | placement | The dashboard window position relative to the target monitor. |
+| fullscreen display placement | A `Configure Display` choice that fits the layout to the whole selected display and commits CaseDash blank wallpaper ownership for that monitor. |
+| edge display placement | A `Configure Display` top, bottom, left, or right choice that fits the layout to one screen edge without owning a wallpaper. |
+| autohide display placement | An edge display placement whose saved `[display] autohide` edge matches the live dashboard client rectangle exactly, making the dashboard a topmost auto-hide drawer. |
+| committed wallpaper ownership | The last successful runtime display commit whose non-empty `display.wallpaper` fills a resolved monitor at `(0,0)`; it drives later Windows wallpaper cleanup even if manual move or resize changes the live placement before the next commit. |
 | `Start with Windows` | The user-visible command that manages machine-wide logon startup and the `CashDashService` service. |
-| `Configure Display` | The command that chooses a display, computes scale, resets placement, writes `casedash_blank.png`, and applies the wallpaper. |
+| `Configure Display` | The command that chooses a fullscreen or edge display placement, computes explicit scale and position, and applies CaseDash wallpaper only for fullscreen placements. |
 | `Bring to Front` | The command that raises the dashboard. |
 | `About CaseDash` | The dialog that shows the themed app icon, version, build kind, and commit when available. |
 

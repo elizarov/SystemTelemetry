@@ -91,6 +91,19 @@ TEST(ConfigWriter, MinimalSavePersistsGpuAdapterAgainstEmptySourceConfig) {
     EXPECT_THAT(output, testing::HasSubstr("[gpu]\r\nadapter_name = NVIDIA GeForce RTX 4070 Laptop GPU\r\n"));
 }
 
+TEST(ConfigWriter, MinimalSavePersistsDisplayAutohide) {
+    AppConfig compareConfig;
+    compareConfig.display.autohide.clear();
+
+    AppConfig currentConfig = compareConfig;
+    currentConfig.display.autohide = "right";
+
+    const std::string output = BuildSavedConfigText(ReadConfigTemplateFromSourceTree(), currentConfig, &compareConfig);
+
+    EXPECT_THAT(output, testing::HasSubstr("[display]\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("autohide = right\r\n"));
+}
+
 TEST(ConfigWriter, MinimalSaveInsertsMissingGpuSectionWithKeyBeforeSectionSeparator) {
     AppConfig compareConfig;
     compareConfig.gpu.adapterName.clear();
@@ -250,7 +263,9 @@ TEST(ConfigWriter, FullExportWritesThemeSections) {
         testing::HasSubstr("[display]\r\n"
                            "monitor_name = \r\n"
                            "layout = 5x3\r\n"
-                           "theme = dark_cyan\r\n"));
+                           "theme = dark_cyan\r\n"
+                           "wallpaper = \r\n"
+                           "autohide = \r\n"));
     EXPECT_THAT(output,
         testing::HasSubstr("[theme.dark_cyan]\r\n"
                            "description = Black, white, cyan\r\n"

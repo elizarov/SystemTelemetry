@@ -27,6 +27,9 @@ public:
     bool IsLayoutEditModalUiActive() const;
     void ShowContextMenu(
         MenuSource source, POINT screenPoint, const LayoutEditController::TooltipTarget* layoutEditTarget);
+    void ApplyTitlebarLayoutSelection(size_t index);
+    void ApplyTitlebarThemeSelection(size_t index);
+    void ShowTitlebarConfigureDisplayMenu(POINT screenPoint);
     void InvokeDefaultAction(MenuSource source,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
@@ -100,6 +103,9 @@ private:
     void OnLayoutEditDialogCloseRequested() override;
     std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override;
     UINT ResolveDefaultCommand(MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const;
+    size_t BuildConfigureDisplayMenu(HMENU menu, DisplayMenuOption* options, size_t capacity);
+    bool AttachConfigureDisplayMenuBitmap(HMENU menu, UINT commandId, const DisplayMenuOption& option);
+    void ClearConfigureDisplayMenuBitmaps();
     void ExecuteCommand(UINT selected,
         const LayoutEditController::TooltipTarget* layoutEditTarget,
         const POINT* cursorAnchorClientPoint = nullptr);
@@ -108,4 +114,5 @@ private:
 
     DashboardApp& app_;
     std::unique_ptr<LayoutEditDialog> layoutEditDialog_;
+    std::vector<HBITMAP> configureDisplayMenuBitmaps_;
 };

@@ -181,7 +181,12 @@ add_executable(CaseDash WIN32
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_menu_format.cpp
+    src/dashboard/display_placement_menu_bitmap.cpp
+    src/dashboard/native_theme_colors.cpp
     src/dashboard/dashboard_shell_ui.cpp
+    src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
+    src/dashboard/dashboard_window_chrome.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
     src/layout_edit_dialog/theme_preview.cpp
     src/layout_edit_dialog/impl/dialog_proc.cpp
@@ -321,6 +326,8 @@ set(casedash_release_speed_sources
     src/dashboard/dashboard_app.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_shell_ui.cpp
+    src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
     src/diagnostics/app_icon_export.cpp
     src/widget/app_icon_geometry.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
@@ -544,6 +551,8 @@ target_link_options(CaseDash PRIVATE
 
 target_link_libraries(CaseDash PRIVATE
     user32
+    dwmapi
+    uxtheme
     gdi32
     d3d11
     d2d1
@@ -643,6 +652,8 @@ add_executable(CaseDashTests
     tests/card_chrome_layout_tests.cpp
     tests/layout_snap_solver_tests.cpp
     tests/board_metric_binding_tests.cpp
+    tests/dashboard_titlebar_tests.cpp
+    tests/display_menu_options_tests.cpp
     tests/layout_edit_controller_tests.cpp
     tests/layout_edit_hit_test_tests.cpp
     tests/layout_edit_parameter_apply_tests.cpp
@@ -693,6 +704,12 @@ add_executable(CaseDashTests
     src/layout_edit/layout_edit_tooltip_text.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
+    src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
+    src/dashboard/dashboard_window_chrome.cpp
+    src/dashboard/display_placement_menu_bitmap.cpp
+    src/dashboard/native_theme_colors.cpp
+    src/display/monitor.cpp
     src/layout_edit_dialog/impl/editor_handler_registry.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
@@ -704,6 +721,7 @@ add_executable(CaseDashTests
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
+    src/util/scale.cpp
     src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/board/board_vendor_selection.cpp
@@ -792,7 +810,10 @@ target_link_options(CaseDashTests PRIVATE
 target_link_libraries(CaseDashTests PRIVATE
     GTest::gtest_main
     user32
+    dwmapi
+    uxtheme
     gdi32
+    advapi32
     d3d11
     d2d1
     dwrite

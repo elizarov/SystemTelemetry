@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdio>
+#include <string_view>
 
 #include "config/color_resolver.h"
 #include "config/config_io.h"
@@ -12,7 +13,6 @@
 #include "dashboard/autostart.h"
 #include "diagnostics/constants.h"
 #include "diagnostics/snapshot_dump.h"
-#include "display/constants.h"
 #include "display/display_config.h"
 #include "layout_edit/layout_edit_parameter_edit.h"
 #include "layout_edit/layout_edit_service.h"
@@ -89,6 +89,47 @@ bool SaveRuntimeConfig(const FilePath& path, const AppConfig& config, HWND owner
         return SaveConfig(path, config, ConfigParseContext{TelemetryMetricCatalog()});
     }
     return SaveConfigElevated(path, config, owner, ConfigParseContext{TelemetryMetricCatalog()});
+}
+
+bool DisplayScalesEqual(double left, double right) {
+    return std::abs(left - right) <= 0.0001;
+}
+
+void TraceDisplayPositionUpdate(Trace& trace,
+    std::string_view source,
+    const DisplayConfig& previous,
+    const DisplayConfig& current,
+    const MonitorPlacementInfo* placement = nullptr) {
+    if (previous.monitorName == current.monitorName && previous.position == current.position &&
+        DisplayScalesEqual(previous.scale, current.scale)) {
+        return;
+    }
+
+    trace.WriteFmt(TracePrefix::DisplayPlacement,
+        RES_STR("config_position source=\"%.*s\" monitor=\"%s\" old_monitor=\"%s\" position=%d,%d "
+                "old_position=%d,%d scale=%.6f old_scale=%.6f"),
+        static_cast<int>(source.size()),
+        source.data(),
+        current.monitorName.c_str(),
+        previous.monitorName.c_str(),
+        current.position.x,
+        current.position.y,
+        previous.position.x,
+        previous.position.y,
+        current.scale,
+        previous.scale);
+    if (placement != nullptr) {
+        trace.WriteFmt(TracePrefix::DisplayPlacement,
+            RES_STR("config_position_detail source=\"%.*s\" physical_position=%ld,%ld dpi=%u device=\"%s\" "
+                    "config_monitor=\"%s\""),
+            static_cast<int>(source.size()),
+            source.data(),
+            placement->physicalRelativePosition.x,
+            placement->physicalRelativePosition.y,
+            placement->dpi,
+            placement->deviceName.c_str(),
+            placement->configMonitorName.c_str());
+    }
 }
 
 double ClampGaugeSegmentGapForCurrentConfig(const AppConfig& config, double value) {
@@ -238,7 +279,53 @@ __declspec(noinline) bool DashboardController::FinishConfigMutation(
 }
 
 bool DashboardController::ApplyConfiguredWallpaper(Trace& trace) {
-    return ::ApplyConfiguredWallpaper(state_.config, trace);
+    const bool applied = ::ApplyConfiguredWallpaper(NormalizeCommittedDisplayWallpaperConfig(state_.config), trace);
+    if (applied &&
+        (!state_.committedDisplayConfig.has_value() || state_.config.display == *state_.committedDisplayConfig)) {
+        // Placement retry can run after live-only changes; only advance the committed snapshot when it still matches.
+        RefreshCommittedDisplayConfig(state_.config);
+    }
+    return applied;
+}
+
+void DashboardController::RefreshCommittedDisplayConfig(const AppConfig& config) {
+    state_.committedDisplayConfig = config.display;
+    RefreshCommittedWallpaperOwner(config);
+}
+
+void DashboardController::RefreshCommittedWallpaperOwner(const AppConfig& config) {
+    if (ResolveCommittedDisplayWallpaperOwner(config).has_value()) {
+        state_.committedWallpaperOwnerConfig = config;
+    } else {
+        state_.committedWallpaperOwnerConfig.reset();
+    }
+}
+
+std::optional<AppConfig> DashboardController::CommittedWallpaperConfigToClear(const AppConfig& nextConfig) const {
+    if (!state_.committedWallpaperOwnerConfig.has_value()) {
+        return std::nullopt;
+    }
+
+    const std::optional<DisplayWallpaperOwner> previousOwner =
+        ResolveCommittedDisplayWallpaperOwner(*state_.committedWallpaperOwnerConfig);
+    const std::optional<DisplayWallpaperOwner> nextOwner = ResolveCommittedDisplayWallpaperOwner(nextConfig);
+    if (!ShouldClearCommittedDisplayWallpaper(previousOwner, nextOwner)) {
+        return std::nullopt;
+    }
+    return state_.committedWallpaperOwnerConfig;
+}
+
+bool DashboardController::CommitDisplayWallpaperTransition(
+    const AppConfig& nextConfig, Trace& trace, bool applyNextWallpaper) {
+    const std::optional<AppConfig> previousWallpaperConfig = CommittedWallpaperConfigToClear(nextConfig);
+    const bool nextApplied = !applyNextWallpaper || ::ApplyConfiguredWallpaper(nextConfig, trace);
+    const bool previousCleared = nextApplied && (!previousWallpaperConfig.has_value() ||
+                                                    ClearConfiguredWallpaper(*previousWallpaperConfig, trace));
+    if (!previousCleared) {
+        return false;
+    }
+    RefreshCommittedDisplayConfig(nextConfig);
+    return true;
 }
 
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
@@ -286,6 +373,7 @@ bool DashboardController::InitializeSession(DashboardShellHost& shell, const Dia
         BeginLayoutEditSessionTracking();
     }
     ApplyConfiguredWallpaper(shell.TraceLog());
+    RefreshCommittedDisplayConfig(state_.config);
     return true;
 }
 
@@ -320,6 +408,7 @@ bool DashboardController::WriteDiagnosticsOutputs() {
 bool DashboardController::ReloadConfigFromDisk(
     DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     std::string telemetryError;
+    const DisplayConfig previousDisplay = state_.config.display;
     if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
             state_.config,
             state_.telemetry,
@@ -335,6 +424,7 @@ bool DashboardController::ReloadConfigFromDisk(
         shell.InitializeFonts();
         return false;
     }
+    TraceDisplayPositionUpdate(shell.TraceLog(), "reload_config", previousDisplay, state_.config.display);
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
@@ -342,7 +432,9 @@ bool DashboardController::ReloadConfigFromDisk(
         }
         return false;
     }
-    ApplyConfiguredWallpaper(shell.TraceLog());
+    if (!CommitDisplayWallpaperTransition(state_.config, shell.TraceLog(), true)) {
+        return false;
+    }
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
@@ -387,7 +479,7 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     std::string errorText;
     if (!SaveDumpScreenshot(*path,
             state_.telemetryUpdate.dump.snapshot,
-            BuildCurrentConfigForSaving(shell),
+            BuildCurrentConfigForSaving(),
             shell.CurrentRenderScale(),
             GetDiagnosticsRenderMode(diagnosticsOptions),
             state_.isEditingLayout || diagnosticsOptions.editLayout,
@@ -420,7 +512,7 @@ void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
     std::string errorText;
     if (!SaveLayoutGuideSheet(*path,
             state_.telemetryUpdate.dump.snapshot,
-            BuildCurrentConfigForSaving(shell),
+            BuildCurrentConfigForSaving(),
             shell.CurrentRenderScale(),
             shell.TraceLog(),
             &errorText)) {
@@ -439,7 +531,7 @@ void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     if (!path.has_value()) {
         return;
     }
-    if (!SaveFullConfig(*path, BuildCurrentConfigForSaving(shell))) {
+    if (!SaveFullConfig(*path, NormalizeCommittedDisplayWallpaperConfig(BuildCurrentConfigForSaving()))) {
         const std::string pathText = path->string();
         shell.ShowError(FormatText("Failed to save full config file:\n%s", pathText.c_str()));
     }
@@ -457,25 +549,29 @@ void DashboardController::ToggleAutoStart(DashboardShellHost& shell) {
 }
 
 bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const DisplayMenuOption& option) {
-    if (state_.telemetry == nullptr || !option.layoutFits || option.fittedScale <= 0.0) {
+    if (state_.telemetry == nullptr || option.targetScale <= 0.0) {
         return false;
     }
 
-    AppConfig updatedConfig = state_.config;
+    const AppConfig previousConfig = state_.config;
+    AppConfig updatedConfig = BuildConfiguredDisplayConfig(state_.config, option);
     ApplyResolvedTelemetrySelections(updatedConfig, state_.telemetryUpdate.resolvedSelections);
-    updatedConfig.display.monitorName = option.configMonitorName;
-    updatedConfig.display.position = {};
-    updatedConfig.display.scale = option.fittedScale;
-    updatedConfig.display.wallpaper = kDefaultBlankWallpaperFileName;
-    if (!::ConfigureDisplay(
-            updatedConfig, state_.telemetryUpdate.dump, option.fittedScale, shell.TraceLog(), shell.WindowHandle())) {
+    const std::optional<AppConfig> previousWallpaperConfig = CommittedWallpaperConfigToClear(updatedConfig);
+    if (!::ConfigureDisplay(updatedConfig,
+            state_.telemetryUpdate.dump,
+            option.targetScale,
+            option.writesWallpaper,
+            previousWallpaperConfig.has_value() ? &*previousWallpaperConfig : nullptr,
+            shell.TraceLog(),
+            shell.WindowHandle())) {
         shell.ShowError("Failed to configure the selected display.");
         return false;
     }
 
+    TraceDisplayPositionUpdate(shell.TraceLog(), "configure_display", previousConfig.display, updatedConfig.display);
     state_.config = std::move(updatedConfig);
+    RefreshCommittedDisplayConfig(state_.config);
     SyncRenderer(shell, state_.isEditingLayout);
-    ApplyConfiguredWallpaper(shell.TraceLog());
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
@@ -543,12 +639,16 @@ bool DashboardController::SwitchTheme(
 
 bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scale) {
     const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
+    const DisplayConfig previousDisplay = state_.config.display;
     state_.config.display.monitorName =
         !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
-    const double targetScale = HasExplicitDisplayScale(scale) ? scale : ScaleFromDpi(placement.dpi);
+    const double requestedScale = RoundDisplayScale(scale);
+    const double targetScale = HasExplicitDisplayScale(requestedScale) ? requestedScale : ScaleFromDpi(placement.dpi);
     state_.config.display.position.x = ScalePhysicalToLogical(placement.physicalRelativePosition.x, targetScale);
     state_.config.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
-    state_.config.display.scale = HasExplicitDisplayScale(scale) ? scale : 0.0;
+    state_.config.display.scale = HasExplicitDisplayScale(requestedScale) ? requestedScale : 0.0;
+    TraceDisplayPositionUpdate(
+        shell.TraceLog(), "set_display_scale", previousDisplay, state_.config.display, &placement);
     SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
@@ -786,7 +886,9 @@ bool DashboardController::ApplyLayoutEditCardTitle(
 
 void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const AppConfig& config) {
     const TelemetrySettings previousSettings = ExtractTelemetrySettings(state_.config);
+    const DisplayConfig previousDisplay = state_.config.display;
     state_.config = config;
+    TraceDisplayPositionUpdate(shell.TraceLog(), "apply_config_snapshot", previousDisplay, state_.config.display);
     if (state_.telemetry != nullptr) {
         const TelemetrySettings nextSettings = ExtractTelemetrySettings(state_.config);
         if (previousSettings != nextSettings) {
@@ -810,24 +912,45 @@ std::optional<int> DashboardController::EvaluateLayoutWidgetExtentForWeights(Das
     return renderer.FindLayoutWidgetExtent(widget, axis);
 }
 
-AppConfig DashboardController::BuildCurrentConfigForSaving(DashboardShellHost& shell) const {
+AppConfig DashboardController::BuildCurrentConfigForSaving() const {
     AppConfig config = state_.config;
     if (state_.telemetry != nullptr) {
         ApplyResolvedTelemetrySelections(config, state_.telemetryUpdate.resolvedSelections);
     }
-    const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
-    config.display.monitorName =
-        !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
-    config.display.position.x = placement.relativePosition.x;
-    config.display.position.y = placement.relativePosition.y;
     return config;
 }
 
-bool DashboardController::UpdateConfigFromCurrentPlacement(DashboardShellHost& shell) {
+void DashboardController::UpdateConfigFromMovePlacement(DashboardShellHost& shell) {
+    const MonitorPlacementInfo placement = shell.GetWindowPlacementInfo();
+    const DisplayConfig previousDisplay = state_.config.display;
+    state_.config.display.monitorName =
+        !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
+    state_.config.display.position.x = placement.relativePosition.x;
+    state_.config.display.position.y = placement.relativePosition.y;
+    TraceDisplayPositionUpdate(shell.TraceLog(), "move_complete", previousDisplay, state_.config.display, &placement);
+}
+
+void DashboardController::UpdateConfigFromResizePlacement(DashboardShellHost& shell) {
+    const double targetScale = RoundDisplayScale(shell.CurrentRenderScale());
+    const MonitorPlacementInfo placement = shell.GetWindowPlacementInfoForScale(targetScale);
+    const DisplayConfig previousDisplay = state_.config.display;
+    const DisplayConfig nextDisplay = BuildResizePlacementDisplayConfig(previousDisplay, placement, targetScale);
+    if (nextDisplay == previousDisplay) {
+        return;
+    }
+    state_.config.display = nextDisplay;
+    TraceDisplayPositionUpdate(shell.TraceLog(), "resize_complete", previousDisplay, state_.config.display, &placement);
+}
+
+bool DashboardController::SaveCurrentConfig(DashboardShellHost& shell) {
     const FilePath configPath = GetRuntimeConfigPath();
-    AppConfig config = BuildCurrentConfigForSaving(shell);
+    AppConfig config = NormalizeCommittedDisplayWallpaperConfig(BuildCurrentConfigForSaving());
     if (!SaveRuntimeConfig(configPath, config, shell.WindowHandle())) {
         shell.ShowError(FormatText("Failed to save %s.", configPath.string().c_str()));
+        return false;
+    }
+    if (!CommitDisplayWallpaperTransition(config, shell.TraceLog(), true)) {
+        shell.ShowError("Failed to commit display wallpaper changes.");
         return false;
     }
     state_.config = std::move(config);

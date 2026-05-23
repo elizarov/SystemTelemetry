@@ -4,15 +4,23 @@
 #include <cmath>
 
 double ScaleFromDpi(UINT dpi) {
-    return static_cast<double>(std::max(kDefaultDpi, dpi)) / static_cast<double>(kDefaultDpi);
+    return RoundDisplayScale(static_cast<double>(std::max(kDefaultDpi, dpi)) / static_cast<double>(kDefaultDpi));
 }
 
 bool HasExplicitDisplayScale(double scale) {
     return std::isfinite(scale) && scale > 0.0;
 }
 
+double RoundDisplayScale(double scale) {
+    if (!std::isfinite(scale)) {
+        return scale;
+    }
+    const double rounded = std::round(scale * 1000.0) / 1000.0;
+    return scale > 0.0 ? std::max(0.001, rounded) : rounded;
+}
+
 double ResolveDisplayScale(double configuredScale, UINT dpi) {
-    return HasExplicitDisplayScale(configuredScale) ? configuredScale : ScaleFromDpi(dpi);
+    return HasExplicitDisplayScale(configuredScale) ? RoundDisplayScale(configuredScale) : ScaleFromDpi(dpi);
 }
 
 int ScaleLogicalToPhysical(int logicalValue, double scale) {

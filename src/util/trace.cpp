@@ -122,6 +122,10 @@ const char* Trace::PrefixName(TracePrefix prefix) {
             return "board_vendor";
         case TracePrefix::Crash:
             return "crash";
+        case TracePrefix::DashboardTooltip:
+            return "dashboard_tooltip";
+        case TracePrefix::DisplayPlacement:
+            return "display_placement";
         case TracePrefix::Diagnostics:
             return "diagnostics";
         case TracePrefix::Fake:

@@ -9,8 +9,13 @@
 struct AppConfig;
 
 bool ApplyConfiguredWallpaper(const AppConfig& config, Trace& trace);
-bool ConfigureDisplay(const AppConfig& config, const TelemetryDump& dump, double targetScale, Trace& trace, HWND owner);
-int RunElevatedConfigureDisplayMode(const FilePath& sourceConfigPath,
-    const FilePath& sourceDumpPath,
-    const FilePath& targetConfigPath,
-    const FilePath& targetImagePath);
+bool ClearConfiguredWallpaper(const AppConfig& config, Trace& trace);
+bool ConfigureDisplay(const AppConfig& config,
+    const TelemetryDump& dump,
+    double targetScale,
+    bool writeWallpaper,
+    const AppConfig* previousWallpaperConfig,
+    Trace& trace,
+    HWND owner);
+int RunElevatedConfigureDisplayMode(
+    const FilePath& configPayloadPath, const FilePath& dumpPayloadPath, bool writeWallpaper);
