@@ -236,6 +236,21 @@ void TrackCoveredParameters() {
     Use(coveredColorParameters);
 }
 
+void TrackFeatureLevels() {
+    const std::array<D3D_FEATURE_LEVEL, 4> preferredFeatureLevels{
+        D3D_FEATURE_LEVEL_11_1,
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0
+    };
+    const std::array<D3D_FEATURE_LEVEL, 3> fallbackFeatureLevels{
+        D3D_FEATURE_LEVEL_11_0,
+        D3D_FEATURE_LEVEL_10_1,
+        D3D_FEATURE_LEVEL_10_0
+    };
+    Use(preferredFeatureLevels, fallbackFeatureLevels);
+}
+
 DashboardApp::DashboardApp(
     const DiagnosticsOptions& diagnosticsOptions,
     bool bringToFrontOnRun

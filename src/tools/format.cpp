@@ -1797,6 +1797,16 @@ private:
                 return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
             }
         }
+        if (owner && owner->kind == SplitOwnerKind::Group) {
+            if (std::optional<GroupPair> group = FindPreferredValueGroupAfterTemplateGroup(
+                tokens,
+                owner->group,
+                indentLevel,
+                prefix
+            )) {
+                return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
+            }
+        }
         if (owner) {
             return FormatSplitOwner(
                 tokens,
@@ -2597,6 +2607,39 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
         );
         return Fits(indentLevel, std::string(prefix) + FormatInline(firstLineTokens)) ? group : std::nullopt;
+    }
+
+    std::optional<GroupPair> FindPreferredValueGroupAfterTemplateGroup(
+        const std::vector<Token>& tokens,
+        GroupPair templateGroup,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
+        if (!IsTemplateAngleGroup(tokens, templateGroup)) {
+            return std::nullopt;
+        }
+        int depth = 0;
+        for (size_t index = templateGroup.close + 1; index < tokens.size(); ++index) {
+            if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
+                    GroupPair group{index, *close};
+                    if (IsTemplateAngleGroup(tokens, group)) {
+                        UpdateDepth(tokens, index, depth);
+                        continue;
+                    }
+                    if (
+                        !IsEmptyGroupPair(tokens, index, *close) &&
+                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index) &&
+                        Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, group))
+                    ) {
+                        return group;
+                    }
+                }
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return std::nullopt;
     }
 
     std::optional<GroupPair> FindFirstWrappableGroupPairAfter(const std::vector<Token>& tokens, size_t begin) const {
@@ -3621,6 +3664,13 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(*close)
         );
         return ContainsTopLevelSeparator(inner, ',');
+    }
+
+    bool IsTemplateAngleGroup(const std::vector<Token>& tokens, GroupPair group) const {
+        return group.open < tokens.size() &&
+            group.close < tokens.size() &&
+            tokens[group.open].text == "<" &&
+            IsTemplateAngleOpen(tokens, group.open);
     }
 
     std::optional<size_t> FindWrappableGroupClose(const std::vector<Token>& tokens, size_t open) const {

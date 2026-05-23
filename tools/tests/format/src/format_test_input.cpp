@@ -178,6 +178,12 @@ std::array<bool,static_cast<size_t>(LayoutEditParameter::Count)> coveredColorPar
 Use(coveredColorParameters);
 }
 
+void TrackFeatureLevels(){
+const std::array<D3D_FEATURE_LEVEL,4> preferredFeatureLevels{D3D_FEATURE_LEVEL_11_1,D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};
+const std::array<D3D_FEATURE_LEVEL,3> fallbackFeatureLevels{D3D_FEATURE_LEVEL_11_0,D3D_FEATURE_LEVEL_10_1,D3D_FEATURE_LEVEL_10_0};
+Use(preferredFeatureLevels,fallbackFeatureLevels);
+}
+
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions,bool bringToFrontOnRun):renderer_(trace_),diagnosticsOptions_(diagnosticsOptions),layoutEditController_(*this),shellUi_(std::make_unique<DashboardShellUi>(*this)),bringToFrontOnRun_(bringToFrontOnRun){
 renderer_.SetLiveAnimationEnabled(true);
 }
