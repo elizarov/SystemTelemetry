@@ -200,6 +200,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | permission-gated value | A value blocked by access rights, surfaced with `permission_required` in dumps and `!admin` where the UI can still explain the state. |
 | provider-owned value | A value supplied by a hardware provider rather than the Windows-native collector. |
 | runtime target resolution | Runtime selection of GPU adapter, network adapter, storage drives, and board provider. |
+| hardware dependency interface | Proposed telemetry test seam that wraps hardware-dependent vendor SDKs, Windows hardware APIs, provider runtime discovery, service IPC, and permission-sensitive sampling so hardware-provider paths can be tested with deterministic mocks. Use `HDI` after first mention only in design notes. |
 
 ## Supported Providers
 

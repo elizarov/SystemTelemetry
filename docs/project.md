@@ -9,6 +9,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `docs/animation.md` owns live-dashboard animation behavior, target render-thread architecture, and animation-specific implementation contracts.
 - `docs/glossary.md` owns canonical project terminology and context-specific spelling rules.
 - `docs/hardware.md` owns supported hardware-provider details, provider runtime requirements, provider-specific telemetry behavior, and provider troubleshooting.
+- `docs/hardware-dependency-interface.md` owns the active hardware dependency interface proposal for testable hardware-provider dependencies.
 - `docs/layout_edit.md` owns layout-edit mode, edit-target interaction, modeless editor behavior, and layout-edit save or discard behavior.
 - `docs/layout.md` owns config language, section ownership, syntax, and validation rules.
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
