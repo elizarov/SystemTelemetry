@@ -347,6 +347,11 @@ const size_t leftCount=cardPlanned.size()==1?(plannedCalloutDetails[cardPlanned.
 return leftCount;
 }
 
+RenderRect BuildGuideSheetTargetRect(const PlannedCallout& planned,const std::vector<CardPlacement>& cardPlacements,double dx,double dy){
+const RenderRect targetRect=cardPlacements[planned.cardIndex].overview?TransformRect(planned.target,cardPlacements[planned.cardIndex].sourceRect,cardPlacements[planned.cardIndex].destRect):OffsetRenderRect(planned.target,dx,dy);
+return targetRect;
+}
+
 double ComputeBackgroundWeight(const Geometry& geometry,double sampleX,double sampleY,double denom){
 const double backgroundWeight=((geometry.topY - geometry.bottomY)*(sampleX - geometry.bottomX)+(geometry.bottomX - geometry.rightX)*(sampleY - geometry.bottomY))/denom;
 return backgroundWeight;

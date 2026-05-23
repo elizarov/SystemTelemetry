@@ -1424,7 +1424,9 @@ private:
                                 CanAttachAssignmentToWrappedLeadingGroup(rhs, indentLevel, attachedPrefix) ||
                                 CanAttachAssignmentToWrappedLambda(rhs, indentLevel, attachedPrefix)
                         )
-                ) || CanAttachAssignmentToWrappedParenthesizedTernary(rhs, indentLevel, attachedPrefix)
+                ) ||
+                    CanAttachAssignmentToWrappedTernaryCondition(rhs, indentLevel, attachedPrefix) ||
+                    CanAttachAssignmentToWrappedParenthesizedTernary(rhs, indentLevel, attachedPrefix)
             )) {
                 return FormatRange(rhs, indentLevel, std::move(attachedPrefix), std::move(suffix), indentSplitChains);
             }
@@ -1572,6 +1574,31 @@ private:
         }
         std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(valueStart + 1));
         return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(firstLineTokens));
+    }
+
+    bool CanAttachAssignmentToWrappedTernaryCondition(
+        const std::vector<Token>& rhs,
+        int indentLevel,
+        std::string_view attachedPrefix
+    ) const {
+        if (SelectChainKind(rhs) != ChainKind::Ternary) {
+            return false;
+        }
+        const std::optional<size_t> question = FindTopLevelToken(rhs, "?");
+        if (!question) {
+            return false;
+        }
+        const std::optional<size_t> colon = FindTopLevelTokenAfter(rhs, ":", *question + 1);
+        if (!colon) {
+            return false;
+        }
+        std::vector<Token> firstPart(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(*colon + 1));
+        std::string firstPartText = std::string(attachedPrefix) + FormatInline(firstPart);
+        if (Fits(indentLevel, firstPartText)) {
+            return false;
+        }
+        std::vector<Token> condition(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(*question + 1));
+        return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(condition));
     }
 
     bool CanAttachAssignmentToWrappedLambda(

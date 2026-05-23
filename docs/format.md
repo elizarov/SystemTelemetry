@@ -255,7 +255,7 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. Use the same opener attachment for wrapped braced constructor calls such as `target = RenderPoint{`. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits. If a ternary right-hand side starts with a parenthesized value arm and the assignment plus that arm opener fits, keep `= condition ? (` on the assignment line.
+Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. Use the same opener attachment for wrapped braced constructor calls such as `target = RenderPoint{`. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits. If a ternary right-hand side must wrap inside its first value arm and the assignment plus condition fits, keep `= condition ?` on the assignment line.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);
@@ -465,7 +465,7 @@ int measuredWidth = MeasureTextWidthForControl(
 ) + 8;
 ```
 
-Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If an assignment owns the wrapped ternary chain, break after the assignment operator before formatting the flat chain.
+Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If an assignment owns the wrapped ternary chain and the first arm itself must split, keep the assignment prefix, condition, and `?` on the first line when they fit.
 
 ```cpp
 int value = condition ? one : two;
