@@ -184,6 +184,14 @@ TEST(DashboardTitlebarChrome, ScalesTopCornerRadiusWithDpi) {
     EXPECT_EQ(ResolveDashboardTitlebarCornerRadius(0), 8);
 }
 
+TEST(DashboardTitlebarChrome, KeepsResizeHitSizeBelowRoundedCornerRadius) {
+    EXPECT_LT(ResolveDashboardTitlebarResizeCornerHitSize(96), ResolveDashboardTitlebarCornerRadius(96));
+    EXPECT_EQ(ResolveDashboardTitlebarResizeCornerHitSize(96), 7);
+    EXPECT_EQ(ResolveDashboardTitlebarResizeCornerHitSize(120), 9);
+    EXPECT_EQ(ResolveDashboardTitlebarResizeCornerHitSize(144), 11);
+    EXPECT_EQ(ResolveDashboardTitlebarResizeCornerHitSize(0), 7);
+}
+
 TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
     const DashboardTitlebarChromeResult result = ApplyDashboardTitlebarChrome(nullptr, true);
 
@@ -193,6 +201,22 @@ TEST(DashboardTitlebarChrome, NullWindowReportsFailureWithoutThrowing) {
     EXPECT_EQ(result.captionColor, E_HANDLE);
     EXPECT_EQ(result.textColor, E_HANDLE);
     EXPECT_EQ(result.darkMode, E_HANDLE);
+}
+
+TEST(DashboardTitlebarResizeHitRects, UsesSmallSquareTopCornerRegions) {
+    const DashboardTitlebarResizeHitRects hitRects =
+        ResolveDashboardTitlebarResizeHitRects(RECT{0, 0, 400, 32}, ResolveDashboardTitlebarResizeCornerHitSize(96));
+
+    ExpectRect(hitRects.topLeft, 0, 0, 7, 7);
+    ExpectRect(hitRects.topRight, 393, 0, 400, 7);
+}
+
+TEST(DashboardTitlebarResizeHitRects, ClampsToAvailableTitlebarSize) {
+    const DashboardTitlebarResizeHitRects hitRects =
+        ResolveDashboardTitlebarResizeHitRects(RECT{10, 20, 14, 24}, ResolveDashboardTitlebarResizeCornerHitSize(96));
+
+    ExpectRect(hitRects.topLeft, 10, 20, 14, 24);
+    ExpectRect(hitRects.topRight, 10, 20, 14, 24);
 }
 
 TEST(DashboardTitlebarControlLayout, FullWidthShowsAllControls) {

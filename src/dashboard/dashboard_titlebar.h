@@ -15,6 +15,11 @@ struct DashboardTitlebarGeometry {
     RECT virtualHoverRect{};
 };
 
+struct DashboardTitlebarResizeHitRects {
+    RECT topLeft{};
+    RECT topRight{};
+};
+
 enum class DashboardTitlebarTooltipControl {
     None,
     AppMenu,
@@ -58,6 +63,7 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarFrameGeometry(
     const RECT& dashboardClientRect, DashboardTitlebarFrameMargins margins);
 DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
     const RECT& dashboardClientRect, const RECT& monitorRect, DashboardTitlebarFrameMargins margins);
+DashboardTitlebarResizeHitRects ResolveDashboardTitlebarResizeHitRects(const RECT& clientRect, int hitSize);
 DashboardTitlebarControlLayout ResolveDashboardTitlebarControlLayout(
     const RECT& clientRect, const DashboardTitlebarControlMetrics& metrics);
 const char* DashboardTitlebarTooltipLocalizationKey(DashboardTitlebarTooltipControl control);

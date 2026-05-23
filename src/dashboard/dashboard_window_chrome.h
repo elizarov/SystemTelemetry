@@ -29,6 +29,7 @@ DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(COLORREF 
 DashboardTitlebarPalette ResolveDashboardTitlebarPaletteFromBaseColors(
     COLORREF background, COLORREF text, COLORREF selectedBackground);
 int ResolveDashboardTitlebarCornerRadius(UINT dpi);
+int ResolveDashboardTitlebarResizeCornerHitSize(UINT dpi);
 DashboardCloseButtonColors ResolveDashboardCloseButtonColors(HWND hwnd, bool pressed);
 DashboardTitlebarChromeResult ApplyDashboardTitlebarChrome(HWND hwnd, bool titlebarVisible);
 bool DashboardTitlebarChromeSucceeded(const DashboardTitlebarChromeResult& result);
