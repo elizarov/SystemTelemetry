@@ -114,6 +114,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Keep empty braces as `{}` with no inner space.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
+- Do not put a space between a string or character literal prefix and its literal: `L"text"`, `u8"text"`, and `L'x'`.
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
 - Do not insert a visual-padding space before braced initializer braces or braced constructor calls: `Widget widget{config};` and `std::string_view{}`.
 - Put one space after commas, and no space before commas.
@@ -212,7 +213,7 @@ The formatter decides wrapping in this order:
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
 - When a child expression inside any split comma list must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, and similar list elements.
 - Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression.
-- When an outer call or initializer has exactly one nested call or initializer argument, share the outer and inner opener when that combined line fits, and share the inner and outer closers. This avoids adding a line and an indent level only for delimiters.
+- When an outer call or initializer has exactly one nested call or initializer argument, share the outer and inner opener when that combined line fits, and share the inner and outer closers. This avoids adding a line and an indent level only for delimiters. Double-braced initializer assignments use the same economy: `value = {{` opens on one line and `}};` closes on one line.
 - Never split a group partially. A comma list, operator chain, declaration parameter list, or control header is either fully compact or fully split.
 - Never choose an empty delimiter pair as a wrapping target. Empty calls, empty braced values, and empty template argument lists stay compact, and the formatter breaks the nearest non-empty owning structure instead.
 - Never split inside a function-pointer declarator group such as `(*)`. If the full function-pointer type does not fit, split the following parameter list instead.
@@ -251,7 +252,7 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line.
+Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);

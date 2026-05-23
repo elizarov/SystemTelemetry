@@ -41,6 +41,8 @@ class string {};
 
 }
 
+constexpr wchar_t kFilterCueText[] = L"Filter settings";
+
 class FormattingExample {
 public:
     int* pointer;
@@ -398,17 +400,15 @@ constexpr FormatTableRow kFormatRows[] = {
     {"gamma.metric.row", 500, 600, kSecondaryFlag}
 };
 
-constexpr FormatTableRow kInitializerChainRows[] = {
-    {
-        "chain.metric.row.with.extra.detail",
-        100,
-        200,
-        firstInitializerFlagWithVeryLongName |
-            secondInitializerFlagWithVeryLongName |
-            thirdInitializerFlagWithVeryLongName |
-            fourthInitializerFlagWithVeryLongName
-    }
-};
+constexpr FormatTableRow kInitializerChainRows[] = {{
+    "chain.metric.row.with.extra.detail",
+    100,
+    200,
+    firstInitializerFlagWithVeryLongName |
+        secondInitializerFlagWithVeryLongName |
+        thirdInitializerFlagWithVeryLongName |
+        fourthInitializerFlagWithVeryLongName
+}};
 
 static constexpr OutputPath kOutputPaths[] = {
     {
@@ -430,6 +430,13 @@ void DiagnosticsSession::ResolveOutputPathMember(const OutputPath& outputPath, c
     this->*outputPath.resolvedPath =
         ResolveDiagnosticsOutputPath(workingDirectory, options_.*outputPath.configuredPath, outputPath.defaultFileName);
 }
+
+inline constexpr std::array<ColorDialogControls, 4> kColorDialogControls = {{
+    {IDC_LAYOUT_EDIT_COLOR_RED_LABEL, IDC_LAYOUT_EDIT_COLOR_RED_EDIT, IDC_LAYOUT_EDIT_COLOR_RED_SLIDER, "red"},
+    {IDC_LAYOUT_EDIT_COLOR_GREEN_LABEL, IDC_LAYOUT_EDIT_COLOR_GREEN_EDIT, IDC_LAYOUT_EDIT_COLOR_GREEN_SLIDER, "green"},
+    {IDC_LAYOUT_EDIT_COLOR_BLUE_LABEL, IDC_LAYOUT_EDIT_COLOR_BLUE_EDIT, IDC_LAYOUT_EDIT_COLOR_BLUE_SLIDER, "blue"},
+    {IDC_LAYOUT_EDIT_COLOR_ALPHA_LABEL, IDC_LAYOUT_EDIT_COLOR_ALPHA_EDIT, IDC_LAYOUT_EDIT_COLOR_ALPHA_SLIDER, "alpha"}
+}};
 
 int kAlignedAssignment = 1;
 int kMuchLongerAlignedAssignment = 2;
@@ -541,6 +548,30 @@ int MeasureHexLabelWidth(HWND hwnd) {
         ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)
     ) + 8;
     return hexLabelWidth;
+}
+
+double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double sampleY, double denom) {
+    const double backgroundWeight = (
+        (geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
+            (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
+    ) / denom;
+    return backgroundWeight;
+}
+
+void BuildTrianglePoints(const RECT& rect, const Geometry& geometry) {
+    POINT points[] = {
+        {
+            rect.left + static_cast<LONG>(std::lround(geometry.leftX)),
+            rect.top + static_cast<LONG>(std::lround(geometry.topY))
+        }, {
+            rect.left + static_cast<LONG>(std::lround(geometry.rightX)),
+            rect.top + static_cast<LONG>(std::lround(geometry.topY))
+        }, {
+            rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),
+            rect.top + static_cast<LONG>(std::lround(geometry.bottomY))
+        }
+    };
+    Use(points);
 }
 
 void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState) {

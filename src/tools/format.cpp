@@ -478,6 +478,10 @@ bool IsNoSpaceAfter(std::string_view text) {
         text == "!";
 }
 
+bool IsStringOrCharacterLiteralPrefix(std::string_view text) {
+    return text == "L" || text == "u" || text == "U" || text == "u8";
+}
+
 std::string TrimRight(std::string value) {
     while (!value.empty() && IsSpaceButNotNewline(value.back())) {
         value.pop_back();
@@ -1416,6 +1420,7 @@ private:
                 SelectChainKind(rhs) != ChainKind::Ternary &&
                 (
                     CanAttachAssignmentToWrappedCall(rhs, indentLevel, attachedPrefix) ||
+                        CanAttachAssignmentToWrappedLeadingGroup(rhs, indentLevel, attachedPrefix) ||
                         CanAttachAssignmentToWrappedLambda(rhs, indentLevel, attachedPrefix)
                 )
             ) {
@@ -1521,6 +1526,19 @@ private:
             !IsFunctionPointerDeclaratorGroupOpen(rhs, group->open);
     }
 
+    bool CanAttachAssignmentToWrappedLeadingGroup(
+        const std::vector<Token>& rhs,
+        int indentLevel,
+        std::string_view attachedPrefix
+    ) const {
+        const std::optional<GroupPair> group = FindFirstGroupPair(rhs);
+        if (!group || group->open != 0 || rhs[group->open].text != "(") {
+            return false;
+        }
+        std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(group->open + 1));
+        return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(firstLineTokens));
+    }
+
     bool CanAttachAssignmentToWrappedLambda(
         const std::vector<Token>& rhs,
         int indentLevel,
@@ -1557,6 +1575,16 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(*close)
         );
         std::vector<Token> after(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
+        if (std::optional<std::vector<std::string>> combined = TryFormatCombinedNestedInitializerAssignment(
+            lhs,
+            inner,
+            after,
+            indentLevel,
+            prefix,
+            suffix
+        )) {
+            return *combined;
+        }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs) + " {");
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
@@ -1573,6 +1601,51 @@ private:
             AppendSplitElementLines(lines, elementLines, true);
         }
         std::string closeLine = "}" + FormatInline(after);
+        AppendSuffix(closeLine, suffix);
+        lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatCombinedNestedInitializerAssignment(
+        const std::vector<Token>& lhs,
+        const std::vector<Token>& inner,
+        const std::vector<Token>& after,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        const size_t nestedOpen = NextSignificantIndex(inner, 0);
+        if (nestedOpen >= inner.size() || inner[nestedOpen].text != "{") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> nestedClose = FindMatchingClose(inner, nestedOpen);
+        if (!nestedClose || NextSignificantIndex(inner, *nestedClose + 1) < inner.size()) {
+            return std::nullopt;
+        }
+        std::string firstLine = std::string(prefix) + FormatInline(lhs) + " {{";
+        if (!Fits(indentLevel, firstLine)) {
+            return std::nullopt;
+        }
+        std::vector<Token> nestedInner(
+            inner.begin() + static_cast<std::ptrdiff_t>(nestedOpen + 1),
+            inner.begin() + static_cast<std::ptrdiff_t>(*nestedClose)
+        );
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + firstLine);
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
+        for (size_t index = 0; index < elements.size(); ++index) {
+            if (elements[index].empty()) {
+                continue;
+            }
+            std::string elementSuffix;
+            if (index + 1 < elements.size()) {
+                elementSuffix = ",";
+            }
+            std::vector<std::string> elementLines =
+                FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
+            AppendSplitElementLines(lines, elementLines, true);
+        }
+        std::string closeLine = "}}" + FormatInline(after);
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
@@ -2147,6 +2220,13 @@ private:
         if (current == "(" && previous.kind == TokenKind::Word) {
             return IsControlKeyword(prev);
         }
+        if (
+            (token.kind == TokenKind::StringLiteral || token.kind == TokenKind::CharLiteral) &&
+            previous.kind == TokenKind::Word &&
+            IsStringOrCharacterLiteralPrefix(prev)
+        ) {
+            return false;
+        }
         if (current == "~" && previous.kind == TokenKind::Word && IsDestructorNameToken(tokens, index)) {
             return true;
         }
@@ -2659,9 +2739,11 @@ private:
 
     std::optional<size_t> FindTopLevelMemberAccess(const std::vector<Token>& tokens) const {
         int depth = 0;
-        for (size_t index = 1; index < tokens.size(); ++index) {
+        for (size_t index = 0; index < tokens.size(); ++index) {
             const Token& token = tokens[index];
-            if (depth == 0 && IsMemberAccessOperator(token.text) && IsMemberAccessSplitPoint(tokens, index)) {
+            if (
+                index > 0 && depth == 0 && IsMemberAccessOperator(token.text) && IsMemberAccessSplitPoint(tokens, index)
+            ) {
                 return index;
             }
             UpdateDepth(token, depth);
