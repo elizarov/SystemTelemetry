@@ -249,6 +249,7 @@ return angleDegrees;
 
 const auto noLookup=[](std::string_view)->std::optional<ColorConfig>{return std::nullopt; };
 const auto handled=[&result](INT_PTR value){result=value;return true;};
+const auto appendTrialLeaders=[&](std::vector<TrialLeader>& leaders,const std::vector<size_t>& plannedIndexes,LayoutGuideSheetExitSide side,const LayoutGuideSheetCardPlacement& placement,const BlockLayout& block){Use(leaders,plannedIndexes,side,placement,block);};
 const auto preserveLambdaSeparator=[](){FirstStep();
 
 

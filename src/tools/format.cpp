@@ -1736,7 +1736,70 @@ private:
                 }
             }
         }
+        if (std::optional<GroupPair> parameterGroup = FindLambdaParameterGroup(header)) {
+            return FormatLambdaParameterGroup(header, *parameterGroup, indentLevel, std::move(prefix));
+        }
         return {Indent(indentLevel) + inlineHeader};
+    }
+
+    std::vector<std::string> FormatLambdaParameterGroup(
+        const std::vector<Token>& header,
+        GroupPair group,
+        int indentLevel,
+        std::string prefix
+    ) const {
+        std::vector<Token> firstLineTokens(
+            header.begin(),
+            header.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+        );
+        std::vector<Token> inner(
+            header.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            header.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        std::vector<Token> afterTokens(header.begin() + static_cast<std::ptrdiff_t>(group.close + 1), header.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + prefix + FormatInline(firstLineTokens));
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
+        for (size_t index = 0; index < elements.size(); ++index) {
+            if (elements[index].empty()) {
+                continue;
+            }
+            std::string elementSuffix;
+            if (index + 1 < elements.size()) {
+                elementSuffix = ",";
+            }
+            std::vector<std::string> elementLines =
+                FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+            AppendSplitElementLines(lines, elementLines, false);
+        }
+        std::string closeLine = ")";
+        std::string afterText = FormatInline(afterTokens);
+        if (!afterText.empty()) {
+            closeLine += " ";
+            closeLine += afterText;
+        }
+        closeLine += " {";
+        lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::optional<GroupPair> FindLambdaParameterGroup(const std::vector<Token>& header) const {
+        if (header.empty() || header.front().text != "[") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> captureClose = FindMatchingClose(header, 0);
+        if (!captureClose) {
+            return std::nullopt;
+        }
+        const size_t open = NextSignificantIndex(header, *captureClose + 1);
+        if (open >= header.size() || header[open].text != "(") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> close = FindMatchingClose(header, open);
+        if (!close || IsEmptyGroupPair(header, open, *close)) {
+            return std::nullopt;
+        }
+        return GroupPair{open, *close};
     }
 
     std::vector<std::string> FormatConstructorInitializerList(
