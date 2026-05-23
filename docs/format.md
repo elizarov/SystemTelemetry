@@ -200,6 +200,8 @@ std::vector<int> longValues{
 
 The same shape applies to function arguments, template arguments, braced initializer lists, array or subscript lists, and similar comma-separated syntax.
 
+Template argument and template-parameter lists are delimiter groups. When a template list wraps, the opening `<` stays with the owning declaration or type name when it fits, every top-level argument or parameter occupies its own line, and the closing `>` starts the continuation line that follows the template list.
+
 When a braced initializer list wraps, the opening brace stays with the declaration or assignment when it fits, and every top-level initializer element is emitted on its own structural line. Nested braced initializer and braced constructor elements stay compact when they fit their own line, such as `{valueA, valueB}` and `ThemeColorEditKey{theme->name, token}`. Nested braced elements split only when their compact element line does not fit. When consecutive nested initializer elements both split, the previous element close and comma share a line with the next element opener as `}, {`; the nested element contents remain indented one level inside that element.
 
 ## Greedy Wrapping Algorithm

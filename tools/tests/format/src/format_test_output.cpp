@@ -184,9 +184,28 @@ void SaveBoardSectionDifferences(
     updateKey(board, compareBoard, sectionName);
 }
 
+template <
+    typename FirstTemplateParameter,
+    typename SecondTemplateParameter,
+    typename ThirdTemplateParameter,
+    typename FourthTemplateParameter
+>
+struct LongTemplateParameterHost {};
+
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
+
+using LayoutEditActiveRegionPayload = std::variant<
+    LayoutEditCardRegion,
+    LayoutEditWidgetRegion,
+    LayoutEditGuide,
+    LayoutEditContainerChildReorderRegion,
+    LayoutEditGapAnchor,
+    LayoutEditWidgetGuide,
+    LayoutEditAnchorRegion,
+    LayoutEditColorRegion
+>;
 
 using RuntimeConfigForEachDynamicItem =
     void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);

@@ -1910,7 +1910,12 @@ private:
         std::vector<Token> templatePrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1));
         std::vector<Token> declaration(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
         std::vector<std::string> lines;
-        lines.push_back(Indent(indentLevel) + prefix + FormatInline(templatePrefix));
+        std::string templatePrefixText = prefix + FormatInline(templatePrefix);
+        if (Fits(indentLevel, templatePrefixText)) {
+            lines.push_back(Indent(indentLevel) + templatePrefixText);
+        } else {
+            lines = FormatSplitGroup(templatePrefix, GroupPair{open, *close}, indentLevel, std::move(prefix), {});
+        }
         if (declaration.empty()) {
             if (!suffix.empty()) {
                 AppendSuffix(lines.back(), suffix);
@@ -2110,11 +2115,23 @@ private:
         int indentLevel,
         std::string_view attachedPrefix
     ) const {
+        return AcceptAttachablePrefix(FormatGroupOpeningLine(tokens, group), indentLevel, attachedPrefix);
+    }
+
+    std::string FormatGroupOpeningLine(const std::vector<Token>& tokens, GroupPair group) const {
+        if (group.open < tokens.size() && tokens[group.open].text == "<" && IsTemplateAngleOpen(tokens, group.open)) {
+            std::vector<Token> beforeOpen(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open));
+            std::string beforeOpenText = FormatInline(beforeOpen);
+            if (!beforeOpen.empty() && beforeOpen.back().text == "template") {
+                beforeOpenText += " ";
+            }
+            return beforeOpenText + "<";
+        }
         std::vector<Token> firstLineTokens(
             tokens.begin(),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
         );
-        return AcceptAttachablePrefix(FormatInline(firstLineTokens), indentLevel, attachedPrefix);
+        return FormatInline(firstLineTokens);
     }
 
     std::optional<std::string> AcceptAttachablePrefix(
@@ -2452,7 +2469,7 @@ private:
         );
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
-        lines.push_back(Indent(indentLevel) + prefix + FormatInline(firstLineTokens));
+        lines.push_back(Indent(indentLevel) + prefix + FormatGroupOpeningLine(tokens, group));
         const bool splitForHeader = StartsWithControlFor(firstLineTokens) ||
             (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = !StartsWithControlHeader(firstLineTokens);
@@ -2585,9 +2602,8 @@ private:
     std::optional<GroupPair> FindFirstWrappableGroupPairAfter(const std::vector<Token>& tokens, size_t begin) const {
         int depth = 0;
         for (size_t index = begin; index < tokens.size(); ++index) {
-            const std::string& text = tokens[index].text;
-            if (IsGroupOpen(text) && depth == 0) {
-                if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
+            if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
                         !IsNonWrappablePrefixGroup(tokens, index, *close) &&
@@ -2597,7 +2613,7 @@ private:
                     }
                 }
             }
-            UpdateDepth(tokens[index], depth);
+            UpdateDepth(tokens, index, depth);
         }
         return std::nullopt;
     }
@@ -3552,17 +3568,16 @@ private:
     std::optional<GroupPair> FindFirstGroupPair(const std::vector<Token>& tokens) const {
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
-            const std::string& text = tokens[index].text;
-            if (IsGroupOpen(text) && depth == 0) {
-                if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
+            if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (IsNonWrappablePrefixGroup(tokens, index, *close)) {
-                        UpdateDepth(tokens[index], depth);
+                        UpdateDepth(tokens, index, depth);
                         continue;
                     }
                     return GroupPair{index, *close};
                 }
             }
-            UpdateDepth(tokens[index], depth);
+            UpdateDepth(tokens, index, depth);
         }
         return std::nullopt;
     }
@@ -3570,9 +3585,8 @@ private:
     std::optional<GroupPair> FindFirstWrappableGroupPair(const std::vector<Token>& tokens) const {
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
-            const std::string& text = tokens[index].text;
-            if (IsGroupOpen(text) && depth == 0) {
-                if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
+            if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
                         !IsNonWrappablePrefixGroup(tokens, index, *close) &&
@@ -3582,9 +3596,45 @@ private:
                     }
                 }
             }
-            UpdateDepth(tokens[index], depth);
+            UpdateDepth(tokens, index, depth);
         }
         return std::nullopt;
+    }
+
+    bool IsWrappableGroupOpen(const std::vector<Token>& tokens, size_t index) const {
+        if (index >= tokens.size()) {
+            return false;
+        }
+        return IsGroupOpen(tokens[index].text) || IsWrappableTemplateAngleOpen(tokens, index);
+    }
+
+    bool IsWrappableTemplateAngleOpen(const std::vector<Token>& tokens, size_t index) const {
+        if (!IsTemplateAngleOpen(tokens, index)) {
+            return false;
+        }
+        const std::optional<size_t> close = FindTemplateAngleClose(tokens, index);
+        if (!close || tokens[*close].text != ">") {
+            return false;
+        }
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(*close)
+        );
+        return ContainsTopLevelSeparator(inner, ',');
+    }
+
+    std::optional<size_t> FindWrappableGroupClose(const std::vector<Token>& tokens, size_t open) const {
+        if (open >= tokens.size()) {
+            return std::nullopt;
+        }
+        if (IsTemplateAngleOpen(tokens, open)) {
+            const std::optional<size_t> close = FindTemplateAngleClose(tokens, open);
+            if (close && tokens[*close].text == ">") {
+                return close;
+            }
+            return std::nullopt;
+        }
+        return FindMatchingClose(tokens, open);
     }
 
     bool IsNonWrappablePrefixGroup(const std::vector<Token>& tokens, size_t open, size_t close) const {
@@ -3678,7 +3728,7 @@ private:
                 continue;
             }
             current.push_back(token);
-            UpdateDepth(token, depth);
+            UpdateDepth(tokens, index, depth);
         }
         result.push_back(current);
         return result;
@@ -3686,11 +3736,12 @@ private:
 
     bool ContainsTopLevelSeparator(const std::vector<Token>& tokens, char separator) const {
         int depth = 0;
-        for (const Token& token : tokens) {
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
             if (depth == 0 && token.text.size() == 1 && token.text[0] == separator) {
                 return true;
             }
-            UpdateDepth(token, depth);
+            UpdateDepth(tokens, index, depth);
         }
         return false;
     }
@@ -4465,6 +4516,22 @@ private:
             ++index;
         }
         return index;
+    }
+
+    void UpdateDepth(const std::vector<Token>& tokens, size_t index, int& depth) const {
+        if (index >= tokens.size()) {
+            return;
+        }
+        const Token& token = tokens[index];
+        if (IsGroupOpen(token.text)) {
+            ++depth;
+        } else if (token.text == ")" || token.text == "]" || token.text == "}") {
+            depth = std::max(0, depth - 1);
+        } else if (IsTemplateAngleOpen(tokens, index)) {
+            ++depth;
+        } else if (IsTemplateAngleCloseToken(tokens, index)) {
+            depth = std::max(0, depth - TemplateCloseWidth(token.text));
+        }
     }
 
     static bool IsGroupOpen(std::string_view text) {
