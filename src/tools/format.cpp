@@ -2446,19 +2446,6 @@ private:
         int indentLevel,
         std::string_view suffix
     ) const {
-        if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(tokens)) {
-            std::vector<Token> inner(
-                tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-                tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
-            );
-            if (
-                tokens[group->open].text == "{" &&
-                NextSignificantIndex(tokens, group->close + 1) >= tokens.size() &&
-                ContainsTopLevelSeparator(inner, ',')
-            ) {
-                return FormatSplitGroup(tokens, *group, indentLevel, {}, std::string(suffix));
-            }
-        }
         return FormatRange(tokens, indentLevel, {}, std::string(suffix), true);
     }
 

@@ -196,7 +196,7 @@ std::vector<int> longValues{
 
 The same shape applies to function arguments, template arguments, braced initializer lists, array or subscript lists, and similar comma-separated syntax.
 
-When a braced initializer list wraps, the opening brace stays with the declaration or assignment when it fits, every top-level initializer element is emitted on its own structural line, and nested initializer elements with comma-separated contents split structurally instead of staying compact. When consecutive nested initializer elements both split, the previous element close and comma share a line with the next element opener as `}, {`; the nested element contents remain indented one level inside that element.
+When a braced initializer list wraps, the opening brace stays with the declaration or assignment when it fits, and every top-level initializer element is emitted on its own structural line. Nested braced initializer and braced constructor elements stay compact when they fit their own line, such as `{valueA, valueB}` and `ThemeColorEditKey{theme->name, token}`. Nested braced elements split only when their compact element line does not fit. When consecutive nested initializer elements both split, the previous element close and comma share a line with the next element opener as `}, {`; the nested element contents remain indented one level inside that element.
 
 ## Greedy Wrapping Algorithm
 

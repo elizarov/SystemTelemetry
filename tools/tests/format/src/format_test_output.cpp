@@ -369,17 +369,9 @@ constexpr FormatTableRow kFormatRows[] = {
         100,
         200,
         kPrimaryFlag | kSecondaryFlag | kTertiaryFlag
-    }, {
-        "beta.metric.row.with.extra.detail",
-        300,
-        400,
-        kPrimaryFlag | kTertiaryFlag
-    }, {
-        "gamma.metric.row",
-        500,
-        600,
-        kSecondaryFlag
-    }
+    },
+    {"beta.metric.row.with.extra.detail", 300, 400, kPrimaryFlag | kTertiaryFlag},
+    {"gamma.metric.row", 500, 600, kSecondaryFlag}
 };
 
 constexpr FormatTableRow kInitializerChainRows[] = {
@@ -400,12 +392,9 @@ static constexpr OutputPath kOutputPaths[] = {
         &DiagnosticsOptions::tracePath,
         &DiagnosticsSession::tracePath_,
         kDefaultTraceFileName
-    }, {
-        &DiagnosticsOptions::dump,
-        &DiagnosticsOptions::dumpPath,
-        &DiagnosticsSession::dumpPath_,
-        kDefaultDumpFileName
-    }, {
+    },
+    {&DiagnosticsOptions::dump, &DiagnosticsOptions::dumpPath, &DiagnosticsSession::dumpPath_, kDefaultDumpFileName},
+    {
         &DiagnosticsOptions::screenshot,
         &DiagnosticsOptions::screenshotPath,
         &DiagnosticsSession::screenshotPath_,
@@ -528,6 +517,21 @@ void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState
             std::move(targetState),
             currentWidgetAnimationTranslation_
         });
+}
+
+void AddThemeColorLeaf(
+    Theme* theme,
+    std::string token,
+    LayoutEditTreeNode& leafNode,
+    const LayoutEditTreeNode& sectionNode
+) {
+    leafNode.leaf.emplace(LayoutEditTreeLeaf{
+        ThemeColorEditKey{theme->name, token},
+        sectionNode.label,
+        token,
+        leafNode.descriptionKey,
+        configschema::ValueFormat::ColorHex,
+    });
 }
 
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {

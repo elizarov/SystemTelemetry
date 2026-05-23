@@ -318,6 +318,10 @@ void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState)
 WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
 }
 
+void AddThemeColorLeaf(Theme* theme,std::string token,LayoutEditTreeNode& leafNode,const LayoutEditTreeNode& sectionNode){
+leafNode.leaf.emplace(LayoutEditTreeLeaf{ThemeColorEditKey{theme->name,token},sectionNode.label,token,leafNode.descriptionKey,configschema::ValueFormat::ColorHex,});
+}
+
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }
