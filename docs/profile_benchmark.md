@@ -28,6 +28,7 @@ This file keeps the shared optimization journal useful across test machines. It 
 - [ASUS GU603VI + Intel UHD + NVIDIA RTX 4070](performance/asus-gu603vi-intel-uhd-rtx4070.md) tracks the ASUS ROG Zephyrus G16 laptop baseline with Intel and NVIDIA GPU providers.
 - [Gigabyte X570 I + AMD RX 6800](performance/gigabyte-x570i-amd-rx6800.md) tracks the Gigabyte board plus AMD Radeon desktop baseline.
 - [Lenovo LNVNB161216 + Intel UHD + NVIDIA GTX 1650 Ti](performance/lenovo-lnvnb161216-intel-uhd-gtx1650ti.md) tracks the Lenovo laptop baseline with Intel and NVIDIA GPU providers.
+- [MSI Z690 Carbon WiFi + NVIDIA RTX 3080](performance/msi-z690-carbon-wifi-nvidia-rtx3080.md) tracks the MSI desktop baseline with MSI Center and NVIDIA GPU providers.
 
 ## Benchmark Workflow
 
