@@ -9,6 +9,7 @@
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_telemetry.h"
+#include "dashboard_renderer/dashboard_renderer.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
@@ -99,6 +100,32 @@ TEST(LayoutGuideSheetPlanner, BuiltInCardSelectionDoesNotSelectNetworkWhenStorag
     const std::vector<std::string> selected = SelectLayoutGuideSheetCards(context.cards);
 
     EXPECT_EQ(selected, (std::vector<std::string>{"cpu", "storage", "time"}));
+}
+
+TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPlacement) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    Trace trace;
+    DashboardRenderer renderer(trace);
+
+    ASSERT_TRUE(SelectLayout(config, "5x3"));
+    renderer.SetConfig(config);
+    ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
+    std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
+    ASSERT_NE(timeCard, cards.end());
+    EXPECT_EQ(timeCard->title, "Time");
+    EXPECT_EQ(timeCard->iconName, "time");
+    EXPECT_TRUE(timeCard->chromeLayout.hasHeader);
+
+    ASSERT_TRUE(SelectLayout(config, "1x4"));
+    renderer.SetConfig(config);
+    ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
+    cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
+    ASSERT_NE(timeCard, cards.end());
+    EXPECT_TRUE(timeCard->title.empty());
+    EXPECT_TRUE(timeCard->iconName.empty());
+    EXPECT_FALSE(timeCard->chromeLayout.hasHeader);
 }
 
 TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetricDefinitions) {

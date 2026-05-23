@@ -16,6 +16,7 @@ See also: [resources/config.ini](../resources/config.ini) for the maintained shi
 - Container weights use `name:weight` or `name:weight(...)`.
 - Omitted weights default to `1`.
 - Widget parameters are written inline as `widget(...)`.
+- Card reference parameters are written inline as `card_id(...)`.
 - Date and time widget format strings are inline widget parameters.
 - Whitespace around commas is ignored.
 
@@ -93,6 +94,8 @@ Card sections use:
 - `icon = ...`
 - `layout = ...`
 
+Named-layout `cards` expressions reference cards by id. A plain card reference such as `time` renders the referenced card with its configured title and icon. A card reference with `!title`, such as `time(!title)` or weighted `time:143(!title)`, renders the same card content as a titleless placement. A titleless placement omits the card's title and header icon for that placement and reserves no header area; the referenced `[card.<id>]` title and icon remain unchanged for other placements.
+
 Card layouts may reference another card id as a leaf node to reuse that card's inner composition.
 
 Widget parameter rules:
@@ -132,6 +135,7 @@ The language defines static layout behavior rather than live interaction behavio
 
 - Every dashboard and container weight must be positive.
 - Every referenced card id in the active layout must have a matching `[card.<id>]` section.
+- `!title` is the only supported card-reference parameter.
 - Every icon name must resolve to a supported embedded resource name.
 - Every widget or container name must use a supported canonical token.
 - Only documented spellings are valid for keys, section families, widget names, icon names, and metric ids.

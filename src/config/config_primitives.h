@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -59,6 +60,11 @@ struct LayoutNodeConfig {
 
     bool operator==(const LayoutNodeConfig& other) const = default;
 };
+
+inline constexpr std::string_view kLayoutCardReferenceWithoutTitleParameter = "!title";
+
+bool LayoutCardReferenceParameterSupported(std::string_view parameter);
+bool LayoutCardReferenceSuppressesTitle(std::string_view parameter);
 
 struct MetricDefinitionConfig {
     std::string id;

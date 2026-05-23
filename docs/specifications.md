@@ -41,7 +41,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The active named theme selects the base color tokens used by derived dashboard colors.
 - The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background matching the dashboard card fill composited over the app background; the embedded `resources/app.ico` carries only `16`, `32`, and `64` pixel fallback frames for Windows shell use before runtime theme application and by executable metadata.
 - The renderer resolves card and widget rectangles after config load or reload and keeps rendering in those resolved coordinates until the next reload.
-- The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition.
+- The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition. A layout card reference can suppress the title for one placement while reusing the same card content elsewhere with its configured title.
 - Cards with no title and no icon reserve no header area.
 - Layout references may reuse another card's inner layout without duplicating its definition.
 - The storage drive list uses the resolved runtime drive selection. An empty persisted drive selection means all currently available fixed drives.

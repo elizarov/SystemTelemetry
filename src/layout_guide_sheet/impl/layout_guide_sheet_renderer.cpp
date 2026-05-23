@@ -4,6 +4,7 @@
 #include <chrono>
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -69,6 +70,7 @@ void StableSortCalloutsByPriority(std::vector<LayoutGuideSheetPlacementCallout>&
 struct PackedOverviewCard {
     std::string id;
     RenderRect rect{};
+    bool suppressTitle = false;
     LayoutGuideSheetCardChromeArtifacts chromeArtifacts;
 };
 
@@ -97,14 +99,18 @@ PackedNode MeasurePackedNode(const LayoutNodeConfig& node, DashboardRenderer& re
         if (card == nullptr) {
             return {};
         }
+        if (!LayoutCardReferenceParameterSupported(node.parameter)) {
+            return {};
+        }
+        const bool suppressTitle = LayoutCardReferenceSuppressesTitle(node.parameter);
         const CardChromeLayoutMetrics metrics = ResolveCardChromeLayoutMetrics(renderer);
-        const int titleWidth =
-            card->title.empty() ? 0 : renderer.Renderer().MeasureTextWidth(TextStyleId::Title, card->title);
-        const int iconWidth = card->icon.empty() ? 0 : metrics.iconSize;
-        const int headerGap = (!card->title.empty() && !card->icon.empty()) ? metrics.iconGap : 0;
+        const std::string_view title = suppressTitle ? std::string_view{} : std::string_view{card->title};
+        const std::string_view icon = suppressTitle ? std::string_view{} : std::string_view{card->icon};
+        const int titleWidth = title.empty() ? 0 : renderer.Renderer().MeasureTextWidth(TextStyleId::Title, title);
+        const int iconWidth = icon.empty() ? 0 : metrics.iconSize;
+        const int headerGap = (!title.empty() && !icon.empty()) ? metrics.iconGap : 0;
         const int headerWidth = iconWidth + headerGap + titleWidth;
-        const int headerHeight =
-            std::max(card->icon.empty() ? 0 : metrics.iconSize, card->title.empty() ? 0 : metrics.titleHeight);
+        const int headerHeight = std::max(icon.empty() ? 0 : metrics.iconSize, title.empty() ? 0 : metrics.titleHeight);
         const int width = std::max(1, metrics.padding * 2 + headerWidth);
         const int height = std::max(1, metrics.padding * 2 + headerHeight);
         return PackedNode{width, height};
@@ -269,9 +275,13 @@ void AppendPackedCards(const LayoutNodeConfig& node,
         if (card == nullptr) {
             return;
         }
+        if (!LayoutCardReferenceParameterSupported(node.parameter)) {
+            return;
+        }
         PackedOverviewCard packedCard;
         packedCard.id = card->id;
         packedCard.rect = rect;
+        packedCard.suppressTitle = LayoutCardReferenceSuppressesTitle(node.parameter);
         overview.cards.push_back(std::move(packedCard));
         return;
     }
@@ -530,8 +540,8 @@ LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(c
     PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
     const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts =
-            dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, card.rect, &metrics);
+        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
+            card.id, card.rect, &metrics, card.suppressTitle);
     }
     return CollectActiveRegionsFromPackedOverview(overview);
 }
@@ -618,7 +628,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     const std::vector<LayoutGuideSheetCardSummary> cards = dashboardRenderer_.CollectLayoutGuideSheetCardSummaries();
     PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, card.rect, nullptr);
+        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
+            card.id, card.rect, nullptr, card.suppressTitle);
     }
     for (const std::string& selectedCardId : selectedCardIds) {
         const auto cardIt =
@@ -876,7 +887,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                         static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.overviewBorderWidth, 1))));
                 for (const PackedOverviewCard& card : overview.cards) {
                     const RenderRect cardRect = TransformRect(card.rect, placement.sourceRect, placement.destRect);
-                    dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(card.id, cardRect, &metrics);
+                    dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
+                        card.id, cardRect, &metrics, card.suppressTitle);
                 }
                 continue;
             }
