@@ -156,6 +156,7 @@ template <typename FirstTemplateParameter,typename SecondTemplateParameter,typen
 
 using ConfigMetricAvailabilityResolver=bool(*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem=void * (*)(AppConfig& config,std::string_view key);
+using ZesDriver=void *;
 using DumpValues=std::vector<std::pair<std::string,std::string>>;
 using LayoutEditActiveRegionPayload=std::variant<LayoutEditCardRegion,LayoutEditWidgetRegion,LayoutEditGuide,LayoutEditContainerChildReorderRegion,LayoutEditGapAnchor,LayoutEditWidgetGuide,LayoutEditAnchorRegion,LayoutEditColorRegion>;
 using RuntimeConfigForEachDynamicItem=void(

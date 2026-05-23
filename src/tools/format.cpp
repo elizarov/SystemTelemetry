@@ -4228,7 +4228,8 @@ private:
         const bool beforeDeclaratorName = next->kind == TokenKind::Word;
         const bool beforeTemplateClose = IsTemplateAngleCloseToken(tokens, nextIndex);
         const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
-        const bool beforeUnnamedDeclaratorEnd = next->text == ")" || next->text == "," || next->text == "=";
+        const bool beforeUnnamedDeclaratorEnd =
+            next->text == ")" || next->text == "," || next->text == "=" || next->text == ";";
         const bool beforePointerOrReferenceDeclarator = IsPointerOrReferenceDeclaratorToken(next->text);
         const bool beforeFunctionPointerDeclarator =
             tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
