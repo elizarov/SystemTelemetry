@@ -225,6 +225,11 @@ metricKey=*metricCandidate;
 }
 }
 
+LayoutEditTreeLeaf* FindFocusedLeaf(LayoutEditTreeNode& node,const FocusKey& focusKey){
+if(node.leaf.has_value() && MatchesLayoutEditFocusKey(node.leaf->focusKey,focusKey)){return & (*node.leaf);}
+return nullptr;
+}
+
 double NormalizeAngleCandidate(double angleDegrees){
 for(double candidate :{angleDegrees - 360.0,angleDegrees + 360.0}){
 Use(candidate);

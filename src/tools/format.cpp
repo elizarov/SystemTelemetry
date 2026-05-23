@@ -2069,6 +2069,9 @@ private:
         if (current == "(" && IsFunctionPointerDeclaratorGroupOpen(tokens, index)) {
             return IsFunctionPointerDeclaratorContextBeforeGroup(tokens, index);
         }
+        if (current == "(" && IsUnaryPrefixOperator(tokens, prevIndex)) {
+            return false;
+        }
         if (prev == "return" && current != ";") {
             return true;
         }
