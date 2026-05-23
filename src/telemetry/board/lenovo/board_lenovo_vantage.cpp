@@ -808,14 +808,6 @@ public:
         }
     }
 
-    void TraceClientStatus(const wchar_t* status) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string statusText = TextFromNullableWide(status);
-            trace_.WriteFmt(
-                TracePrefix::LenovoHardwareScan, RES_STR("client_status status=\"%s\""), statusText.c_str());
-        }
-    }
-
     void TraceExecutionResult(const wchar_t* result) override {
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
             const std::string resultText = TextFromNullableWide(result);
@@ -843,6 +835,17 @@ public:
         if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
             const std::string diagnosticsText = TextFromNullableWide(diagnostics);
             trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
+        }
+    }
+
+    bool TraceTimingEnabled() const override {
+        return trace_.Enabled(TracePrefix::LenovoHardwareScan);
+    }
+
+    void TraceTiming(const wchar_t* timing) override {
+        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
+            const std::string timingText = TextFromNullableWide(timing);
+            trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("timing %s"), timingText.c_str());
         }
     }
 

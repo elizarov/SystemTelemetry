@@ -5,6 +5,7 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <cstring>
 #include <cwchar>
 #include <iomanip>
 #include <iostream>
@@ -30,6 +31,7 @@
 #include "layout_guide_sheet/layout_guide_sheet.h"
 #include "layout_model/layout_edit_service.h"
 #include "telemetry/board/lenovo/board_lenovo_vantage.h"
+#include "telemetry/board/lenovo/board_lenovo_vantage_bridge.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
@@ -48,6 +50,8 @@
     X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
     X(LayoutSwitch, "layout-switch")                                                                                   \
     X(LenovoGameZone, "lenovo-gamezone")                                                                               \
+    X(LenovoLdePhases, "lenovo-lde-phases")                                                                            \
+    X(LenovoHardwareScan, "lenovo-hardware-scan")                                                                      \
     X(MouseHover, "mouse-hover")                                                                                       \
     X(SnapshotHandoff, "snapshot-handoff")                                                                             \
     X(TelemetryInit, "telemetry-init")                                                                                 \
@@ -215,6 +219,10 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     BenchmarkCommandLine commandLine{*parsedBenchmark};
     if (commandLine.benchmark == Benchmark::LenovoGameZone) {
         commandLine.iterations = 5;
+    } else if (commandLine.benchmark == Benchmark::LenovoLdePhases) {
+        commandLine.iterations = 1;
+    } else if (commandLine.benchmark == Benchmark::LenovoHardwareScan) {
+        commandLine.iterations = 3;
     } else if (commandLine.benchmark == Benchmark::TemperatureSources) {
         commandLine.iterations = 1;
     } else if (commandLine.benchmark == Benchmark::TelemetryInit) {
@@ -717,6 +725,47 @@ struct LenovoGameZoneBenchTotals {
     BenchResult loop;
     PhaseStats sample;
     BoardVendorTelemetrySample lastSample;
+};
+
+struct LenovoHardwareScanReading {
+    std::string title;
+    double celsius = 0.0;
+};
+
+struct LenovoHardwareScanIterationResult {
+    std::chrono::nanoseconds elapsed{};
+    std::vector<LenovoHardwareScanReading> readings;
+    std::vector<std::string> executionResults;
+    std::vector<std::string> timings;
+    std::string diagnostics;
+    std::string moduleLoadResult;
+    bool captured = false;
+};
+
+struct LenovoHardwareScanBenchTotals {
+    BenchResult loop;
+    PhaseStats sample;
+    PhaseStats warmSample;
+    std::chrono::nanoseconds coldSample{};
+    FilePath addinDirectory;
+    LenovoHardwareScanIterationResult cold;
+    LenovoHardwareScanIterationResult last;
+    std::string errorText;
+    bool succeeded = true;
+};
+
+struct LenovoLdePhaseResult {
+    const char* name = "";
+    LenovoHardwareScanLdeProbeMode mode = LenovoHardwareScanLdeProbeMode::ManualCpuThermalToolExecution;
+    LenovoHardwareScanIterationResult result;
+};
+
+struct LenovoLdePhaseBenchTotals {
+    BenchResult loop;
+    FilePath addinDirectory;
+    std::vector<LenovoLdePhaseResult> phases;
+    std::string errorText;
+    bool succeeded = true;
 };
 
 struct TemperatureSourceResult {
@@ -1403,6 +1452,318 @@ std::string EscapeBenchmarkText(const std::string& text) {
         }
     }
     return escaped;
+}
+
+std::string TextFromNullableWide(const wchar_t* text) {
+    return text != nullptr ? TextFromWide(std::wstring_view(text)) : std::string();
+}
+
+bool DirectoryExists(const FilePath& path) {
+    if (path.Empty()) {
+        return false;
+    }
+    const DWORD attributes = GetFileAttributesA(path.string().c_str());
+    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+}
+
+std::optional<FilePath> ProgramDataDirectory() {
+    const DWORD required = GetEnvironmentVariableA("ProgramData", nullptr, 0);
+    if (required == 0) {
+        return std::nullopt;
+    }
+    std::string value(required, '\0');
+    const DWORD written = GetEnvironmentVariableA("ProgramData", value.data(), required);
+    if (written == 0 || written >= required) {
+        return std::nullopt;
+    }
+    value.resize(written);
+    return FilePath(std::move(value));
+}
+
+std::optional<std::array<int, 4>> ParseVersionParts(std::string_view text) {
+    std::array<int, 4> parts{};
+    size_t partIndex = 0;
+    size_t offset = 0;
+    while (partIndex < parts.size() && offset <= text.size()) {
+        const size_t dot = text.find('.', offset);
+        const size_t endOffset = dot == std::string_view::npos ? text.size() : dot;
+        if (endOffset == offset) {
+            return std::nullopt;
+        }
+
+        const std::string part(text.substr(offset, endOffset - offset));
+        char* parseEnd = nullptr;
+        const long parsed = std::strtol(part.c_str(), &parseEnd, 10);
+        if (parseEnd == part.c_str() || *parseEnd != '\0' || parsed < 0) {
+            return std::nullopt;
+        }
+        parts[partIndex] = static_cast<int>(parsed);
+        ++partIndex;
+
+        if (dot == std::string_view::npos) {
+            break;
+        }
+        offset = dot + 1;
+    }
+    return partIndex > 0 ? std::optional<std::array<int, 4>>(parts) : std::nullopt;
+}
+
+bool VersionPartsLess(const std::array<int, 4>& lhs, const std::array<int, 4>& rhs) {
+    for (size_t index = 0; index < lhs.size(); ++index) {
+        if (lhs[index] != rhs[index]) {
+            return lhs[index] < rhs[index];
+        }
+    }
+    return false;
+}
+
+bool IsBenchmarkLenovoHardwareScanDirectory(const FilePath& path) {
+    return DirectoryExists(path) && FileExists(path / "LdeApi.Core.dll") && FileExists(path / "LdeApi.Client.dll") &&
+           FileExists(path / "Lenovo.Vantage.RpcClient.dll") && FileExists(path / "thermal_monitor_tool.dll") &&
+           FileExists(path / "lde_module_cpu.dll");
+}
+
+std::optional<FilePath> FindBenchmarkLenovoHardwareScanDirectory() {
+    const std::optional<FilePath> programData = ProgramDataDirectory();
+    if (!programData.has_value()) {
+        return std::nullopt;
+    }
+    const FilePath root = *programData / "Lenovo" / "Vantage" / "Addins" / "LenovoHardwareScanAddin";
+    if (!DirectoryExists(root)) {
+        return std::nullopt;
+    }
+
+    WIN32_FIND_DATAA data{};
+    const FilePath pattern = root / "*";
+    HANDLE find = FindFirstFileA(pattern.string().c_str(), &data);
+    if (find == INVALID_HANDLE_VALUE) {
+        return std::nullopt;
+    }
+
+    std::optional<FilePath> bestPath;
+    std::optional<std::array<int, 4>> bestVersion;
+    do {
+        if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) == 0 || std::strcmp(data.cFileName, ".") == 0 ||
+            std::strcmp(data.cFileName, "..") == 0) {
+            continue;
+        }
+        const FilePath candidate = root / data.cFileName;
+        if (!IsBenchmarkLenovoHardwareScanDirectory(candidate)) {
+            continue;
+        }
+        const std::optional<std::array<int, 4>> version = ParseVersionParts(data.cFileName);
+        if (!bestPath.has_value() ||
+            (version.has_value() && (!bestVersion.has_value() || VersionPartsLess(*bestVersion, *version)))) {
+            bestPath = candidate;
+            bestVersion = version;
+        }
+    } while (FindNextFileA(find, &data));
+    FindClose(find);
+
+    return bestPath;
+}
+
+class BenchmarkLenovoHardwareScanSink final : public LenovoHardwareScanCaptureSink {
+public:
+    void AddTemperatureReading(const wchar_t* title, double celsius) override {
+        readings_.push_back({TextFromNullableWide(title), celsius});
+    }
+
+    void SetDiagnostics(const wchar_t* diagnostics) override {
+        diagnostics_ = TextFromNullableWide(diagnostics);
+    }
+
+    void TraceAssemblyLoaded(const wchar_t* path) override {
+        assemblyPath_ = TextFromNullableWide(path);
+    }
+
+    void TraceExecutionResult(const wchar_t* result) override {
+        executionResults_.push_back(TextFromNullableWide(result));
+    }
+
+    void TraceInitializeException(const wchar_t* diagnostics) override {
+        diagnostics_ = TextFromNullableWide(diagnostics);
+    }
+
+    void TraceModuleLoadResult(const wchar_t* result) override {
+        moduleLoadResult_ = TextFromNullableWide(result);
+    }
+
+    void TraceSnapshotException(const wchar_t* diagnostics) override {
+        diagnostics_ = TextFromNullableWide(diagnostics);
+    }
+
+    bool TraceTimingEnabled() const override {
+        return true;
+    }
+
+    void TraceTiming(const wchar_t* timing) override {
+        timings_.push_back(TextFromNullableWide(timing));
+    }
+
+    LenovoHardwareScanIterationResult Result(std::chrono::nanoseconds elapsed, bool captured) const {
+        LenovoHardwareScanIterationResult result;
+        result.elapsed = elapsed;
+        result.readings = readings_;
+        result.executionResults = executionResults_;
+        result.timings = timings_;
+        result.diagnostics = diagnostics_.empty() ? assemblyPath_ : diagnostics_;
+        result.moduleLoadResult = moduleLoadResult_;
+        result.captured = captured;
+        return result;
+    }
+
+private:
+    std::vector<LenovoHardwareScanReading> readings_;
+    std::vector<std::string> executionResults_;
+    std::vector<std::string> timings_;
+    std::string diagnostics_;
+    std::string assemblyPath_;
+    std::string moduleLoadResult_;
+};
+
+LenovoHardwareScanBenchTotals RunLenovoHardwareScanBenchmark(size_t iterations, Trace&) {
+    LenovoHardwareScanBenchTotals totals{};
+    if (iterations == 0) {
+        return totals;
+    }
+
+    const std::optional<FilePath> addinDirectory = FindBenchmarkLenovoHardwareScanDirectory();
+    if (!addinDirectory.has_value()) {
+        totals.succeeded = false;
+        totals.errorText = "Lenovo Hardware Scan addin directory was not found";
+        return totals;
+    }
+    totals.addinDirectory = *addinDirectory;
+
+    LenovoHardwareScanCaptureOptions options;
+    options.includeCpuTemperature = true;
+    options.includeGpuTemperature = false;
+    options.includeStorageTemperature = false;
+    options.includeMotherboardTemperature = false;
+    options.includeBatteryTemperature = false;
+
+    LenovoHardwareScanRuntime runtime;
+    const std::wstring wideAddinDirectory = totals.addinDirectory.WideForNativeApi();
+    const auto start = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        BenchmarkLenovoHardwareScanSink sink;
+        const auto sampleStart = Clock::now();
+        const bool captured = runtime.Capture(wideAddinDirectory.c_str(), options, sink);
+        const std::chrono::nanoseconds elapsed = Clock::now() - sampleStart;
+        RecordPhase(totals.sample, elapsed);
+        if (iteration == 0) {
+            totals.coldSample = elapsed;
+            totals.cold = sink.Result(elapsed, captured);
+        } else {
+            RecordPhase(totals.warmSample, elapsed);
+        }
+        totals.last = sink.Result(elapsed, captured);
+    }
+    totals.loop.total = Clock::now() - start;
+    totals.loop.perIteration = totals.loop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+LenovoLdePhaseBenchTotals RunLenovoLdePhaseBenchmark(Trace&) {
+    LenovoLdePhaseBenchTotals totals{};
+    const std::optional<FilePath> addinDirectory = FindBenchmarkLenovoHardwareScanDirectory();
+    if (!addinDirectory.has_value()) {
+        totals.succeeded = false;
+        totals.errorText = "Lenovo Hardware Scan addin directory was not found";
+        return totals;
+    }
+    totals.addinDirectory = *addinDirectory;
+
+    totals.phases = {
+        {"manual-thermal-tool", LenovoHardwareScanLdeProbeMode::ManualCpuThermalToolExecution, {}},
+        {"available-modules-then-manual",
+            LenovoHardwareScanLdeProbeMode::AvailableModulesThenManualCpuThermalToolExecution,
+            {}},
+        {"load-modules-then-execution", LenovoHardwareScanLdeProbeMode::LoadModulesThenCpuThermalToolExecution, {}},
+    };
+
+    const std::wstring wideAddinDirectory = totals.addinDirectory.WideForNativeApi();
+    const auto start = Clock::now();
+    for (LenovoLdePhaseResult& phase : totals.phases) {
+        BenchmarkLenovoHardwareScanSink sink;
+        const auto phaseStart = Clock::now();
+        const bool captured = ProbeLenovoHardwareScanCpuThermalTool(wideAddinDirectory.c_str(), phase.mode, sink);
+        const std::chrono::nanoseconds elapsed = Clock::now() - phaseStart;
+        phase.result = sink.Result(elapsed, captured);
+    }
+    totals.loop.total = Clock::now() - start;
+    totals.loop.perIteration = totals.loop.total / static_cast<double>(totals.phases.size());
+    return totals;
+}
+
+void PrintLenovoHardwareScanBenchResult(const LenovoHardwareScanBenchTotals& totals) {
+    PrintBenchLoopResult("scan_loop", totals.loop);
+    PrintPhaseResult("scan_sample", totals.sample);
+    PrintPhaseResult("scan_warm_sample", totals.warmSample);
+    std::cout << std::left << std::setw(18) << "scan_cold" << " elapsed_ms=" << std::fixed << std::setprecision(2)
+              << DurationMilliseconds(totals.coldSample) << "\n";
+    std::cout << std::left << std::setw(18) << "scan_addin" << " path=\"" << totals.addinDirectory.string() << "\"\n";
+
+    const LenovoHardwareScanIterationResult& last = totals.last;
+    std::cout << std::left << std::setw(18) << "scan_last" << " captured=" << (last.captured ? "yes" : "no")
+              << " elapsed_ms=" << std::fixed << std::setprecision(2) << DurationMilliseconds(last.elapsed)
+              << " temperatures=" << last.readings.size() << " module_load=\""
+              << EscapeBenchmarkText(last.moduleLoadResult) << "\" diagnostics=\""
+              << EscapeBenchmarkText(last.diagnostics) << "\"\n";
+    for (const LenovoHardwareScanReading& reading : last.readings) {
+        std::cout << std::left << std::setw(18) << "scan_temperature" << " name=\"" << reading.title
+                  << "\" value_c=" << std::fixed << std::setprecision(2) << reading.celsius << "\n";
+    }
+    size_t index = 0;
+    for (const std::string& timing : totals.cold.timings) {
+        std::cout << std::left << std::setw(18) << "scan_cold_timing" << " index=" << index++ << " "
+                  << EscapeBenchmarkText(timing) << "\n";
+    }
+    index = 0;
+    for (const std::string& result : last.executionResults) {
+        std::cout << std::left << std::setw(18) << "scan_execution" << " index=" << index++ << " result=\""
+                  << EscapeBenchmarkText(result) << "\"\n";
+    }
+    index = 0;
+    for (const std::string& timing : last.timings) {
+        std::cout << std::left << std::setw(18) << "scan_timing" << " index=" << index++ << " "
+                  << EscapeBenchmarkText(timing) << "\n";
+    }
+}
+
+void PrintLenovoLdePhaseBenchResult(const LenovoLdePhaseBenchTotals& totals) {
+    PrintBenchLoopResult("lde_phase_loop", totals.loop);
+    std::cout << std::left << std::setw(18) << "lde_phase_addin" << " path=\"" << totals.addinDirectory.string()
+              << "\"\n";
+
+    for (const LenovoLdePhaseResult& phase : totals.phases) {
+        const LenovoHardwareScanIterationResult& result = phase.result;
+        std::cout << std::left << std::setw(18) << "lde_phase" << " name=\"" << phase.name
+                  << "\" captured=" << (result.captured ? "yes" : "no") << " elapsed_ms=" << std::fixed
+                  << std::setprecision(2) << DurationMilliseconds(result.elapsed)
+                  << " temperatures=" << result.readings.size() << " module_load=\""
+                  << EscapeBenchmarkText(result.moduleLoadResult) << "\" diagnostics=\""
+                  << EscapeBenchmarkText(result.diagnostics) << "\"\n";
+
+        for (const LenovoHardwareScanReading& reading : result.readings) {
+            std::cout << std::left << std::setw(18) << "lde_temperature" << " phase=\"" << phase.name << "\" name=\""
+                      << reading.title << "\" value_c=" << std::fixed << std::setprecision(2) << reading.celsius
+                      << "\n";
+        }
+
+        size_t index = 0;
+        for (const std::string& execution : result.executionResults) {
+            std::cout << std::left << std::setw(18) << "lde_execution" << " phase=\"" << phase.name
+                      << "\" index=" << index++ << " result=\"" << EscapeBenchmarkText(execution) << "\"\n";
+        }
+
+        index = 0;
+        for (const std::string& timing : result.timings) {
+            std::cout << std::left << std::setw(18) << "lde_timing" << " phase=\"" << phase.name
+                      << "\" index=" << index++ << " " << EscapeBenchmarkText(timing) << "\n";
+        }
+    }
 }
 
 std::optional<double> NumericVariantValue(const VARIANT& value) {
@@ -2296,6 +2657,30 @@ int RunLenovoGameZoneBenchmarkCommand(size_t iterations, double renderScale, Tra
     return 0;
 }
 
+int RunLenovoHardwareScanBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    std::cout << "lenovo_hardware_scan_benchmark modules=cpu_temperature_only iterations=" << iterations
+              << " render_scale_ignored=" << renderScale << "\n";
+    const LenovoHardwareScanBenchTotals totals = RunLenovoHardwareScanBenchmark(iterations, trace);
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+    PrintLenovoHardwareScanBenchResult(totals);
+    return 0;
+}
+
+int RunLenovoLdePhaseBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
+    std::cout << "lenovo_lde_phases_benchmark mode=cold_private_paths requested_iterations=" << iterations
+              << " render_scale_ignored=" << renderScale << "\n";
+    const LenovoLdePhaseBenchTotals totals = RunLenovoLdePhaseBenchmark(trace);
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+    PrintLenovoLdePhaseBenchResult(totals);
+    return 0;
+}
+
 int RunTemperatureSourcesBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
     std::cout << "temperature_sources_benchmark iterations=" << iterations << " render_scale_ignored=" << renderScale
               << "\n";
@@ -2375,6 +2760,10 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunLayoutSwitchBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LenovoGameZone:
             return RunLenovoGameZoneBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::LenovoLdePhases:
+            return RunLenovoLdePhaseBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::LenovoHardwareScan:
+            return RunLenovoHardwareScanBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::MouseHover:
             return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::SnapshotHandoff:

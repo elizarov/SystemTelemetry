@@ -11,7 +11,7 @@ set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
 set "BENCHMARK_EXTRA_ARGS="
 set "ARGUMENT_ERROR="
-set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, lenovo-gamezone, mouse-hover, snapshot-handoff, telemetry-init, temperature-sources, theme-change, update-telemetry"
+set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, lenovo-gamezone, lenovo-lde-phases, lenovo-hardware-scan, mouse-hover, snapshot-handoff, telemetry-init, temperature-sources, theme-change, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_PROFILE=1"
 set "REQUEST_ELEVATION=0"
@@ -94,6 +94,16 @@ if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-gamezone" (
     shift
     goto parse_args
 )
+if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-lde-phases" (
+    set "BENCHMARK_NAME=lenovo-lde-phases"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-hardware-scan" (
+    set "BENCHMARK_NAME=lenovo-hardware-scan"
+    shift
+    goto parse_args
+)
 if not defined BENCHMARK_NAME if /i "%~1"=="mouse-hover" (
     set "BENCHMARK_NAME=mouse-hover"
     shift
@@ -146,6 +156,10 @@ if defined ARGUMENT_ERROR (
 if not defined ITERATIONS (
     if /i "%BENCHMARK_NAME%"=="lenovo-gamezone" (
         set "ITERATIONS=5"
+    ) else if /i "%BENCHMARK_NAME%"=="lenovo-lde-phases" (
+        set "ITERATIONS=1"
+    ) else if /i "%BENCHMARK_NAME%"=="lenovo-hardware-scan" (
+        set "ITERATIONS=3"
     ) else if /i "%BENCHMARK_NAME%"=="temperature-sources" (
         set "ITERATIONS=1"
     ) else if /i "%BENCHMARK_NAME%"=="telemetry-init" (
@@ -579,6 +593,8 @@ if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-guide-sheet" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0
 if /i "%BENCHMARK_NAME%"=="lenovo-gamezone" exit /b 0
+if /i "%BENCHMARK_NAME%"=="lenovo-lde-phases" exit /b 0
+if /i "%BENCHMARK_NAME%"=="lenovo-hardware-scan" exit /b 0
 if /i "%BENCHMARK_NAME%"=="mouse-hover" exit /b 0
 if /i "%BENCHMARK_NAME%"=="snapshot-handoff" exit /b 0
 if /i "%BENCHMARK_NAME%"=="telemetry-init" exit /b 0

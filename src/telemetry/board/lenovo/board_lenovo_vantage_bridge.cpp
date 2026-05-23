@@ -14,6 +14,7 @@
 using namespace System;
 using namespace System::Collections;
 using namespace System::Collections::Generic;
+using namespace System::Diagnostics;
 using namespace System::IO;
 using namespace System::Reflection;
 using namespace System::Text;
@@ -37,6 +38,22 @@ String ^ ManagedStringFromText(std::string_view text) {
 void SetDiagnosticsText(LenovoHardwareScanCaptureSink& sink, std::string_view text) {
     const std::wstring wide = WideFromText(text);
     sink.SetDiagnostics(wide.c_str());
+}
+
+Stopwatch ^ StartTiming(LenovoHardwareScanCaptureSink& sink) {
+    return sink.TraceTimingEnabled() ? Stopwatch::StartNew() : nullptr;
+}
+
+void TraceTiming(LenovoHardwareScanCaptureSink& sink, const char* phase, Stopwatch ^ stopwatch) {
+    if (stopwatch == nullptr) {
+        return;
+    }
+    String ^ timing = String::Format(Globalization::CultureInfo::InvariantCulture,
+        "phase={0} elapsed_ms={1:F2}",
+        ManagedStringFromText(phase),
+        stopwatch->Elapsed.TotalMilliseconds);
+    pin_ptr<const wchar_t> pinnedTiming = PtrToStringChars(timing);
+    sink.TraceTiming(pinnedTiming);
 }
 
 String ^ CombinePath(String ^ directory, const char* fileName) {
@@ -270,8 +287,8 @@ public:
     Type ^ clientType = nullptr;
     Type ^ resultType = nullptr;
     MethodInfo ^ loadModulesMethod = nullptr;
+    MethodInfo ^ getAvailableModulesMethod = nullptr;
     MethodInfo ^ startExecutionMethod = nullptr;
-    MethodInfo ^ getStatusMethod = nullptr;
     MethodInfo ^ disposeMethod = nullptr;
     Object ^ client = nullptr;
     Object ^ loadedModules = nullptr;
@@ -315,6 +332,47 @@ int EnumerableCount(Object ^ value) {
         ++count;
     }
     return count;
+}
+
+Object ^ CreateGenericList(Type ^ itemType) {
+    Type ^ listDefinition = List<Object ^>::typeid->GetGenericTypeDefinition();
+    return Activator::CreateInstance(listDefinition->MakeGenericType(itemType));
+}
+
+void AddToList(Object ^ list, Object ^ value) {
+    System::Collections::IList ^ items = dynamic_cast<System::Collections::IList ^>(list);
+    if (items != nullptr) {
+        items->Add(value);
+    }
+}
+
+Object ^ BuildManualCpuThermalToolModules(Assembly ^ coreAssembly) {
+    Type ^ toolType = coreAssembly->GetType("Lenovo.LdeApi.Core.Models.Tool", true);
+    Type ^ deviceType = coreAssembly->GetType("Lenovo.LdeApi.Core.Models.Device", true);
+    Type ^ moduleType = coreAssembly->GetType("Lenovo.LdeApi.Core.Models.Module", true);
+    Type ^ parameterType = coreAssembly->GetType("Lenovo.LdeApi.Core.Models.Parameter", true);
+    Type ^ loadingStatusType = coreAssembly->GetType("Lenovo.LdeApi.Core.Enums.ModuleLoadingStatus", true);
+
+    Object ^ parameters = CreateGenericList(parameterType);
+    Object ^ tool = Activator::CreateInstance(toolType);
+    toolType->GetProperty("Id")->SetValue(tool, "90", nullptr);
+    toolType->GetProperty("Name")->SetValue(tool, "Thermal Tool", nullptr);
+    toolType->GetProperty("Parameters")->SetValue(tool, parameters, nullptr);
+
+    Object ^ tools = CreateGenericList(toolType);
+    AddToList(tools, tool);
+    Object ^ device = Activator::CreateInstance(deviceType,
+        gcnew array<Object ^>{
+            "0", "Intel(R) Core(TM) i7-10750H CPU @ 2.60GHz", nullptr, tools, nullptr, nullptr});
+    Object ^ devices = CreateGenericList(deviceType);
+    AddToList(devices, device);
+
+    Object ^ loadingStatus = Enum::Parse(loadingStatusType, "Success", false);
+    Object ^ module = Activator::CreateInstance(
+        moduleType, gcnew array<Object ^>{"13", "CPU", devices, loadingStatus, nullptr});
+    Object ^ modules = CreateGenericList(moduleType);
+    AddToList(modules, module);
+    return modules;
 }
 
 array<String ^> ^
@@ -382,62 +440,84 @@ String ^ ModuleLoadSummary(array<String ^> ^ requestedModules, Object ^ loadedMo
 
 bool InitializeLenovoRuntime(
     LenovoRuntimeContext ^ context, const wchar_t* addinDirectory, LenovoHardwareScanCaptureSink& sink) {
+    Stopwatch ^ totalWatch = StartTiming(sink);
     if (context->loaded) {
+        TraceTiming(sink, "initialize_cached", totalWatch);
         return true;
     }
 
     context->addinDirectory = gcnew String(addinDirectory);
+    Stopwatch ^ fileCheckWatch = StartTiming(sink);
     if (!File::Exists(CombinePath(context->addinDirectory, kClientDll)) ||
         !File::Exists(CombinePath(context->addinDirectory, kCoreDll)) ||
         !File::Exists(CombinePath(context->addinDirectory, kRpcClientDll)) ||
         !File::Exists(CombinePath(context->addinDirectory, kServerExe))) {
+        TraceTiming(sink, "initialize_file_check", fileCheckWatch);
+        TraceTiming(sink, "initialize_total", totalWatch);
         SetDiagnosticsText(sink, "Lenovo Hardware Scan LdeApi files were not found.");
         return false;
     }
+    TraceTiming(sink, "initialize_file_check", fileCheckWatch);
 
     try {
+        Stopwatch ^ resolverWatch = StartTiming(sink);
         LenovoAssemblyResolver::EnsureInstalled(context->addinDirectory);
         Environment::SetEnvironmentVariable("PATH",
             String::Concat(context->addinDirectory, ";", Environment::GetEnvironmentVariable("PATH")),
             EnvironmentVariableTarget::Process);
+        TraceTiming(sink, "initialize_resolver_path", resolverWatch);
 
+        Stopwatch ^ assemblyWatch = StartTiming(sink);
         context->coreAssembly = Assembly::LoadFrom(CombinePath(context->addinDirectory, kCoreDll));
         context->clientAssembly = Assembly::LoadFrom(CombinePath(context->addinDirectory, kClientDll));
         Assembly::LoadFrom(CombinePath(context->addinDirectory, kRpcClientDll));
+        TraceTiming(sink, "initialize_load_assemblies", assemblyWatch);
+
+        Stopwatch ^ reflectionWatch = StartTiming(sink);
         context->clientType = context->clientAssembly->GetType("Lenovo.LdeApi.Client.LdeApiClient", true);
         context->resultType = context->coreAssembly->GetType("Lenovo.LdeApi.Core.Models.Result", true);
         Type ^ serverInitModeType = context->coreAssembly->GetType("Lenovo.LdeApi.Core.Enums.ServerInitMode", true);
         Object ^ serverInitMode = Enum::Parse(serverInitModeType, "AsParentProcess", false);
 
         context->loadModulesMethod = context->clientType->GetMethod("LoadModules");
+        context->getAvailableModulesMethod = context->clientType->GetMethod("GetAvailableModules");
         context->startExecutionMethod = context->clientType->GetMethod("StartExecution");
-        context->getStatusMethod = context->clientType->GetMethod("GetStatus");
         context->disposeMethod = context->clientType->GetMethod("Dispose", Type::EmptyTypes);
-        if (context->loadModulesMethod == nullptr || context->startExecutionMethod == nullptr ||
-            context->getStatusMethod == nullptr || context->disposeMethod == nullptr) {
+        if (context->loadModulesMethod == nullptr || context->getAvailableModulesMethod == nullptr ||
+            context->startExecutionMethod == nullptr || context->disposeMethod == nullptr) {
+            TraceTiming(sink, "initialize_reflection", reflectionWatch);
+            TraceTiming(sink, "initialize_total", totalWatch);
             SetDiagnosticsText(sink, "Lenovo Hardware Scan reflection members were not found.");
             return false;
         }
+        TraceTiming(sink, "initialize_reflection", reflectionWatch);
 
+        Stopwatch ^ logPathWatch = StartTiming(sink);
         String ^ logPath = Path::Combine(Path::GetTempPath(), "CaseDashLenovoHardwareScanLogs");
         Directory::CreateDirectory(logPath);
         if (!logPath->EndsWith(Path::DirectorySeparatorChar.ToString())) {
             logPath = String::Concat(logPath, Path::DirectorySeparatorChar);
         }
+        TraceTiming(sink, "initialize_log_path", logPathWatch);
+
+        Stopwatch ^ createClientWatch = StartTiming(sink);
         String ^ processMonitorName = System::Diagnostics::Process::GetCurrentProcess()->ProcessName;
         context->client = Activator::CreateInstance(
             context->clientType, gcnew array<Object ^>{logPath, nullptr, nullptr, serverInitMode, processMonitorName});
+        TraceTiming(sink, "initialize_create_client", createClientWatch);
 
         pin_ptr<const wchar_t> pinnedAssembly = PtrToStringChars(CombinePath(context->addinDirectory, kClientDll));
         sink.TraceAssemblyLoaded(pinnedAssembly);
         context->loaded = true;
         SetDiagnosticsText(sink, "Lenovo Hardware Scan runtime initialized.");
+        TraceTiming(sink, "initialize_total", totalWatch);
         return true;
     } catch (Exception ^ ex) {
         String ^ exceptionText = ex->ToString();
         pin_ptr<const wchar_t> pinnedDiagnostics = PtrToStringChars(exceptionText);
         sink.SetDiagnostics(pinnedDiagnostics);
         sink.TraceInitializeException(pinnedDiagnostics);
+        TraceTiming(sink, "initialize_total", totalWatch);
         return false;
     }
 }
@@ -454,22 +534,31 @@ bool EnsureModulesLoaded(LenovoRuntimeContext ^ context,
 
     if (context->loadedModules != nullptr && EnumerableCount(context->loadedModules) > 0 &&
         String::Equals(context->loadedModuleSignature, signature, StringComparison::Ordinal)) {
+        Stopwatch ^ cachedWatch = StartTiming(sink);
+        TraceTiming(sink, "module_load_cached", cachedWatch);
         return true;
     }
 
     context->loadedModules = nullptr;
     context->loadedModuleSignature = nullptr;
+    Stopwatch ^ invokeWatch = StartTiming(sink);
     Task ^ task =
         safe_cast<Task ^>(context->loadModulesMethod->Invoke(context->client, gcnew array<Object ^>{modules}));
+    TraceTiming(sink, "module_load_invoke", invokeWatch);
+    Stopwatch ^ waitWatch = StartTiming(sink);
     if (!WaitTask(task, kLoadModulesTimeoutMs, sink, "Lenovo Hardware Scan module load timed out.")) {
+        TraceTiming(sink, "module_load_wait", waitWatch);
         return false;
     }
+    TraceTiming(sink, "module_load_wait", waitWatch);
 
+    Stopwatch ^ resultWatch = StartTiming(sink);
     context->loadedModules = TaskResult(task);
     context->loadedModuleSignature = signature;
     String ^ loadSummary = ModuleLoadSummary(modules, context->loadedModules);
     pin_ptr<const wchar_t> pinnedLoadSummary = PtrToStringChars(loadSummary);
     sink.TraceModuleLoadResult(pinnedLoadSummary);
+    TraceTiming(sink, "module_load_result", resultWatch);
     if (EnumerableCount(context->loadedModules) == 0) {
         SetDiagnosticsText(sink, "Lenovo Hardware Scan loaded no thermal modules.");
         return false;
@@ -485,29 +574,39 @@ bool CaptureLenovoSnapshot(LenovoRuntimeContext ^ context,
         return false;
     }
 
+    Stopwatch ^ totalWatch = StartTiming(sink);
     try {
-        Object ^ status = context->getStatusMethod->Invoke(context->client, gcnew array<Object ^>{});
-        String ^ statusText = status != nullptr ? status->ToString() : "null";
-        pin_ptr<const wchar_t> pinnedStatus = PtrToStringChars(statusText);
-        sink.TraceClientStatus(pinnedStatus);
-
+        Stopwatch ^ modulesWatch = StartTiming(sink);
         if (!EnsureModulesLoaded(context, options, sink)) {
+            TraceTiming(sink, "ensure_modules_loaded", modulesWatch);
+            TraceTiming(sink, "capture_total", totalWatch);
             return false;
         }
+        TraceTiming(sink, "ensure_modules_loaded", modulesWatch);
 
         LenovoExecutionCapture ^ capture = gcnew LenovoExecutionCapture(sink, context->resultType);
+        Stopwatch ^ executionInvokeWatch = StartTiming(sink);
         Task ^ task = safe_cast<Task ^>(context->startExecutionMethod->Invoke(
             context->client, gcnew array<Object ^>{capture->Callback, context->loadedModules, true, false}));
+        TraceTiming(sink, "start_execution_invoke", executionInvokeWatch);
+        Stopwatch ^ executionWaitWatch = StartTiming(sink);
         if (!WaitTask(task, kExecutionTimeoutMs, sink, "Lenovo Hardware Scan thermal execution timed out.")) {
+            TraceTiming(sink, "start_execution_wait", executionWaitWatch);
+            TraceTiming(sink, "capture_total", totalWatch);
             return false;
         }
+        TraceTiming(sink, "start_execution_wait", executionWaitWatch);
 
+        Stopwatch ^ executionResultWatch = StartTiming(sink);
         Object ^ result = TaskResult(task);
         const bool executionStarted = result != nullptr && Convert::ToBoolean(result);
+        TraceTiming(sink, "start_execution_result", executionResultWatch);
         if (!executionStarted && capture->TemperatureCount == 0) {
             SetDiagnosticsText(sink, "Lenovo Hardware Scan thermal execution returned no telemetry.");
+            TraceTiming(sink, "capture_total", totalWatch);
             return false;
         }
+        TraceTiming(sink, "capture_total", totalWatch);
         return capture->TemperatureCount > 0;
     } catch (Exception ^ ex) {
         context->loadedModules = nullptr;
@@ -516,8 +615,61 @@ bool CaptureLenovoSnapshot(LenovoRuntimeContext ^ context,
         pin_ptr<const wchar_t> pinnedDiagnostics = PtrToStringChars(exceptionText);
         sink.SetDiagnostics(pinnedDiagnostics);
         sink.TraceSnapshotException(pinnedDiagnostics);
+        TraceTiming(sink, "capture_total", totalWatch);
         return false;
     }
+}
+
+bool InvokeGetAvailableModules(LenovoRuntimeContext ^ context, LenovoHardwareScanCaptureSink& sink) {
+    Stopwatch ^ invokeWatch = StartTiming(sink);
+    Task ^ task = safe_cast<Task ^>(context->getAvailableModulesMethod->Invoke(context->client, gcnew array<Object ^>{}));
+    TraceTiming(sink, "get_available_modules_invoke", invokeWatch);
+    Stopwatch ^ waitWatch = StartTiming(sink);
+    if (!WaitTask(task, kLoadModulesTimeoutMs, sink, "Lenovo Hardware Scan available-module query timed out.")) {
+        TraceTiming(sink, "get_available_modules_wait", waitWatch);
+        return false;
+    }
+    TraceTiming(sink, "get_available_modules_wait", waitWatch);
+
+    Stopwatch ^ resultWatch = StartTiming(sink);
+    Object ^ available = TaskResult(task);
+    Object ^ modules = GetProperty(available, "Modules");
+    String ^ summary = String::Format(
+        Globalization::CultureInfo::InvariantCulture, "available_count={0}", EnumerableCount(modules));
+    pin_ptr<const wchar_t> pinnedSummary = PtrToStringChars(summary);
+    sink.TraceModuleLoadResult(pinnedSummary);
+    TraceTiming(sink, "get_available_modules_result", resultWatch);
+    return true;
+}
+
+bool StartCpuThermalToolExecution(LenovoRuntimeContext ^ context,
+    Object ^ modules,
+    LenovoHardwareScanCaptureSink& sink,
+    Stopwatch ^ totalWatch) {
+    LenovoExecutionCapture ^ capture = gcnew LenovoExecutionCapture(sink, context->resultType);
+    Stopwatch ^ executionInvokeWatch = StartTiming(sink);
+    Task ^ task = safe_cast<Task ^>(context->startExecutionMethod->Invoke(
+        context->client, gcnew array<Object ^>{capture->Callback, modules, true, false}));
+    TraceTiming(sink, "start_execution_invoke", executionInvokeWatch);
+    Stopwatch ^ executionWaitWatch = StartTiming(sink);
+    if (!WaitTask(task, kExecutionTimeoutMs, sink, "Lenovo Hardware Scan thermal execution timed out.")) {
+        TraceTiming(sink, "start_execution_wait", executionWaitWatch);
+        TraceTiming(sink, "probe_total", totalWatch);
+        return false;
+    }
+    TraceTiming(sink, "start_execution_wait", executionWaitWatch);
+
+    Stopwatch ^ executionResultWatch = StartTiming(sink);
+    Object ^ result = TaskResult(task);
+    const bool executionStarted = result != nullptr && Convert::ToBoolean(result);
+    TraceTiming(sink, "start_execution_result", executionResultWatch);
+    if (!executionStarted && capture->TemperatureCount == 0) {
+        SetDiagnosticsText(sink, "Lenovo Hardware Scan thermal execution returned no telemetry.");
+        TraceTiming(sink, "probe_total", totalWatch);
+        return false;
+    }
+    TraceTiming(sink, "probe_total", totalWatch);
+    return capture->TemperatureCount > 0;
 }
 
 void DisposeLenovoRuntime(LenovoRuntimeContext ^ context) {
@@ -551,4 +703,63 @@ bool LenovoHardwareScanRuntime::Capture(const wchar_t* addinDirectory,
     const LenovoHardwareScanCaptureOptions& options,
     LenovoHardwareScanCaptureSink& sink) {
     return CaptureLenovoSnapshot(impl_->context, addinDirectory, options, sink);
+}
+
+bool ProbeLenovoHardwareScanCpuThermalTool(const wchar_t* addinDirectory,
+    LenovoHardwareScanLdeProbeMode mode,
+    LenovoHardwareScanCaptureSink& sink) {
+    LenovoRuntimeContext ^ context = gcnew LenovoRuntimeContext();
+    if (!InitializeLenovoRuntime(context, addinDirectory, sink)) {
+        DisposeLenovoRuntime(context);
+        return false;
+    }
+
+    Stopwatch ^ totalWatch = StartTiming(sink);
+    try {
+        Object ^ modules = nullptr;
+        if (mode == LenovoHardwareScanLdeProbeMode::AvailableModulesThenManualCpuThermalToolExecution) {
+            Stopwatch ^ availableWatch = StartTiming(sink);
+            if (!InvokeGetAvailableModules(context, sink)) {
+                TraceTiming(sink, "probe_get_available_modules", availableWatch);
+                TraceTiming(sink, "probe_total", totalWatch);
+                DisposeLenovoRuntime(context);
+                return false;
+            }
+            TraceTiming(sink, "probe_get_available_modules", availableWatch);
+        }
+
+        if (mode == LenovoHardwareScanLdeProbeMode::LoadModulesThenCpuThermalToolExecution) {
+            LenovoHardwareScanCaptureOptions options;
+            options.includeCpuTemperature = true;
+            options.includeGpuTemperature = false;
+            options.includeStorageTemperature = false;
+            options.includeMotherboardTemperature = false;
+            options.includeBatteryTemperature = false;
+            Stopwatch ^ modulesWatch = StartTiming(sink);
+            if (!EnsureModulesLoaded(context, options, sink)) {
+                TraceTiming(sink, "probe_ensure_modules_loaded", modulesWatch);
+                TraceTiming(sink, "probe_total", totalWatch);
+                DisposeLenovoRuntime(context);
+                return false;
+            }
+            TraceTiming(sink, "probe_ensure_modules_loaded", modulesWatch);
+            modules = context->loadedModules;
+        } else {
+            Stopwatch ^ payloadWatch = StartTiming(sink);
+            modules = BuildManualCpuThermalToolModules(context->coreAssembly);
+            TraceTiming(sink, "probe_manual_payload", payloadWatch);
+        }
+
+        const bool captured = StartCpuThermalToolExecution(context, modules, sink, totalWatch);
+        DisposeLenovoRuntime(context);
+        return captured;
+    } catch (Exception ^ ex) {
+        String ^ exceptionText = ex->ToString();
+        pin_ptr<const wchar_t> pinnedDiagnostics = PtrToStringChars(exceptionText);
+        sink.SetDiagnostics(pinnedDiagnostics);
+        sink.TraceSnapshotException(pinnedDiagnostics);
+        TraceTiming(sink, "probe_total", totalWatch);
+        DisposeLenovoRuntime(context);
+        return false;
+    }
 }
