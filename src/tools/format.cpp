@@ -2478,6 +2478,9 @@ private:
     }
 
     bool ShouldForceSplit(const std::vector<Token>& tokens) const {
+        if (HasMultiStatementLambdaBody(tokens)) {
+            return true;
+        }
         if (!HasLineComment(tokens)) {
             return false;
         }
@@ -2485,6 +2488,62 @@ private:
             return false;
         }
         return FindFirstWrappableGroupPair(tokens).has_value() || CanSplitOperatorChain(tokens);
+    }
+
+    bool HasMultiStatementLambdaBody(const std::vector<Token>& tokens) const {
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (!IsLambdaBodyOpenToken(tokens, index)) {
+                continue;
+            }
+            const std::optional<size_t> close = FindMatchingClose(tokens, index);
+            if (!close) {
+                continue;
+            }
+            if (CountTopLevelLambdaBodyStatements(tokens, index + 1, *close) > 1) {
+                return true;
+            }
+            index = *close;
+        }
+        return false;
+    }
+
+    size_t CountTopLevelLambdaBodyStatements(const std::vector<Token>& tokens, size_t begin, size_t end) const {
+        int depth = 0;
+        size_t count = 0;
+        for (size_t index = begin; index < end; ++index) {
+            if (tokens[index].kind == TokenKind::Newline) {
+                continue;
+            }
+            if (depth == 0) {
+                if (tokens[index].text == ";") {
+                    ++count;
+                } else if (tokens[index].text == "{" && IsTopLevelLambdaStatementBlockOpen(tokens, index, begin)) {
+                    ++count;
+                }
+            }
+            UpdateDepth(tokens[index], depth);
+        }
+        return count;
+    }
+
+    bool IsTopLevelLambdaStatementBlockOpen(const std::vector<Token>& tokens, size_t open, size_t bodyBegin) const {
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, open);
+        if (!previous || *previous < bodyBegin) {
+            return true;
+        }
+        const std::string& previousText = tokens[*previous].text;
+        if (previousText == "else" || previousText == "try" || previousText == "do") {
+            return true;
+        }
+        if (previousText != ")") {
+            return false;
+        }
+        const std::optional<size_t> groupOpen = FindMatchingOpen(tokens, *previous);
+        if (!groupOpen || *groupOpen < bodyBegin) {
+            return false;
+        }
+        const std::optional<size_t> beforeGroup = PreviousNonNewlineIndex(tokens, *groupOpen);
+        return beforeGroup && *beforeGroup >= bodyBegin && IsControlKeyword(tokens[*beforeGroup].text);
     }
 
     bool HasOriginalBlankSeparator(const std::vector<Token>& tokens) const {

@@ -65,7 +65,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Keep preprocessor directives at column zero. Macro continuation backslashes, spaces before continuation backslashes, and continuation newlines are formatter-owned layout. For multi-line macro definitions, normalize the replacement list as code, collapse it onto one indented continuation line when it fits, and insert continuation backslashes only on emitted macro lines that continue onto another emitted macro line.
 - Put one empty line after `#pragma once` before the next include, preprocessor directive, comment, or declaration.
 - Put one empty line before and after each `#undef` directive. `#undef` directives are cleanup boundaries, not part of consecutive macro-definition groups.
-- Single-line lambda bodies are supported when the complete lambda fits the configured line width. A lambda body that does not fit splits after `{`, formats its body as normal code indented one level deeper, and closes on its own line.
+- Single-line lambda bodies are supported only when the body contains one statement and the complete lambda fits the configured line width. Multi-statement lambda bodies always split after `{`, format each statement on its own normal body line, and close on their own line.
 - When a wrapped lambda is assigned to a variable, keep the assignment prefix and lambda opener on the same line if the complete opener fits. If the opener does not fit but the assignment prefix plus `[` fits, keep `= [` on the assignment line and split the capture list like a multi-line function declaration without adding a second continuation indent.
 
 ## Namespaces
