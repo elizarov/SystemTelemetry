@@ -209,7 +209,7 @@ private:
         const RenderRect& destRect,
         const MetricSource& metrics);
     LayoutGuideSheetCardChromeArtifacts BuildLayoutGuideSheetCardChromeArtifacts(
-        const std::string& cardId, const RenderRect& rect, const MetricSource* metrics);
+        const std::string& cardId, const RenderRect& rect, const MetricSource* metrics, bool suppressTitle = false);
 
     AppConfig config_;
     Trace& trace_;

@@ -15,6 +15,16 @@ bool ContainsCardReference(const std::vector<std::string>& stack, const std::str
     return std::find(stack.begin(), stack.end(), cardId) != stack.end();
 }
 
+LayoutCardConfig ResolveReferencedCardDisplayConfig(const LayoutCardConfig& card, const LayoutNodeConfig& reference) {
+    LayoutCardConfig displayCard = card;
+    if (LayoutCardReferenceSuppressesTitle(reference.parameter)) {
+        // Header icons are part of titled card chrome; titleless references use the full card area for content.
+        displayCard.title.clear();
+        displayCard.icon.clear();
+    }
+    return displayCard;
+}
+
 RenderRect MakeSquareAnchorRect(int centerX, int centerY, int size) {
     const int clampedSize = (std::max)(4, size);
     const int radius = clampedSize / 2;
@@ -1089,20 +1099,29 @@ bool DashboardLayoutResolver::ResolveLayout(DashboardRenderer& renderer, bool in
         if (cardIt == renderer.config_.layout.cards.end()) {
             return;
         }
+        if (!LayoutCardReferenceParameterSupported(node.parameter)) {
+            if (writeTrace) {
+                renderer.WriteTraceFmt(RES_STR("layout_card_ref_parameter_invalid id=\"%s\" parameter=\"%s\""),
+                    node.name.c_str(),
+                    node.parameter.c_str());
+            }
+            return;
+        }
 
+        const LayoutCardConfig displayCard = ResolveReferencedCardDisplayConfig(*cardIt, node);
         DashboardLayoutResolver::ResolvedCardLayout card;
-        card.id = cardIt->id;
-        card.title = cardIt->title;
-        card.iconName = cardIt->icon;
+        card.id = displayCard.id;
+        card.title = displayCard.title;
+        card.iconName = displayCard.icon;
         card.nodePath = nodePath;
         card.rect = rect;
-        card.chromeLayout = ResolveCardChromeLayout(*cardIt, card.rect, ResolveCardChromeLayoutMetrics(renderer));
+        card.chromeLayout = ResolveCardChromeLayout(displayCard, card.rect, ResolveCardChromeLayoutMetrics(renderer));
         card.chrome.rect = card.rect;
         card.chrome.cardId = card.id;
         card.chrome.editCardId = card.id;
         card.chrome.overlayOwners = overlayOwners;
         card.chrome.overlayLayer = currentOverlayAffordanceLayer_;
-        card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(*cardIt) : nullptr;
+        card.chrome.widget = includeWidgetState ? CreateCardChromeWidget(displayCard) : nullptr;
 
         if (writeTrace) {
             renderer.WriteTraceFmt(RES_STR("layout_card id=\"%s\" rect=(%d,%d,%d,%d) title=rect=(%d,%d,%d,%d) "

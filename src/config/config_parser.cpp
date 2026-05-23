@@ -271,8 +271,8 @@ bool IsWidgetOrContainerNodeName(const std::string& name) {
 
 void MarkCardReferencesRecursive(LayoutNodeConfig& node, const std::set<std::string>& cardIds) {
     node.cardReference = false;
-    if (node.children.empty() && node.parameter.empty() && !IsWidgetOrContainerNodeName(node.name) &&
-        cardIds.find(node.name) != cardIds.end()) {
+    if (node.children.empty() && LayoutCardReferenceParameterSupported(node.parameter) &&
+        !IsWidgetOrContainerNodeName(node.name) && cardIds.find(node.name) != cardIds.end()) {
         node.cardReference = true;
     }
     for (auto& child : node.children) {

@@ -924,18 +924,23 @@ void DashboardRenderer::DrawLayoutGuideSheetOverlay(const DashboardOverlayState&
 }
 
 LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCardChromeArtifacts(
-    const std::string& cardId, const RenderRect& rect, const MetricSource* metrics) {
+    const std::string& cardId, const RenderRect& rect, const MetricSource* metrics, bool suppressTitle) {
     LayoutGuideSheetCardChromeArtifacts artifacts;
     const LayoutCardConfig* card = FindCardConfigById(cardId);
     if (card == nullptr) {
         return artifacts;
+    }
+    LayoutCardConfig displayCard = *card;
+    if (suppressTitle) {
+        displayCard.title.clear();
+        displayCard.icon.clear();
     }
 
     WidgetLayout widget;
     widget.rect = rect;
     widget.cardId = cardId;
     widget.editCardId = cardId;
-    widget.widget = CreateCardChromeWidget(*card);
+    widget.widget = CreateCardChromeWidget(displayCard);
     widget.widget->ResolveLayoutState(*this, rect);
 
     auto savedWidgetGuides = std::move(layoutResolver_->widgetEditGuides_);
@@ -953,25 +958,25 @@ LayoutGuideSheetCardChromeArtifacts DashboardRenderer::BuildLayoutGuideSheetCard
         widget.widget->Draw(*this, widget, *metrics);
     }
 
-    artifacts.chromeLayout = ResolveCardChromeLayout(*card, rect, ResolveCardChromeLayoutMetrics(*this));
+    artifacts.chromeLayout = ResolveCardChromeLayout(displayCard, rect, ResolveCardChromeLayoutMetrics(*this));
     artifacts.widgetGuides = layoutResolver_->widgetEditGuides_;
     artifacts.anchorRegions = layoutResolver_->staticEditableAnchorRegions_;
     artifacts.colorRegions = layoutResolver_->dynamicColorEditRegions_;
-    if (!card->icon.empty() && !artifacts.chromeLayout.iconRect.IsEmpty() &&
+    if (!displayCard.icon.empty() && !artifacts.chromeLayout.iconRect.IsEmpty() &&
         std::none_of(artifacts.colorRegions.begin(), artifacts.colorRegions.end(), [](const auto& region) {
             return region.parameter == LayoutEditParameter::ColorIcon;
         })) {
         artifacts.colorRegions.push_back(
             LayoutEditColorRegion{LayoutEditParameter::ColorIcon, artifacts.chromeLayout.iconRect});
     }
-    if (!card->title.empty() && !artifacts.chromeLayout.titleRect.IsEmpty() &&
+    if (!displayCard.title.empty() && !artifacts.chromeLayout.titleRect.IsEmpty() &&
         std::none_of(artifacts.colorRegions.begin(), artifacts.colorRegions.end(), [](const auto& region) {
             return region.parameter == LayoutEditParameter::ColorForeground;
         })) {
         const RenderRect titleTextRect =
             Renderer()
                 .MeasureTextBlock(artifacts.chromeLayout.titleRect,
-                    card->title,
+                    displayCard.title,
                     TextStyleId::Title,
                     TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center))
                 .textRect;

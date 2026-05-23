@@ -1,9 +1,11 @@
+#include <algorithm>
 #include <fstream>
 #include <gtest/gtest.h>
 
 #include "config/color_expression.h"
 #include "config/color_math.h"
 #include "config/config_parser.h"
+#include "config/config_runtime_fields.h"
 #include "config/config_telemetry.h"
 #include "telemetry/metrics.h"
 
@@ -326,6 +328,41 @@ TEST(ConfigParser, ParsesDateTimeWidgetFormatParameters) {
     EXPECT_EQ(config.layout.cards[0].layout.children[0].parameter, "HH:MM");
     EXPECT_EQ(config.layout.cards[0].layout.children[1].name, "clock_date");
     EXPECT_EQ(config.layout.cards[0].layout.children[1].parameter, "YYYY-MM-DD");
+
+    RemoveFileIfExists(path);
+}
+
+TEST(ConfigParser, ParsesCardReferenceTitleSuppressionParameter) {
+    LayoutNodeConfig expression;
+    ASSERT_TRUE(ParseLayoutExpression("rows(time:143(!title))", expression));
+    ASSERT_EQ(expression.children.size(), 1u);
+    EXPECT_EQ(expression.children[0].name, "time");
+    EXPECT_EQ(expression.children[0].weight, 143);
+    EXPECT_EQ(expression.children[0].parameter, "!title");
+    EXPECT_EQ(FormatLayoutExpression(expression), "rows(time:143(!title))");
+
+    const FilePath path = WriteTestConfig("[display]\n"
+                                          "layout = test\n"
+                                          "\n"
+                                          "[layout.test]\n"
+                                          "cards = time(!title)\n"
+                                          "\n"
+                                          "[card.shell]\n"
+                                          "layout = time(!title)\n"
+                                          "\n"
+                                          "[card.time]\n"
+                                          "layout = rows(clock_time(HH:MM),clock_date(YYYY-MM-DD))\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.layout.structure.cards.name, "time");
+    EXPECT_EQ(config.layout.structure.cards.parameter, "!title");
+
+    const auto shell = std::find_if(
+        config.layout.cards.begin(), config.layout.cards.end(), [](const auto& card) { return card.id == "shell"; });
+    ASSERT_NE(shell, config.layout.cards.end());
+    EXPECT_TRUE(shell->layout.cardReference);
+    EXPECT_EQ(shell->layout.parameter, "!title");
 
     RemoveFileIfExists(path);
 }

@@ -17,3 +17,11 @@ unsigned int ColorConfig::ToRgba() const {
 std::uint8_t ColorConfig::Alpha() const {
     return static_cast<std::uint8_t>(rgba & 0xFFu);
 }
+
+bool LayoutCardReferenceParameterSupported(std::string_view parameter) {
+    return parameter.empty() || LayoutCardReferenceSuppressesTitle(parameter);
+}
+
+bool LayoutCardReferenceSuppressesTitle(std::string_view parameter) {
+    return parameter == kLayoutCardReferenceWithoutTitleParameter;
+}
