@@ -2477,16 +2477,13 @@ std::optional<DisplayResizeCorner> DashboardApp::HitTestNativeTitlebarResizeHand
         return std::nullopt;
     }
 
-    const int hitSize = std::max(12, ScaleLogicalToPhysical(kDashboardResizeHandleLogical, CurrentWindowDpi()));
-    const RECT topLeftRect{
-        clientRect.left, clientRect.top, std::min(clientRect.right, clientRect.left + hitSize), clientRect.bottom};
-    if (PtInRect(&topLeftRect, clientPoint) != FALSE) {
+    const DashboardTitlebarResizeHitRects hitRects = ResolveDashboardTitlebarResizeHitRects(
+        clientRect, ResolveDashboardTitlebarResizeCornerHitSize(CurrentWindowDpi()));
+    if (PtInRect(&hitRects.topLeft, clientPoint) != FALSE) {
         return DisplayResizeCorner::TopLeft;
     }
 
-    const RECT topRightRect{
-        std::max(clientRect.left, clientRect.right - hitSize), clientRect.top, clientRect.right, clientRect.bottom};
-    if (PtInRect(&topRightRect, clientPoint) != FALSE) {
+    if (PtInRect(&hitRects.topRight, clientPoint) != FALSE) {
         return DisplayResizeCorner::TopRight;
     }
 

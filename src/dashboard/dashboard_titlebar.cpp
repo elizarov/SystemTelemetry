@@ -129,6 +129,19 @@ DashboardTitlebarGeometry ResolveDashboardTitlebarGeometry(
     return geometry;
 }
 
+DashboardTitlebarResizeHitRects ResolveDashboardTitlebarResizeHitRects(const RECT& clientRect, int hitSize) {
+    DashboardTitlebarResizeHitRects hitRects;
+    if (!IsRectUsable(clientRect) || hitSize <= 0) {
+        return hitRects;
+    }
+
+    const int width = std::min(RectWidth(clientRect), hitSize);
+    const int height = std::min(RectHeight(clientRect), hitSize);
+    hitRects.topLeft = RECT{clientRect.left, clientRect.top, clientRect.left + width, clientRect.top + height};
+    hitRects.topRight = RECT{clientRect.right - width, clientRect.top, clientRect.right, clientRect.top + height};
+    return hitRects;
+}
+
 DashboardTitlebarControlLayout ResolveDashboardTitlebarControlLayout(
     const RECT& clientRect, const DashboardTitlebarControlMetrics& metrics) {
     DashboardTitlebarControlLayout layout;

@@ -118,6 +118,10 @@ int ResolveDashboardTitlebarCornerRadius(UINT dpi) {
     return std::max(1, MulDiv(kNativeTitlebarCornerRadiusLogical, static_cast<int>(effectiveDpi), kDefaultDpi));
 }
 
+int ResolveDashboardTitlebarResizeCornerHitSize(UINT dpi) {
+    return std::max(1, ResolveDashboardTitlebarCornerRadius(dpi) - 1);
+}
+
 DashboardCloseButtonColors ResolveDashboardCloseButtonColors(HWND hwnd, bool pressed) {
     DashboardCloseButtonColors colors{
         pressed ? kDefaultCloseButtonPressedColor : kDefaultCloseButtonHoverColor, kDefaultCloseButtonGlyphColor};
