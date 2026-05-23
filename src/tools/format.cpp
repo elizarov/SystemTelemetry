@@ -28,13 +28,13 @@ constexpr int kDefaultContinuationIndentWidth = 4;
 
 enum class Mode {
     Check,
-    Fix,
+    Fix
 };
 
 enum class Scope {
     All,
     Changed,
-    Path,
+    Path
 };
 
 enum class TokenKind {
@@ -46,7 +46,7 @@ enum class TokenKind {
     BlockComment,
     Preprocessor,
     Symbol,
-    Newline,
+    Newline
 };
 
 struct Options {
@@ -170,6 +170,40 @@ bool IsDigit(char ch) {
 
 bool IsSpaceButNotNewline(char ch) {
     return ch == ' ' || ch == '\t' || ch == '\f' || ch == '\v';
+}
+
+bool IsCommentOrNewline(const Token& token) {
+    return token.kind == TokenKind::Newline ||
+        token.kind == TokenKind::LineComment ||
+        token.kind == TokenKind::BlockComment;
+}
+
+bool IsGroupClose(std::string_view text) {
+    return text == ")" || text == "]" || text == "}";
+}
+
+bool IsTrailingComma(const std::vector<Token>& tokens, size_t index) {
+    if (index >= tokens.size() || tokens[index].text != ",") {
+        return false;
+    }
+    for (size_t next = index + 1; next < tokens.size(); ++next) {
+        if (IsCommentOrNewline(tokens[next])) {
+            continue;
+        }
+        return IsGroupClose(tokens[next].text);
+    }
+    return false;
+}
+
+std::vector<Token> DropTrailingCommas(std::vector<Token> tokens) {
+    std::vector<Token> result;
+    result.reserve(tokens.size());
+    for (size_t index = 0; index < tokens.size(); ++index) {
+        if (!IsTrailingComma(tokens, index)) {
+            result.push_back(std::move(tokens[index]));
+        }
+    }
+    return result;
 }
 
 bool IsAtPreprocessorStart(std::string_view text, size_t index) {
@@ -365,7 +399,7 @@ std::vector<Token> Tokenize(std::string_view text) {
             ++index;
         }
     }
-    return tokens;
+    return DropTrailingCommas(std::move(tokens));
 }
 
 bool IsWordLike(const Token& token) {
@@ -541,7 +575,7 @@ private:
         NamespaceDeclaration,
         EnumDeclaration,
         TypeDeclaration,
-        FunctionDefinition,
+        FunctionDefinition
     };
 
     enum class DeclarationKind {
@@ -550,7 +584,7 @@ private:
         MacroDefinition,
         Method,
         NamespaceDeclaration,
-        TypeDeclaration,
+        TypeDeclaration
     };
 
     struct BlockState {
@@ -1336,7 +1370,7 @@ private:
         Relational,
         Shift,
         Additive,
-        Multiplicative,
+        Multiplicative
     };
 
     std::vector<std::string> FormatRange(

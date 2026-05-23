@@ -102,6 +102,14 @@ from.b + (to.b - from.b)* amount
 };
 }
 
+OklchColor NormalizeOklch(const double* lightnessOverrideWithLongName,const double* chromaOverrideWithLongName,const double* hueOverrideWithLongName){
+return OklchColor{
+std::clamp(*lightnessOverrideWithLongName,0.0,1.0),
+std::max(0.0,*chromaOverrideWithLongName),
+std::clamp(*hueOverrideWithLongName,0.0,360.0),
+};
+}
+
 enum class RuntimeConfigFieldValueKind{HexColor,Integer};
 
 enum class ValueFormat : std::uint8_t {
