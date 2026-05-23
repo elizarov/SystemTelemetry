@@ -2054,6 +2054,9 @@ private:
         if (lines.empty() || finalPart.empty() || HasOriginalBlankSeparator(finalPart) || ShouldForceSplit(finalPart)) {
             return false;
         }
+        if (!StartsWithGroupClose(tools::lint::Trim(lines.back()))) {
+            return false;
+        }
         const std::string inlineText = FormatInline(finalPart);
         if (inlineText.empty()) {
             return false;
@@ -2089,6 +2092,21 @@ private:
             return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
         std::vector<Token> value(tokens.begin() + static_cast<std::ptrdiff_t>(*question + 1), tokens.end());
+        const size_t valueStart = NextSignificantIndex(value, 0);
+        if (valueStart < value.size() && IsGroupOpen(value[valueStart].text)) {
+            if (std::optional<size_t> valueClose = FindMatchingClose(value, valueStart)) {
+                std::string attachedGroupPrefix = conditionLine + " ";
+                if (Fits(indentLevel, attachedGroupPrefix + value[valueStart].text)) {
+                    return FormatSplitGroup(
+                        value,
+                        GroupPair{valueStart, *valueClose},
+                        indentLevel,
+                        std::move(attachedGroupPrefix),
+                        std::move(suffix)
+                    );
+                }
+            }
+        }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + conditionLine);
         std::vector<std::string> valueLines = FormatRange(value, valueIndentLevel, {}, std::move(suffix), true);
@@ -2103,6 +2121,15 @@ private:
         std::string suffix,
         bool indentSplitChains
     ) const {
+        if (std::optional<std::vector<std::string>> splitCondition = TryFormatTernaryConditionOperatorSplit(
+            tokens,
+            indentLevel,
+            prefix,
+            suffix,
+            indentSplitChains
+        )) {
+            return *splitCondition;
+        }
         std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
         int depth = 0;
@@ -2139,9 +2166,62 @@ private:
                 std::move(partPrefix),
                 std::move(partSuffix)
             );
+            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
+                partLines,
+                parts[index + 1],
+                suffix
+            )) {
+                lines.insert(lines.end(), partLines.begin(), partLines.end());
+                break;
+            }
             lines.insert(lines.end(), partLines.begin(), partLines.end());
         }
         return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatTernaryConditionOperatorSplit(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix,
+        bool indentSplitChains
+    ) const {
+        const std::optional<size_t> question = FindTopLevelToken(tokens, "?");
+        if (!question) {
+            return std::nullopt;
+        }
+        if (ContainsTokenAfter(tokens, *question + 1, "?")) {
+            return std::nullopt;
+        }
+        const std::optional<size_t> colon = FindTopLevelTokenAfter(tokens, ":", *question + 1);
+        if (!colon) {
+            return std::nullopt;
+        }
+        std::vector<Token> condition(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*question));
+        if (!CanSplitOperatorChain(condition)) {
+            return std::nullopt;
+        }
+        std::vector<Token> ternaryTail(tokens.begin() + static_cast<std::ptrdiff_t>(*question), tokens.end());
+        std::vector<std::string> conditionLines =
+            FormatOperatorChain(condition, indentLevel, std::string(prefix), {}, indentSplitChains);
+        if (conditionLines.size() <= 1) {
+            return std::nullopt;
+        }
+        std::string tailText = FormatInline(ternaryTail);
+        if (tailText.empty()) {
+            return std::nullopt;
+        }
+        std::string lastLine = TrimRight(conditionLines.back()) + " " + tailText;
+        AppendSuffix(lastLine, suffix);
+        if (static_cast<int>(lastLine.size()) > config_.columnLimit) {
+            return std::nullopt;
+        }
+        conditionLines.back() = std::move(lastLine);
+        return conditionLines;
+    }
+
+    static bool StartsWithGroupClose(std::string_view text) {
+        return !text.empty() && (text.front() == ')' || text.front() == ']' || text.front() == '}');
     }
 
     std::vector<std::string> FormatChainPart(
@@ -3376,6 +3456,30 @@ private:
             }
         }
         return std::nullopt;
+    }
+
+    std::optional<size_t> FindTopLevelTokenAfter(
+        const std::vector<Token>& tokens,
+        std::string_view tokenText,
+        size_t begin
+    ) const {
+        int depth = 0;
+        for (size_t index = begin; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && tokens[index].text == tokenText) {
+                return index;
+            }
+        }
+        return std::nullopt;
+    }
+
+    bool ContainsTokenAfter(const std::vector<Token>& tokens, size_t begin, std::string_view tokenText) const {
+        for (size_t index = begin; index < tokens.size(); ++index) {
+            if (tokens[index].text == tokenText) {
+                return true;
+            }
+        }
+        return false;
     }
 
     bool ContainsWord(const std::vector<Token>& tokens, std::string_view text) const {
