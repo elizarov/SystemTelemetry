@@ -302,6 +302,7 @@ void DiscardServiceResult(Service& service) {
 }
 
 void StructuredBindingLoop(const BoardSelections& resolvedSelections) {
+    auto [parameterLine, descriptionLine] = SplitTooltipLines(tooltipText);
     for (const auto& [logicalName, sensorName] : resolvedSelections.boardFanSensorNames) {
         Use(logicalName, sensorName);
     }

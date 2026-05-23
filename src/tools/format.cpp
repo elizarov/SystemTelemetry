@@ -2890,6 +2890,9 @@ private:
         if ((current == "++" || current == "--") && prev == ")") {
             return true;
         }
+        if (current == "[" && prev == "auto") {
+            return true;
+        }
         if (current == "{" || IsNoSpaceBefore(current) || IsNoSpaceAfter(prev)) {
             return false;
         }

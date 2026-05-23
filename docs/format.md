@@ -115,6 +115,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Keep empty braces as `{}` with no inner space.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, and `catch`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
+- Put a space between `auto` and the opening bracket of a structured binding: `auto [name, value] = pair;`.
 - Do not put a space between a string or character literal prefix and its literal: `L"text"`, `u8"text"`, and `L'x'`.
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
 - Do not insert a visual-padding space before braced initializer braces or braced constructor calls: `Widget widget{config};` and `std::string_view{}`.
