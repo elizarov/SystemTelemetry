@@ -442,21 +442,12 @@ add_library(CaseDashMsi OBJECT
     src/telemetry/board/msi/board_msi_center_bridge.cpp
 )
 
-add_library(CaseDashLenovo OBJECT
-    src/telemetry/board/lenovo/board_lenovo_vantage_bridge.cpp
-)
-
 set_target_properties(CaseDashGigabyte PROPERTIES
     COMMON_LANGUAGE_RUNTIME ""
     VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
 )
 
 set_target_properties(CaseDashMsi PROPERTIES
-    COMMON_LANGUAGE_RUNTIME ""
-    VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
-)
-
-set_target_properties(CaseDashLenovo PROPERTIES
     COMMON_LANGUAGE_RUNTIME ""
     VS_DOTNET_TARGET_FRAMEWORK_VERSION "v4.0"
 )
@@ -471,11 +462,6 @@ target_include_directories(CaseDashMsi PRIVATE
     "${CMAKE_SOURCE_DIR}/resources"
 )
 
-target_include_directories(CaseDashLenovo PRIVATE
-    "${CMAKE_SOURCE_DIR}/src"
-    "${CMAKE_SOURCE_DIR}/resources"
-)
-
 target_compile_definitions(CaseDashGigabyte PRIVATE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
@@ -483,14 +469,6 @@ target_compile_definitions(CaseDashGigabyte PRIVATE
 )
 
 target_compile_definitions(CaseDashMsi PRIVATE
-    NOMINMAX
-    WIN32_LEAN_AND_MEAN
-    _HAS_EXCEPTIONS=0
-)
-
-target_compile_definitions(CaseDashLenovo PRIVATE
-    UNICODE
-    _UNICODE
     NOMINMAX
     WIN32_LEAN_AND_MEAN
     _HAS_EXCEPTIONS=0
@@ -514,18 +492,8 @@ target_compile_options(CaseDashMsi PRIVATE
     /Zi
 )
 
-target_compile_options(CaseDashLenovo PRIVATE
-    /clr
-    /W4
-    /permissive-
-    /w14505
-    /we4505
-    /Zi
-)
-
 target_sources(CaseDash PRIVATE
     $<TARGET_OBJECTS:CaseDashGigabyte>
-    $<TARGET_OBJECTS:CaseDashLenovo>
     $<TARGET_OBJECTS:CaseDashMsi>
 )
 
@@ -973,7 +941,6 @@ add_executable(CaseDashBenchmarks
 )
 target_sources(CaseDashBenchmarks PRIVATE
     $<TARGET_OBJECTS:CaseDashGigabyte>
-    $<TARGET_OBJECTS:CaseDashLenovo>
     $<TARGET_OBJECTS:CaseDashMsi>
 )
 

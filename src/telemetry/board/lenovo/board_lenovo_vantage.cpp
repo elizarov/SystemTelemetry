@@ -6,7 +6,9 @@
 #include <array>
 #include <chrono>
 #include <cstdint>
+#include <cstring>
 #include <future>
+#include <intrin.h>
 #include <iterator>
 #include <memory>
 #include <optional>
@@ -15,7 +17,6 @@
 #include <vector>
 #include <Wbemidl.h>
 
-#include "telemetry/board/lenovo/board_lenovo_vantage_bridge.h"
 #include "telemetry/fps_service_protocol.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/elevated_process.h"
@@ -31,26 +32,29 @@
 namespace {
 
 constexpr char kLenovoProviderName[] = "Lenovo";
-constexpr char kLenovoDriverLibrary[] = "Lenovo Hardware Scan LdeApi";
+constexpr char kLenovoDirectDriverLibrary[] = "Lenovo Diagnostics Driver";
+constexpr char kLenovoDiagnosticsDriverServiceDll[] = "LenovoDiagnosticsDriverService.dll";
+constexpr char kLenovoDiagnosticsDriverSys[] = "LenovoDiagnosticsDriver.sys";
+constexpr char kLenovoCpuTemperatureName[] = "CPU Temperature";
 constexpr DWORD kPipeConnectTimeoutMs = 100;
 constexpr DWORD kPipeReadChunkBytes = 4096;
 constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kSensorRetrySampleInterval = 10;
 constexpr std::chrono::seconds kDirectSnapshotRefreshInterval{5};
 constexpr DWORD kWmiQueryTimeoutMs = 1500;
-constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";         // WMI COM namespace uses UTF-16 BSTRs.
-constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";  // WMI COM class uses UTF-16 BSTRs.
-constexpr wchar_t kWmiRelPathProperty[] = L"__RELPATH";              // WMI property names are UTF-16 BSTRs.
-constexpr wchar_t kWmiDataProperty[] = L"Data";                      // WMI property names are UTF-16 BSTRs.
-constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";             // WMI method names are UTF-16 BSTRs.
-constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";           // WMI method names are UTF-16 BSTRs.
-constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";           // WMI method names are UTF-16 BSTRs.
-constexpr wchar_t kGetCpuTempMethod[] = L"GetCPUTemp";               // WMI method names are UTF-16 BSTRs.
-constexpr wchar_t kGetGpuTempMethod[] = L"GetGPUTemp";               // WMI method names are UTF-16 BSTRs.
+constexpr wchar_t kLenovoDiagnosticsDriverServiceName[] = L"LenovoDiagnosticsDriver";
+constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";
+constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";
+constexpr wchar_t kWmiRelPathProperty[] = L"__RELPATH";
+constexpr wchar_t kWmiDataProperty[] = L"Data";
+constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";
+constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";
+constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";
 
-struct LenovoHardwareScanSnapshot {
+struct LenovoSensorSnapshot {
     bool success = false;
     std::string diagnostics;
+    std::string driverLibrary = kLenovoDirectDriverLibrary;
     std::vector<BoardSensorReading> fans;
     std::vector<BoardSensorReading> temperatures;
 };
@@ -65,7 +69,7 @@ struct LenovoServiceSnapshotState {
     bool done = false;
     bool hasResponse = false;
     std::string diagnostics;
-    LenovoHardwareScanSnapshot snapshot;
+    LenovoSensorSnapshot snapshot;
 };
 
 class Handle {
@@ -87,6 +91,66 @@ public:
 
 private:
     HANDLE handle_ = INVALID_HANDLE_VALUE;
+};
+
+class ServiceHandle {
+public:
+    explicit ServiceHandle(SC_HANDLE handle = nullptr) : handle_(handle) {}
+
+    ~ServiceHandle() {
+        Reset();
+    }
+
+    ServiceHandle(const ServiceHandle&) = delete;
+    ServiceHandle& operator=(const ServiceHandle&) = delete;
+
+    SC_HANDLE Get() const {
+        return handle_;
+    }
+
+    bool Valid() const {
+        return handle_ != nullptr;
+    }
+
+    void Reset(SC_HANDLE handle = nullptr) {
+        if (handle_ != nullptr) {
+            CloseServiceHandle(handle_);
+        }
+        handle_ = handle;
+    }
+
+private:
+    SC_HANDLE handle_ = nullptr;
+};
+
+class LibraryHandle {
+public:
+    explicit LibraryHandle(HMODULE handle = nullptr) : handle_(handle) {}
+
+    ~LibraryHandle() {
+        Reset();
+    }
+
+    LibraryHandle(const LibraryHandle&) = delete;
+    LibraryHandle& operator=(const LibraryHandle&) = delete;
+
+    HMODULE Get() const {
+        return handle_;
+    }
+
+    bool Valid() const {
+        return handle_ != nullptr;
+    }
+
+    void Reset(HMODULE handle = nullptr) {
+        if (handle_ != nullptr) {
+            FreeLibrary(handle_);
+        }
+        handle_ = handle;
+    }
+
+private:
+    HMODULE handle_ = nullptr;
 };
 
 class ComApartment {
@@ -186,7 +250,7 @@ bool IsSaneCelsius(double value) {
     return value > 0.0 && value <= 125.0;
 }
 
-bool HasAvailableFanReading(const LenovoHardwareScanSnapshot& snapshot) {
+bool HasAvailableFanReading(const LenovoSensorSnapshot& snapshot) {
     return std::any_of(snapshot.fans.begin(), snapshot.fans.end(), [](const BoardSensorReading& reading) {
         return reading.value.has_value() && IsSaneRpm(*reading.value);
     });
@@ -244,12 +308,12 @@ bool VersionGreater(const std::string& left, const std::string& right) {
     return false;
 }
 
-bool IsHardwareScanDirectory(const FilePath& path) {
-    return FileExists(path / "LenovoHardwareScanAddin.dll") && FileExists(path / "LdeApi.Client.dll") &&
-           FileExists(path / "LdeApi.Server.exe") && FileExists(path / "Lenovo.Vantage.RpcClient.dll");
+bool IsLenovoDiagnosticsDriverDirectory(const FilePath& path) {
+    return DirectoryExists(path) && FileExists(path / kLenovoDiagnosticsDriverSys) &&
+           FileExists(path / kLenovoDiagnosticsDriverServiceDll);
 }
 
-std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
+std::optional<FilePath> FindInstalledLenovoDiagnosticsDriverDirectory() {
     const std::optional<FilePath> programData = ProgramDataDirectory();
     if (!programData.has_value()) {
         return std::nullopt;
@@ -278,7 +342,7 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
             continue;
         }
         const FilePath candidate = addinRoot / FilePath(name);
-        if (!IsHardwareScanDirectory(candidate)) {
+        if (!IsLenovoDiagnosticsDriverDirectory(candidate)) {
             continue;
         }
         if (!bestPath.has_value() || VersionGreater(name, bestVersion)) {
@@ -289,6 +353,276 @@ std::optional<FilePath> FindInstalledLenovoHardwareScanDirectory() {
 
     FindClose(search);
     return bestPath;
+}
+
+bool IsIntelCpuVendor() {
+    std::array<int, 4> registers{};
+    __cpuid(registers.data(), 0);
+
+    std::array<char, 13> vendor{};
+    memcpy(vendor.data(), &registers[1], sizeof(int));
+    memcpy(vendor.data() + 4, &registers[3], sizeof(int));
+    memcpy(vendor.data() + 8, &registers[2], sizeof(int));
+    return std::string(vendor.data()) == "GenuineIntel";
+}
+
+bool QueryServiceRunning(SC_HANDLE service) {
+    SERVICE_STATUS_PROCESS status{};
+    DWORD bytesNeeded = 0;
+    if (!QueryServiceStatusEx(
+            service, SC_STATUS_PROCESS_INFO, reinterpret_cast<LPBYTE>(&status), sizeof(status), &bytesNeeded)) {
+        return false;
+    }
+    return status.dwCurrentState == SERVICE_RUNNING;
+}
+
+bool WaitForServiceRunning(SC_HANDLE service) {
+    for (int retry = 0; retry < 50; ++retry) {
+        if (QueryServiceRunning(service)) {
+            return true;
+        }
+        Sleep(20);
+    }
+    return false;
+}
+
+void StopServiceBestEffort(SC_HANDLE service) {
+    if (service == nullptr) {
+        return;
+    }
+
+    SERVICE_STATUS status{};
+    ControlService(service, SERVICE_CONTROL_STOP, &status);
+    for (int retry = 0; retry < 50; ++retry) {
+        SERVICE_STATUS_PROCESS processStatus{};
+        DWORD bytesNeeded = 0;
+        if (!QueryServiceStatusEx(service,
+                SC_STATUS_PROCESS_INFO,
+                reinterpret_cast<LPBYTE>(&processStatus),
+                sizeof(processStatus),
+                &bytesNeeded)) {
+            break;
+        }
+        if (processStatus.dwCurrentState == SERVICE_STOPPED) {
+            break;
+        }
+        Sleep(100);
+    }
+}
+
+std::optional<double> DecodeIntelMsrTemperature(std::uint64_t thermalStatus, std::uint64_t temperatureTarget) {
+    if ((thermalStatus & (std::uint64_t{1} << 31)) == 0) {
+        return std::nullopt;
+    }
+
+    const std::uint32_t thermalDelta = static_cast<std::uint32_t>((thermalStatus >> 16) & 0x7f);
+    const std::uint32_t targetCelsius = static_cast<std::uint32_t>((temperatureTarget >> 16) & 0xff);
+    if (targetCelsius <= thermalDelta) {
+        return std::nullopt;
+    }
+
+    const double celsius = static_cast<double>(targetCelsius - thermalDelta);
+    return IsSaneCelsius(celsius) ? std::optional<double>(celsius) : std::nullopt;
+}
+
+std::vector<GROUP_AFFINITY> ActiveLogicalProcessorAffinities() {
+    std::vector<GROUP_AFFINITY> affinities;
+    const WORD groupCount = GetActiveProcessorGroupCount();
+    for (WORD group = 0; group < groupCount; ++group) {
+        const DWORD processorCount = GetActiveProcessorCount(group);
+        const DWORD maximumBits = static_cast<DWORD>(sizeof(KAFFINITY) * 8);
+        for (DWORD index = 0; index < processorCount && index < maximumBits; ++index) {
+            GROUP_AFFINITY affinity{};
+            affinity.Group = group;
+            affinity.Mask = static_cast<KAFFINITY>(1) << index;
+            affinities.push_back(affinity);
+        }
+    }
+    return affinities;
+}
+
+using CreateLDDServiceFn = void* (*)();
+using DestroyLDDServiceFn = void (*)(void*);
+using LDDServiceBoolMethod = bool (*)(void*);
+using LDDServiceReadMsrMethod = int (*)(void*, std::uint32_t, std::uint64_t*);
+
+std::optional<double> ReadLenovoDriverIntelTemperature(void* service, LDDServiceReadMsrMethod readMsr) {
+    std::uint64_t thermalStatus = 0;
+    std::uint64_t temperatureTarget = 0;
+    if (readMsr(service, 0x19c, &thermalStatus) != 0 || readMsr(service, 0x1a2, &temperatureTarget) != 0) {
+        return std::nullopt;
+    }
+    return DecodeIntelMsrTemperature(thermalStatus, temperatureTarget);
+}
+
+std::vector<double> ReadLenovoDriverIntelTemperatures(void* service, LDDServiceReadMsrMethod readMsr) {
+    std::vector<double> temperatures;
+    const std::vector<GROUP_AFFINITY> affinities = ActiveLogicalProcessorAffinities();
+    for (const GROUP_AFFINITY& affinity : affinities) {
+        GROUP_AFFINITY previousAffinity{};
+        const bool affinitySet = SetThreadGroupAffinity(GetCurrentThread(), &affinity, &previousAffinity) != FALSE;
+        const std::optional<double> temperature = ReadLenovoDriverIntelTemperature(service, readMsr);
+        if (affinitySet) {
+            SetThreadGroupAffinity(GetCurrentThread(), &previousAffinity, nullptr);
+        }
+        if (temperature.has_value()) {
+            temperatures.push_back(*temperature);
+        }
+    }
+
+    if (temperatures.empty()) {
+        const std::optional<double> temperature = ReadLenovoDriverIntelTemperature(service, readMsr);
+        if (temperature.has_value()) {
+            temperatures.push_back(*temperature);
+        }
+    }
+    return temperatures;
+}
+
+LenovoSensorSnapshot CaptureLenovoDriverCpuTemperatureSensors(Trace& trace, const FilePath& addinDirectory) {
+    LenovoSensorSnapshot snapshot;
+    if (!IsIntelCpuVendor()) {
+        snapshot.diagnostics =
+            ResourceStringText(RES_STR("Lenovo Diagnostics Driver CPU temperature path supports Intel CPUs only."));
+        return snapshot;
+    }
+    if (!IsLenovoDiagnosticsDriverDirectory(addinDirectory)) {
+        snapshot.diagnostics =
+            ResourceStringText(RES_STR("Lenovo Diagnostics Driver files were not found in the Vantage addin."));
+        return snapshot;
+    }
+
+    bool serviceCreated = false;
+    void* wrapperService = nullptr;
+    DestroyLDDServiceFn destroyService = nullptr;
+    std::string diagnostics;
+    std::vector<double> temperatures;
+
+    ServiceHandle scm(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
+    ServiceHandle service;
+    LibraryHandle wrapper;
+
+    do {
+        if (!scm.Valid()) {
+            diagnostics = FormatText(
+                RES_STR("Lenovo Diagnostics Driver SCM open failed: %s"), FormatWin32Error(GetLastError()).c_str());
+            break;
+        }
+
+        service.Reset(OpenServiceW(scm.Get(),
+            kLenovoDiagnosticsDriverServiceName,
+            SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP | DELETE));
+        if (!service.Valid()) {
+            const FilePath driverPath = addinDirectory / kLenovoDiagnosticsDriverSys;
+            const std::wstring wideDriverPath = driverPath.WideForNativeApi();
+            service.Reset(CreateServiceW(scm.Get(),
+                kLenovoDiagnosticsDriverServiceName,
+                kLenovoDiagnosticsDriverServiceName,
+                SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP | DELETE,
+                SERVICE_KERNEL_DRIVER,
+                SERVICE_DEMAND_START,
+                SERVICE_ERROR_NORMAL,
+                wideDriverPath.c_str(),
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr,
+                nullptr));
+            serviceCreated = service.Valid();
+            if (!service.Valid()) {
+                diagnostics = FormatText(RES_STR("Lenovo Diagnostics Driver service creation failed: %s"),
+                    FormatWin32Error(GetLastError()).c_str());
+                break;
+            }
+        }
+
+        if (!StartServiceW(service.Get(), 0, nullptr)) {
+            const DWORD error = GetLastError();
+            if (error != ERROR_SERVICE_ALREADY_RUNNING) {
+                diagnostics =
+                    FormatText(RES_STR("Lenovo Diagnostics Driver start failed: %s"), FormatWin32Error(error).c_str());
+                break;
+            }
+        }
+        if (!WaitForServiceRunning(service.Get())) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver service did not reach running state."));
+            break;
+        }
+
+        const FilePath wrapperPath = addinDirectory / kLenovoDiagnosticsDriverServiceDll;
+        const std::wstring wideWrapperPath = wrapperPath.WideForNativeApi();
+        wrapper.Reset(LoadLibraryW(wideWrapperPath.c_str()));
+        if (!wrapper.Valid()) {
+            diagnostics = FormatText(
+                RES_STR("Lenovo Diagnostics Driver wrapper load failed: %s"), FormatWin32Error(GetLastError()).c_str());
+            break;
+        }
+
+        const auto createService =
+            reinterpret_cast<CreateLDDServiceFn>(GetProcAddress(wrapper.Get(), "CreateLDDService"));
+        destroyService = reinterpret_cast<DestroyLDDServiceFn>(GetProcAddress(wrapper.Get(), "DestroyLDDService"));
+        if (createService == nullptr || destroyService == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver wrapper exports were not found."));
+            break;
+        }
+
+        wrapperService = createService();
+        if (wrapperService == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver wrapper creation failed."));
+            break;
+        }
+
+        void** vtable = *reinterpret_cast<void***>(wrapperService);
+        if (vtable == nullptr || vtable[5] == nullptr || vtable[11] == nullptr) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver wrapper ABI was not recognized."));
+            break;
+        }
+
+        const auto isOpen = reinterpret_cast<LDDServiceBoolMethod>(vtable[5]);
+        if (!isOpen(wrapperService)) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver wrapper did not open the device."));
+            break;
+        }
+
+        const auto readMsr = reinterpret_cast<LDDServiceReadMsrMethod>(vtable[11]);
+        temperatures = ReadLenovoDriverIntelTemperatures(wrapperService, readMsr);
+        if (temperatures.empty()) {
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver returned no valid CPU temperature."));
+            break;
+        }
+    } while (false);
+
+    if (destroyService != nullptr && wrapperService != nullptr) {
+        destroyService(wrapperService);
+    }
+    if (serviceCreated) {
+        StopServiceBestEffort(service.Get());
+        DeleteService(service.Get());
+    }
+
+    if (temperatures.empty()) {
+        snapshot.diagnostics = diagnostics;
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
+            RES_STR("driver_cpu_temperature_failed diagnostics=\"%s\""),
+            snapshot.diagnostics.c_str());
+        return snapshot;
+    }
+
+    const auto [minimumIt, maximumIt] = std::minmax_element(temperatures.begin(), temperatures.end());
+    snapshot.success = true;
+    snapshot.temperatures.push_back(BoardSensorReading{kLenovoCpuTemperatureName, *maximumIt});
+    snapshot.diagnostics =
+        FormatText(RES_STR("Lenovo Diagnostics Driver CPU temperature query completed. logical_processors=%zu "
+                           "minimum_c=%.1f maximum_c=%.1f"),
+            temperatures.size(),
+            *minimumIt,
+            *maximumIt);
+    trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
+        RES_STR("driver_cpu_temperature_done logical_processors=%zu minimum_c=%.1f maximum_c=%.1f"),
+        temperatures.size(),
+        *minimumIt,
+        *maximumIt);
+    return snapshot;
 }
 
 std::optional<std::wstring> ReadWmiStringProperty(IWbemClassObject* object, const wchar_t* propertyName) {
@@ -331,7 +665,7 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
     Bstr path(objectPath.c_str());
     Bstr method(methodName);
     if (!path.Valid() || !method.Valid()) {
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_method method=\"%s\" status=alloc_failed"),
             TextFromNullableWide(methodName).c_str());
         return std::nullopt;
@@ -340,7 +674,7 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
     ComObject<IWbemClassObject> output;
     const HRESULT hr = services->ExecMethod(path.Get(), method.Get(), 0, nullptr, nullptr, output.Out(), nullptr);
     if (FAILED(hr)) {
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_method method=\"%s\" status=%s"),
             TextFromNullableWide(methodName).c_str(),
             FormatHresult(hr).c_str());
@@ -349,13 +683,13 @@ std::optional<std::uint32_t> ExecuteLenovoGameZoneMethod(
 
     const std::optional<std::uint32_t> value = ReadWmiUInt32Property(output.Get(), kWmiDataProperty);
     if (!value.has_value()) {
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_method method=\"%s\" status=no_data"),
             TextFromNullableWide(methodName).c_str());
         return std::nullopt;
     }
 
-    trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+    trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
         RES_STR("gamezone_wmi_method method=\"%s\" status=ok data=%lu"),
         TextFromNullableWide(methodName).c_str(),
         static_cast<unsigned long>(*value));
@@ -371,13 +705,6 @@ void AddLenovoGameZoneFanReading(
 
 std::string FormatOptionalUInt32(std::optional<std::uint32_t> value) {
     return value.has_value() ? FormatText("%lu", static_cast<unsigned long>(*value)) : std::string("N/A");
-}
-
-void AddLenovoGameZoneTemperatureReading(
-    std::vector<BoardSensorReading>& temperatures, const char* title, std::optional<std::uint32_t> celsius) {
-    if (celsius.has_value() && IsSaneCelsius(static_cast<double>(*celsius))) {
-        temperatures.push_back(BoardSensorReading{title, static_cast<double>(*celsius)});
-    }
 }
 
 void AddLenovoGameZoneFanReadings(std::vector<BoardSensorReading>& fans,
@@ -402,13 +729,13 @@ void AddLenovoGameZoneFanReadings(std::vector<BoardSensorReading>& fans,
     AddLenovoGameZoneFanReading(fans, "GPU Fan", fan2);
 }
 
-LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool includeTemperatures, bool includeFans) {
-    LenovoHardwareScanSnapshot snapshot;
+LenovoSensorSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
+    LenovoSensorSnapshot snapshot;
     const ComApartment com;
     if (!com.Ready()) {
         snapshot.diagnostics = FormatText(RES_STR("Lenovo GameZone WMI fan query COM initialization failed: %s"),
             FormatHresult(com.Status()).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=co_initialize status=%s"),
             FormatHresult(com.Status()).c_str());
         return snapshot;
@@ -426,7 +753,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     if (FAILED(securityHr) && securityHr != RPC_E_TOO_LATE) {
         snapshot.diagnostics = FormatText(
             RES_STR("Lenovo GameZone WMI fan query COM security failed: %s"), FormatHresult(securityHr).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=co_initialize_security status=%s"),
             FormatHresult(securityHr).c_str());
         return snapshot;
@@ -437,7 +764,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI locator creation failed: %s"), FormatHresult(hr).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=create_locator status=%s"),
             FormatHresult(hr).c_str());
         return snapshot;
@@ -446,7 +773,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     Bstr namespacePath(kLenovoGameZoneNamespace);
     if (!namespacePath.Valid()) {
         snapshot.diagnostics = ResourceStringText(RES_STR("Lenovo GameZone WMI namespace allocation failed."));
-        trace.Write(TracePrefix::LenovoHardwareScan, RES_STR("gamezone_wmi_failed stage=namespace_alloc"));
+        trace.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("gamezone_wmi_failed stage=namespace_alloc"));
         return snapshot;
     }
 
@@ -456,7 +783,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI connection failed: %s"), FormatHresult(hr).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=connect status=%s"),
             FormatHresult(hr).c_str());
         return snapshot;
@@ -473,7 +800,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI proxy security failed: %s"), FormatHresult(hr).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=proxy_blanket status=%s"),
             FormatHresult(hr).c_str());
         return snapshot;
@@ -482,7 +809,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     Bstr className(kLenovoGameZoneClass);
     if (!className.Valid()) {
         snapshot.diagnostics = ResourceStringText(RES_STR("Lenovo GameZone WMI class allocation failed."));
-        trace.Write(TracePrefix::LenovoHardwareScan, RES_STR("gamezone_wmi_failed stage=class_alloc"));
+        trace.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("gamezone_wmi_failed stage=class_alloc"));
         return snapshot;
     }
 
@@ -492,15 +819,13 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
     if (FAILED(hr)) {
         snapshot.diagnostics =
             FormatText(RES_STR("Lenovo GameZone WMI instance enumeration failed: %s"), FormatHresult(hr).c_str());
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_failed stage=enumerate status=%s"),
             FormatHresult(hr).c_str());
         return snapshot;
     }
 
     int instanceCount = 0;
-    std::optional<std::uint32_t> lastCpuTemperature;
-    std::optional<std::uint32_t> lastGpuTemperature;
     std::optional<std::uint32_t> lastFanCount;
     std::optional<std::uint32_t> lastFan1;
     std::optional<std::uint32_t> lastFan2;
@@ -514,7 +839,7 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
         if (FAILED(hr)) {
             snapshot.diagnostics =
                 FormatText(RES_STR("Lenovo GameZone WMI instance read failed: %s"), FormatHresult(hr).c_str());
-            trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+            trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
                 RES_STR("gamezone_wmi_failed stage=next status=%s"),
                 FormatHresult(hr).c_str());
             return snapshot;
@@ -522,65 +847,42 @@ LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiSensors(Trace& trace, bool in
 
         const std::optional<std::wstring> objectPath = ReadWmiStringProperty(instance.Get(), kWmiRelPathProperty);
         if (!objectPath.has_value() || objectPath->empty()) {
-            trace.Write(TracePrefix::LenovoHardwareScan, RES_STR("gamezone_wmi_instance status=no_path"));
+            trace.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("gamezone_wmi_instance status=no_path"));
             continue;
         }
 
         ++instanceCount;
-        trace.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("gamezone_wmi_instance path=\"%s\""),
             TextFromWide(*objectPath).c_str());
 
-        if (includeTemperatures) {
-            const std::optional<std::uint32_t> cpuTemperature =
-                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetCpuTempMethod);
-            const std::optional<std::uint32_t> gpuTemperature =
-                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetGpuTempMethod);
-            lastCpuTemperature = cpuTemperature;
-            lastGpuTemperature = gpuTemperature;
-            AddLenovoGameZoneTemperatureReading(snapshot.temperatures, "CPU Temperature", cpuTemperature);
-            AddLenovoGameZoneTemperatureReading(snapshot.temperatures, "GPU Temperature", gpuTemperature);
-        }
-
-        if (includeFans) {
-            const std::optional<std::uint32_t> fanCount =
-                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFanCountMethod);
-            const std::optional<std::uint32_t> fan1 =
-                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan1SpeedMethod);
-            const std::optional<std::uint32_t> fan2 =
-                ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan2SpeedMethod);
-            lastFanCount = fanCount;
-            lastFan1 = fan1;
-            lastFan2 = fan2;
-            AddLenovoGameZoneFanReadings(snapshot.fans, fanCount, fan1, fan2);
-        }
+        const std::optional<std::uint32_t> fanCount =
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFanCountMethod);
+        const std::optional<std::uint32_t> fan1 =
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan1SpeedMethod);
+        const std::optional<std::uint32_t> fan2 =
+            ExecuteLenovoGameZoneMethod(trace, services.Get(), *objectPath, kGetFan2SpeedMethod);
+        lastFanCount = fanCount;
+        lastFan1 = fan1;
+        lastFan2 = fan2;
+        AddLenovoGameZoneFanReadings(snapshot.fans, fanCount, fan1, fan2);
     }
 
     snapshot.success = true;
     snapshot.diagnostics =
-        FormatText(RES_STR("Lenovo GameZone WMI sensor query completed. instance_count=%d temperature_count=%zu "
-                           "fan_count=%zu cpu_temp_raw=%s gpu_temp_raw=%s fan_count_raw=%s fan1_raw=%s fan2_raw=%s"),
+        FormatText(RES_STR("Lenovo GameZone WMI fan query completed. instance_count=%d fan_count=%zu "
+                           "fan_count_raw=%s fan1_raw=%s fan2_raw=%s"),
             instanceCount,
-            snapshot.temperatures.size(),
             snapshot.fans.size(),
-            FormatOptionalUInt32(lastCpuTemperature).c_str(),
-            FormatOptionalUInt32(lastGpuTemperature).c_str(),
             FormatOptionalUInt32(lastFanCount).c_str(),
             FormatOptionalUInt32(lastFan1).c_str(),
             FormatOptionalUInt32(lastFan2).c_str());
-    trace.WriteFmt(TracePrefix::LenovoHardwareScan,
-        RES_STR("gamezone_wmi_done instance_count=%d temperature_count=%zu fan_count=%zu temperature_names=\"%s\" "
-                "fan_names=\"%s\""),
+    trace.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
+        RES_STR("gamezone_wmi_done instance_count=%d fan_count=%zu fan_names=\"%s\""),
         instanceCount,
-        snapshot.temperatures.size(),
         snapshot.fans.size(),
-        JoinNames(ExtractBoardSensorNames(snapshot.temperatures)).c_str(),
         JoinNames(ExtractBoardSensorNames(snapshot.fans)).c_str());
     return snapshot;
-}
-
-LenovoHardwareScanSnapshot CaptureLenovoGameZoneWmiFans(Trace& trace) {
-    return CaptureLenovoGameZoneWmiSensors(trace, false, true);
 }
 
 void AppendDiagnosticsSuffix(std::string& diagnostics, const char* label, const std::string& suffix) {
@@ -602,13 +904,14 @@ void AppendFanReadings(std::vector<BoardSensorReading>& target, const std::vecto
     }
 }
 
-void AppendLenovoGameZoneWmiFans(Trace& trace, LenovoHardwareScanSnapshot& snapshot) {
-    LenovoHardwareScanSnapshot gameZone = CaptureLenovoGameZoneWmiFans(trace);
+void AppendLenovoGameZoneWmiFans(Trace& trace, LenovoSensorSnapshot& snapshot) {
+    LenovoSensorSnapshot gameZone = CaptureLenovoGameZoneWmiFans(trace);
     AppendDiagnosticsSuffix(snapshot.diagnostics, "gamezone_fans", gameZone.diagnostics);
     if (!gameZone.success) {
         return;
     }
     AppendFanReadings(snapshot.fans, gameZone.fans);
+    snapshot.success = snapshot.success || HasAvailableFanReading(snapshot);
 }
 
 std::vector<NamedScalarMetric> CreateRawMetrics(
@@ -627,40 +930,6 @@ void MarkMissingMetricsPermissionRequired(std::vector<NamedScalarMetric>& metric
             metric.metric.issue = ScalarMetricIssue::PermissionRequired;
         }
     }
-}
-
-bool HasLogicalName(const std::vector<std::string>& names, const char* value) {
-    return std::any_of(
-        names.begin(), names.end(), [value](const std::string& name) { return EqualsInsensitive(name, value); });
-}
-
-bool HasUnknownTemperatureRequest(const std::vector<std::string>& names) {
-    return std::any_of(names.begin(), names.end(), [](const std::string& name) {
-        return !EqualsInsensitive(name, "cpu") && !EqualsInsensitive(name, "gpu") && !EqualsInsensitive(name, "disk") &&
-               !EqualsInsensitive(name, "storage") && !EqualsInsensitive(name, "motherboard") &&
-               !EqualsInsensitive(name, "system") && !EqualsInsensitive(name, "board") &&
-               !EqualsInsensitive(name, "battery");
-    });
-}
-
-LenovoHardwareScanCaptureOptions CaptureOptionsForSettings(const BoardTelemetrySettings& settings) {
-    LenovoHardwareScanCaptureOptions options{};
-    const std::vector<std::string>& temperatures = settings.requestedTemperatureNames;
-    const bool unknownTemperature = HasUnknownTemperatureRequest(temperatures);
-    options.includeCpuTemperature = HasLogicalName(temperatures, "cpu") || unknownTemperature;
-    options.includeGpuTemperature = HasLogicalName(temperatures, "gpu") || unknownTemperature;
-    options.includeStorageTemperature =
-        HasLogicalName(temperatures, "disk") || HasLogicalName(temperatures, "storage") || unknownTemperature;
-    options.includeMotherboardTemperature = HasLogicalName(temperatures, "motherboard") ||
-                                            HasLogicalName(temperatures, "system") ||
-                                            HasLogicalName(temperatures, "board") || unknownTemperature;
-    options.includeBatteryTemperature = HasLogicalName(temperatures, "battery") || unknownTemperature;
-    return options;
-}
-
-bool HasRequestedHardwareScanModule(const LenovoHardwareScanCaptureOptions& options) {
-    return options.includeCpuTemperature || options.includeGpuTemperature || options.includeStorageTemperature ||
-           options.includeMotherboardTemperature || options.includeBatteryTemperature;
 }
 
 std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& diagnostics) {
@@ -714,16 +983,13 @@ std::optional<BoardVendorTelemetrySample> QueryServiceBoardSample(std::string& d
     return ParseBoardSensorsServiceResponse(response.data(), response.size(), diagnostics);
 }
 
-struct LenovoServiceSnapshotThreadContext {
-    std::shared_ptr<LenovoServiceSnapshotState> state;
-};
-
-LenovoHardwareScanSnapshot SnapshotFromServiceSample(const BoardVendorTelemetrySample& sample) {
-    LenovoHardwareScanSnapshot snapshot;
+LenovoSensorSnapshot SnapshotFromServiceSample(const BoardVendorTelemetrySample& sample) {
+    LenovoSensorSnapshot snapshot;
     snapshot.success = sample.available;
     snapshot.diagnostics = sample.diagnostics.empty()
-                               ? ResourceStringText(RES_STR("Lenovo Hardware Scan service sample completed."))
+                               ? ResourceStringText(RES_STR("Lenovo Diagnostics Driver service sample completed."))
                                : sample.diagnostics;
+    snapshot.driverLibrary = sample.driverLibrary.empty() ? kLenovoDirectDriverLibrary : sample.driverLibrary;
     for (const NamedScalarMetric& metric : sample.fans) {
         snapshot.fans.push_back(BoardSensorReading{metric.name, metric.metric.value});
     }
@@ -732,6 +998,10 @@ LenovoHardwareScanSnapshot SnapshotFromServiceSample(const BoardVendorTelemetryS
     }
     return snapshot;
 }
+
+struct LenovoServiceSnapshotThreadContext {
+    std::shared_ptr<LenovoServiceSnapshotState> state;
+};
 
 DWORD WINAPI LenovoServiceSnapshotThread(void* contextPtr) {
     std::unique_ptr<LenovoServiceSnapshotThreadContext> context(
@@ -742,7 +1012,7 @@ DWORD WINAPI LenovoServiceSnapshotThread(void* contextPtr) {
 
     std::string diagnostics;
     std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
-    LenovoHardwareScanSnapshot snapshot;
+    LenovoSensorSnapshot snapshot;
     const bool hasResponse = serviceSample.has_value();
     if (hasResponse) {
         snapshot = SnapshotFromServiceSample(*serviceSample);
@@ -783,110 +1053,19 @@ void StartLenovoServiceSnapshot(std::shared_ptr<LenovoServiceSnapshotState> stat
     const DWORD error = GetLastError();
     const LightweightMutexLock lock(context->state->mutex);
     context->state->diagnostics = FormatText(
-        RES_STR("Failed to start CashDash service Lenovo Hardware Scan refresh: %s"), FormatWin32Error(error).c_str());
+        RES_STR("Failed to start CashDash service Lenovo direct-driver refresh: %s"), FormatWin32Error(error).c_str());
     context->state->hasResponse = false;
     context->state->done = true;
     context->state->running = false;
 }
 
-class LenovoHardwareScanCapture final : public LenovoHardwareScanCaptureSink {
-public:
-    explicit LenovoHardwareScanCapture(Trace& trace) : trace_(trace) {}
-
-    void AddTemperatureReading(const wchar_t* title, double celsius) override {
-        snapshot_.temperatures.push_back(BoardSensorReading{TextFromNullableWide(title), celsius});
-    }
-
-    void SetDiagnostics(const wchar_t* diagnostics) override {
-        snapshot_.diagnostics = TextFromNullableWide(diagnostics);
-    }
-
-    void TraceAssemblyLoaded(const wchar_t* path) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string pathText = TextFromNullableWide(path);
-            trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("assembly_loaded path=\"%s\""), pathText.c_str());
-        }
-    }
-
-    void TraceExecutionResult(const wchar_t* result) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string resultText = TextFromNullableWide(result);
-            trace_.WriteFmt(
-                TracePrefix::LenovoHardwareScan, RES_STR("execution_result result=\"%s\""), resultText.c_str());
-        }
-    }
-
-    void TraceInitializeException(const wchar_t* diagnostics) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
-            trace_.WriteFmt(
-                TracePrefix::LenovoHardwareScan, RES_STR("initialize_exception %s"), diagnosticsText.c_str());
-        }
-    }
-
-    void TraceModuleLoadResult(const wchar_t* result) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string resultText = TextFromNullableWide(result);
-            trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("module_load_result %s"), resultText.c_str());
-        }
-    }
-
-    void TraceSnapshotException(const wchar_t* diagnostics) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string diagnosticsText = TextFromNullableWide(diagnostics);
-            trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("snapshot_exception %s"), diagnosticsText.c_str());
-        }
-    }
-
-    bool TraceTimingEnabled() const override {
-        return trace_.Enabled(TracePrefix::LenovoHardwareScan);
-    }
-
-    void TraceTiming(const wchar_t* timing) override {
-        if (trace_.Enabled(TracePrefix::LenovoHardwareScan)) {
-            const std::string timingText = TextFromNullableWide(timing);
-            trace_.WriteFmt(TracePrefix::LenovoHardwareScan, RES_STR("timing %s"), timingText.c_str());
-        }
-    }
-
-    LenovoHardwareScanSnapshot FinishSuccess() {
-        snapshot_.success = true;
-        snapshot_.diagnostics = FormatText(
-            RES_STR("Lenovo Hardware Scan temperature query completed. temp_count=%zu"), snapshot_.temperatures.size());
-        const std::vector<std::string> temperatureNames = ExtractBoardSensorNames(snapshot_.temperatures);
-        trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
-            RES_STR("snapshot_done temp_count=%zu temp_names=\"%s\""),
-            snapshot_.temperatures.size(),
-            JoinNames(temperatureNames).c_str());
-        return std::move(snapshot_);
-    }
-
-    LenovoHardwareScanSnapshot FinishFailure() {
-        return std::move(snapshot_);
-    }
-
-private:
-    Trace& trace_;
-    LenovoHardwareScanSnapshot snapshot_;
-};
-
-LenovoHardwareScanSnapshot CaptureLenovoHardwareScanSensors(Trace& trace,
-    LenovoHardwareScanRuntime& runtime,
-    const FilePath& addinDirectory,
-    const LenovoHardwareScanCaptureOptions& options) {
-    LenovoHardwareScanCapture capture(trace);
-    const std::wstring wideAddinDirectory = addinDirectory.WideForNativeApi();
-    const bool captured = runtime.Capture(wideAddinDirectory.c_str(), options, capture);
-    return captured ? capture.FinishSuccess() : capture.FinishFailure();
-}
-
 BoardVendorTelemetrySample CreateRawLenovoSampleFromSnapshot(
-    const BoardVendorInfo& info, const LenovoHardwareScanSnapshot& snapshot) {
+    const BoardVendorInfo& info, const LenovoSensorSnapshot& snapshot) {
     BoardVendorTelemetrySample sample;
     sample.providerName = kLenovoProviderName;
     sample.boardManufacturer = info.manufacturer;
     sample.boardProduct = info.product;
-    sample.driverLibrary = kLenovoDriverLibrary;
+    sample.driverLibrary = snapshot.driverLibrary.empty() ? kLenovoDirectDriverLibrary : snapshot.driverLibrary;
     sample.diagnostics = snapshot.diagnostics;
     sample.availableFanNames = ExtractBoardSensorNames(snapshot.fans);
     sample.availableTemperatureNames = ExtractBoardSensorNames(snapshot.temperatures);
@@ -896,39 +1075,29 @@ BoardVendorTelemetrySample CreateRawLenovoSampleFromSnapshot(
     return sample;
 }
 
-class LenovoHardwareScanBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
+class LenovoDiagnosticsDriverBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    LenovoHardwareScanBoardTelemetryProvider(
+    LenovoDiagnosticsDriverBoardTelemetryProvider(
         Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options)
         : trace_(trace), info_(std::move(info)), synchronousSamples_(options.synchronousSamples) {}
 
-    ~LenovoHardwareScanBoardTelemetryProvider() override {
+    ~LenovoDiagnosticsDriverBoardTelemetryProvider() override {
         if (pendingDirectSnapshot_.valid()) {
             pendingDirectSnapshot_.wait();
         }
     }
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
-        if (pendingDirectSnapshot_.valid()) {
-            if (pendingDirectSnapshot_.wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
-                cachedDirectSnapshot_ = pendingDirectSnapshot_.get();
-                hasCachedDirectSnapshot_ = cachedDirectSnapshot_.success;
-                trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
-                    RES_STR("direct_snapshot_ready_during_initialize available=%d"),
-                    cachedDirectSnapshot_.success ? 1 : 0);
-            } else {
-                trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("direct_snapshot_pending_during_initialize"));
-            }
-        }
+        CompleteReadyDirectSnapshotDuringInitialize();
 
         settings_ = settings;
-        captureOptions_ = CaptureOptionsForSettings(settings_);
+        wantsDriverTemperature_ = !settings_.requestedTemperatureNames.empty();
         wantsGameZoneFans_ = !settings_.requestedFanNames.empty();
-        trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("initialize_begin"));
+        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("initialize_begin"));
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
             boardProduct_.c_str());
@@ -938,17 +1107,19 @@ public:
             return false;
         }
 
-        hardwareScanDirectory_ = FindInstalledLenovoHardwareScanDirectory();
-        if (!hardwareScanDirectory_.has_value()) {
-            diagnostics_ = ResourceStringText(RES_STR("Lenovo Hardware Scan addin directory was not found."));
+        diagnosticsDriverDirectory_ = FindInstalledLenovoDiagnosticsDriverDirectory();
+        if (!diagnosticsDriverDirectory_.has_value()) {
+            diagnostics_ = ResourceStringText(RES_STR("Lenovo Diagnostics Driver addin directory was not found."));
             return false;
         }
 
-        driverLibrary_ = (*hardwareScanDirectory_ / "LenovoHardwareScanAddin.dll").string();
-        diagnostics_ = ResourceStringText(RES_STR("Lenovo Hardware Scan provider ready."));
+        driverLibrary_ = (*diagnosticsDriverDirectory_ / kLenovoDiagnosticsDriverServiceDll).string();
+        diagnostics_ = ResourceStringText(RES_STR("Lenovo Diagnostics Driver provider ready."));
         temperatureMetricTemplate_ =
             CreateRequestedBoardMetrics(settings_.requestedTemperatureNames, ScalarMetricUnit::Celsius);
         fanMetricTemplate_ = CreateRequestedBoardMetrics(settings_.requestedFanNames, ScalarMetricUnit::Rpm);
+        availableTemperatureNames_ =
+            wantsDriverTemperature_ ? std::vector<std::string>{kLenovoCpuTemperatureName} : std::vector<std::string>{};
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
@@ -978,118 +1149,114 @@ public:
 
     BoardVendorTelemetrySample Sample() override {
         BoardVendorTelemetrySample sample = CreateBaseSample();
-        if (!initialized_ || !hardwareScanDirectory_.has_value()) {
+        if (!initialized_ || !diagnosticsDriverDirectory_.has_value()) {
             return sample;
         }
         if (synchronousSamples_) {
             return SampleSynchronously();
         }
-
-        std::string serviceDiagnostics;
-        CompletePendingServiceSnapshot(serviceDiagnostics);
-        MaybeStartServiceSnapshot(serviceDiagnostics);
-        const bool serviceSnapshotRunning = IsServiceSnapshotRunning();
-        if (hasCachedServiceSnapshot_) {
-            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
-            if (serviceSnapshotRunning) {
-                sample.diagnostics = FormatText(RES_STR("%s refresh=running service=\"%s\""),
-                    sample.diagnostics.c_str(),
-                    serviceDiagnostics.c_str());
-            }
-            return sample;
+        if (!processElevated_ && wantsDriverTemperature_) {
+            return SampleThroughService(sample);
         }
-        if (ServicePermissionRequired()) {
-            ApplyServicePermissionRequiredSample(sample, serviceDiagnostics, serviceSnapshotRunning);
-            return sample;
+        return SampleDirectly(sample);
+    }
+
+private:
+    void CompleteReadyDirectSnapshotDuringInitialize() {
+        if (!pendingDirectSnapshot_.valid()) {
+            return;
+        }
+        if (pendingDirectSnapshot_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
+            trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_pending_during_initialize"));
+            return;
         }
 
+        cachedDirectSnapshot_ = pendingDirectSnapshot_.get();
+        hasCachedDirectSnapshot_ = cachedDirectSnapshot_.success;
+        trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
+            RES_STR("direct_snapshot_ready_during_initialize available=%d"),
+            cachedDirectSnapshot_.success ? 1 : 0);
+    }
+
+    BoardVendorTelemetrySample SampleSynchronously() {
+        BoardVendorTelemetrySample sample = CreateBaseSample();
+        LenovoSensorSnapshot snapshot;
         std::string directDiagnostics;
-        CompletePendingDirectSnapshot(directDiagnostics);
-        if (serviceSnapshotRunning) {
-            if (directDiagnostics.empty()) {
-                directDiagnostics =
-                    ResourceStringText(RES_STR("Direct Lenovo Hardware Scan refresh is waiting for service sample."));
-            }
+        if (wantsDriverTemperature_) {
+            trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_refresh_started"));
+            snapshot = CaptureLenovoDriverCpuTemperatureSensors(trace_, *diagnosticsDriverDirectory_);
+            directDiagnostics = snapshot.diagnostics;
         } else {
-            MaybeStartDirectSnapshot(directDiagnostics);
+            directDiagnostics =
+                ResourceStringText(RES_STR("No Lenovo Diagnostics Driver temperature values were requested."));
         }
+        AppendGameZoneFans(snapshot);
 
-        if (hasCachedDirectSnapshot_) {
-            ApplySnapshotToSample(cachedDirectSnapshot_, sample);
-            if (pendingDirectSnapshot_.valid()) {
-                sample.diagnostics = FormatText(RES_STR("%s refresh=running service=\"%s\""),
-                    sample.diagnostics.c_str(),
-                    serviceDiagnostics.c_str());
-            }
+        if (snapshot.success) {
+            ApplySnapshotToSample(snapshot, sample);
             return sample;
         }
 
-        if (directDiagnostics.empty()) {
-            directDiagnostics = ResourceStringText(RES_STR("Direct Lenovo Hardware Scan refresh is waiting."));
-        }
-        std::string gameZoneDiagnostics;
-        LenovoHardwareScanSnapshot gameZoneSnapshot;
-        if (serviceSnapshotRunning) {
-            gameZoneDiagnostics =
-                ResourceStringText(RES_STR("Lenovo GameZone WMI fan query is waiting for service sample."));
-        } else {
-            gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
-        }
-        if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
-            gameZoneSnapshot.diagnostics = FormatText(
-                RES_STR("Lenovo GameZone WMI fan query active. service=\"%s\" direct=\"%s\" gamezone=\"%s\""),
-                serviceDiagnostics.c_str(),
-                directDiagnostics.c_str(),
-                gameZoneSnapshot.diagnostics.c_str());
-            ApplySnapshotToSample(gameZoneSnapshot, sample);
-            return sample;
-        }
-
-        diagnostics_ = FormatText(RES_STR("Lenovo Hardware Scan unavailable. service=\"%s\" direct=\"%s\""),
-            serviceDiagnostics.c_str(),
-            directDiagnostics.c_str());
-        AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
+        diagnostics_ =
+            FormatText(RES_STR("Lenovo Diagnostics Driver unavailable. direct=\"%s\""), directDiagnostics.c_str());
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
 
-private:
-    BoardVendorTelemetrySample SampleSynchronously() {
-        BoardVendorTelemetrySample sample = CreateBaseSample();
-
-        std::string directDiagnostics;
-        LenovoHardwareScanSnapshot directSnapshot;
-        if (HasRequestedHardwareScanModule(captureOptions_)) {
-            trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("direct_snapshot_refresh_started"));
-            directSnapshot =
-                CaptureLenovoHardwareScanSensors(trace_, runtime_, *hardwareScanDirectory_, captureOptions_);
-            directDiagnostics = directSnapshot.diagnostics;
-            if (directSnapshot.success) {
-                AppendGameZoneFans(directSnapshot);
-                ApplySnapshotToSample(directSnapshot, sample);
-                return sample;
+    BoardVendorTelemetrySample SampleThroughService(BoardVendorTelemetrySample sample) {
+        std::string serviceDiagnostics;
+        CompletePendingServiceSnapshot(serviceDiagnostics);
+        if (hasCachedServiceSnapshot_) {
+            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
+            if (IsServiceSnapshotRunning()) {
+                sample.diagnostics = FormatText(RES_STR("%s refresh=running service=\"%s\""),
+                    sample.diagnostics.c_str(),
+                    serviceDiagnostics.c_str());
             }
-        } else {
-            directDiagnostics =
-                ResourceStringText(RES_STR("No Lenovo Hardware Scan temperature modules were requested."));
-        }
-
-        std::string gameZoneDiagnostics;
-        LenovoHardwareScanSnapshot gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
-        if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
-            gameZoneSnapshot.diagnostics = FormatText(
-                RES_STR("Lenovo GameZone WMI fan query active. service=\"%s\" direct=\"%s\" gamezone=\"%s\""),
-                "disabled=synchronous",
-                directDiagnostics.c_str(),
-                gameZoneSnapshot.diagnostics.c_str());
-            ApplySnapshotToSample(gameZoneSnapshot, sample);
             return sample;
         }
 
-        diagnostics_ = FormatText(RES_STR("Lenovo Hardware Scan unavailable. service=\"%s\" direct=\"%s\""),
-            "disabled=synchronous",
-            directDiagnostics.c_str());
-        AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
+        MaybeStartServiceSnapshot(serviceDiagnostics);
+        const bool serviceSnapshotRunning = IsServiceSnapshotRunning();
+        if (hasCachedServiceSnapshot_) {
+            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
+            return sample;
+        }
+
+        if (!serviceUsable_) {
+            ApplyDriverPermissionRequiredSample(sample, serviceDiagnostics, serviceSnapshotRunning);
+            return sample;
+        }
+
+        ApplyFanOnlySample(sample);
+        diagnostics_ = serviceDiagnostics.empty()
+                           ? ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is waiting."))
+                           : serviceDiagnostics;
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        return sample;
+    }
+
+    BoardVendorTelemetrySample SampleDirectly(BoardVendorTelemetrySample sample) {
+        std::string directDiagnostics;
+        CompletePendingDirectSnapshot(directDiagnostics);
+        if (hasCachedDirectSnapshot_) {
+            ApplySnapshotToSample(cachedDirectSnapshot_, sample);
+            if (pendingDirectSnapshot_.valid()) {
+                sample.diagnostics = FormatText(RES_STR("%s refresh=running"), sample.diagnostics.c_str());
+            }
+            return sample;
+        }
+
+        MaybeStartDirectSnapshot(directDiagnostics);
+        if (hasCachedDirectSnapshot_) {
+            ApplySnapshotToSample(cachedDirectSnapshot_, sample);
+            return sample;
+        }
+
+        ApplyFanOnlySample(sample);
+        diagnostics_ = directDiagnostics.empty()
+                           ? ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is waiting."))
+                           : directDiagnostics;
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
@@ -1111,10 +1278,17 @@ private:
         return sample;
     }
 
-    void ApplySnapshotToSample(const LenovoHardwareScanSnapshot& snapshot, BoardVendorTelemetrySample& sample) {
+    void ApplySnapshotToSample(const LenovoSensorSnapshot& snapshot, BoardVendorTelemetrySample& sample) {
         diagnostics_ = snapshot.diagnostics;
+        if (!snapshot.driverLibrary.empty()) {
+            driverLibrary_ = snapshot.driverLibrary;
+            sample.driverLibrary = driverLibrary_;
+        }
         availableFanNames_ = ExtractBoardSensorNames(snapshot.fans);
         availableTemperatureNames_ = ExtractBoardSensorNames(snapshot.temperatures);
+        if (availableTemperatureNames_.empty() && wantsDriverTemperature_) {
+            availableTemperatureNames_ = {kLenovoCpuTemperatureName};
+        }
         sample.availableFanNames = availableFanNames_;
         sample.availableTemperatureNames = availableTemperatureNames_;
 
@@ -1129,39 +1303,39 @@ private:
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
     }
 
-    bool ServicePermissionRequired() const {
-        return !processElevated_ && !serviceUsable_;
-    }
-
-    void ApplyServicePermissionRequiredSample(
-        BoardVendorTelemetrySample& sample, const std::string& serviceDiagnostics, bool serviceSnapshotRunning) {
+    void ApplyFanOnlySample(BoardVendorTelemetrySample& sample) {
         std::string gameZoneDiagnostics;
-        LenovoHardwareScanSnapshot gameZoneSnapshot;
-        if (serviceSnapshotRunning) {
-            gameZoneDiagnostics =
-                ResourceStringText(RES_STR("Lenovo GameZone WMI fan query is waiting for service sample."));
-        } else {
-            gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        LenovoSensorSnapshot gameZoneSnapshot = CaptureGameZoneFanSnapshot(gameZoneDiagnostics);
+        if (!gameZoneSnapshot.success || !HasAvailableFanReading(gameZoneSnapshot)) {
+            AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
+            return;
         }
 
-        diagnostics_ = FormatText(
-            RES_STR("Lenovo Hardware Scan requires administrator privileges without CashDashService. service=\"%s\""),
-            serviceDiagnostics.c_str());
+        availableFanNames_ = ExtractBoardSensorNames(gameZoneSnapshot.fans);
+        sample.availableFanNames = availableFanNames_;
+        sample.fans = fanMetricTemplate_;
+        ResetBoardMetricValues(sample.fans);
+        ApplyBoardSensorReadingsToMetrics(gameZoneSnapshot.fans, requestedFanIndexBySourceName_, sample.fans);
+        sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         AppendDiagnosticsSuffix(diagnostics_, "gamezone_fans", gameZoneDiagnostics);
+    }
+
+    void ApplyDriverPermissionRequiredSample(
+        BoardVendorTelemetrySample& sample, const std::string& serviceDiagnostics, bool serviceSnapshotRunning) {
+        diagnostics_ = FormatText(
+            RES_STR(
+                "Lenovo Diagnostics Driver requires administrator privileges without CashDashService. service=\"%s\""),
+            serviceDiagnostics.c_str());
+        if (serviceSnapshotRunning) {
+            AppendDiagnosticsSuffix(diagnostics_, "service_refresh", "running");
+        }
 
         sample.temperatures = temperatureMetricTemplate_;
         sample.fans = fanMetricTemplate_;
         ResetBoardMetricValues(sample.temperatures);
         ResetBoardMetricValues(sample.fans);
         MarkMissingMetricsPermissionRequired(sample.temperatures);
-
-        if (gameZoneSnapshot.success && HasAvailableFanReading(gameZoneSnapshot)) {
-            availableFanNames_ = ExtractBoardSensorNames(gameZoneSnapshot.fans);
-            sample.availableFanNames = availableFanNames_;
-            ApplyBoardSensorReadingsToMetrics(gameZoneSnapshot.fans, requestedFanIndexBySourceName_, sample.fans);
-        }
-        MarkMissingMetricsPermissionRequired(sample.fans);
-
+        ApplyFanOnlySample(sample);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
     }
@@ -1172,13 +1346,13 @@ private:
     }
 
     void CompletePendingServiceSnapshot(std::string& diagnostics) {
-        LenovoHardwareScanSnapshot snapshot;
+        LenovoSensorSnapshot snapshot;
         bool done = false;
         bool hasResponse = false;
         {
             const LightweightMutexLock lock(serviceSnapshotState_->mutex);
             if (serviceSnapshotState_->running && diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan refresh is running."));
+                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is running."));
             }
             if (!serviceSnapshotState_->done) {
                 return;
@@ -1202,11 +1376,7 @@ private:
             serviceRetrySample_ = 0;
             cachedServiceSnapshot_ = {};
             hasCachedServiceSnapshot_ = false;
-            if (!processElevated_) {
-                cachedDirectSnapshot_ = {};
-                hasCachedDirectSnapshot_ = false;
-            }
-            trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
+            trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
                 RES_STR("service_sample_failed diagnostics=\"%s\""),
                 diagnostics.c_str());
             return;
@@ -1214,13 +1384,11 @@ private:
 
         serviceUsable_ = true;
         serviceRetrySample_ = kSensorRetrySampleInterval;
-        trace_.WriteFmt(TracePrefix::LenovoHardwareScan,
+        trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
             RES_STR("service_sample_done available=%d diagnostics=\"%s\""),
             snapshot.success ? 1 : 0,
             snapshot.diagnostics.c_str());
         if (snapshot.success) {
-            AppendGameZoneFans(snapshot);
-            diagnostics = snapshot.diagnostics;
             cachedServiceSnapshot_ = std::move(snapshot);
             hasCachedServiceSnapshot_ = true;
         }
@@ -1232,7 +1400,7 @@ private:
             if (serviceSnapshotState_->running) {
                 if (diagnostics.empty()) {
                     diagnostics =
-                        ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan refresh is running."));
+                        ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is running."));
                 }
                 return;
             }
@@ -1243,7 +1411,7 @@ private:
             if (serviceRetrySample_ < kSensorRetrySampleInterval) {
                 if (diagnostics.empty()) {
                     diagnostics =
-                        ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan path is waiting for retry."));
+                        ResourceStringText(RES_STR("CashDash service Lenovo direct-driver path is waiting for retry."));
                 }
                 return;
             }
@@ -1254,14 +1422,14 @@ private:
         if (lastServiceSnapshotStart_.has_value() &&
             now - *lastServiceSnapshotStart_ < kDirectSnapshotRefreshInterval) {
             if (diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan refresh is waiting."));
+                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is waiting."));
             }
             return;
         }
 
         lastServiceSnapshotStart_ = now;
-        diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo Hardware Scan refresh started."));
-        trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("service_sample_refresh_started"));
+        diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh started."));
+        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("service_sample_refresh_started"));
         StartLenovoServiceSnapshot(serviceSnapshotState_);
     }
 
@@ -1270,15 +1438,13 @@ private:
             return;
         }
         if (pendingDirectSnapshot_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            diagnostics = ResourceStringText(RES_STR("Direct Lenovo Hardware Scan refresh is running."));
+            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is running."));
             return;
         }
 
-        LenovoHardwareScanSnapshot snapshot = pendingDirectSnapshot_.get();
+        LenovoSensorSnapshot snapshot = pendingDirectSnapshot_.get();
         diagnostics = snapshot.diagnostics;
         if (snapshot.success) {
-            AppendGameZoneFans(snapshot);
-            diagnostics = snapshot.diagnostics;
             cachedDirectSnapshot_ = std::move(snapshot);
             hasCachedDirectSnapshot_ = true;
         } else if (!hasCachedDirectSnapshot_) {
@@ -1287,41 +1453,51 @@ private:
     }
 
     void MaybeStartDirectSnapshot(std::string& diagnostics) {
-        if (pendingDirectSnapshot_.valid() || !hardwareScanDirectory_.has_value()) {
+        if (pendingDirectSnapshot_.valid() || !diagnosticsDriverDirectory_.has_value()) {
             return;
         }
-        if (!HasRequestedHardwareScanModule(captureOptions_)) {
-            diagnostics = ResourceStringText(RES_STR("No Lenovo Hardware Scan temperature modules were requested."));
+        if (!wantsDriverTemperature_) {
+            diagnostics =
+                ResourceStringText(RES_STR("No Lenovo Diagnostics Driver temperature values were requested."));
             return;
         }
 
         const auto now = std::chrono::steady_clock::now();
         if (lastDirectSnapshotStart_.has_value() && now - *lastDirectSnapshotStart_ < kDirectSnapshotRefreshInterval) {
             if (diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("Direct Lenovo Hardware Scan refresh is waiting."));
+                diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is waiting."));
             }
             return;
         }
 
-        const FilePath addinDirectory = *hardwareScanDirectory_;
-        const LenovoHardwareScanCaptureOptions options = captureOptions_;
+        const FilePath addinDirectory = *diagnosticsDriverDirectory_;
         lastDirectSnapshotStart_ = now;
-        diagnostics = ResourceStringText(RES_STR("Direct Lenovo Hardware Scan refresh started."));
-        trace_.Write(TracePrefix::LenovoHardwareScan, RES_STR("direct_snapshot_refresh_started"));
-        pendingDirectSnapshot_ = std::async(std::launch::async, [this, addinDirectory, options]() {
-            return CaptureLenovoHardwareScanSensors(trace_, runtime_, addinDirectory, options);
+        diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh started."));
+        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_refresh_started"));
+        pendingDirectSnapshot_ = std::async(std::launch::async, [this, addinDirectory]() {
+            LenovoSensorSnapshot snapshot = CaptureLenovoDriverCpuTemperatureSensors(trace_, addinDirectory);
+            AppendGameZoneFans(snapshot);
+            return snapshot;
         });
     }
 
     std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
-        return ResolveMappedBoardSensorName(settings_.temperatureSensorNames, logicalName);
+        const std::string mapped = ResolveMappedBoardSensorName(settings_.temperatureSensorNames, logicalName);
+        return EqualsInsensitive(mapped, "cpu") ? std::string(kLenovoCpuTemperatureName) : mapped;
     }
 
     std::string ResolveFanSensorName(const std::string& logicalName) const {
-        return ResolveMappedBoardSensorName(settings_.fanSensorNames, logicalName);
+        const std::string mapped = ResolveMappedBoardSensorName(settings_.fanSensorNames, logicalName);
+        if (EqualsInsensitive(mapped, "cpu")) {
+            return "CPU Fan";
+        }
+        if (EqualsInsensitive(mapped, "gpu")) {
+            return "GPU Fan";
+        }
+        return mapped;
     }
 
-    LenovoHardwareScanSnapshot CaptureGameZoneFanSnapshot(std::string& diagnostics) {
+    LenovoSensorSnapshot CaptureGameZoneFanSnapshot(std::string& diagnostics) {
         diagnostics.clear();
         if (!wantsGameZoneFans_) {
             return {};
@@ -1335,7 +1511,7 @@ private:
             gameZoneFanRetrySample_ = 0;
         }
 
-        LenovoHardwareScanSnapshot snapshot = CaptureLenovoGameZoneWmiFans(trace_);
+        LenovoSensorSnapshot snapshot = CaptureLenovoGameZoneWmiFans(trace_);
         diagnostics = snapshot.diagnostics;
         if (!snapshot.success) {
             gameZoneFanUsable_ = false;
@@ -1353,30 +1529,29 @@ private:
         return snapshot;
     }
 
-    void AppendGameZoneFans(LenovoHardwareScanSnapshot& snapshot) {
+    void AppendGameZoneFans(LenovoSensorSnapshot& snapshot) {
         if (!wantsGameZoneFans_ || HasAvailableFanReading(snapshot)) {
             return;
         }
 
         std::string diagnostics;
-        LenovoHardwareScanSnapshot gameZone = CaptureGameZoneFanSnapshot(diagnostics);
+        LenovoSensorSnapshot gameZone = CaptureGameZoneFanSnapshot(diagnostics);
         AppendDiagnosticsSuffix(snapshot.diagnostics, "gamezone_fans", diagnostics);
         if (!gameZone.success) {
             return;
         }
         AppendFanReadings(snapshot.fans, gameZone.fans);
+        snapshot.success = snapshot.success || HasAvailableFanReading(snapshot);
     }
 
     Trace& trace_;
     BoardVendorInfo info_;
     BoardTelemetrySettings settings_{};
-    LenovoHardwareScanRuntime runtime_;
-    LenovoHardwareScanCaptureOptions captureOptions_{};
-    std::optional<FilePath> hardwareScanDirectory_;
+    std::optional<FilePath> diagnosticsDriverDirectory_;
     std::string boardManufacturer_;
     std::string boardProduct_;
     std::string driverLibrary_;
-    std::string diagnostics_ = ResourceStringText(RES_STR("Lenovo Hardware Scan provider not initialized."));
+    std::string diagnostics_ = ResourceStringText(RES_STR("Lenovo Diagnostics Driver provider not initialized."));
     std::string requestedDiagnosticsSuffix_;
     std::vector<std::string> availableFanNames_;
     std::vector<std::string> availableTemperatureNames_;
@@ -1385,15 +1560,16 @@ private:
     BoardMetricIndexBySourceName requestedFanIndexBySourceName_;
     BoardMetricIndexBySourceName requestedTemperatureIndexBySourceName_;
     std::shared_ptr<LenovoServiceSnapshotState> serviceSnapshotState_ = std::make_shared<LenovoServiceSnapshotState>();
-    LenovoHardwareScanSnapshot cachedServiceSnapshot_;
-    LenovoHardwareScanSnapshot cachedDirectSnapshot_;
-    std::future<LenovoHardwareScanSnapshot> pendingDirectSnapshot_;
+    LenovoSensorSnapshot cachedServiceSnapshot_;
+    LenovoSensorSnapshot cachedDirectSnapshot_;
+    std::future<LenovoSensorSnapshot> pendingDirectSnapshot_;
     std::optional<std::chrono::steady_clock::time_point> lastServiceSnapshotStart_;
     std::optional<std::chrono::steady_clock::time_point> lastDirectSnapshotStart_;
     int serviceRetrySample_ = kSensorRetrySampleInterval;
     int gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
     bool serviceUsable_ = true;
     bool gameZoneFanUsable_ = true;
+    bool wantsDriverTemperature_ = false;
     bool wantsGameZoneFans_ = false;
     bool hasCachedServiceSnapshot_ = false;
     bool hasCachedDirectSnapshot_ = false;
@@ -1404,58 +1580,34 @@ private:
 
 }  // namespace
 
-BoardVendorTelemetrySample CaptureLenovoGameZoneWmiSensorSample(Trace& trace, BoardVendorInfo info) {
-    BoardVendorTelemetrySample sample;
-    sample.providerName = kLenovoProviderName;
-    sample.boardManufacturer = info.manufacturer;
-    sample.boardProduct = info.product;
-    sample.driverLibrary = "Lenovo GameZone WMI";
-    if (SelectBoardVendor(info) != BoardVendor::Lenovo) {
-        sample.diagnostics =
-            ResourceStringText(RES_STR("No Lenovo GameZone WMI provider matches the baseboard manufacturer."));
-        return sample;
-    }
-
-    const LenovoHardwareScanSnapshot snapshot = CaptureLenovoGameZoneWmiSensors(trace, true, true);
-    sample.diagnostics = snapshot.diagnostics;
-    sample.availableFanNames = ExtractBoardSensorNames(snapshot.fans);
-    sample.availableTemperatureNames = ExtractBoardSensorNames(snapshot.temperatures);
-    sample.fans = CreateRawMetrics(snapshot.fans, ScalarMetricUnit::Rpm);
-    sample.temperatures = CreateRawMetrics(snapshot.temperatures, ScalarMetricUnit::Celsius);
-    sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
-    return sample;
-}
-
-BoardVendorTelemetrySample CaptureLenovoHardwareScanServiceSample(Trace& trace, BoardVendorInfo info) {
+BoardVendorTelemetrySample CaptureLenovoBoardServiceSample(Trace& trace, BoardVendorInfo info) {
     if (SelectBoardVendor(info) != BoardVendor::Lenovo) {
         BoardVendorTelemetrySample sample;
         sample.providerName = "Unsupported";
         sample.boardManufacturer = info.manufacturer;
         sample.boardProduct = info.product;
         sample.diagnostics =
-            ResourceStringText(RES_STR("No Lenovo Hardware Scan provider matches the baseboard manufacturer."));
+            ResourceStringText(RES_STR("No Lenovo Diagnostics Driver provider matches the baseboard manufacturer."));
         return sample;
     }
 
-    const std::optional<FilePath> addinDirectory = FindInstalledLenovoHardwareScanDirectory();
+    const std::optional<FilePath> addinDirectory = FindInstalledLenovoDiagnosticsDriverDirectory();
     if (!addinDirectory.has_value()) {
         BoardVendorTelemetrySample sample;
         sample.providerName = kLenovoProviderName;
         sample.boardManufacturer = info.manufacturer;
         sample.boardProduct = info.product;
-        sample.driverLibrary = kLenovoDriverLibrary;
-        sample.diagnostics = ResourceStringText(RES_STR("Lenovo Hardware Scan addin directory was not found."));
+        sample.driverLibrary = kLenovoDirectDriverLibrary;
+        sample.diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver addin directory was not found."));
         return sample;
     }
 
-    LenovoHardwareScanRuntime runtime;
-    LenovoHardwareScanCaptureOptions options;
-    LenovoHardwareScanSnapshot snapshot = CaptureLenovoHardwareScanSensors(trace, runtime, *addinDirectory, options);
+    LenovoSensorSnapshot snapshot = CaptureLenovoDriverCpuTemperatureSensors(trace, *addinDirectory);
     AppendLenovoGameZoneWmiFans(trace, snapshot);
     return CreateRawLenovoSampleFromSnapshot(info, snapshot);
 }
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateLenovoBoardTelemetryProvider(
     Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
-    return std::make_unique<LenovoHardwareScanBoardTelemetryProvider>(trace, std::move(info), options);
+    return std::make_unique<LenovoDiagnosticsDriverBoardTelemetryProvider>(trace, std::move(info), options);
 }

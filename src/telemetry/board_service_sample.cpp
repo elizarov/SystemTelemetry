@@ -4,5 +4,5 @@
 #include "telemetry/board/lenovo/board_lenovo_vantage.h"
 
 BoardVendorTelemetrySample CaptureBoardSensorsServiceSample(Trace& trace) {
-    return CaptureLenovoHardwareScanServiceSample(trace, ExtractBoardVendorInfo());
+    return CaptureLenovoBoardServiceSample(trace, ExtractBoardVendorInfo());
 }

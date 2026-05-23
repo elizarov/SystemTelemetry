@@ -11,7 +11,7 @@ set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
 set "BENCHMARK_EXTRA_ARGS="
 set "ARGUMENT_ERROR="
-set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, lenovo-gamezone, lenovo-lde-phases, lenovo-hardware-scan, mouse-hover, snapshot-handoff, telemetry-init, temperature-sources, theme-change, update-telemetry"
+set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, mouse-hover, snapshot-handoff, telemetry-init, theme-change, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_PROFILE=1"
 set "REQUEST_ELEVATION=0"
@@ -89,21 +89,6 @@ if not defined BENCHMARK_NAME if /i "%~1"=="layout-switch" (
     shift
     goto parse_args
 )
-if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-gamezone" (
-    set "BENCHMARK_NAME=lenovo-gamezone"
-    shift
-    goto parse_args
-)
-if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-lde-phases" (
-    set "BENCHMARK_NAME=lenovo-lde-phases"
-    shift
-    goto parse_args
-)
-if not defined BENCHMARK_NAME if /i "%~1"=="lenovo-hardware-scan" (
-    set "BENCHMARK_NAME=lenovo-hardware-scan"
-    shift
-    goto parse_args
-)
 if not defined BENCHMARK_NAME if /i "%~1"=="mouse-hover" (
     set "BENCHMARK_NAME=mouse-hover"
     shift
@@ -116,11 +101,6 @@ if not defined BENCHMARK_NAME if /i "%~1"=="snapshot-handoff" (
 )
 if not defined BENCHMARK_NAME if /i "%~1"=="telemetry-init" (
     set "BENCHMARK_NAME=telemetry-init"
-    shift
-    goto parse_args
-)
-if not defined BENCHMARK_NAME if /i "%~1"=="temperature-sources" (
-    set "BENCHMARK_NAME=temperature-sources"
     shift
     goto parse_args
 )
@@ -154,15 +134,7 @@ if defined ARGUMENT_ERROR (
     exit /b 1
 )
 if not defined ITERATIONS (
-    if /i "%BENCHMARK_NAME%"=="lenovo-gamezone" (
-        set "ITERATIONS=5"
-    ) else if /i "%BENCHMARK_NAME%"=="lenovo-lde-phases" (
-        set "ITERATIONS=1"
-    ) else if /i "%BENCHMARK_NAME%"=="lenovo-hardware-scan" (
-        set "ITERATIONS=3"
-    ) else if /i "%BENCHMARK_NAME%"=="temperature-sources" (
-        set "ITERATIONS=1"
-    ) else if /i "%BENCHMARK_NAME%"=="telemetry-init" (
+    if /i "%BENCHMARK_NAME%"=="telemetry-init" (
         set "ITERATIONS=2"
     ) else (
         set "ITERATIONS=600"
@@ -592,13 +564,9 @@ if /i "%BENCHMARK_NAME%"=="animation" exit /b 0
 if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-guide-sheet" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0
-if /i "%BENCHMARK_NAME%"=="lenovo-gamezone" exit /b 0
-if /i "%BENCHMARK_NAME%"=="lenovo-lde-phases" exit /b 0
-if /i "%BENCHMARK_NAME%"=="lenovo-hardware-scan" exit /b 0
 if /i "%BENCHMARK_NAME%"=="mouse-hover" exit /b 0
 if /i "%BENCHMARK_NAME%"=="snapshot-handoff" exit /b 0
 if /i "%BENCHMARK_NAME%"=="telemetry-init" exit /b 0
-if /i "%BENCHMARK_NAME%"=="temperature-sources" exit /b 0
 if /i "%BENCHMARK_NAME%"=="theme-change" exit /b 0
 if /i "%BENCHMARK_NAME%"=="update-telemetry" exit /b 0
 echo Unknown benchmark '%BENCHMARK_NAME%'. Supported benchmarks: %SUPPORTED_BENCHMARKS%

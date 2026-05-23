@@ -12,7 +12,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - [ASUS](#asus) - board CPU temperature and fan telemetry through Armoury Crate or ASUS System Control Interface ATKACPI.
 - [MSI](#msi) - board temperature and fan telemetry through MSI Center SDK.
 - [Gigabyte](#gigabyte) - board temperature and fan telemetry through Gigabyte SIV.
-- [Lenovo](#lenovo) - board temperature telemetry through Lenovo Vantage Hardware Scan and fan telemetry through Lenovo GameZone WMI.
+- [Lenovo](#lenovo) - board CPU temperature telemetry through the Lenovo diagnostics driver and fan telemetry through Lenovo GameZone WMI.
 
 ## Provider Model
 
@@ -143,19 +143,18 @@ Troubleshooting:
 
 ## Lenovo
 
-- Supported hardware family: Lenovo board telemetry on systems with the Lenovo Vantage Hardware Scan addin installed under `ProgramData\Lenovo\Vantage\Addins\LenovoHardwareScanAddin`.
-- Runtime dependency: Lenovo Vantage Hardware Scan and its LdeApi diagnostics modules, including `LdeApi.Client.dll`, `LdeApi.Server.exe`, and the Lenovo diagnostics driver components installed by Lenovo platform software. Fan RPM uses Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods.
-- Metrics include requested Hardware Scan temperature telemetry from the storage, CPU, motherboard, video-card, and battery modules. Fan telemetry comes from `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class. CaseDash names those readings as `Disk Temperature`, `CPU Temperature`, `Motherboard Temperature`, `GPU Temperature`, `Battery Temperature`, `Fan`, `CPU Fan`, and `GPU Fan`.
-- Lenovo Hardware Scan temperature execution is retained per provider instance. A cold LdeApi/module setup can take seconds on some machines, while repeated execution through the warmed runtime returns CPU package and per-core temperature messages quickly. The LdeApi client performs the first server startup, Lenovo signature validation, server-ready wait, and module load synchronously inside the first request before returning an already-completed task. Do not add diagnostic LdeApi calls before `LoadModules`, and do not recreate the Lenovo runtime for periodic samples unless the addin fails or the requested module set changes.
-- CaseDash uses the public LdeApi `LoadModules` and thermal-tool execution path for Hardware Scan temperatures. Lenovo's native SDK contains lower performance and thermal entrypoints, but direct use outside Lenovo's signed LDE process is treated as private and unstable; probing currently shows native initialization can fail signature validation, and manual thermal-tool execution still requires the loaded module set.
-- The unelevated dashboard starts `CashDashService` `board_sensors_sample` queries asynchronously so the LocalSystem service can run the Lenovo diagnostics addin with the same privilege boundary Lenovo uses for hardware access without blocking dashboard startup. The service keeps accepting presented-FPS and later board-sensor pipe clients while a slow Hardware Scan request is running. The provider reuses the last successful service sample while a refresh is running. When the service becomes absent or unreachable in a non-elevated dashboard, the provider clears cached service readings, marks requested Hardware Scan values with `!admin`, and still tries the GameZone WMI fan path as the last-resort fan source. Elevated runs without the service refresh the same Hardware Scan LdeApi path in the dashboard process in the background, reuse the last successful direct sample, and keep startup and board auto-binding reconfiguration responsive while a slow direct scan is running.
-- Lenovo Vantage's UI reaches the same diagnostics stack through the trusted `SystemManagement.HardwareScan.General` private RPC contract with the `DoExecutionThermalTool` command. CaseDash does not depend on that private trusted Vantage RPC endpoint or the older firmware interface for board telemetry.
-- Trace output can include `lenovo_hardware_scan:*` provider details, `module_load_result` summaries for requested Lenovo temperature modules, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for fan queries, and `unsupported_board` markers.
+- Supported hardware family: Lenovo board telemetry on systems with the Lenovo Vantage addin directory `ProgramData\Lenovo\Vantage\Addins\LenovoHardwareScanAddin\<version>`.
+- Runtime dependency: `LenovoDiagnosticsDriver.sys` and `LenovoDiagnosticsDriverService.dll` from Lenovo platform software. CaseDash creates and starts the `LenovoDiagnosticsDriver` kernel-driver service on demand when elevated, loads the service wrapper, and reads Intel CPU thermal MSRs through the wrapper's private driver method. Fan RPM uses Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods.
+- Metrics include `CPU Temperature` from Intel `IA32_THERM_STATUS` and `IA32_TEMPERATURE_TARGET` through the Lenovo diagnostics driver. Fan telemetry comes from `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class and is named `Fan`, `CPU Fan`, or `GPU Fan` depending on the returned fan shape.
+- Lenovo temperature collection does not use Lenovo diagnostics module loading or Vantage's private Hardware Scan RPC route. Storage, motherboard, GPU, and battery temperatures are not queried from Lenovo Hardware Scan.
+- The unelevated dashboard starts `CashDashService` `board_sensors_sample` queries asynchronously so the LocalSystem service can run the same direct diagnostics-driver path without blocking dashboard startup. The provider reuses the last successful service sample while a refresh is running. When the service is absent or unreachable in a non-elevated dashboard, requested Lenovo temperature values are marked `!admin`; GameZone WMI fan RPM is still queried directly because it does not require the diagnostics driver.
+- Elevated runs without the service refresh the diagnostics-driver path in the dashboard process in the background. Benchmark collectors can force synchronous provider samples so `telemetry-init` measures the direct driver initialization cost inside `collector_initialize`.
+- Trace output can include `lenovo_diagnostics_driver:*` provider details, `driver_cpu_temperature_*` markers for direct CPU temperature reads, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for fan queries, and `unsupported_board` markers.
 
 Troubleshooting:
 
 1. Install or update Lenovo Vantage, Lenovo System Interface Foundation, and Lenovo platform drivers for the machine.
-2. Confirm Lenovo Vantage Hardware Scan is installed and can show thermal telemetry from a normal user session.
-3. Enable `Start with Windows` once from CaseDash when no-elevation Hardware Scan access is required; that installs and starts `CashDashService`.
+2. Confirm the Vantage addin directory contains `LenovoDiagnosticsDriver.sys` and `LenovoDiagnosticsDriverService.dll`.
+3. Enable `Start with Windows` once from CaseDash when no-elevation diagnostics-driver access is required; that installs and starts `CashDashService`.
 4. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
-5. Inspect the dump for `board.*` values and the trace for `lenovo_hardware_scan:*` diagnostics.
+5. Inspect the dump for `board.*` values and the trace for `lenovo_diagnostics_driver:*` diagnostics.

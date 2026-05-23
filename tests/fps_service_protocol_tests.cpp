@@ -103,7 +103,7 @@ TEST(FpsServiceProtocol, RoundTripsBoardSensorSample) {
     sample.providerName = "Lenovo";
     sample.boardManufacturer = "LENOVO";
     sample.boardProduct = "LNVNB161216";
-    sample.driverLibrary = "Lenovo Hardware Scan LdeApi";
+    sample.driverLibrary = "Lenovo Diagnostics Driver";
     sample.diagnostics = "service active";
     sample.requestedFanNames = {"cpu"};
     sample.requestedTemperatureNames = {"cpu"};
@@ -122,7 +122,7 @@ TEST(FpsServiceProtocol, RoundTripsBoardSensorSample) {
     EXPECT_EQ(parsed->providerName, "Lenovo");
     EXPECT_EQ(parsed->boardManufacturer, "LENOVO");
     EXPECT_EQ(parsed->boardProduct, "LNVNB161216");
-    EXPECT_EQ(parsed->driverLibrary, "Lenovo Hardware Scan LdeApi");
+    EXPECT_EQ(parsed->driverLibrary, "Lenovo Diagnostics Driver");
     EXPECT_EQ(parsed->diagnostics, "service active");
     ASSERT_EQ(parsed->fans.size(), 1u);
     EXPECT_EQ(parsed->fans[0].name, "CPU Fan");
