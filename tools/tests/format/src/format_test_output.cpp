@@ -179,11 +179,8 @@ using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 
-using RuntimeConfigForEachDynamicItem = void (*)(
-    const AppConfig& config,
-    void* context,
-    RuntimeConfigDynamicItemVisitor visitor
-);
+using RuntimeConfigForEachDynamicItem =
+    void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay = true, const ConfigParseContext& context = {});
 
@@ -637,6 +634,28 @@ void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState
         });
 }
 
+void DrawGuideDot(RenderHost& renderer, int x, int y, int dotLength, int right, int strokeWidth) {
+    renderer.Renderer().FillSolidRect(
+        RenderRect{x, y, std::min(x + dotLength, right), y + strokeWidth},
+        RenderColorId::LayoutGuide
+    );
+}
+
+void DrawGuideDotFromAdapter(
+    RenderHost& renderer,
+    RenderState& state,
+    int x,
+    int y,
+    int dotLength,
+    int right,
+    int strokeWidth
+) {
+    RenderHostAdapter{renderer, state}.Renderer().FillSolidRect(
+        RenderRect{x, y, std::min(x + dotLength, right), y + strokeWidth},
+        RenderColorId::LayoutGuide
+    );
+}
+
 void AddThemeColorLeaf(
     Theme* theme,
     std::string token,
@@ -650,6 +669,11 @@ void AddThemeColorLeaf(
         leafNode.descriptionKey,
         configschema::ValueFormat::ColorHex
     });
+}
+
+void AssignCompactBracedConstructor(LayoutEditGapAnchor& outerMarginAnchor) {
+    outerMarginAnchor.key.widget =
+        LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome};
 }
 
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {

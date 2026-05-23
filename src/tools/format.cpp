@@ -1784,6 +1784,11 @@ private:
         if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
         }
+        if (owner && owner->kind == SplitOwnerKind::MemberAccess) {
+            if (std::optional<GroupPair> group = FindPreferredCallChainArgumentGroup(tokens, indentLevel, prefix)) {
+                return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
+            }
+        }
         if (owner) {
             return FormatSplitOwner(
                 tokens,
@@ -1925,7 +1930,7 @@ private:
         std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1), tokens.end());
         std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
         if (
-            !CanKeepCallRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
+            !CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
             CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)
         ) {
             return FormatRange(rhs, indentLevel, std::move(attachedPrefix), std::move(suffix), indentSplitChains);
@@ -1936,25 +1941,17 @@ private:
         return lines;
     }
 
-    bool CanKeepCallRhsCompactOnContinuation(
+    bool CanKeepRhsCompactOnContinuation(
         const std::vector<Token>& rhs,
         int assignmentIndentLevel,
         std::string_view suffix
     ) const {
-        if (!IsTopLevelCallExpression(rhs) || ShouldForceSplit(rhs)) {
+        if (ShouldForceSplit(rhs)) {
             return false;
         }
         std::string inlineText = FormatInline(rhs);
         AppendSuffix(inlineText, suffix);
         return Fits(assignmentIndentLevel + 1, inlineText);
-    }
-
-    bool IsTopLevelCallExpression(const std::vector<Token>& rhs) const {
-        const std::optional<GroupPair> group = FindFirstGroupPair(rhs);
-        return group &&
-            group->open > 0 &&
-            rhs[group->open].text == "(" &&
-            !IsFunctionPointerDeclaratorGroupOpen(rhs, group->open);
     }
 
     bool CanAttachPrefixToOwnedSplit(
@@ -2545,6 +2542,56 @@ private:
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
+    }
+
+    std::optional<GroupPair> FindPreferredCallChainArgumentGroup(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
+        const std::optional<size_t> memberAccess = FindTopLevelMemberAccess(tokens);
+        if (!memberAccess) {
+            return std::nullopt;
+        }
+        const std::optional<GroupPair> group = FindFirstWrappableGroupPairAfter(tokens, *memberAccess + 1);
+        if (!group || tokens[group->open].text != "(") {
+            return std::nullopt;
+        }
+        if (IsFunctionPointerDeclaratorGroupOpen(tokens, group->open)) {
+            return std::nullopt;
+        }
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
+        );
+        if (!ContainsTopLevelSeparator(inner, ',')) {
+            return std::nullopt;
+        }
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
+        );
+        return Fits(indentLevel, std::string(prefix) + FormatInline(firstLineTokens)) ? group : std::nullopt;
+    }
+
+    std::optional<GroupPair> FindFirstWrappableGroupPairAfter(const std::vector<Token>& tokens, size_t begin) const {
+        int depth = 0;
+        for (size_t index = begin; index < tokens.size(); ++index) {
+            const std::string& text = tokens[index].text;
+            if (IsGroupOpen(text) && depth == 0) {
+                if (std::optional<size_t> close = FindMatchingClose(tokens, index)) {
+                    if (
+                        !IsEmptyGroupPair(tokens, index, *close) &&
+                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
+                    ) {
+                        return GroupPair{index, *close};
+                    }
+                }
+            }
+            UpdateDepth(tokens[index], depth);
+        }
+        return std::nullopt;
     }
 
     std::vector<std::string> FormatMemberAccessChain(
@@ -3731,8 +3778,8 @@ private:
         const bool beforeTemplateClose = IsTemplateAngleCloseToken(tokens, nextIndex);
         const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
         const bool beforeUnnamedDeclaratorEnd = next->text == ")" || next->text == "," || next->text == "=";
-        const bool beforeFunctionPointerDeclarator = tokens[index].text == "*" &&
-            IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
+        const bool beforeFunctionPointerDeclarator =
+            tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
         const bool beforeDeclarator = beforeDeclaratorName ||
             beforeTemplateClose ||
             beforeStructuredBinding ||

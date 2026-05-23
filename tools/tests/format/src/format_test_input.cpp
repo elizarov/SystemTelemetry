@@ -376,8 +376,20 @@ void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState)
 WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
 }
 
+void DrawGuideDot(RenderHost& renderer,int x,int y,int dotLength,int right,int strokeWidth){
+renderer.Renderer().FillSolidRect(RenderRect{x,y,std::min(x+dotLength,right),y+strokeWidth},RenderColorId::LayoutGuide);
+}
+
+void DrawGuideDotFromAdapter(RenderHost& renderer,RenderState& state,int x,int y,int dotLength,int right,int strokeWidth){
+RenderHostAdapter{renderer,state}.Renderer().FillSolidRect(RenderRect{x,y,std::min(x+dotLength,right),y+strokeWidth},RenderColorId::LayoutGuide);
+}
+
 void AddThemeColorLeaf(Theme* theme,std::string token,LayoutEditTreeNode& leafNode,const LayoutEditTreeNode& sectionNode){
 leafNode.leaf.emplace(LayoutEditTreeLeaf{ThemeColorEditKey{theme->name,token},sectionNode.label,token,leafNode.descriptionKey,configschema::ValueFormat::ColorHex,});
+}
+
+void AssignCompactBracedConstructor(LayoutEditGapAnchor& outerMarginAnchor){
+outerMarginAnchor.key.widget=LayoutEditWidgetIdentity{"","",{},LayoutEditWidgetIdentity::Kind::DashboardChrome};
 }
 
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){

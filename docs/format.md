@@ -215,7 +215,7 @@ The formatter decides wrapping in this order:
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
 - When an owner has a prefix, such as an assignment left side, attach the child's first split opener or first operator-chain part to that prefix when it fits. This is a generic edge rule: calls, braced constructors, parenthesized expressions, lambdas, member chains, and operator chains do not each get their own attachment style.
 - When a child expression inside any split comma list must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, and similar list elements.
-- Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression.
+- Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression. If the chain ends in a comma-separated function-call argument list and the complete callee fits up to the opening `(`, the argument list owns the split instead, so `receiver().method(` stays together. The same rule applies when the receiver is an initializer or another compact expression, such as `Receiver{value}.method(`.
 - When an outer call or initializer has exactly one nested call or initializer argument, share the outer and inner opener when that combined line fits, and share the inner and outer closers. This avoids adding a line and an indent level only for delimiters. Double-braced initializer assignments use the same economy: `value = {{` opens on one line and `}};` closes on one line.
 - When a parenthesized expression is the value of an owning expression such as an assignment or ternary arm, keep the owner text and opening `(` on the same line when they fit. The closing `)` may keep same-expression suffix text such as a ternary `:` arm or arithmetic tail when that fits.
 - Inside a wrapped parenthesized expression, split the outermost operator chain that solves the width problem before splitting nested calls, subscripts, or member access inside an operand.
@@ -257,13 +257,16 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. Otherwise, if the right-hand side must split and the assignment prefix plus the child's first split line fits, keep that first child line with the assignment. This is why wrapped calls, braced constructors such as `target = RenderPoint{`, parenthesized expressions such as `value = (`, ternaries, member chains, and operator chains all use the same attachment behavior.
+Assignment-like outer expressions follow the same rule. When the whole right-hand side does not fit with the assignment prefix, but does fit at continuation indentation, split after the assignment and keep the right-hand side compact. Otherwise, if the right-hand side must split and the assignment prefix plus the child's first split line fits, keep that first child line with the assignment. This is why wrapped calls, braced constructors such as `target = RenderPoint{`, parenthesized expressions such as `value = (`, ternaries, member chains, and operator chains all use the same attachment behavior.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);
 
 HBITMAP colorBitmap =
     CreateDIBSection(nullptr, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
+
+anchor.key.widget =
+    LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome};
 
 auto value = buildValue(
     firstValue,
