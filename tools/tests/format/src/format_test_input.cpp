@@ -178,6 +178,11 @@ HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_){
 return DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown * *>(dwriteFactory_.ReleaseAndGetAddressOf()));
 }
 
+void GatewayAddress(const Gateway* gateway){
+const sockaddr * address = gateway->Address.lpSockaddr;
+Use(address);
+}
+
 void ManagedReferenceSpacing(NativeType & nativeRef,NativeType && nativeRvalueRef,NativeType * & pointerRef,NativeType * && pointerRvalueRef,NativeType * * pointerPointer,ManagedWidget ^ managedHandle,ManagedWidget ^ % managedTrackingRef,ManagedWidget % managedReference){
 Use(nativeRef,nativeRvalueRef,pointerRef,pointerRvalueRef,pointerPointer,managedHandle,managedTrackingRef,managedReference);
 }

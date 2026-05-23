@@ -3508,6 +3508,9 @@ private:
             return true;
         }
         const std::optional<size_t> beforeType = PreviousNonNewlineIndex(tokens, index);
+        if (beforeType && tokens[*beforeType].kind == TokenKind::Word && IsTypeContextWord(tokens[*beforeType].text)) {
+            return true;
+        }
         return beforeType && tokens[*beforeType].text == "::";
     }
 

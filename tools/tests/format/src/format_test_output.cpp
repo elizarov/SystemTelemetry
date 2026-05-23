@@ -250,6 +250,11 @@ HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_) {
     );
 }
 
+void GatewayAddress(const Gateway* gateway) {
+    const sockaddr* address = gateway->Address.lpSockaddr;
+    Use(address);
+}
+
 void ManagedReferenceSpacing(
     NativeType& nativeRef,
     NativeType&& nativeRvalueRef,
