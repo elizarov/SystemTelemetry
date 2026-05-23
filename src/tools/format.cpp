@@ -2674,13 +2674,72 @@ private:
         std::string receiverLine = prefix + FormatInline(receiver);
         if (Fits(indentLevel, receiverLine)) {
             lines.push_back(Indent(indentLevel) + receiverLine);
+            if (TryAppendMemberAccessChainToLastLine(lines, member, suffix)) {
+                return lines;
+            }
+            if (std::optional<std::vector<std::string>> splitReceiver = TryFormatSplitReceiverWithTrailingMemberChain(
+                receiver,
+                member,
+                indentLevel,
+                prefix,
+                suffix
+            )) {
+                return *splitReceiver;
+            }
         } else {
             std::vector<std::string> receiverLines = FormatRange(receiver, indentLevel, std::move(prefix), {});
             lines.insert(lines.end(), receiverLines.begin(), receiverLines.end());
+            if (TryAppendMemberAccessChainToLastLine(lines, member, suffix)) {
+                return lines;
+            }
         }
         std::vector<std::string> memberLines = FormatRange(member, indentLevel + 1, {}, std::move(suffix));
         lines.insert(lines.end(), memberLines.begin(), memberLines.end());
         return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatSplitReceiverWithTrailingMemberChain(
+        const std::vector<Token>& receiver,
+        const std::vector<Token>& member,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        const std::optional<GroupPair> trailingGroup = FindTrailingWrappableGroupPair(receiver);
+        if (!trailingGroup) {
+            return std::nullopt;
+        }
+        std::vector<std::string> lines =
+            FormatSplitGroup(receiver, *trailingGroup, indentLevel, std::string(prefix), {});
+        if (!TryAppendMemberAccessChainToLastLine(lines, member, suffix)) {
+            return std::nullopt;
+        }
+        return lines;
+    }
+
+    bool TryAppendMemberAccessChainToLastLine(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& member,
+        std::string_view suffix
+    ) const {
+        if (lines.empty() || member.empty() || HasOriginalBlankSeparator(member) || ShouldForceSplit(member)) {
+            return false;
+        }
+        const std::string trimmedLastLine = tools::lint::Trim(lines.back());
+        if (!StartsWithGroupClose(trimmedLastLine)) {
+            return false;
+        }
+        std::string inlineText = FormatInline(member);
+        if (inlineText.empty()) {
+            return false;
+        }
+        std::string candidate = TrimRight(lines.back()) + inlineText;
+        AppendSuffix(candidate, suffix);
+        if (static_cast<int>(candidate.size()) > config_.columnLimit) {
+            return false;
+        }
+        lines.back() = std::move(candidate);
+        return true;
     }
 
     std::vector<std::string> FormatOperatorChain(
@@ -3643,6 +3702,23 @@ private:
             UpdateDepth(tokens, index, depth);
         }
         return std::nullopt;
+    }
+
+    std::optional<GroupPair> FindTrailingWrappableGroupPair(const std::vector<Token>& tokens) const {
+        const std::optional<size_t> close = PreviousNonNewlineIndex(tokens, tokens.size());
+        if (!close || !IsGroupClose(tokens[*close].text)) {
+            return std::nullopt;
+        }
+        const std::optional<size_t> open = FindMatchingOpen(tokens, *close);
+        if (
+            !open ||
+            IsEmptyGroupPair(tokens, *open, *close) ||
+            IsNonWrappablePrefixGroup(tokens, *open, *close) ||
+            IsFunctionPointerDeclaratorGroupOpen(tokens, *open)
+        ) {
+            return std::nullopt;
+        }
+        return GroupPair{*open, *close};
     }
 
     bool IsWrappableGroupOpen(const std::vector<Token>& tokens, size_t index) const {

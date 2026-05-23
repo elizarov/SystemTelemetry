@@ -371,6 +371,11 @@ const int hexLabelWidth=MeasureTextWidthForControl(hwnd,IDC_LAYOUT_EDIT_COLOR_HE
 return hexLabelWidth;
 }
 
+int MeasureTextBlockRight(const RenderRect& measureRect,const std::wstring& wideText,const TextStyle& style){
+const int width=std::max(0,static_cast<int>(MeasureTextBlockD2D(measureRect,wideText,style,TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading,TextVerticalAlign::Center),nullptr).textRect.right));
+return width;
+}
+
 size_t CountLeftCards(const std::vector<int>& cardPlanned,const std::vector<Callout>& plannedCalloutDetails,const std::vector<CardPlacement>& cardPlacements,size_t cardIndex){
 const size_t leftCount=cardPlanned.size()==1?(plannedCalloutDetails[cardPlanned.front()].target.Center().x<cardPlacements[cardIndex].sourceRect.Center().x?1:0):cardPlanned.size()/2;
 return leftCount;
@@ -393,6 +398,10 @@ Use(points);
 
 void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState){
 WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
+}
+
+int BracedReceiverChain(int firstCoordinateWithLongName,int secondCoordinateWithLongName,int thirdCoordinateWithLongName,int y,int deltaX,int deltaY){
+return RenderPoint{firstCoordinateWithLongName+secondCoordinateWithLongName+thirdCoordinateWithLongName,y}.OffsetBy(deltaX,deltaY).x;
 }
 
 void DrawGuideDot(RenderHost& renderer,int x,int y,int dotLength,int right,int strokeWidth){

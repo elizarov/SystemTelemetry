@@ -618,6 +618,22 @@ int MeasureHexLabelWidth(HWND hwnd) {
     return hexLabelWidth;
 }
 
+int MeasureTextBlockRight(const RenderRect& measureRect, const std::wstring& wideText, const TextStyle& style) {
+    const int width = std::max(
+        0,
+        static_cast<int>(
+            MeasureTextBlockD2D(
+                measureRect,
+                wideText,
+                style,
+                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+                nullptr
+            ).textRect.right
+        )
+    );
+    return width;
+}
+
 size_t CountLeftCards(
     const std::vector<int>& cardPlanned,
     const std::vector<Callout>& plannedCalloutDetails,
@@ -677,6 +693,20 @@ void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState
             std::move(targetState),
             currentWidgetAnimationTranslation_
         });
+}
+
+int BracedReceiverChain(
+    int firstCoordinateWithLongName,
+    int secondCoordinateWithLongName,
+    int thirdCoordinateWithLongName,
+    int y,
+    int deltaX,
+    int deltaY
+) {
+    return RenderPoint{
+        firstCoordinateWithLongName + secondCoordinateWithLongName + thirdCoordinateWithLongName,
+        y
+    }.OffsetBy(deltaX, deltaY).x;
 }
 
 void DrawGuideDot(RenderHost& renderer, int x, int y, int dotLength, int right, int strokeWidth) {
