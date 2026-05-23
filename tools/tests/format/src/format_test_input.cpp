@@ -366,6 +366,12 @@ if(field.kind==RuntimeConfigFieldValueKind::HexColor && std::string_view(field.k
 return false;
 }
 
+void EnumerateUninstallChildren(HKEY uninstallKey){
+while(RegEnumKeyExA(uninstallKey,index,childName,&childNameLength,nullptr,nullptr,nullptr,nullptr)==ERROR_SUCCESS){
+++index;
+}
+}
+
 void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
 if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
 }

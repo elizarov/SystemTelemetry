@@ -34,7 +34,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 
 ## General Rules
 
-- Use the configured 4 spaces for each indent level. Tabs are never emitted; the configured tab width is only for measuring existing tab characters before they are replaced.
+- Use the configured 4 spaces for each indent level. Continuation lines use that same indent step; there is no separate continuation-indent setting. Tabs are never emitted; the configured tab width is only for measuring existing tab characters before they are replaced.
 - Do not increase indentation for namespace bodies. A namespace declaration owns braces and blank-line grouping, but declarations inside it stay at the same indentation level as the namespace declaration.
 - Separate namespace opening lines and namespace closing braces from neighboring declarations with one empty line.
 - Remove trailing whitespace from every line, including comment-only and trailing-comment lines.
@@ -216,7 +216,7 @@ The formatter decides wrapping in this order:
 - If the compact form overflows, split the outermost wrappable group that owns the overflowing line.
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
 - When an owner has a prefix, such as an assignment left side, attach the child's first split opener or first operator-chain part to that prefix when it fits. This is a generic edge rule: calls, braced constructors, parenthesized expressions, lambdas, member chains, and operator chains do not each get their own attachment style.
-- When a child expression inside any split comma list must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, and similar list elements.
+- When a child expression inside any split delimiter group must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, control conditions, and similar list or group elements.
 - Prefer splitting value groups over splitting type groups when both are available and the value group opener still fits. For example, a direct-list declaration keeps `std::array<T, N> name{` compact and splits the initializer values before splitting `std::array<T, N>`.
 - Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression. If the chain ends in a comma-separated function-call argument list and the complete callee fits up to the opening `(`, the argument list owns the split instead, so `receiver().method(` stays together. The same rule applies when the receiver is an initializer or another compact expression, such as `Receiver{value}.method(`.
 - When a split receiver closes with `)`, `]`, or `}`, attach the trailing member chain to that closing delimiter whenever the complete chain fits on the closing line. This applies equally to call receivers and braced initializer receivers.

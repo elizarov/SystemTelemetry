@@ -606,12 +606,21 @@ size_t SelectConfigSectionStart(const std::string& sectionName) {
 bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_view name) {
     if (
         field.kind == RuntimeConfigFieldValueKind::HexColor &&
-        std::string_view(field.key, field.keyLength) == name &&
-        field.keyLength > 0
+            std::string_view(field.key, field.keyLength) == name &&
+            field.keyLength > 0
     ) {
         return true;
     }
     return false;
+}
+
+void EnumerateUninstallChildren(HKEY uninstallKey) {
+    while (
+        RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
+            ERROR_SUCCESS
+    ) {
+        ++index;
+    }
 }
 
 void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {

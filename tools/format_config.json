@@ -3,8 +3,7 @@
   "formatting": {
     "line_width": 120,
     "indent_width": 4,
-    "tab_width": 4,
-    "continuation_indent_width": 4
+    "tab_width": 4
   },
   "macro_categories": {
     "calling_convention": [

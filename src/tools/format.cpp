@@ -24,7 +24,6 @@ namespace {
 constexpr int kDefaultColumnLimit = 120;
 constexpr int kDefaultIndentWidth = 4;
 constexpr int kDefaultTabWidth = 4;
-constexpr int kDefaultContinuationIndentWidth = 4;
 
 enum class Mode {
     Check,
@@ -94,7 +93,6 @@ struct FormatterConfig {
     int columnLimit = kDefaultColumnLimit;
     int indentWidth = kDefaultIndentWidth;
     int tabWidth = kDefaultTabWidth;
-    int continuationIndentWidth = kDefaultContinuationIndentWidth;
     std::string mainIncludeRegex = "(Test)?$";
     bool mainIncludeQuote = true;
     std::vector<std::string> statementLikeMacroParameters;
@@ -601,8 +599,8 @@ size_t FindControlBracesStatementEnd(const std::vector<Token>& tokens, size_t be
     }
     if (
         tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
+            tokens[statementStart].text == "while" ||
+            tokens[statementStart].text == "switch"
     ) {
         return FindHeaderBodyControlBracesStatementEnd(tokens, statementStart, end);
     }
@@ -663,8 +661,8 @@ size_t RewriteElseControlStatement(
                 const size_t innerEnd = FindIfControlBracesStatementEnd(tokens, innerStart, *bodyClose);
                 if (
                     innerEnd <= *bodyClose &&
-                    ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
-                    ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)
+                        ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
+                        ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)
                 ) {
                     RewriteIfControlStatement(tokens, innerStart, *bodyClose, output);
                     return *bodyClose + 1;
@@ -742,8 +740,8 @@ size_t RewriteControlBracesStatement(
     }
     if (
         tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
+            tokens[statementStart].text == "while" ||
+            tokens[statementStart].text == "switch"
     ) {
         return RewriteHeaderBodyControlStatement(tokens, statementStart, end, output);
     }
@@ -1167,9 +1165,9 @@ private:
             NoteDeclarationKind(declarationKind);
             if (
                 blockKind == BlockKind::EnumDeclaration ||
-                blockKind == BlockKind::TypeDeclaration ||
-                blockKind == BlockKind::FunctionDefinition ||
-                blockKind == BlockKind::NamespaceDeclaration
+                    blockKind == BlockKind::TypeDeclaration ||
+                    blockKind == BlockKind::FunctionDefinition ||
+                    blockKind == BlockKind::NamespaceDeclaration
             ) {
                 pendingLogicalBlank_ = true;
             }
@@ -1228,12 +1226,12 @@ private:
         }
         if (
             next < tokens.size() &&
-            tokens[next].kind == TokenKind::Word &&
-            (
-                tokens[next].text == "else" ||
-                    tokens[next].text == "catch" ||
-                    (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
-            )
+                tokens[next].kind == TokenKind::Word &&
+                (
+                    tokens[next].text == "else" ||
+                        tokens[next].text == "catch" ||
+                        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+                )
         ) {
             pendingPrefix_ = "} ";
             return;
@@ -1252,9 +1250,9 @@ private:
         Token comment{TokenKind::LineComment, TrimRight(TrimLeft(tokens[index].text))};
         if (
             pendingTokens_.empty() &&
-            pendingPrefix_.empty() &&
-            IsTrailingCommentAfterEmittedClose(tokens, index) &&
-            !outputLines_.empty()
+                pendingPrefix_.empty() &&
+                IsTrailingCommentAfterEmittedClose(tokens, index) &&
+                !outputLines_.empty()
         ) {
             outputLines_.back() = TrimRight(std::move(outputLines_.back())) + "  " + comment.text;
             return;
@@ -1687,9 +1685,9 @@ private:
         }
         if (
             previousDeclarationKind_ == declarationKind &&
-            !separateSameKind &&
-            !previousDeclarationWasMultilineField_ &&
-            !currentDeclarationIsMultilineField
+                !separateSameKind &&
+                !previousDeclarationWasMultilineField_ &&
+                !currentDeclarationIsMultilineField
         ) {
             return;
         }
@@ -1950,7 +1948,7 @@ private:
         std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
         if (
             !CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
-            CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)
+                CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)
         ) {
             return FormatRange(rhs, indentLevel, std::move(attachedPrefix), std::move(suffix), indentSplitChains);
         }
@@ -2482,7 +2480,7 @@ private:
         const char separator = splitForHeader ? ';' : ',';
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
-            std::vector<std::string> childLines = FormatRange(inner, indentLevel + 1, {}, {}, indentElementChains);
+            std::vector<std::string> childLines = FormatRange(inner, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
         } else {
             for (size_t index = 0; index < elements.size(); ++index) {
@@ -2625,9 +2623,9 @@ private:
                     }
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index) &&
-                        Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, group))
+                            !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                            !IsFunctionPointerDeclaratorGroupOpen(tokens, index) &&
+                            Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, group))
                     ) {
                         return group;
                     }
@@ -2645,8 +2643,8 @@ private:
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
+                            !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                            !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
                         return GroupPair{index, *close};
                     }
@@ -2978,10 +2976,10 @@ private:
             }
             if (
                 token.kind == TokenKind::StringLiteral &&
-                previous &&
-                previous->kind == TokenKind::StringLiteral &&
-                trailingStringLiteral &&
-                TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index)
+                    previous &&
+                    previous->kind == TokenKind::StringLiteral &&
+                    trailingStringLiteral &&
+                    TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index)
             ) {
                 previous = Token{TokenKind::StringLiteral, *trailingStringLiteral};
                 continue;
@@ -3009,7 +3007,7 @@ private:
     ) const {
         if (
             !CanConcatenateStringLiteralText(trailingLiteral, currentLiteral) ||
-            HasUserDefinedLiteralSuffix(tokens, index)
+                HasUserDefinedLiteralSuffix(tokens, index)
         ) {
             return false;
         }
@@ -3111,8 +3109,8 @@ private:
         }
         if (
             (token.kind == TokenKind::StringLiteral || token.kind == TokenKind::CharLiteral) &&
-            previous.kind == TokenKind::Word &&
-            IsStringOrCharacterLiteralPrefix(prev)
+                previous.kind == TokenKind::Word &&
+                IsStringOrCharacterLiteralPrefix(prev)
         ) {
             return false;
         }
@@ -3136,7 +3134,7 @@ private:
         }
         if (
             IsTemplateAngleCloseToken(tokens, prevIndex) &&
-            (current == "(" || IsPointerOrReferenceDeclaratorToken(current) || IsNoSpaceBefore(current))
+                (current == "(" || IsPointerOrReferenceDeclaratorToken(current) || IsNoSpaceBefore(current))
         ) {
             return false;
         }
@@ -3230,13 +3228,13 @@ private:
         const std::string& text = tokens[index].text;
         if (
             text != "*" &&
-            text != "&" &&
-            text != "+" &&
-            text != "-" &&
-            text != "++" &&
-            text != "--" &&
-            text != "!" &&
-            text != "~"
+                text != "&" &&
+                text != "+" &&
+                text != "-" &&
+                text != "++" &&
+                text != "--" &&
+                text != "!" &&
+                text != "~"
         ) {
             return false;
         }
@@ -3288,15 +3286,15 @@ private:
             }
             if (
                 token.kind != TokenKind::Word &&
-                token.text != "::" &&
-                token.text != "*" &&
-                token.text != "&" &&
-                token.text != "&&" &&
-                token.text != "^" &&
-                token.text != "%" &&
-                token.text != "<" &&
-                token.text != ">" &&
-                token.text != ","
+                    token.text != "::" &&
+                    token.text != "*" &&
+                    token.text != "&" &&
+                    token.text != "&&" &&
+                    token.text != "^" &&
+                    token.text != "%" &&
+                    token.text != "<" &&
+                    token.text != ">" &&
+                    token.text != ","
             ) {
                 return false;
             }
@@ -3316,7 +3314,7 @@ private:
         }
         if (
             IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
-            IsPointerOrReferenceDeclarator(tokens, *previous)
+                IsPointerOrReferenceDeclarator(tokens, *previous)
         ) {
             return true;
         }
@@ -3524,9 +3522,9 @@ private:
         size_t firstElementLine = 0;
         if (
             combineNestedInitializerBoundary &&
-            !lines.empty() &&
-            tools::lint::Trim(lines.back()) == "}," &&
-            tools::lint::Trim(elementLines.front()) == "{"
+                !lines.empty() &&
+                tools::lint::Trim(lines.back()) == "}," &&
+                tools::lint::Trim(elementLines.front()) == "{"
         ) {
             lines.back() = TrimRight(lines.back()) + " " + TrimLeft(elementLines.front());
             firstElementLine = 1;
@@ -3707,8 +3705,8 @@ private:
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
+                            !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                            !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
                         return GroupPair{index, *close};
                     }
@@ -3727,9 +3725,9 @@ private:
         const std::optional<size_t> open = FindMatchingOpen(tokens, *close);
         if (
             !open ||
-            IsEmptyGroupPair(tokens, *open, *close) ||
-            IsNonWrappablePrefixGroup(tokens, *open, *close) ||
-            IsFunctionPointerDeclaratorGroupOpen(tokens, *open)
+                IsEmptyGroupPair(tokens, *open, *close) ||
+                IsNonWrappablePrefixGroup(tokens, *open, *close) ||
+                IsFunctionPointerDeclaratorGroupOpen(tokens, *open)
         ) {
             return std::nullopt;
         }
@@ -4132,7 +4130,7 @@ private:
         }
         if (
             IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
-            IsPointerOrReferenceDeclarator(tokens, *previous)
+                IsPointerOrReferenceDeclarator(tokens, *previous)
         ) {
             return true;
         }
@@ -4146,24 +4144,24 @@ private:
         const std::string first = pendingTokens_.front().text;
         if (
             first == "namespace" ||
-            first == "class" ||
-            first == "struct" ||
-            first == "enum" ||
-            first == "if" ||
-            first == "for" ||
-            first == "while" ||
-            first == "switch" ||
-            first == "catch" ||
-            first == "try" ||
-            first == "do" ||
-            first == "else"
+                first == "class" ||
+                first == "struct" ||
+                first == "enum" ||
+                first == "if" ||
+                first == "for" ||
+                first == "while" ||
+                first == "switch" ||
+                first == "catch" ||
+                first == "try" ||
+                first == "do" ||
+                first == "else"
         ) {
             return true;
         }
         if (
             ContainsWord(pendingTokens_, "class") ||
-            ContainsWord(pendingTokens_, "struct") ||
-            ContainsWord(pendingTokens_, "enum")
+                ContainsWord(pendingTokens_, "struct") ||
+                ContainsWord(pendingTokens_, "enum")
         ) {
             return true;
         }
@@ -4268,7 +4266,7 @@ private:
         }
         if (
             (!ContainsTopLevelAssignment(tokens) || IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)) &&
-            ContainsTopLevelToken(tokens, ")")
+                ContainsTopLevelToken(tokens, ")")
         ) {
             return DeclarationKind::Method;
         }
@@ -4300,17 +4298,17 @@ private:
         const std::string& first = tokens.front().text;
         if (
             first == "namespace" ||
-            first == "class" ||
-            first == "struct" ||
-            first == "enum" ||
-            first == "if" ||
-            first == "for" ||
-            first == "while" ||
-            first == "switch" ||
-            first == "catch" ||
-            first == "try" ||
-            first == "do" ||
-            first == "else"
+                first == "class" ||
+                first == "struct" ||
+                first == "enum" ||
+                first == "if" ||
+                first == "for" ||
+                first == "while" ||
+                first == "switch" ||
+                first == "catch" ||
+                first == "try" ||
+                first == "do" ||
+                first == "else"
         ) {
             return false;
         }
@@ -4802,7 +4800,6 @@ std::optional<FormatterConfig> LoadFormatterConfig(const std::string& root, std:
         config.columnLimit = formatting.At("line_width").AsInt();
         config.indentWidth = formatting.At("indent_width").AsInt();
         config.tabWidth = formatting.At("tab_width").AsInt();
-        config.continuationIndentWidth = formatting.At("continuation_indent_width").AsInt();
         if (const tools::lint::JsonValue* macroCategories = configJson.Find("macro_categories")) {
             if (const tools::lint::JsonValue* parameters = macroCategories->Find("statement_like_parameters")) {
                 for (const tools::lint::JsonValue& parameter : parameters->AsArray()) {
