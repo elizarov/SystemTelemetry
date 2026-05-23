@@ -206,6 +206,11 @@ std::string_view LayoutNodeFieldEditTitle(const LayoutNodeFieldEditKey& key) {
     return descriptor != nullptr ? FindLocalizedText(descriptor->titleKey) : std::string_view{};
 }
 
+void TrackCoveredParameters() {
+    std::array<bool, static_cast<size_t>(LayoutEditParameter::Count)> coveredColorParameters{};
+    Use(coveredColorParameters);
+}
+
 DashboardApp::DashboardApp(
     const DiagnosticsOptions& diagnosticsOptions,
     bool bringToFrontOnRun

@@ -162,6 +162,11 @@ const LayoutNodeFieldEditDescriptor* descriptor=FindLayoutNodeFieldEditDescripto
 return descriptor!=nullptr?FindLocalizedText(descriptor->titleKey):std::string_view {};
 }
 
+void TrackCoveredParameters(){
+std::array<bool,static_cast<size_t>(LayoutEditParameter::Count)> coveredColorParameters {};
+Use(coveredColorParameters);
+}
+
 DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions,bool bringToFrontOnRun):renderer_(trace_),diagnosticsOptions_(diagnosticsOptions),layoutEditController_(*this),shellUi_(std::make_unique<DashboardShellUi>(*this)),bringToFrontOnRun_(bringToFrontOnRun){
 renderer_.SetLiveAnimationEnabled(true);
 }

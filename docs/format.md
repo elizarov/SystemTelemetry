@@ -118,7 +118,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Put a space between `auto` and the opening bracket of a structured binding: `auto [name, value] = pair;`.
 - Do not put a space between a string or character literal prefix and its literal: `L"text"`, `u8"text"`, and `L'x'`.
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.
-- Do not insert a visual-padding space before braced initializer braces or braced constructor calls: `Widget widget{config};` and `std::string_view{}`.
+- Do not insert a visual-padding space before braced initializer braces or braced constructor calls: `Widget widget{config};`, `std::array<bool, Count> values{};`, and `std::string_view{}`.
 - Put one space after commas, and no space before commas.
 - Put one space after semicolons that separate non-empty `for` header parts, and no space before semicolons. Empty forever-loop headers stay compact: `for (;;)`.
 - Put no space before a statement-terminating semicolon.

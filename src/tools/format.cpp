@@ -3822,7 +3822,7 @@ private:
         if (ContainsTopLevelAssignment(pendingTokens_)) {
             return false;
         }
-        return EndsWithMatchingParen(pendingTokens_) || ContainsTopLevelToken(pendingTokens_, ")");
+        return IsFunctionDefinitionBlock(pendingTokens_);
     }
 
     bool IsBracedConstructorExpressionOpen() const {
@@ -3963,7 +3963,7 @@ private:
         ) {
             return false;
         }
-        return EndsWithMatchingParen(tokens) || ContainsTopLevelToken(tokens, ")");
+        return EndsWithMatchingParen(tokens) || ContainsTopLevelTokenOutsideTemplateArguments(tokens, ")");
     }
 
     BlockState PopBlockState() {
@@ -3985,6 +3985,26 @@ private:
 
     bool ContainsTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
         return FindTopLevelToken(tokens, tokenText).has_value();
+    }
+
+    bool ContainsTopLevelTokenOutsideTemplateArguments(
+        const std::vector<Token>& tokens,
+        std::string_view tokenText
+    ) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (depth == 0 && IsTemplateAngleOpen(tokens, index)) {
+                if (std::optional<size_t> close = FindTemplateAngleClose(tokens, index)) {
+                    index = *close;
+                    continue;
+                }
+            }
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && tokens[index].text == tokenText) {
+                return true;
+            }
+        }
+        return false;
     }
 
     std::optional<size_t> FindTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
