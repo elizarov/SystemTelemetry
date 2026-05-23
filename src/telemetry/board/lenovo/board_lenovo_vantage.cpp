@@ -42,14 +42,14 @@ constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kSensorRetrySampleInterval = 10;
 constexpr std::chrono::seconds kDirectSnapshotRefreshInterval{5};
 constexpr DWORD kWmiQueryTimeoutMs = 1500;
-constexpr wchar_t kLenovoDiagnosticsDriverServiceName[] = L"LenovoDiagnosticsDriver";
-constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";
-constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";
-constexpr wchar_t kWmiRelPathProperty[] = L"__RELPATH";
-constexpr wchar_t kWmiDataProperty[] = L"Data";
-constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";
-constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";
-constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";
+constexpr char kLenovoDiagnosticsDriverServiceName[] = "LenovoDiagnosticsDriver";
+constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";         // WMI COM BSTR boundary has no A API.
+constexpr wchar_t kLenovoGameZoneClass[] = L"LENOVO_GAMEZONE_DATA";  // WMI COM BSTR boundary has no A API.
+constexpr wchar_t kWmiRelPathProperty[] = L"__RELPATH";              // WMI property boundary has no A API.
+constexpr wchar_t kWmiDataProperty[] = L"Data";                      // WMI property boundary has no A API.
+constexpr wchar_t kGetFanCountMethod[] = L"GetFanCount";             // WMI method boundary has no A API.
+constexpr wchar_t kGetFan1SpeedMethod[] = L"GetFan1Speed";           // WMI method boundary has no A API.
+constexpr wchar_t kGetFan2SpeedMethod[] = L"GetFan2Speed";           // WMI method boundary has no A API.
 
 struct LenovoSensorSnapshot {
     bool success = false;
@@ -498,7 +498,7 @@ LenovoSensorSnapshot CaptureLenovoDriverCpuTemperatureSensors(Trace& trace, cons
     std::string diagnostics;
     std::vector<double> temperatures;
 
-    ServiceHandle scm(OpenSCManagerW(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
+    ServiceHandle scm(OpenSCManagerA(nullptr, nullptr, SC_MANAGER_CONNECT | SC_MANAGER_CREATE_SERVICE));
     ServiceHandle service;
     LibraryHandle wrapper;
 
@@ -509,20 +509,20 @@ LenovoSensorSnapshot CaptureLenovoDriverCpuTemperatureSensors(Trace& trace, cons
             break;
         }
 
-        service.Reset(OpenServiceW(scm.Get(),
+        service.Reset(OpenServiceA(scm.Get(),
             kLenovoDiagnosticsDriverServiceName,
             SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP | DELETE));
         if (!service.Valid()) {
             const FilePath driverPath = addinDirectory / kLenovoDiagnosticsDriverSys;
-            const std::wstring wideDriverPath = driverPath.WideForNativeApi();
-            service.Reset(CreateServiceW(scm.Get(),
+            const std::string driverPathText = driverPath.string();
+            service.Reset(CreateServiceA(scm.Get(),
                 kLenovoDiagnosticsDriverServiceName,
                 kLenovoDiagnosticsDriverServiceName,
                 SERVICE_QUERY_STATUS | SERVICE_START | SERVICE_STOP | DELETE,
                 SERVICE_KERNEL_DRIVER,
                 SERVICE_DEMAND_START,
                 SERVICE_ERROR_NORMAL,
-                wideDriverPath.c_str(),
+                driverPathText.c_str(),
                 nullptr,
                 nullptr,
                 nullptr,
@@ -536,7 +536,7 @@ LenovoSensorSnapshot CaptureLenovoDriverCpuTemperatureSensors(Trace& trace, cons
             }
         }
 
-        if (!StartServiceW(service.Get(), 0, nullptr)) {
+        if (!StartServiceA(service.Get(), 0, nullptr)) {
             const DWORD error = GetLastError();
             if (error != ERROR_SERVICE_ALREADY_RUNNING) {
                 diagnostics =
@@ -550,8 +550,7 @@ LenovoSensorSnapshot CaptureLenovoDriverCpuTemperatureSensors(Trace& trace, cons
         }
 
         const FilePath wrapperPath = addinDirectory / kLenovoDiagnosticsDriverServiceDll;
-        const std::wstring wideWrapperPath = wrapperPath.WideForNativeApi();
-        wrapper.Reset(LoadLibraryW(wideWrapperPath.c_str()));
+        wrapper.Reset(LoadLibraryA(wrapperPath.string().c_str()));
         if (!wrapper.Valid()) {
             diagnostics = FormatText(
                 RES_STR("Lenovo Diagnostics Driver wrapper load failed: %s"), FormatWin32Error(GetLastError()).c_str());

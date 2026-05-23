@@ -33,7 +33,6 @@
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
-#include "util/text_format.h"
 #include "util/trace.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
