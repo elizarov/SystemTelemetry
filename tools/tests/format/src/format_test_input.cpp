@@ -390,14 +390,18 @@ switch(message){case WM_WTSSESSION_CHANGE:switch(wParam){case WTS_SESSION_LOCK:r
 
 void ControlFlowVariety(int * values,int count){
 if(count>0){values[0]+=1;}else values[0]=0;
+if(count==0)values[0]=0;else if(count==1)values[0]=1;else{if(count==2){values[0]=2;}}
 
 
 if(values!=nullptr){values[0]=count;}while(count>0){--count;}
 
 for(int outer=0;outer<count;++outer){if(values[outer]%2==0)values[outer]+=outer;else{values[outer]-=outer;}}
+for(int simple=0;simple<count;++simple)values[simple]+=1;
+switch(count)default:values[0]=count;
 int index=0;
 for(;;){break;}
 while(index<count){values[index]+=index;++index;}
+do ++index;while(index<count);
 do{--index;}while(index>0);
 }
 

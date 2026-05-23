@@ -676,8 +676,12 @@ int ManyParameters(
         fourthValueWithLongName > 0 &&
         fifthValueWithLongName > 0 &&
         sixthValueWithLongName > 0;
-    if (localValueWithLongName) return firstReferenceWithLongName;
-    while (localValueWithLongName < secondValueWithLongName) ++localValueWithLongName;
+    if (localValueWithLongName) {
+        return firstReferenceWithLongName;
+    }
+    while (localValueWithLongName < secondValueWithLongName) {
+        ++localValueWithLongName;
+    }
     for (int index = 0; index < thirdValueWithLongName; ++index) {
         localValueWithLongName += index;
     }
@@ -724,7 +728,16 @@ int NestedSwitchIndent(int message, int wParam) {
 void ControlFlowVariety(int* values, int count) {
     if (count > 0) {
         values[0] += 1;
-    } else values[0] = 0;
+    } else {
+        values[0] = 0;
+    }
+    if (count == 0) {
+        values[0] = 0;
+    } else if (count == 1) {
+        values[0] = 1;
+    } else if (count == 2) {
+        values[0] = 2;
+    }
 
     if (values != nullptr) {
         values[0] = count;
@@ -734,10 +747,18 @@ void ControlFlowVariety(int* values, int count) {
     }
 
     for (int outer = 0; outer < count; ++outer) {
-        if (values[outer] % 2 == 0) values[outer] += outer;
-        else {
+        if (values[outer] % 2 == 0) {
+            values[outer] += outer;
+        } else {
             values[outer] -= outer;
         }
+    }
+    for (int simple = 0; simple < count; ++simple) {
+        values[simple] += 1;
+    }
+    switch (count) {
+        default:
+            values[0] = count;
     }
     int index = 0;
     for (;;) {
@@ -747,6 +768,9 @@ void ControlFlowVariety(int* values, int count) {
         values[index] += index;
         ++index;
     }
+    do {
+        ++index;
+    } while (index < count);
     do {
         --index;
     } while (index > 0);

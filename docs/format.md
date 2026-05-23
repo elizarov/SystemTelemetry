@@ -38,7 +38,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Do not increase indentation for namespace bodies. A namespace declaration owns braces and blank-line grouping, but declarations inside it stay at the same indentation level as the namespace declaration.
 - Separate namespace opening lines and namespace closing braces from neighboring declarations with one empty line.
 - Remove trailing whitespace from every line, including comment-only and trailing-comment lines.
-- Preserve the source token sequence except for include sorting and trailing-comma removal. Outside those formatter-owned changes, the formatter only changes spaces and line breaks, and never adds or removes braces by itself.
+- Preserve the source token sequence except for formatter-owned structural changes: include sorting, trailing-comma removal, and inserting required control-statement braces. Outside those formatter-owned changes, the formatter only changes spaces and line breaks.
 - Preserve one source blank line when it separates already closed declarations or statements at the same structural level, including inside function, method, and lambda bodies. Multiple source blank lines collapse to one. Blank lines at the beginning of a block, class, struct, enum, namespace, or immediately before its closing brace are not preserved.
 - Never vertically align tokens, comments, assignments, parameters, ternary arms, or consecutive declarations.
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
@@ -340,7 +340,7 @@ DashboardApp::DashboardApp(
 }
 ```
 
-Control-statement headers use the same treatment. This applies to `if`, `else if`, `while`, `for`, `switch`, `catch`, and similar parenthesized control constructs. A short header stays on one line. A long header puts the opening parenthesis at the end of the keyword line, formats the whole condition or header as structural contents, and puts the closing parenthesis on the line that opens the body.
+Control-statement headers use the same treatment. This applies to `if`, `while`, `for`, `switch`, `catch`, and similar parenthesized control constructs. A short header stays on one line. A long header puts the opening parenthesis at the end of the keyword line, formats the whole condition or header as structural contents, and puts the closing parenthesis on the line that opens the body.
 
 Long conditions split by logical-chain element before splitting nested calls or comparisons. A simple comparison such as `value > 0` stays atomic when the surrounding `&&` or `||` chain wraps.
 
@@ -348,19 +348,29 @@ Control headers with init-statements split at the top-level semicolon before spl
 
 When a long control condition consists of one nested call expression, keep the control opener and nested call opener on the same line when that line fits. The nested call arguments use one structural indent inside the control statement, and the call close plus control close combine on the body-opening line.
 
-Short unbraced statement bodies may stay on one line when the full statement fits. The formatter does not add braces to unbraced statements and does not remove braces from braced statements.
+Control flow uses one normalized bracing style: every `if`, `else`, `for`, `while`, `do`, and `switch` body is a braced block, while a multi-branch conditional is represented as a direct `if (...) { ... } else if (...) { ... } else { ... }` chain. The formatter normalizes equivalent source shapes into that style and then formats the resulting blocks normally.
 
 ```cpp
 if (ready) {
     // code
 }
 
-if (ok) return;
+if (ok) {
+    return;
+}
 
 if (ready) {
     // code
 } else {
     // code
+}
+
+if (value == 0) {
+    // zero
+} else if (value == 1) {
+    // one
+} else {
+    // many
 }
 
 if (
