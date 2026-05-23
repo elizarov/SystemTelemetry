@@ -3140,7 +3140,7 @@ private:
         }
         if (
             IsTemplateAngleCloseToken(tokens, prevIndex) &&
-            (current == "(" || current == "*" || current == "&" || current == "&&" || IsNoSpaceBefore(current))
+            (current == "(" || IsPointerOrReferenceDeclaratorToken(current) || IsNoSpaceBefore(current))
         ) {
             return false;
         }
@@ -3171,7 +3171,7 @@ private:
         if (current == "{" || IsNoSpaceBefore(current) || IsNoSpaceAfter(prev)) {
             return false;
         }
-        if (current == "*" || current == "&" || current == "&&") {
+        if (IsPointerOrReferenceDeclaratorToken(current)) {
             if (IsPointerOrReferenceDeclarator(tokens, index)) {
                 return false;
             }
@@ -3179,7 +3179,10 @@ private:
         if (IsUnaryPrefixOperator(tokens, index) && IsUnaryPrefixOperator(tokens, prevIndex)) {
             return false;
         }
-        if ((prev == "*" || prev == "&") && token.kind == TokenKind::Word) {
+        if (IsPointerOrReferenceDeclaratorToken(prev) && token.kind == TokenKind::Word) {
+            if (IsPointerOrReferenceDeclarator(tokens, prevIndex)) {
+                return true;
+            }
             return !IsUnaryPrefixOperator(tokens, prevIndex);
         }
         if ((prev == "+" || prev == "-") && IsUnaryPrefixOperator(tokens, prevIndex)) {
@@ -3293,6 +3296,8 @@ private:
                 token.text != "*" &&
                 token.text != "&" &&
                 token.text != "&&" &&
+                token.text != "^" &&
+                token.text != "%" &&
                 token.text != "<" &&
                 token.text != ">" &&
                 token.text != ","
@@ -3305,16 +3310,19 @@ private:
             return false;
         }
         return IsLikelyTypeNameToken(tokens, last) ||
-            (
-                (tokens[last].text == "*" || tokens[last].text == "&" || tokens[last].text == "&&") &&
-                    IsLikelyTypeBeforePointer(tokens, last)
-            );
+            (IsPointerOrReferenceDeclaratorToken(tokens[last].text) && IsLikelyTypeBeforePointer(tokens, last));
     }
 
     bool IsLikelyTypeBeforePointer(const std::vector<Token>& tokens, size_t index) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
         if (!previous) {
             return false;
+        }
+        if (
+            IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
+            IsPointerOrReferenceDeclarator(tokens, *previous)
+        ) {
+            return true;
         }
         return IsLikelyTypeNameToken(tokens, *previous);
     }
@@ -3391,9 +3399,7 @@ private:
             text == "{" ||
             text == "," ||
             text == "<" ||
-            text == "*" ||
-            text == "&" ||
-            text == "&&" ||
+            IsPointerOrReferenceDeclaratorToken(text) ||
             text == ":";
     }
 
@@ -3414,6 +3420,19 @@ private:
         start = UnwrapTemplateTypeNameStart(tokens, *start);
         if (!start) {
             return std::nullopt;
+        }
+        while (IsPointerOrReferenceDeclaratorToken(tokens[*start].text)) {
+            if (!IsPointerOrReferenceDeclarator(tokens, *start)) {
+                return std::nullopt;
+            }
+            start = PreviousNonNewlineIndex(tokens, *start);
+            if (!start) {
+                return std::nullopt;
+            }
+            start = UnwrapTemplateTypeNameStart(tokens, *start);
+            if (!start) {
+                return std::nullopt;
+            }
         }
         while (*start > 1) {
             const std::optional<size_t> before = PreviousNonNewlineIndex(tokens, *start);
@@ -3906,7 +3925,7 @@ private:
             const std::string& text = tokens[index].text;
             if (text == "?") {
                 hasTernary = true;
-            } else if (text == "&&" && IsPointerOrReferenceDeclarator(tokens, index)) {
+            } else if (IsPointerOrReferenceDeclaratorToken(text) && IsPointerOrReferenceDeclarator(tokens, index)) {
                 continue;
             } else if (text == "&&" || text == "||") {
                 hasLogical = true;
@@ -3959,10 +3978,7 @@ private:
         if (chainKind == ChainKind::None || IsTemplateAngleToken(tokens, index)) {
             return false;
         }
-        if ((tokens[index].text == "*" || tokens[index].text == "&") && IsPointerOrReferenceDeclarator(tokens, index)) {
-            return false;
-        }
-        if (tokens[index].text == "&&" && IsPointerOrReferenceDeclarator(tokens, index)) {
+        if (IsPointerOrReferenceDeclaratorToken(tokens[index].text) && IsPointerOrReferenceDeclarator(tokens, index)) {
             return false;
         }
         if ((tokens[index].text == "+" || tokens[index].text == "-") && IsUnaryPrefixOperator(tokens, index)) {
@@ -4052,9 +4068,7 @@ private:
     }
 
     bool IsPointerOrReferenceDeclarator(const std::vector<Token>& tokens, size_t index) const {
-        if (index >= tokens.size() || (
-            tokens[index].text != "*" && tokens[index].text != "&" && tokens[index].text != "&&"
-        )) {
+        if (index >= tokens.size() || !IsPointerOrReferenceDeclaratorToken(tokens[index].text)) {
             return false;
         }
         const size_t nextIndex = NextSignificantIndex(tokens, index + 1);
@@ -4066,16 +4080,22 @@ private:
         const bool beforeTemplateClose = IsTemplateAngleCloseToken(tokens, nextIndex);
         const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
         const bool beforeUnnamedDeclaratorEnd = next->text == ")" || next->text == "," || next->text == "=";
+        const bool beforePointerOrReferenceDeclarator = IsPointerOrReferenceDeclaratorToken(next->text);
         const bool beforeFunctionPointerDeclarator =
             tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
         const bool beforeDeclarator = beforeDeclaratorName ||
             beforeTemplateClose ||
             beforeStructuredBinding ||
             beforeUnnamedDeclaratorEnd ||
+            beforePointerOrReferenceDeclarator ||
             beforeFunctionPointerDeclarator;
         return beforeDeclarator &&
             IsLikelyTypeBeforePointer(tokens, index) &&
             IsLikelyDeclaratorContextBeforePointer(tokens, index);
+    }
+
+    static bool IsPointerOrReferenceDeclaratorToken(std::string_view text) {
+        return text == "*" || text == "&" || text == "&&" || text == "^" || text == "%";
     }
 
     bool IsFunctionPointerDeclaratorGroupOpen(const std::vector<Token>& tokens, size_t index) const {
@@ -4097,12 +4117,12 @@ private:
                 continue;
             }
             if (!sawSignificant) {
-                if (tokens[inner].text != "*" && tokens[inner].text != "&" && tokens[inner].text != "&&") {
+                if (!IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
                     return false;
                 }
                 sawSignificant = true;
             }
-            if (tokens[inner].text == "*" || tokens[inner].text == "&" || tokens[inner].text == "&&") {
+            if (IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
                 sawPointer = true;
             }
         }
@@ -4115,7 +4135,7 @@ private:
             return false;
         }
         if (
-            (tokens[*previous].text == "*" || tokens[*previous].text == "&" || tokens[*previous].text == "&&") &&
+            IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
             IsPointerOrReferenceDeclarator(tokens, *previous)
         ) {
             return true;
@@ -4236,7 +4256,7 @@ private:
             return false;
         }
         const Token& token = tokens[next];
-        return token.kind == TokenKind::Word || token.text == "*" || token.text == "&" || token.text == "&&";
+        return token.kind == TokenKind::Word || IsPointerOrReferenceDeclaratorToken(token.text);
     }
 
     DeclarationKind ClassifySemicolonDeclaration(const std::vector<Token>& tokens) const {
@@ -5178,7 +5198,7 @@ std::optional<std::vector<std::string>> ResolveTargetPathFiles(const std::string
     return UniqueSorted(std::move(files));
 }
 
-std::optional<Options> ParseOptions(int argc, char * *argv) {
+std::optional<Options> ParseOptions(int argc, char** argv) {
     Options options;
     options.root = tools::lint::CurrentDirectoryAbsolute();
     for (int index = 0; index < argc; ++index) {
@@ -5240,7 +5260,7 @@ std::optional<Options> ParseOptions(int argc, char * *argv) {
 
 }  // namespace
 
-int RunFormat(int argc, char * *argv) {
+int RunFormat(int argc, char** argv) {
     const auto start = std::chrono::steady_clock::now();
     std::optional<Options> parsed = ParseOptions(argc, argv);
     if (!parsed) {

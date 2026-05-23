@@ -161,6 +161,14 @@ ColorConfig& MutableColorField(void* owner,const RuntimeConfigFieldDescriptor& f
 return *reinterpret_cast<ColorConfig *>(static_cast<char *>(owner)+field.offset);
 }
 
+HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_){
+return DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED,__uuidof(IDWriteFactory),reinterpret_cast<IUnknown * *>(dwriteFactory_.ReleaseAndGetAddressOf()));
+}
+
+void ManagedReferenceSpacing(NativeType & nativeRef,NativeType && nativeRvalueRef,NativeType * & pointerRef,NativeType * && pointerRvalueRef,NativeType * * pointerPointer,ManagedWidget ^ managedHandle,ManagedWidget ^ % managedTrackingRef,ManagedWidget % managedReference){
+Use(nativeRef,nativeRvalueRef,pointerRef,pointerRvalueRef,pointerPointer,managedHandle,managedTrackingRef,managedReference);
+}
+
 struct NetworkFooterWidgetConfig{
 int bottomGap{};  // config_meta: policy=non_negative_int
 bool operator==(const NetworkFooterWidgetConfig& other) const = default;
