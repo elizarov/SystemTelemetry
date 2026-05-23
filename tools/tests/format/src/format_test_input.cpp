@@ -177,6 +177,10 @@ HBITMAP colorBitmap=CreateDIBSection(nullptr,reinterpret_cast<BITMAPINFO*>(&head
 return colorBitmap;
 }
 
+void AttachCalloutBubble(Callout& callout,LayoutGuideSheetExitSide side){
+callout.bubbleAttachment=RenderPoint{side==LayoutGuideSheetExitSide::Left?callout.bubbleRect.right:callout.bubbleRect.left,callout.bubbleRect.Center().y};
+}
+
 double MaxSegmentGap(double totalSweep,double minSegmentSweep,int segmentCount){
 const double maxSegmentGap=(std::max)(0.0,(totalSweep-(minSegmentSweep*static_cast<double>(segmentCount)))/static_cast<double>(segmentCount-1));
 return maxSegmentGap;

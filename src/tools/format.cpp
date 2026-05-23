@@ -1420,6 +1420,7 @@ private:
                     SelectChainKind(rhs) != ChainKind::Ternary &&
                         (
                             CanAttachAssignmentToWrappedCall(rhs, indentLevel, attachedPrefix) ||
+                                CanAttachAssignmentToWrappedBracedConstructor(rhs, indentLevel, attachedPrefix) ||
                                 CanAttachAssignmentToWrappedLeadingGroup(rhs, indentLevel, attachedPrefix) ||
                                 CanAttachAssignmentToWrappedLambda(rhs, indentLevel, attachedPrefix)
                         )
@@ -1513,6 +1514,19 @@ private:
     ) const {
         const std::optional<GroupPair> group = FindFirstGroupPair(rhs);
         if (!group || group->open == 0 || rhs[group->open].text != "(") {
+            return false;
+        }
+        std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(group->open + 1));
+        return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(firstLineTokens));
+    }
+
+    bool CanAttachAssignmentToWrappedBracedConstructor(
+        const std::vector<Token>& rhs,
+        int indentLevel,
+        std::string_view attachedPrefix
+    ) const {
+        const std::optional<GroupPair> group = FindFirstGroupPair(rhs);
+        if (!group || group->open == 0 || rhs[group->open].text != "{") {
             return false;
         }
         std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(group->open + 1));

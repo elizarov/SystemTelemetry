@@ -239,6 +239,13 @@ HBITMAP CreateBitmap(BITMAPINFOHEADER header) {
     return colorBitmap;
 }
 
+void AttachCalloutBubble(Callout& callout, LayoutGuideSheetExitSide side) {
+    callout.bubbleAttachment = RenderPoint{
+        side == LayoutGuideSheetExitSide::Left ? callout.bubbleRect.right : callout.bubbleRect.left,
+        callout.bubbleRect.Center().y
+    };
+}
+
 double MaxSegmentGap(double totalSweep, double minSegmentSweep, int segmentCount) {
     const double maxSegmentGap = (std::max)(
         0.0,

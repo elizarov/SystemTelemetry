@@ -255,7 +255,7 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits. If a ternary right-hand side starts with a parenthesized value arm and the assignment plus that arm opener fits, keep `= condition ? (` on the assignment line.
+Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. Use the same opener attachment for wrapped braced constructor calls such as `target = RenderPoint{`. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits. If a ternary right-hand side starts with a parenthesized value arm and the assignment plus that arm opener fits, keep `= condition ? (` on the assignment line.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);
