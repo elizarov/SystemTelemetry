@@ -508,13 +508,11 @@ const char* LayoutGuideAxisSizingKey(const LayoutGuide* guide) {
 
 std::optional<double> LayoutEditAnchorValue(const LayoutEditAnchor* anchor) {
     return LayoutEditAnchorParameter(anchor->key).has_value() ?
-        std::optional<double>(static_cast<double>(anchor->value)) :
-        std::nullopt;
+        std::optional<double>(static_cast<double>(anchor->value)) : std::nullopt;
 }
 
 size_t SelectConfigSectionStart(const std::string& sectionName) {
-    size_t sectionStart =
-        sectionName == "[gpu]" ? ensureSectionAfter(sectionName, "[display]") :
+    size_t sectionStart = sectionName == "[gpu]" ? ensureSectionAfter(sectionName, "[display]") :
         sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]") :
         sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]") :
         sectionName == "[board]" ? ensureSectionAfter(sectionName, "[storage]") :
@@ -579,8 +577,8 @@ size_t CountLeftCards(
     size_t cardIndex
 ) {
     const size_t leftCount = cardPlanned.size() == 1 ? (
-        plannedCalloutDetails[cardPlanned.front()].target.Center().x <
-            cardPlacements[cardIndex].sourceRect.Center().x ? 1 : 0
+        plannedCalloutDetails[cardPlanned.front()].target.Center().x < cardPlacements[cardIndex].sourceRect.Center().x ?
+            1 : 0
     ) : cardPlanned.size() / 2;
     return leftCount;
 }
@@ -674,8 +672,7 @@ int ManyParameters(
     int sixthValueWithLongName
 ) {
     int localValueWithLongName = firstPointerWithLongName ? *firstPointerWithLongName : 0;  // trailing
-    bool combinedValue =
-        firstReferenceWithLongName > 0 &&
+    bool combinedValue = firstReferenceWithLongName > 0 &&
         secondValueWithLongName > 0 &&
         thirdValueWithLongName > 0 &&
         fourthValueWithLongName > 0 &&

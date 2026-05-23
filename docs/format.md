@@ -203,7 +203,7 @@ When a braced initializer list wraps, the opening brace stays with the declarati
 
 ## Greedy Wrapping Algorithm
 
-The formatter uses a greedy wrapping algorithm over syntax-owned layout groups. Each wrappable group has a compact form and a split form. The compact form is the group printed on one line with all descendants also using their compact form when possible. The split form is the group printed using its structural multi-line shape.
+The formatter uses a greedy wrapping algorithm over syntax-owned layout groups. Each wrappable group has a compact form and a split form. The compact form is the group printed on one line with all descendants also using their compact form when possible. The split form is the group printed using its structural multi-line shape. For each overflowing range, the formatter selects one split owner, such as an assignment, ternary, member chain, operator chain, lambda, initializer, or delimiter group, and that owner decides the first break before children are reconsidered recursively.
 
 The formatter decides wrapping in this order:
 
@@ -212,6 +212,7 @@ The formatter decides wrapping in this order:
 - If the compact form fits within the configured line width, keep it compact.
 - If the compact form overflows, split the outermost wrappable group that owns the overflowing line.
 - After splitting that group, format each child greedily at its new indentation. A child stays compact when it now fits, and splits only when its own compact form still overflows.
+- When an owner has a prefix, such as an assignment left side, attach the child's first split opener or first operator-chain part to that prefix when it fits. This is a generic edge rule: calls, braced constructors, parenthesized expressions, lambdas, member chains, and operator chains do not each get their own attachment style.
 - When a child expression inside any split comma list must split an operator chain, continuation parts of that child are indented one more level than the child line. This applies to function arguments, constructor arguments, braced initializer elements, array or subscript elements, template arguments, and similar list elements.
 - Prefer splitting a non-fitting member-access chain before the top-level `.`, `->`, `.*`, or `->*` member access before splitting a compact receiver expression. This keeps `receiver()` compact when the outer member call is the wider expression.
 - When an outer call or initializer has exactly one nested call or initializer argument, share the outer and inner opener when that combined line fits, and share the inner and outer closers. This avoids adding a line and an indent level only for delimiters. Double-braced initializer assignments use the same economy: `value = {{` opens on one line and `}};` closes on one line.
@@ -255,7 +256,7 @@ render(
 );
 ```
 
-Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. If the call itself must wrap and the assignment prefix plus call opener fits, keep the opener on the assignment line. Use the same opener attachment for wrapped braced constructor calls such as `target = RenderPoint{`. If a parenthesized right-hand expression must wrap, keep `= (` on the assignment line when it fits. If a ternary right-hand side must wrap inside its first value arm and the assignment plus condition fits, keep `= condition ?` on the assignment line.
+Assignment-like outer expressions follow the same rule. When a right-hand function call does not fit with the assignment prefix, but the complete call fits at continuation indentation, split after the assignment and keep the call compact. Otherwise, if the right-hand side must split and the assignment prefix plus the child's first split line fits, keep that first child line with the assignment. This is why wrapped calls, braced constructors such as `target = RenderPoint{`, parenthesized expressions such as `value = (`, ternaries, member chains, and operator chains all use the same attachment behavior.
 
 ```cpp
 auto value = buildValue(firstValue, transform(secondValueA, secondValueB), thirdValue);
@@ -475,7 +476,7 @@ int measuredWidth = MeasureTextWidthForControl(
 ) + 8;
 ```
 
-Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. This outer ternary split is preferred before splitting operators inside the condition. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If an assignment owns the wrapped ternary chain and the first arm itself must split, keep the assignment prefix, condition, and `?` on the first line when they fit.
+Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. This outer ternary split is preferred before splitting operators inside the condition. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If the condition itself still does not fit, split that condition recursively as the child expression. A short final fallback may stay on the previous line after `:` when it fits.
 
 ```cpp
 int value = condition ? one : two;
