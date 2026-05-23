@@ -501,6 +501,11 @@ std::string SelectCurrentSensorName(const BoardConfig& board, const std::string&
     return currentValue;
 }
 
+const char* LayoutGuideAxisSizingKey(const LayoutGuide* guide) {
+    return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide" :
+        "overview_vertical_sizing_guide";
+}
+
 std::optional<double> LayoutEditAnchorValue(const LayoutEditAnchor* anchor) {
     return LayoutEditAnchorParameter(anchor->key).has_value() ?
         std::optional<double>(static_cast<double>(anchor->value)) :

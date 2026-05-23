@@ -475,7 +475,7 @@ int measuredWidth = MeasureTextWidthForControl(
 ) + 8;
 ```
 
-Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If an assignment owns the wrapped ternary chain and the first arm itself must split, keep the assignment prefix, condition, and `?` on the first line when they fit.
+Ternary expressions are one operator chain. A chained ternary does not add another indent level for the second, third, or later condition arm; every wrapped arm belongs to the same flat chain. When a ternary chain wraps, each non-final arm keeps its `condition ? value :` text together on one line when that arm fits the line width. This outer ternary split is preferred before splitting operators inside the condition. If that arm does not fit, split the arm after the top-level `?` before splitting nested calls inside the condition. If an assignment owns the wrapped ternary chain and the first arm itself must split, keep the assignment prefix, condition, and `?` on the first line when they fit.
 
 ```cpp
 int value = condition ? one : two;

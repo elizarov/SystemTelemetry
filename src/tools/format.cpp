@@ -2692,6 +2692,10 @@ private:
         if (!colon) {
             return std::nullopt;
         }
+        std::vector<Token> firstPart(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*colon + 1));
+        if (Fits(indentLevel, std::string(prefix) + FormatInline(firstPart))) {
+            return std::nullopt;
+        }
         std::vector<Token> condition(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*question));
         if (!CanSplitOperatorChain(condition)) {
             return std::nullopt;
