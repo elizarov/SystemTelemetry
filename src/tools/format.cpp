@@ -1126,8 +1126,7 @@ private:
             config_.statementLikeMacroParameters.begin(),
             config_.statementLikeMacroParameters.end(),
             parameter
-        ) !=
-            config_.statementLikeMacroParameters.end();
+        ) != config_.statementLikeMacroParameters.end();
     }
 
     bool IsStatementLikeMacroInvocation(
@@ -1622,9 +1621,10 @@ private:
         }
         if (!header.empty() && header.front().text == "[") {
             if (std::optional<size_t> captureClose = FindMatchingClose(header, 0)) {
-                std::vector<Token> captureInner(header.begin() + 1, header.begin() + static_cast<std::ptrdiff_t>(
-                    *captureClose
-                ));
+                std::vector<Token> captureInner(
+                    header.begin() + 1,
+                    header.begin() + static_cast<std::ptrdiff_t>(*captureClose)
+                );
                 if (ContainsTopLevelSeparator(captureInner, ',')) {
                     std::vector<std::string> lines;
                     lines.push_back(Indent(indentLevel) + prefix + "[");
@@ -1722,9 +1722,10 @@ private:
         )) {
             return *combined;
         }
-        std::vector<Token> firstLineTokens(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(
-            group.open + 1
-        ));
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+        );
         std::vector<Token> inner(
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
@@ -1779,6 +1780,10 @@ private:
         );
         const std::optional<GroupPair> nested = FindFirstWrappableGroupPair(inner);
         if (!nested || IsEmptyGroupPair(inner, nested->open, nested->close)) {
+            return std::nullopt;
+        }
+        std::vector<Token> beforeNested(inner.begin(), inner.begin() + static_cast<std::ptrdiff_t>(nested->open));
+        if (ContainsTopLevelSeparator(beforeNested, ',')) {
             return std::nullopt;
         }
         if (NextSignificantIndex(inner, nested->close + 1) < inner.size()) {
@@ -1874,9 +1879,10 @@ private:
         if (NextSignificantIndex(condition, nested->close + 1) < condition.size()) {
             return std::nullopt;
         }
-        std::vector<Token> nestedPrefix(condition.begin(), condition.begin() + static_cast<std::ptrdiff_t>(
-            nested->open + 1
-        ));
+        std::vector<Token> nestedPrefix(
+            condition.begin(),
+            condition.begin() + static_cast<std::ptrdiff_t>(nested->open + 1)
+        );
         std::string firstLine = std::string(prefix) + FormatInline(controlPrefix) + FormatInline(nestedPrefix);
         if (!Fits(indentLevel, firstLine)) {
             return std::nullopt;
@@ -1954,9 +1960,38 @@ private:
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             std::vector<std::string> partLines =
                 FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
+            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
+                partLines,
+                parts[index + 1],
+                suffix
+            )) {
+                lines.insert(lines.end(), partLines.begin(), partLines.end());
+                break;
+            }
             lines.insert(lines.end(), partLines.begin(), partLines.end());
         }
         return lines;
+    }
+
+    bool TryAppendFinalChainPartToLastLine(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& finalPart,
+        std::string_view suffix
+    ) const {
+        if (lines.empty() || finalPart.empty() || HasOriginalBlankSeparator(finalPart) || ShouldForceSplit(finalPart)) {
+            return false;
+        }
+        const std::string inlineText = FormatInline(finalPart);
+        if (inlineText.empty()) {
+            return false;
+        }
+        std::string candidate = TrimRight(lines.back()) + " " + inlineText;
+        AppendSuffix(candidate, suffix);
+        if (static_cast<int>(candidate.size()) > config_.columnLimit) {
+            return false;
+        }
+        lines.back() = std::move(candidate);
+        return true;
     }
 
     std::vector<std::string> FormatTernaryPart(
@@ -3951,19 +3986,22 @@ bool IsInsideRootOrRoot(const std::string& root, const std::string& path) {
 }
 
 std::vector<std::string> GetAllFiles(const std::string& root) {
-    const std::optional<std::vector<std::string>> files = RunGit(root, {
-        "-c",
-        "core.quotepath=off",
-        "-c",
-        "core.safecrlf=false",
-        "ls-files",
-        "--cached",
-        "--others",
-        "--exclude-standard",
-        "--",
-        "*.cpp",
-        "*.h"
-    });
+    const std::optional<std::vector<std::string>> files = RunGit(
+        root,
+        {
+            "-c",
+            "core.quotepath=off",
+            "-c",
+            "core.safecrlf=false",
+            "ls-files",
+            "--cached",
+            "--others",
+            "--exclude-standard",
+            "--",
+            "*.cpp",
+            "*.h"
+        }
+    );
     if (!files) {
         return {};
     }

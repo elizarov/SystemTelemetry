@@ -534,6 +534,15 @@ bool ConfigureDisplayGuard(
     return false;
 }
 
+int MeasureHexLabelWidth(HWND hwnd) {
+    const int hexLabelWidth = MeasureTextWidthForControl(
+        hwnd,
+        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
+        ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)
+    ) + 8;
+    return hexLabelWidth;
+}
+
 void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState) {
     WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
         .push_back(DashboardPresentationAnimation{
