@@ -49,10 +49,12 @@ constexpr DumpFieldDescriptor kFlatDumpFields[] = {
     DUMP_FIELD("gpu.load_percent", DumpFieldKind::Double, snapshot.gpu.loadPercent),
     DUMP_FIELD("gpu.temperature.value", DumpFieldKind::OptionalDouble, snapshot.gpu.temperature.value),
     DUMP_FIELD("gpu.temperature.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.temperature.unit),
+    DUMP_FIELD("gpu.temperature.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.temperature.issue),
     DUMP_FIELD("gpu.clock.value", DumpFieldKind::OptionalDouble, snapshot.gpu.clock.value),
     DUMP_FIELD("gpu.clock.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.clock.unit),
     DUMP_FIELD("gpu.fan.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fan.value),
     DUMP_FIELD("gpu.fan.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fan.unit),
+    DUMP_FIELD("gpu.fan.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fan.issue),
     DUMP_FIELD("gpu.fps.value", DumpFieldKind::OptionalDouble, snapshot.gpu.fps.value),
     DUMP_FIELD("gpu.fps.unit", DumpFieldKind::ScalarUnit, snapshot.gpu.fps.unit),
     DUMP_FIELD("gpu.fps.issue", DumpFieldKind::ScalarIssue, snapshot.gpu.fps.issue),
@@ -261,6 +263,7 @@ void WriteNamedScalarMetrics(
         WriteString(output, DumpKey(metricPrefix, ".name"), metrics[i].name);
         WriteOptionalDouble(output, DumpKey(metricPrefix, ".value"), metrics[i].metric.value, 6);
         WriteScalarMetricUnit(output, DumpKey(metricPrefix, ".unit"), metrics[i].metric.unit);
+        WriteScalarMetricIssue(output, DumpKey(metricPrefix, ".issue"), metrics[i].metric.issue);
     }
 }
 
@@ -511,7 +514,8 @@ bool LoadNamedScalarMetrics(
         const std::string metricPrefix = FormatText("%s.%zu", prefix.c_str(), i);
         if (!LoadString(values, DumpKey(metricPrefix, ".name"), metric.name, error) ||
             !LoadOptionalDouble(values, DumpKey(metricPrefix, ".value"), metric.metric.value, error) ||
-            !LoadScalarMetricUnit(values, DumpKey(metricPrefix, ".unit"), metric.metric.unit, error)) {
+            !LoadScalarMetricUnit(values, DumpKey(metricPrefix, ".unit"), metric.metric.unit, error) ||
+            !LoadScalarMetricIssue(values, DumpKey(metricPrefix, ".issue"), metric.metric.issue, error)) {
             return false;
         }
         field.push_back(std::move(metric));

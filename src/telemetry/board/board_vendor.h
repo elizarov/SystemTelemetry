@@ -31,5 +31,10 @@ public:
     virtual BoardVendorTelemetrySample Sample() = 0;
 };
 
+struct BoardVendorTelemetryProviderOptions {
+    bool synchronousSamples = false;
+};
+
 BoardVendorInfo ExtractBoardVendorInfo();
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, const BoardVendorTelemetryProviderOptions& options);

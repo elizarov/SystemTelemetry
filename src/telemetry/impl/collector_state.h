@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "telemetry/board/board_vendor.h"
+#include "telemetry/fps_provider.h"
 #include "telemetry/gpu/gpu_vendor.h"
 #include "telemetry/impl/retained_history.h"
 #include "telemetry/telemetry.h"
@@ -54,6 +55,7 @@ struct RealTelemetryCollectorState {
 
     struct GpuState {
         std::unique_ptr<GpuVendorTelemetryProvider> provider;
+        std::unique_ptr<FpsTelemetryProvider> fallbackFpsProvider;
         std::string providerName = "None";
         std::string providerDiagnostics = ResourceStringText(RES_STR("Provider not initialized."));
         bool providerAvailable = false;
@@ -85,7 +87,7 @@ struct RealTelemetryCollectorState {
         std::chrono::steady_clock::time_point previousTick{};
     };
 
-    explicit RealTelemetryCollectorState(Trace& trace);
+    RealTelemetryCollectorState(Trace& trace, bool synchronousProviderSamples);
     ~RealTelemetryCollectorState();
 
     TelemetrySettings settings_;
@@ -99,4 +101,5 @@ struct RealTelemetryCollectorState {
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     Trace& trace_;
+    bool synchronousProviderSamples_ = false;
 };

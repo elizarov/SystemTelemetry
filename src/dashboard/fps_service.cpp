@@ -10,6 +10,7 @@
 #include <vector>
 #include <winsvc.h>
 
+#include "telemetry/board_service_sample.h"
 #include "telemetry/fps_provider.h"
 #include "telemetry/fps_service_protocol.h"
 #include "util/command_line.h"
@@ -135,6 +136,31 @@ public:
 
 private:
     void* memory_ = nullptr;
+};
+
+struct PipeServerState {
+    PipeServerState() {
+        InitializeCriticalSection(&fpsProviderLock);
+        InitializeCriticalSection(&boardProviderLock);
+    }
+
+    ~PipeServerState() {
+        DeleteCriticalSection(&boardProviderLock);
+        DeleteCriticalSection(&fpsProviderLock);
+    }
+
+    PipeServerState(const PipeServerState&) = delete;
+    PipeServerState& operator=(const PipeServerState&) = delete;
+
+    Trace trace;
+    std::unique_ptr<FpsTelemetryProvider> fpsProvider;
+    CRITICAL_SECTION fpsProviderLock{};
+    CRITICAL_SECTION boardProviderLock{};
+};
+
+struct PipeClientContext {
+    HANDLE pipe = INVALID_HANDLE_VALUE;
+    std::shared_ptr<PipeServerState> state;
 };
 
 void SetServiceStatusState(DWORD state, DWORD win32ExitCode = NO_ERROR, DWORD waitHint = 0) {
@@ -370,7 +396,7 @@ bool ConnectPipeOrStop(HANDLE pipe, HANDLE stopEvent) {
     return waitResult == WAIT_OBJECT_0 + 1;
 }
 
-void ServePipeClient(HANDLE pipe, FpsTelemetryProvider& fpsProvider) {
+void ServePipeClient(HANDLE pipe, PipeServerState& state) {
     std::vector<char> request;
     request.reserve(kPipeRequestBytes);
     std::optional<CashDashServiceRequest> serviceRequest;
@@ -398,8 +424,22 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider& fpsProvider) {
 
     std::vector<char> response;
     switch (serviceRequest->id) {
-        case CashDashServiceRequestId::PresentedFpsSample:
-            response = SerializeFpsServiceSample(fpsProvider.Sample());
+        case CashDashServiceRequestId::PresentedFpsSample: {
+            FpsTelemetrySample sample;
+            EnterCriticalSection(&state.fpsProviderLock);
+            if (state.fpsProvider != nullptr) {
+                sample = state.fpsProvider->Sample(serviceRequest->fpsOptions);
+            } else {
+                sample.diagnostics = "FPS service provider is unavailable.";
+            }
+            LeaveCriticalSection(&state.fpsProviderLock);
+            response = SerializeFpsServiceSample(sample);
+            break;
+        }
+        case CashDashServiceRequestId::BoardSensorsSample:
+            EnterCriticalSection(&state.boardProviderLock);
+            response = SerializeBoardSensorsServiceSample(CaptureBoardSensorsServiceSample(state.trace));
+            LeaveCriticalSection(&state.boardProviderLock);
             break;
     }
     if (response.empty()) {
@@ -411,11 +451,40 @@ void ServePipeClient(HANDLE pipe, FpsTelemetryProvider& fpsProvider) {
     FlushFileBuffers(pipe);
 }
 
+DWORD WINAPI PipeClientThread(void* contextPtr) {
+    std::unique_ptr<PipeClientContext> context(static_cast<PipeClientContext*>(contextPtr));
+    if (context == nullptr || context->state == nullptr) {
+        return 1;
+    }
+
+    Handle pipe(context->pipe);
+    context->pipe = INVALID_HANDLE_VALUE;
+    if (pipe.Get() != INVALID_HANDLE_VALUE) {
+        ServePipeClient(pipe.Get(), *context->state);
+        DisconnectNamedPipe(pipe.Get());
+    }
+    return 0;
+}
+
+bool StartPipeClientThread(HANDLE pipe, std::shared_ptr<PipeServerState> state) {
+    auto context = std::make_unique<PipeClientContext>();
+    context->pipe = pipe;
+    context->state = std::move(state);
+    HANDLE thread = CreateThread(nullptr, 0, PipeClientThread, context.get(), 0, nullptr);
+    if (thread == nullptr) {
+        return false;
+    }
+
+    context.release();
+    CloseHandle(thread);
+    return true;
+}
+
 void RunPipeServer(HANDLE stopEvent) {
-    Trace trace;
-    std::unique_ptr<FpsTelemetryProvider> fpsProvider = CreateFpsServiceTelemetryProvider(trace);
-    if (fpsProvider != nullptr) {
-        fpsProvider->Initialize();
+    auto state = std::make_shared<PipeServerState>();
+    state->fpsProvider = CreateFpsServiceTelemetryProvider(state->trace);
+    if (state->fpsProvider != nullptr) {
+        state->fpsProvider->Initialize();
     }
 
     while (WaitForSingleObject(stopEvent, 0) == WAIT_TIMEOUT) {
@@ -426,10 +495,12 @@ void RunPipeServer(HANDLE stopEvent) {
         }
 
         if (ConnectPipeOrStop(pipe.Get(), stopEvent)) {
-            if (fpsProvider != nullptr) {
-                ServePipeClient(pipe.Get(), *fpsProvider);
+            HANDLE connectedPipe = pipe.Release();
+            if (!StartPipeClientThread(connectedPipe, state)) {
+                Handle fallbackPipe(connectedPipe);
+                ServePipeClient(fallbackPipe.Get(), *state);
+                DisconnectNamedPipe(fallbackPipe.Get());
             }
-            DisconnectNamedPipe(pipe.Get());
         }
     }
 }

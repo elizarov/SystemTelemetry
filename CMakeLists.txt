@@ -248,8 +248,9 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/board_service_sample.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -261,6 +262,7 @@ add_executable(CaseDash WIN32
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
@@ -371,10 +373,11 @@ set(casedash_release_speed_sources
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -560,6 +563,8 @@ target_link_libraries(CaseDash PRIVATE
     comctl32
     ws2_32
     ole32
+    oleaut32
+    wbemuuid
     advapi32
     dbghelp
     wtsapi32
@@ -837,6 +842,8 @@ add_executable(CaseDashBenchmarks
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/win32_format.cpp
+    src/util/elevated_process.cpp
+    src/util/paths.cpp
     src/util/scale.cpp
     src/config/config_telemetry.cpp
     src/config/config_primitives.cpp
@@ -866,8 +873,8 @@ add_executable(CaseDashBenchmarks
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
-    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/fps_service_protocol.cpp
     src/telemetry/gpu/gpu_vendor.cpp
@@ -879,6 +886,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
@@ -1015,6 +1023,8 @@ target_link_libraries(CaseDashBenchmarks PRIVATE
     dxgi
     ws2_32
     ole32
+    oleaut32
+    wbemuuid
     advapi32
     ${MSCOREE_LIB}
 )

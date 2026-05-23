@@ -61,7 +61,21 @@ private:
     HANDLE handle_ = INVALID_HANDLE_VALUE;
 };
 
-std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
+FpsTelemetrySampleOptions OptionsForAdapter(const std::optional<GpuAdapterInfo>& adapter) {
+    FpsTelemetrySampleOptions options;
+    if (adapter.has_value()) {
+        options.gpuAdapterLuidToken = GpuAdapterPdhLuidToken(*adapter).value_or(std::string{});
+    }
+    return options;
+}
+
+const FpsTelemetrySampleOptions& EffectiveOptions(
+    const FpsTelemetrySampleOptions& requested, const FpsTelemetrySampleOptions& fallback) {
+    return requested.gpuAdapterLuidToken.empty() ? fallback : requested;
+}
+
+std::optional<FpsTelemetrySample> QueryServiceSample(
+    const FpsTelemetrySampleOptions& options, std::string& diagnostics) {
     diagnostics.clear();
     if (!WaitNamedPipeA(kFpsServicePipeName, kPipeConnectTimeoutMs)) {
         diagnostics =
@@ -77,7 +91,7 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
         return std::nullopt;
     }
 
-    const std::vector<char> request = BuildFpsServiceRequest();
+    const std::vector<char> request = BuildFpsServiceRequest(options);
     DWORD written = 0;
     if (!WriteFile(pipe.Get(), request.data(), static_cast<DWORD>(request.size()), &written, nullptr) ||
         written != request.size()) {
@@ -118,7 +132,8 @@ std::optional<FpsTelemetrySample> QueryServiceSample(std::string& diagnostics) {
 
 class FpsServiceClientProvider final : public FpsTelemetryProvider {
 public:
-    explicit FpsServiceClientProvider(Trace& trace) : trace_(trace) {}
+    FpsServiceClientProvider(Trace& trace, FpsTelemetrySampleOptions defaultOptions)
+        : trace_(trace), defaultOptions_(std::move(defaultOptions)) {}
 
     bool Initialize() override {
         if (initialized_) {
@@ -126,7 +141,7 @@ public:
         }
 
         std::string diagnostics;
-        const std::optional<FpsTelemetrySample> sample = QueryServiceSample(diagnostics);
+        const std::optional<FpsTelemetrySample> sample = QueryServiceSample(defaultOptions_, diagnostics);
         if (!sample.has_value()) {
             diagnostics_ =
                 diagnostics.empty() ? ResourceStringText(RES_STR("FPS service did not return a sample.")) : diagnostics;
@@ -144,9 +159,10 @@ public:
         return true;
     }
 
-    FpsTelemetrySample Sample() override {
+    FpsTelemetrySample Sample(const FpsTelemetrySampleOptions& options) override {
         std::string diagnostics;
-        const std::optional<FpsTelemetrySample> sample = QueryServiceSample(diagnostics);
+        const std::optional<FpsTelemetrySample> sample =
+            QueryServiceSample(EffectiveOptions(options, defaultOptions_), diagnostics);
         if (sample.has_value()) {
             cachedSample_ = *sample;
             return *sample;
@@ -166,18 +182,21 @@ public:
 
 private:
     Trace& trace_;
+    FpsTelemetrySampleOptions defaultOptions_;
     std::string diagnostics_ = ResourceStringText(RES_STR("FPS service client not initialized."));
     std::optional<FpsTelemetrySample> cachedSample_;
     bool initialized_ = false;
 };
 
-std::unique_ptr<FpsTelemetryProvider> CreateFpsServiceClientProvider(Trace& trace) {
-    return std::make_unique<FpsServiceClientProvider>(trace);
+std::unique_ptr<FpsTelemetryProvider> CreateFpsServiceClientProvider(
+    Trace& trace, const FpsTelemetrySampleOptions& defaultOptions) {
+    return std::make_unique<FpsServiceClientProvider>(trace, defaultOptions);
 }
 
 class FpsHybridProvider final : public FpsTelemetryProvider {
 public:
-    explicit FpsHybridProvider(Trace& trace) : trace_(trace) {}
+    FpsHybridProvider(Trace& trace, FpsTelemetrySampleOptions defaultOptions)
+        : trace_(trace), defaultOptions_(std::move(defaultOptions)) {}
 
     bool Initialize() override {
         if (TryInitializeServiceProvider()) {
@@ -191,9 +210,10 @@ public:
         return initialized_;
     }
 
-    FpsTelemetrySample Sample() override {
+    FpsTelemetrySample Sample(const FpsTelemetrySampleOptions& options) override {
+        const FpsTelemetrySampleOptions& effectiveOptions = EffectiveOptions(options, defaultOptions_);
         if (serviceProvider_ != nullptr) {
-            return serviceProvider_->Sample();
+            return serviceProvider_->Sample(effectiveOptions);
         }
 
         ++serviceRetrySample_;
@@ -201,12 +221,12 @@ public:
             serviceRetrySample_ = 0;
             if (TryInitializeServiceProvider()) {
                 trace_.Write(TracePrefix::FpsProvider, RES_STR("service_recovered"));
-                return serviceProvider_->Sample();
+                return serviceProvider_->Sample(effectiveOptions);
             }
         }
 
         if (localProvider_ != nullptr) {
-            return localProvider_->Sample();
+            return localProvider_->Sample(effectiveOptions);
         }
 
         FpsTelemetrySample sample;
@@ -216,7 +236,7 @@ public:
 
 private:
     bool TryInitializeServiceProvider() {
-        auto provider = CreateFpsServiceClientProvider(trace_);
+        auto provider = CreateFpsServiceClientProvider(trace_, defaultOptions_);
         if (provider != nullptr && provider->Initialize()) {
             serviceProvider_ = std::move(provider);
             return true;
@@ -227,6 +247,7 @@ private:
     }
 
     Trace& trace_;
+    FpsTelemetrySampleOptions defaultOptions_;
     std::unique_ptr<FpsTelemetryProvider> serviceProvider_;
     std::unique_ptr<FpsTelemetryProvider> localProvider_;
     int serviceRetrySample_ = kServiceRetrySampleInterval;
@@ -236,6 +257,7 @@ private:
 
 }  // namespace
 
-std::unique_ptr<FpsTelemetryProvider> CreatePresentedFpsProvider(Trace& trace) {
-    return std::make_unique<FpsHybridProvider>(trace);
+std::unique_ptr<FpsTelemetryProvider> CreatePresentedFpsProvider(
+    Trace& trace, const std::optional<GpuAdapterInfo>& adapter) {
+    return std::make_unique<FpsHybridProvider>(trace, OptionsForAdapter(adapter));
 }

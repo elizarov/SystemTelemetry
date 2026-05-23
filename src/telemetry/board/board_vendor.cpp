@@ -4,6 +4,7 @@
 
 #include "telemetry/board/asus/board_asus_armoury_crate.h"
 #include "telemetry/board/gigabyte/board_gigabyte_siv.h"
+#include "telemetry/board/lenovo/board_lenovo_vantage.h"
 #include "telemetry/board/msi/board_msi_center.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/resource_strings.h"
@@ -47,7 +48,7 @@ private:
 };
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
-    Trace& trace, BoardVendor vendor, BoardVendorInfo info) {
+    Trace& trace, BoardVendor vendor, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
     if (vendor == BoardVendor::Asus) {
         return CreateAsusBoardTelemetryProvider(trace, std::move(info));
     }
@@ -56,6 +57,9 @@ std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
     }
     if (vendor == BoardVendor::Gigabyte) {
         return CreateGigabyteBoardTelemetryProvider(trace, std::move(info));
+    }
+    if (vendor == BoardVendor::Lenovo) {
+        return CreateLenovoBoardTelemetryProvider(trace, std::move(info), options);
     }
 
     return std::make_unique<UnsupportedBoardTelemetryProvider>(trace, std::move(info));
@@ -70,7 +74,8 @@ BoardVendorInfo ExtractBoardVendorInfo() {
     };
 }
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, const BoardVendorTelemetryProviderOptions& options) {
     BoardVendorInfo info = ExtractBoardVendorInfo();
     const BoardVendor vendor = SelectBoardVendor(info);
     trace.WriteFmt(TracePrefix::BoardVendor,
@@ -78,5 +83,5 @@ std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider
         BoardVendorName(vendor),
         info.manufacturer.c_str(),
         info.product.c_str());
-    return CreateBoardProviderForVendor(trace, vendor, std::move(info));
+    return CreateBoardProviderForVendor(trace, vendor, std::move(info), options);
 }

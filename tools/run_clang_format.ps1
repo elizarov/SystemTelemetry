@@ -106,7 +106,8 @@ function Test-EligibleCppPath {
         return $false
     }
     $fileName = [System.IO.Path]::GetFileName($normalizedPath)
-    if ($fileName -eq 'board_gigabyte_siv_bridge.cpp' -or $fileName -eq 'board_msi_center_bridge.cpp') {
+    if ($fileName -eq 'board_gigabyte_siv_bridge.cpp' -or $fileName -eq 'board_msi_center_bridge.cpp' -or
+        $fileName -eq 'board_lenovo_vantage_bridge.cpp') {
         return $false
     }
 

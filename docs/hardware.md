@@ -12,6 +12,7 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - [ASUS](#asus) - board CPU temperature and fan telemetry through Armoury Crate or ASUS System Control Interface ATKACPI.
 - [MSI](#msi) - board temperature and fan telemetry through MSI Center SDK.
 - [Gigabyte](#gigabyte) - board temperature and fan telemetry through Gigabyte SIV.
+- [Lenovo](#lenovo) - board CPU temperature telemetry through the Lenovo diagnostics driver and fan telemetry through Lenovo GameZone WMI.
 
 ## Provider Model
 
@@ -25,10 +26,11 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - On hybrid laptops, the integrated adapter can be the first DXGI adapter even when a discrete GPU is also installed; selecting a different adapter in the dashboard devices menu recreates the matching vendor provider for that adapter.
 - The displayed GPU product name uses the selected DXGI adapter description when available; provider diagnostics can still include lower-level runtime device names.
 - Vendor GPU providers match their runtime device handle to the selected DXGI adapter by PCI identity when the driver API exposes enough detail, then fall back to provider name matching.
-- Board telemetry selects the supported hardware provider from the baseboard manufacturer.
+- Board telemetry selects the supported hardware provider from the baseboard manufacturer only when the runtime layout requests at least one board-backed temperature or fan metric.
 - Trace output can include `gpu_vendor:*` and `board_vendor:*` selection details, provider-specific diagnostics, and unsupported-provider fallback markers.
-- Layout metric references are the source of truth for requested logical board metrics. The `[board]` mapping connects logical names to provider-specific sensor names.
-- Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric. The CPU board temperature binding is requested by `gpu.temp` as the Intel fallback source.
+- Layout metric references are the source of truth for requested logical board metrics. Runtime layouts that omit board-backed metric ids do not instantiate a board provider. The `[board]` mapping connects logical names to provider-specific sensor names.
+- Empty CPU, GPU, and system board bindings use first-use auto-detection from the active provider's sensor names; the system binding also accepts motherboard or board sensor names. Otherwise, bound board metrics resolve when the mapped sensor exists. The GPU board fan binding is requested by `gpu.fan` as a fallback source and does not need to appear as a `board.fan.gpu` widget metric. The CPU board temperature binding is requested by `gpu.temp` as the Intel fallback source.
+- The CaseDash service IPC exposes `presented_fps_sample` for FPS and `board_sensors_sample` for board providers that need LocalSystem access to hardware interfaces.
 
 ## Provider Validation
 
@@ -42,7 +44,7 @@ Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics command
 ## Adding Hardware Support
 
 - Provider selection stays split into three steps: extract adapter identity, map vendor information to the vendor enum, and create the matching provider with the full adapter identity.
-- GPU extraction reads the selected unique non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, PCI bus address when Windows reports a usable address, adapter index, dedicated-memory size, raw adapter name, and derived selection name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and raw adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
+- GPU extraction reads the selected unique non-software DXGI adapter identity into `GpuAdapterInfo`, including PCI vendor id, PCI device id, subsystem id, revision, DXGI adapter LUID, PCI bus address when Windows reports a usable address, adapter index, dedicated-memory size, raw adapter name, and derived selection name. `GpuAdapterInfo` inherits the `GpuVendorInfo` vendor id and raw adapter name used by vendor mapping, so vendor providers keep the full adapter identity for runtime device matching without broadening the selection contract.
 - Board extraction reads baseboard registry strings into `BoardVendorInfo`, including manufacturer and product.
 - Vendor mapping lives in `src/telemetry/gpu/gpu_vendor_selection.*` and `src/telemetry/board/board_vendor_selection.*`; provider factories instantiate modules only after that mapping returns a supported enum value.
 - Each added GPU or board hardware module extends `tests/hardware_vendor_selection_tests.cpp` with a known-machine fixture from hardware that has actually run CaseDash. Record the GPU vendor id and adapter string for GPU support, the board manufacturer and product strings for board support, and the expected vendor enum values.
@@ -50,11 +52,11 @@ Use [docs/diagnostics.md](diagnostics.md) for the maintained diagnostics command
 
 ## Presented FPS
 
-- Presented FPS comes from Windows present-event telemetry and process selection, with the machine-wide CaseDash service used when installed.
-- The dashboard asks the service for the `presented_fps_sample` request and falls back to local ETW collection when the service is absent or unreachable.
+- Presented FPS comes from Windows present-event telemetry and selected-adapter process selection, with the machine-wide CaseDash service used when installed.
+- The dashboard asks the service for the `presented_fps_sample` request with the selected DXGI adapter LUID and falls back to local ETW collection when the service is absent or unreachable.
 - Local ETW collection may require elevation or membership in the local `Performance Log Users` group.
-- Process selection prefers a presenting process with dominant GPU Engine 3D usage over background presenters and keeps the current presenter through brief count ties or near-ties.
-- When a dominant 3D application is visible but matching present events are not, `gpu.fps` reports unavailable for that application instead of showing another process's FPS.
+- Process selection filters formatted GPU Engine 3D usage to the selected adapter LUID using the same adapter-activity source as `gpu.load`, prefers a presenting process with dominant selected-adapter 3D usage over background presenters, and keeps the current presenter through brief count ties or near-ties.
+- When the selected adapter is idle or powered off, `gpu.fps` reports `0 FPS`. When a dominant 3D application is visible on the selected adapter but matching present events are not, `gpu.fps` reports unavailable for that adapter instead of showing another process's FPS.
 - The FPS sample includes the selected presenter's cleaned process name without path or extension when available.
 - If Windows denies process-name or ETW access, the dashboard marks the affected FPS display with the warning-colored `!admin` indicator when a value or permission state can still be shown.
 
@@ -74,24 +76,26 @@ Troubleshooting:
 ## Intel
 
 - Supported hardware family: Intel GPU telemetry.
-- Runtime dependency: Intel display driver with the Level Zero Sysman loader (`ze_loader.dll`) available.
-- Metrics include provider-supplied GPU telemetry such as engine load, temperature, clock, device-local memory, and fan speed when the driver exposes those Sysman components.
-- Integrated GPUs commonly expose no device-local memory or fan component; in those cases CaseDash keeps VRAM on the generic Windows dedicated-memory fallback and renders fan speed unavailable. When Level Zero exposes no native temperature sensor for the selected Intel GPU, CaseDash falls back to the resolved board CPU temperature for `gpu.temp` because integrated CPU and GPU telemetry describe the same package temperature source.
+- Runtime dependency: Intel display driver with the Level Zero Sysman loader (`ze_loader.dll`) available. CaseDash supports loaders that expose direct Sysman driver and device enumeration, and older loaders that expose core Level Zero device enumeration plus Sysman component APIs.
+- Metrics include provider-supplied GPU telemetry such as engine load, temperature, clock, device-local memory, and fan speed when the driver exposes those Sysman components. `gpu.clock` uses the selected GPU's Sysman GPU frequency domain first, then the selected adapter's WDDM node performance frequency when Sysman frequency domains are unavailable, then the selected Level Zero device's core clock rate when the driver exposes no dynamic graphics frequency; it does not fall back to CPU clock.
+- Integrated GPUs commonly expose no device-local memory or fan component; in those cases CaseDash keeps VRAM on the generic Windows dedicated-memory fallback and lets `gpu.fan` use the configured board fan fallback, including the board provider's `!admin` permission state. When Level Zero exposes no native temperature sensor for the selected Intel GPU, CaseDash falls back to the resolved board CPU temperature for `gpu.temp` and forwards the board provider's `!admin` permission state because integrated CPU and GPU telemetry can describe the same package temperature source.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because Level Zero Sysman has no native game-FPS metric.
-- Trace output can include `intel_level_zero:*` provider details and `unsupported_gpu` fallback markers.
+- Trace output can include `intel_level_zero:*` provider details such as Sysman and core enumeration availability, WDDM clock initialization, clock source, component counts, and `unsupported_gpu` fallback markers.
 
 Troubleshooting:
 
 1. Install or update the Intel graphics driver.
 2. Confirm `ze_loader.dll` is present in `C:\Windows\System32`.
+3. Run the matching dump or trace validation flow from [docs/diagnostics.md](diagnostics.md).
+4. Inspect the exported dump and trace outputs for Level Zero Sysman capability markers, component counts, `get_clock source=...`, and provider state on that machine.
 
 ## NVIDIA
 
 - Supported hardware family: NVIDIA GPU telemetry.
 - Runtime dependency: NVIDIA display driver with NVML available.
-- Metrics include provider-supplied GPU telemetry such as load, dedicated memory, temperature, clock, and fan speed.
+- Metrics include NVML provider telemetry such as dedicated memory, temperature, and fan speed. GPU load uses Windows GPU Engine counters filtered to the selected DXGI adapter LUID because `nvmlDeviceGetUtilizationRates` can intermittently return `Unknown Error` on WDDM laptop drivers. GPU clock uses NVAPI; when NVAPI reports `GPU not powered`, the clock value reports `0 MHz` instead of forcing the slower NVML clock path to wake or poll the idle dGPU.
 - Presented FPS is the smoothed rolling presented-FPS rate from Windows DXGI, D3D9, or fallback DxgKrnl ETW present events because NVML has no native game-FPS metric.
-- Trace output can include `nvidia_nvml:*` provider details and `unsupported_gpu` fallback markers.
+- Trace output can include `nvidia_nvml:*` provider details, including NVAPI clock-selection markers, and `unsupported_gpu` fallback markers.
 
 Troubleshooting:
 
@@ -134,3 +138,23 @@ Troubleshooting:
 Troubleshooting:
 
 1. Install Gigabyte SIV.
+2. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
+3. Inspect the dump for `board.*` values and the trace for `gigabyte_siv:*` diagnostics.
+
+## Lenovo
+
+- Supported hardware family: Lenovo board telemetry on systems with the Lenovo Vantage addin directory `ProgramData\Lenovo\Vantage\Addins\LenovoHardwareScanAddin\<version>`.
+- Runtime dependency: `LenovoDiagnosticsDriver.sys` and `LenovoDiagnosticsDriverService.dll` from Lenovo platform software. CaseDash creates and starts the `LenovoDiagnosticsDriver` kernel-driver service on demand when elevated, loads the service wrapper, and reads Intel CPU thermal MSRs through the wrapper's private driver method. Fan RPM uses Lenovo's `ROOT\WMI:LENOVO_GAMEZONE_DATA` methods.
+- Metrics include `CPU Temperature` from Intel `IA32_THERM_STATUS` and `IA32_TEMPERATURE_TARGET` through the Lenovo diagnostics driver. Fan telemetry comes from `GetFanCount`, `GetFan1Speed`, and `GetFan2Speed` on Lenovo's GameZone WMI class and is named `Fan`, `CPU Fan`, or `GPU Fan` depending on the returned fan shape.
+- Lenovo temperature collection does not use Lenovo diagnostics module loading or Vantage's private Hardware Scan RPC route. Storage, motherboard, GPU, and battery temperatures are not queried from Lenovo Hardware Scan.
+- The unelevated dashboard starts `CashDashService` `board_sensors_sample` queries asynchronously so the LocalSystem service can run the same direct diagnostics-driver path without blocking dashboard startup. The provider reuses the last successful service sample while a refresh is running. When the service is absent or unreachable in a non-elevated dashboard, requested Lenovo temperature values and any requested fan values still missing after the direct GameZone WMI probe are marked `!admin`.
+- Elevated runs without the service refresh the diagnostics-driver path in the dashboard process in the background. Benchmark collectors can force synchronous provider samples so `telemetry-init` measures the direct driver initialization cost inside `collector_initialize`.
+- Trace output can include `lenovo_diagnostics_driver:*` provider details, `driver_cpu_temperature_*` markers for direct CPU temperature reads, `direct_snapshot_refresh_started` markers for background direct scans, `gamezone_wmi_*` markers for fan queries, and `unsupported_board` markers.
+
+Troubleshooting:
+
+1. Install or update Lenovo Vantage, Lenovo System Interface Foundation, and Lenovo platform drivers for the machine.
+2. Confirm the Vantage addin directory contains `LenovoDiagnosticsDriver.sys` and `LenovoDiagnosticsDriverService.dll`.
+3. Enable `Start with Windows` once from CaseDash when no-elevation diagnostics-driver access is required; that installs and starts `CashDashService`.
+4. Run the matching trace plus dump validation flow from [docs/diagnostics.md](diagnostics.md).
+5. Inspect the dump for `board.*` values and the trace for `lenovo_diagnostics_driver:*` diagnostics.

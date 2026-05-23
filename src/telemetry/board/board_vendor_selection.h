@@ -6,6 +6,7 @@ enum class BoardVendor {
     Unknown,
     Asus,
     Gigabyte,
+    Lenovo,
     Msi,
 };
 

@@ -39,4 +39,3 @@ Ranges use direct `build\CaseDashBenchmarks.exe` runs unless a note says otherwi
 - Explore reducing DirectWrite/text-shaping work in the live Direct2D scene without reintroducing a second renderer path.
 - Explore throughput chart and gauge geometry reductions that preserve the current pixels and avoid hybrid GDI/Direct2D interop.
 - For `layout-guide-sheet`, focus on local leader-routing repairs and cheaper intersection scoring rather than global side-split or stack-order search.
-- For `update-telemetry`, compare this AMD/Gigabyte provider shape against other vendors before generalizing. The current machine is useful for AMD ADLX plus Gigabyte SIV cost, not for NVIDIA, Intel, ASUS, or MSI provider conclusions.

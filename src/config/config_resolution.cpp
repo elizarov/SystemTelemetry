@@ -31,11 +31,16 @@ void AddUniqueValue(std::vector<std::string>& values, const std::string& value) 
     }
 }
 
-void CollectLayoutBindingsRecursive(
-    const LayoutNodeConfig& node, std::vector<std::string>& boardTemperatures, std::vector<std::string>& boardFans) {
+void CollectLayoutBindingsRecursive(const LayoutNodeConfig& node,
+    std::vector<std::string>& boardTemperatures,
+    std::vector<std::string>& boardFans,
+    bool& presentedFpsRequested) {
     for (const std::string& metricRef : SplitTrimmed(node.parameter, ',')) {
         if (!IsValidMetricId(metricRef)) {
             continue;
+        }
+        if (metricRef == "gpu.fps") {
+            presentedFpsRequested = true;
         }
         if (const auto target = ResolveMetricBoardBindingTarget(metricRef); target.has_value()) {
             if (target->kind == BoardMetricBindingKind::Temperature) {
@@ -47,7 +52,7 @@ void CollectLayoutBindingsRecursive(
     }
 
     for (const auto& child : node.children) {
-        CollectLayoutBindingsRecursive(child, boardTemperatures, boardFans);
+        CollectLayoutBindingsRecursive(child, boardTemperatures, boardFans, presentedFpsRequested);
     }
 }
 
@@ -69,7 +74,8 @@ std::string NormalizeConfiguredDriveLetter(const std::string& drive) {
 LayoutBindingSelection CollectLayoutBindings(const LayoutConfig& layout) {
     LayoutBindingSelection result;
     for (const auto& card : layout.cards) {
-        CollectLayoutBindingsRecursive(card.layout, result.boardTemperatureNames, result.boardFanNames);
+        CollectLayoutBindingsRecursive(
+            card.layout, result.boardTemperatureNames, result.boardFanNames, result.presentedFpsRequested);
     }
     return result;
 }

@@ -63,7 +63,13 @@ std::optional<std::string> FindAutoBoardSensorName(
         if (auto match = findContaining("system"); match.has_value()) {
             return match;
         }
-        return findContaining("sys");
+        if (auto match = findContaining("sys"); match.has_value()) {
+            return match;
+        }
+        if (auto match = findContaining("motherboard"); match.has_value()) {
+            return match;
+        }
+        return findContaining("board");
     }
     return std::nullopt;
 }
@@ -89,9 +95,38 @@ bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
             state.settings_.board.fanSensorNames[name] = *sensorName;
             state.resolvedSelections_.boardFanSensorNames[name] = *sensorName;
             resolved = true;
+        } else if (state.board_.availableFanNames.size() == 1) {
+            // Some laptop providers expose a single shared fan as just "Fan"; bind it to any requested fan fallback.
+            state.settings_.board.fanSensorNames[name] = state.board_.availableFanNames.front();
+            state.resolvedSelections_.boardFanSensorNames[name] = state.board_.availableFanNames.front();
+            resolved = true;
         }
     }
     return resolved;
+}
+
+bool HasRequestedBoardMetrics(const BoardTelemetrySettings& settings) {
+    return !settings.requestedTemperatureNames.empty() || !settings.requestedFanNames.empty();
+}
+
+void ClearBoardProviderState(RealTelemetryCollectorState& state, const char* diagnostics) {
+    state.board_.provider.reset();
+    state.board_.providerName = "None";
+    state.board_.providerDiagnostics = diagnostics;
+    state.board_.providerAvailable = false;
+    state.board_.boardManufacturer.clear();
+    state.board_.boardProduct.clear();
+    state.board_.driverLibrary.clear();
+    state.board_.requestedFanNames.clear();
+    state.board_.requestedTemperatureNames.clear();
+    state.board_.availableFanNames.clear();
+    state.board_.availableTemperatureNames.clear();
+}
+
+void CreateBoardProvider(RealTelemetryCollectorState& state) {
+    BoardVendorTelemetryProviderOptions providerOptions;
+    providerOptions.synchronousSamples = state.synchronousProviderSamples_;
+    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_, providerOptions);
 }
 
 }  // namespace
@@ -99,7 +134,14 @@ bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
 void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
-    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_);
+    if (!HasRequestedBoardMetrics(settings)) {
+        ClearBoardProviderState(state, ResourceStringText(RES_STR("No board metrics requested by layout.")));
+        state.trace_.Write(
+            TracePrefix::Telemetry, RES_STR("board_provider_initialize_skipped reason=no_requested_metrics"));
+        return;
+    }
+
+    CreateBoardProvider(state);
     if (state.board_.provider != nullptr) {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_initialize_begin"));
         if (state.board_.provider->Initialize(settings)) {
@@ -128,8 +170,19 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
 void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
     InitializeRequestedBoardMetrics(state, settings);
 
-    if (state.board_.provider == nullptr) {
+    if (!HasRequestedBoardMetrics(settings)) {
+        ClearBoardProviderState(state, ResourceStringText(RES_STR("No board metrics requested by layout.")));
+        state.trace_.Write(
+            TracePrefix::Telemetry, RES_STR("board_provider_reconfigure_skipped reason=no_requested_metrics"));
         return;
+    }
+
+    if (state.board_.provider == nullptr) {
+        CreateBoardProvider(state);
+        if (state.board_.provider == nullptr) {
+            state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_create result=null"));
+            return;
+        }
     }
 
     state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_reconfigure_begin"));

@@ -17,7 +17,8 @@ namespace {
 
 class RealTelemetryCollector : public TelemetryCollector {
 public:
-    explicit RealTelemetryCollector(Trace& trace) : state_(std::make_unique<RealTelemetryCollectorState>(trace)) {}
+    RealTelemetryCollector(Trace& trace, bool synchronousProviderSamples)
+        : state_(std::make_unique<RealTelemetryCollectorState>(trace, synchronousProviderSamples)) {}
 
     bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
@@ -98,20 +99,27 @@ public:
         const bool boardChanged = state_->settings_.board != settings.board;
         const TelemetrySelectionSettings previousSelection = state_->settings_.selection;
         const bool selectionChanged = previousSelection != settings.selection;
+        const bool presentedFpsChanged = state_->settings_.collectPresentedFps != settings.collectPresentedFps;
         state_->settings_ = settings;
         state_->resolvedSelections_.boardTemperatureSensorNames.clear();
         state_->resolvedSelections_.boardFanSensorNames.clear();
 
+        bool gpuReconfigured = false;
         if (selectionChanged) {
             if (previousSelection.preferredAdapterName != settings.selection.preferredAdapterName) {
                 SetPreferredNetworkAdapterName(settings.selection.preferredAdapterName);
             }
             if (previousSelection.preferredGpuAdapterName != settings.selection.preferredGpuAdapterName) {
                 SetPreferredGpuAdapterName(settings.selection.preferredGpuAdapterName);
+                gpuReconfigured = true;
             }
             if (previousSelection.configuredDrives != settings.selection.configuredDrives) {
                 SetSelectedStorageDrives(settings.selection.configuredDrives);
             }
+        }
+
+        if (presentedFpsChanged && !gpuReconfigured) {
+            ReconfigureGpuCollector(*state_);
         }
 
         if (boardChanged) {
@@ -163,6 +171,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
-    return std::make_unique<RealTelemetryCollector>(trace);
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace, bool synchronousProviderSamples) {
+    return std::make_unique<RealTelemetryCollector>(trace, synchronousProviderSamples);
 }

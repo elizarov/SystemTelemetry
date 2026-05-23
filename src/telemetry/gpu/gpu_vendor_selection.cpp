@@ -5,6 +5,7 @@
 #include <tuple>
 
 #include "util/strings.h"
+#include "util/text_format.h"
 
 namespace {
 
@@ -89,6 +90,15 @@ GpuVendor SelectGpuVendor(const GpuVendorInfo& info) {
         return GpuVendor::Intel;
     }
     return GpuVendor::Unknown;
+}
+
+std::optional<std::string> GpuAdapterPdhLuidToken(const GpuAdapterInfo& info) {
+    if (!info.hasAdapterLuid) {
+        return std::nullopt;
+    }
+    return FormatText("luid_0x%08x_0x%08x",
+        static_cast<unsigned int>(info.adapterLuidHighPart),
+        static_cast<unsigned int>(info.adapterLuidLowPart));
 }
 
 bool HasUsableGpuPciAddress(const GpuAdapterInfo& info) {

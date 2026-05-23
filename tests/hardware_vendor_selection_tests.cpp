@@ -28,6 +28,7 @@ const KnownTestGpu kKnownTestGpus[] = {
 const KnownTestBoard kKnownTestBoards[] = {
     {BoardVendorInfo{"ASUSTeK COMPUTER INC.", "GU603VI"}, BoardVendor::Asus},
     {BoardVendorInfo{"Gigabyte Technology Co., Ltd.", "X570 I AORUS PRO WIFI"}, BoardVendor::Gigabyte},
+    {BoardVendorInfo{"LENOVO", "LNVNB161216"}, BoardVendor::Lenovo},
     {BoardVendorInfo{"Micro-Star International Co., Ltd.", "MPG Z690 CARBON WIFI (MS-7D30)"}, BoardVendor::Msi},
 };
 

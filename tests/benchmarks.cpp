@@ -1,3 +1,5 @@
+#include <windows.h>
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -40,6 +42,7 @@
     X(LayoutSwitch, "layout-switch")                                                                                   \
     X(MouseHover, "mouse-hover")                                                                                       \
     X(SnapshotHandoff, "snapshot-handoff")                                                                             \
+    X(TelemetryInit, "telemetry-init")                                                                                 \
     X(ThemeChange, "theme-change")                                                                                     \
     X(UpdateTelemetry, "update-telemetry")
 
@@ -86,6 +89,7 @@ struct BenchmarkCommandLine {
     Benchmark benchmark;
     size_t iterations = 240;
     double renderScale = 2.0;
+    std::optional<FilePath> configPath;
 };
 
 FilePath SourceConfigPath() {
@@ -200,6 +204,9 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     }
 
     BenchmarkCommandLine commandLine{*parsedBenchmark};
+    if (commandLine.benchmark == Benchmark::TelemetryInit) {
+        commandLine.iterations = 2;
+    }
     int nextArgument = 2;
     if (argc > nextArgument) {
         size_t parsedIterations = commandLine.iterations;
@@ -213,6 +220,15 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
         if (TryParsePositiveDouble(argv[nextArgument], parsedRenderScale)) {
             commandLine.renderScale = parsedRenderScale;
         }
+        ++nextArgument;
+    }
+    if (argc > nextArgument) {
+        commandLine.configPath = FilePath(argv[nextArgument]);
+        ++nextArgument;
+    }
+    if (argc > nextArgument) {
+        std::cerr << "too many benchmark arguments\n";
+        return std::nullopt;
     }
     return commandLine;
 }
@@ -221,6 +237,7 @@ std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppC
     TelemetryCollectorOptions options;
     // The update-telemetry benchmark intentionally uses the package-private synchronous collector. It measures provider
     // collection CPU directly; the production TelemetryRuntime thread would hide that cost behind scheduling waits.
+    options.synchronousProviderSamples = true;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
@@ -666,6 +683,20 @@ struct SnapshotHandoffBenchTotals {
     PhaseStats frameBuild;
     PhaseStats framePublish;
     std::string errorText;
+    bool succeeded = true;
+};
+
+struct TelemetryInitBenchTotals {
+    BenchResult initLoop;
+    PhaseStats collectorCreate;
+    PhaseStats collectorInitialize;
+    PhaseStats collectorDestroy;
+    ResolvedTelemetrySelections lastResolvedSelections;
+    std::string errorText;
+    uint64_t lastRevision = 0;
+    size_t lastGpuAdapterCandidates = 0;
+    size_t lastNetworkAdapterCandidates = 0;
+    size_t lastStorageDriveCandidates = 0;
     bool succeeded = true;
 };
 
@@ -1124,6 +1155,60 @@ void PrintTelemetryBenchResult(const BenchResult& result) {
               << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
 }
 
+void PrintPhaseResult(const char* name, const PhaseStats& stats);
+
+TelemetryInitBenchTotals RunTelemetryInitBenchmark(const TelemetrySettings& settings, size_t iterations, Trace& trace) {
+    TelemetryInitBenchTotals totals{};
+    if (iterations == 0) {
+        return totals;
+    }
+
+    TelemetryCollectorOptions options;
+    options.synchronousProviderSamples = true;
+    const auto start = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        const auto createStart = Clock::now();
+        std::unique_ptr<TelemetryCollector> telemetry =
+            CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
+        RecordPhase(totals.collectorCreate, Clock::now() - createStart);
+        if (telemetry == nullptr) {
+            totals.succeeded = false;
+            totals.errorText = "telemetry collector creation failed";
+            break;
+        }
+
+        std::string errorText;
+        const auto initializeStart = Clock::now();
+        const bool initialized = telemetry->Initialize(settings, &errorText);
+        RecordPhase(totals.collectorInitialize, Clock::now() - initializeStart);
+        if (!initialized) {
+            totals.succeeded = false;
+            totals.errorText = errorText.empty() ? "telemetry initialize failed" : errorText;
+            break;
+        }
+
+        totals.lastRevision = telemetry->Snapshot().revision;
+        totals.lastResolvedSelections = telemetry->ResolvedSelections();
+        totals.lastGpuAdapterCandidates = telemetry->GpuAdapterCandidates().size();
+        totals.lastNetworkAdapterCandidates = telemetry->NetworkAdapterCandidates().size();
+        totals.lastStorageDriveCandidates = telemetry->StorageDriveCandidates().size();
+
+        const auto destroyStart = Clock::now();
+        telemetry.reset();
+        RecordPhase(totals.collectorDestroy, Clock::now() - destroyStart);
+    }
+    totals.initLoop.total = Clock::now() - start;
+    totals.initLoop.perIteration = totals.initLoop.total / static_cast<double>(iterations);
+    return totals;
+}
+
+void PrintTelemetryInitBenchResult(const TelemetryInitBenchTotals& totals) {
+    PrintBenchLoopResult("iteration_loop", totals.initLoop);
+    PrintPhaseResult("collector_create", totals.collectorCreate);
+    PrintPhaseResult("collector_initialize", totals.collectorInitialize);
+    PrintPhaseResult("collector_destroy", totals.collectorDestroy);
+}
+
 LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
     DashboardRenderer& renderer, const SystemSnapshot& snapshot, size_t iterations) {
     LayoutGuideSheetBenchTotals totals{};
@@ -1460,8 +1545,11 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
     return 0;
 }
 
-int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
-    const AppConfig config = LoadConfig(SourceConfigPath(), false, BenchmarkConfigParseContext());
+int RunUpdateTelemetryBenchmarkCommand(
+    size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
+    const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
+    const bool includeOverlay = configPath.has_value();
+    const AppConfig config = LoadConfig(resolvedConfigPath, includeOverlay, BenchmarkConfigParseContext());
     std::unique_ptr<TelemetryCollector> telemetry = CreateBenchmarkTelemetryCollector(config, trace);
     if (telemetry == nullptr) {
         std::cerr << "telemetry init failed\n";
@@ -1476,8 +1564,9 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
         return 1;
     }
 
-    std::cout << "update_telemetry_benchmark mode=sync_collector iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout << "update_telemetry_benchmark mode=sync_collector sync_provider_samples=yes iterations=" << iterations
+              << " render_scale=" << renderScale << " config=\"" << resolvedConfigPath.string()
+              << "\" include_overlay=" << (includeOverlay ? "yes" : "no") << "\n";
     const BenchResult result = RunTelemetryUpdateBenchmark(host, *telemetry, iterations);
     PrintTelemetryBenchResult(result);
 
@@ -1485,6 +1574,33 @@ int RunUpdateTelemetryBenchmarkCommand(size_t iterations, double renderScale, Tr
     PrintPhaseResult(PhaseName(BenchPhase::TelemetryUpdate), phases[PhaseIndex(BenchPhase::TelemetryUpdate)]);
     PrintPhaseResult(PhaseName(BenchPhase::PaintTotal), phases[PhaseIndex(BenchPhase::PaintTotal)]);
     PrintPhaseResult(PhaseName(BenchPhase::PaintDraw), phases[PhaseIndex(BenchPhase::PaintDraw)]);
+    return 0;
+}
+
+int RunTelemetryInitBenchmarkCommand(
+    size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
+    const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
+    const bool includeOverlay = configPath.has_value();
+    const AppConfig config = LoadConfig(resolvedConfigPath, includeOverlay, BenchmarkConfigParseContext());
+    const TelemetrySettings settings = ExtractTelemetrySettings(config);
+
+    std::cout << "telemetry_init_benchmark mode=sync_collector sync_provider_samples=yes iterations=" << iterations
+              << " render_scale_ignored=" << renderScale << " config=\"" << resolvedConfigPath.string()
+              << "\" include_overlay=" << (includeOverlay ? "yes" : "no") << "\n";
+    const TelemetryInitBenchTotals totals = RunTelemetryInitBenchmark(settings, iterations, trace);
+    if (!totals.succeeded) {
+        std::cerr << totals.errorText << "\n";
+        return 1;
+    }
+
+    PrintTelemetryInitBenchResult(totals);
+    std::cout << std::left << std::setw(14) << "init_result" << " revision=" << totals.lastRevision << " gpu_adapter=\""
+              << totals.lastResolvedSelections.gpuAdapterName << "\" network_adapter=\""
+              << totals.lastResolvedSelections.adapterName
+              << "\" drives=" << totals.lastResolvedSelections.drives.size()
+              << " gpu_candidates=" << totals.lastGpuAdapterCandidates
+              << " network_candidates=" << totals.lastNetworkAdapterCandidates
+              << " storage_candidates=" << totals.lastStorageDriveCandidates << "\n";
     return 0;
 }
 
@@ -1502,10 +1618,14 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunMouseHoverBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::SnapshotHandoff:
             return RunSnapshotHandoffBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::TelemetryInit:
+            return RunTelemetryInitBenchmarkCommand(
+                commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
         case Benchmark::ThemeChange:
             return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
-            return RunUpdateTelemetryBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+            return RunUpdateTelemetryBenchmarkCommand(
+                commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
     }
     std::cerr << "unknown benchmark \"" << EnumToString(commandLine.benchmark) << "\"\n";
     return 1;

@@ -7,6 +7,12 @@ See also: [docs/build.md](build.md) for build and tooling entrypoints, [docs/opt
 
 This file keeps the shared optimization journal useful across test machines. It records benchmark commands, cross-machine rules, retained optimization decisions, rejected hypotheses that should not be repeated blindly, and practical guidance for new experiments.
 
+## Telemetry Benchmark Invariant
+
+- `update-telemetry` intentionally stresses the real synchronous provider path back-to-back. Do not add benchmark-only cadence gates, retry delays, cached provider samples, or config variants that skip requested telemetry measurements and then treat the result as an optimization.
+- A retained telemetry optimization must reduce CPU work paid by the real app for each 250 ms metrics collection, or it must deliberately change production behavior with the owning spec updated in the same change.
+- Overlay configs that remove metrics are useful for isolating bottlenecks, but their results are diagnostic variants only. Keep the default benchmark range on the real requested metric set.
+
 ## Performance Documentation Rules
 
 - Machine performance files live under `docs/performance/<machine>.md`.
@@ -20,12 +26,13 @@ This file keeps the shared optimization journal useful across test machines. It 
 ## Machine Files
 
 - [Gigabyte X570 I + AMD RX 6800](performance/gigabyte-x570i-amd-rx6800.md) tracks the Gigabyte board plus AMD Radeon desktop baseline.
+- [Lenovo LNVNB161216 + Intel UHD + NVIDIA GTX 1650 Ti](performance/lenovo-lnvnb161216-intel-uhd-gtx1650ti.md) tracks the Lenovo laptop baseline with Intel and NVIDIA GPU providers.
 
 ## Benchmark Workflow
 
 - Start the elevated daemon once with `profile_benchmark.cmd /daemon-start` when repeated unattended profiling runs are needed.
 - Build the benchmark executable with `build.cmd /benchmarks` for direct benchmark runs; normal `build.cmd` and release or validation builds do not build `CaseDashBenchmarks.exe`.
-- `CaseDashBenchmarks` accepts the supported benchmark names `animation`, `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `snapshot-handoff`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
+- `CaseDashBenchmarks` accepts the supported benchmark names `animation`, `edit-layout`, `layout-guide-sheet`, `layout-switch`, `mouse-hover`, `snapshot-handoff`, `telemetry-init`, `theme-change`, and `update-telemetry` as the first argument; starting it without arguments prints that list and exits without running a benchmark. `profile_benchmark.cmd` uses the same required benchmark-name argument for profiling runs.
 - Direct benchmark runs create a disabled trace object without an output stream, so trace formatting and writes do not affect benchmark timing.
 - Treat direct `build\CaseDashBenchmarks.exe <benchmark> <iterations> 2` runs as the repeatable comparison loop and xperf profiles as hotspot validation.
 - Treat timing lines printed in the elevated daemon console during `profile_benchmark.cmd` as profiler-instrumented wall-clock numbers, not as the repeatable baseline.
@@ -43,12 +50,13 @@ This file keeps the shared optimization journal useful across test machines. It 
 - Measure layout switching with `build\CaseDashBenchmarks.exe layout-switch 240 2`; the benchmark cycles configured layouts, applies the selected layout, refreshes the edit-dialog tree model, and repaints.
 - Measure mouse hover with `build\CaseDashBenchmarks.exe mouse-hover 240 2`; the benchmark moves the layout-edit cursor path from the dashboard top-left to bottom-right, resolving hover hits and drawing overlay state on every step.
 - Measure theme changes with `build\CaseDashBenchmarks.exe theme-change 240 2`; the benchmark rotates through all configured themes and measures config copy, color resolution, dashboard reconfiguration, edit-tree rebuild, theme-preview drawing, and dashboard repaint.
-- Measure telemetry refresh with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; the benchmark deliberately uses the package-private synchronous collector to measure one real provider collection plus one repaint instead of the production telemetry runtime thread scheduler. For machine-specific provider stress against the executable-side overlay, pass a config path after the render scale, such as `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini`.
+- Measure telemetry initialization with `build\CaseDashBenchmarks.exe telemetry-init 2 2`; the benchmark creates a fresh real synchronous collector on every iteration, forces provider samples to run synchronously during initialization, prints create, initialize, and destroy phase splits, reports the full repeated setup plus teardown as `iteration_loop`, defaults to `2` iterations, and ignores the render-scale placeholder kept for the shared command shape.
+- Measure telemetry refresh with `build\CaseDashBenchmarks.exe update-telemetry 240 2`; the benchmark deliberately uses the package-private synchronous collector with synchronous provider samples to measure one real provider collection plus one repaint instead of the production telemetry runtime thread scheduler. For machine-specific provider stress against the executable-side overlay, pass a config path after the render scale, such as `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini`.
 - When the elevated daemon runs a telemetry benchmark with an overlay config, pass an absolute config path; relative paths resolve from the daemon process working directory.
 
 ## Profile Commands
 
-- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd animation 2400 2`, `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd snapshot-handoff 240 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
+- Capture a benchmark-focused CPU profile with `profile_benchmark.cmd animation 2400 2`, `profile_benchmark.cmd edit-layout 240 2`, `profile_benchmark.cmd layout-switch 240 2`, `profile_benchmark.cmd mouse-hover 240 2`, `profile_benchmark.cmd snapshot-handoff 240 2`, `profile_benchmark.cmd telemetry-init 2 2`, `profile_benchmark.cmd theme-change 240 2`, or `profile_benchmark.cmd update-telemetry 240 2` when a change materially moves that benchmark or when hotspot confirmation is needed.
 - Capture a layout-guide-sheet CPU profile with `profile_benchmark.cmd layout-guide-sheet 20 2`.
 - Real `/trace-prefixes:profile` runs emit only `profile:timing` summaries every 10 seconds for comparable runtime operation names such as `telemetry_update`, `paint_draw`, `presentation_frame_build`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `presentation_frame_publish`, and `animation_frame`.
 - `animation_frame` covers animation sampling and composition work and excludes the live DXGI vsync wait. Use those summaries to check whether direct benchmark timings match the interactive app on the same machine without paying verbose provider-trace overhead.
@@ -59,7 +67,9 @@ This file keeps the shared optimization journal useful across test machines. It 
 - `snapshot-handoff` is expected to be frame-build bound. `presentation_frame_publish` should stay near zero unless the mailbox or render-thread handoff changes.
 - Layout-edit drag, layout-switch, theme-change, and mouse-hover runs are mostly paint-bound once snap, apply, tree refresh, and hover hit testing stay in their documented low ranges. Remaining samples normally sit in Direct2D, DirectWrite, text shaping, WIC or layer drawing, and the display driver.
 - `layout-guide-sheet` is placement-score bound. Offscreen drawing is visible, but the dominant target is still leader routing and intersection scoring inside `sheet_place`.
-- `update-telemetry` measures real synchronous provider work and can be provider-bound on machines with expensive board or GPU vendor APIs. Do not hide that cost with benchmark-only cadence caches.
+- `telemetry-init` measures repeated fresh real collector setup and teardown. The benchmark forces provider samples to run synchronously so startup latency stays in the `collector_initialize` split; use `collector_destroy` only to spot provider cleanup churn in the repeated loop.
+- On the Lenovo laptop profile machine, direct `telemetry-init` overlays now measure the production Lenovo diagnostics-driver path when board CPU temperature is requested. Use direct overlay comparisons for absolute timing and profiling-daemon output for attribution, because xperf can make even no-board telemetry initialization look multi-second by magnifying CPU PDH, kernel, and filter-driver work.
+- `update-telemetry` measures real synchronous provider work with synchronous provider samples and can be provider-bound on machines with expensive board or GPU vendor APIs. Do not hide that cost with benchmark-only cadence caches.
 - The flat text hotspot export often under-symbolizes app leaves once the dominant work is inside Direct2D, DirectWrite, PDH, provider runtimes, or display drivers. Prefer call-tree HTML or a richer WPA view when the flat summary is too coarse.
 
 ## Kept Optimizations
@@ -224,6 +234,22 @@ These shared decisions produced useful wins or preserve important benchmark sema
 - Result: Kept.
 - Evidence: Moving preview construction into `layout_edit_dialog/theme_preview.*` and replacing `SetPixel` with a DIB transfer improved maintainability and established the full `theme-change` benchmark.
 - Conclusion: Keep theme preview rendering behind the shared module and compare future theme-selector work against the whole-flow benchmark.
+
+### Hypothesis: NVIDIA laptop telemetry should not poll NVML utilization or clock at 250 ms
+
+- Change:
+  - Stop using `nvmlDeviceGetUtilizationRates` for NVIDIA load and let the existing Windows GPU Engine counter path provide per-update load.
+  - Stop using `nvmlDeviceGetClockInfo` for NVIDIA current clock and use NVAPI current-clock reads instead, treating `NVAPI_GPU_NOT_POWERED` as an unavailable clock for that sample.
+  - Add an optional config path argument to `update-telemetry` so local provider stress can run against `build\config.ini`.
+- Result:
+  - Fixed the real NVIDIA laptop telemetry stalls without caching whole GPU samples.
+- Observed effect:
+  - The failing real trace showed `nvmlDeviceGetUtilizationRates` returning `Unknown Error` and later showed `nvmlDeviceGetClockInfo` independently blocking for about `390 ms` at the production 250 ms cadence while the dGPU was idle.
+  - `nvidia-smi --query-gpu=timestamp,pstate,utilization.gpu,temperature.gpu,clocks.gr,memory.used,memory.total --format=csv -lms 250` reproduced the driver behavior outside CaseDash: idle samples intermittently reported `[Unknown Error]` for P-state and utilization while temperature, clock, and memory remained printable.
+  - `build\CaseDashBenchmarks.exe update-telemetry 2000 2 build\config.ini` landed at `update_loop per_iter_ms=7.36`, `telemetry_update avg_ms=2.96`, and `paint_draw avg_ms=4.40`.
+  - A verbose real-config trace recorded `43` NVIDIA sample starts and `43` successful sample completions, with zero NVML utilization calls, zero NVML clock calls, zero cached samples, `43` NVAPI clock attempts, `43` successful temperature reads, `43` successful memory reads, and `42` GPU Engine load samples. Runtime `telemetry_update` averaged `5.90 ms` over the main 10-second window.
+- Conclusion:
+  - On WDDM laptop dGPUs, the idle power state can make NVML utilization and current-clock polling unreliable at the app cadence. Keep NVIDIA load on PDH and current clock on NVAPI so a powered-off dGPU reports clock unavailable quickly instead of blocking the telemetry worker.
 
 ## Practical Guidance For Future Experiments
 

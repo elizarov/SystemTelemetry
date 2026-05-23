@@ -84,7 +84,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 ### Runtime And Providers
 
 - Telemetry runtime, FPS ETW processing, render-thread handoff, trace locking, and app telemetry handoff use direct Win32 thread/event handles plus `LightweightMutex` instead of STL threading wrappers.
-- Provider boundaries keep broad STL or managed metadata out of the app where practical: Gigabyte SIV logic stays native with narrow `/clr` bridge signatures, Intel Level Zero and NVML dynamic entry-point loads stay concrete at call sites, and process/provider names convert at the OS boundary.
+- Provider boundaries keep broad STL or managed metadata out of the app where practical: Gigabyte SIV logic stays native with narrow `/clr` bridge signatures, Intel Level Zero, Lenovo diagnostics-driver, and NVML dynamic entry-point loads stay concrete at call sites, and process/provider names convert at the OS boundary.
 - Network selection streams visible candidates directly into retained telemetry state, with the selected candidate tracked in place.
 - Synthetic telemetry history generation keeps spec records static and moves generated history vectors into retained-history entries.
 

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cmath>
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
@@ -12,6 +13,7 @@
 #include <optional>
 #include <pdhmsg.h>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -43,6 +45,7 @@ constexpr double kGpu3dDominanceRatio = 3.0;
 constexpr size_t kMaximumEventsPerProcess = 4096;
 constexpr char kGpuEngine3dMarker[] = "engtype_3D";
 constexpr char kGpuEnginePidMarker[] = "pid_";
+constexpr char kAllGpuAdaptersFilterLabel[] = "all";
 
 struct EtwSessionProperties {
     EVENT_TRACE_PROPERTIES properties{};
@@ -122,6 +125,30 @@ std::string QueryProcessBaseName(DWORD processId, bool& permissionRequired) {
 
 bool IsExcludedProcessName(const std::string& processName) {
     return processName.empty() || processName == "casedash" || processName == "dwm";
+}
+
+char LowerAscii(char ch) {
+    return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : ch;
+}
+
+bool ContainsAsciiInsensitive(const char* value, std::string_view needle) {
+    if (needle.empty()) {
+        return true;
+    }
+    if (value == nullptr) {
+        return false;
+    }
+    for (const char* cursor = value; *cursor != '\0'; ++cursor) {
+        size_t matched = 0;
+        while (matched < needle.size() && cursor[matched] != '\0' &&
+               LowerAscii(cursor[matched]) == LowerAscii(needle[matched])) {
+            ++matched;
+        }
+        if (matched == needle.size()) {
+            return true;
+        }
+    }
+    return false;
 }
 
 DWORD ExtractProcessIdFromGpuEngineInstance(const char* instance) {
@@ -254,7 +281,7 @@ public:
         return true;
     }
 
-    FpsTelemetrySample Sample() override {
+    FpsTelemetrySample Sample(const FpsTelemetrySampleOptions& options) override {
         LARGE_INTEGER now{};
         QueryPerformanceCounter(&now);
 
@@ -271,11 +298,14 @@ public:
         const uint64_t windowTicks = static_cast<uint64_t>(static_cast<double>(qpcFrequency_) * kFpsWindowSeconds);
         const uint64_t minimumQpc = nowQpc > windowTicks ? nowQpc - windowTicks : 0;
 
-        UpdateGpu3dUsageLocked();
-        const ProcessEventSelection runtimeSelection = SelectBestProcessLocked(runtimeEventsByProcess_, minimumQpc);
-        const ProcessEventSelection kernelSelection = SelectBestProcessLocked(kernelEventsByProcess_, minimumQpc);
+        UpdateGpu3dUsageLocked(options);
+        const bool requireSelectedGpuActivity = !options.gpuAdapterLuidToken.empty();
+        const ProcessEventSelection runtimeSelection =
+            SelectBestProcessLocked(runtimeEventsByProcess_, minimumQpc, requireSelectedGpuActivity);
+        const ProcessEventSelection kernelSelection =
+            SelectBestProcessLocked(kernelEventsByProcess_, minimumQpc, requireSelectedGpuActivity);
         ProcessEventSelection bestSelection = SelectBestSourceLocked(runtimeSelection, kernelSelection);
-        bestSelection = ApplyProcessHysteresisLocked(bestSelection, minimumQpc);
+        bestSelection = ApplyProcessHysteresisLocked(bestSelection, minimumQpc, requireSelectedGpuActivity);
 
         FpsTelemetrySample blockedByGpuSelection;
         if (BuildUnavailableDominantGpuSampleLocked(bestSelection, blockedByGpuSelection)) {
@@ -285,6 +315,13 @@ public:
 
         if (bestSelection.processId == 0 || bestSelection.count < 2) {
             ResetSelectionLocked();
+            if (requireSelectedGpuActivity && topGpu3dUsage_ < kGpu3dActiveThresholdPercent) {
+                sample.available = true;
+                sample.fps = 0.0;
+                sample.diagnostics = BuildDiagnosticsLocked(
+                    FormatText(RES_STR(" selected adapter idle/off; fps=value=0.0%s"), GpuUsageDiagnostics().c_str()));
+                return sample;
+            }
             sample.available = false;
             sample.diagnostics = BuildDiagnosticsLocked(
                 FormatText(RES_STR(" No presenting application selected.%s"), GpuUsageDiagnostics().c_str()));
@@ -292,6 +329,23 @@ public:
         }
 
         const double rawFps = static_cast<double>(bestSelection.count) / kFpsWindowSeconds;
+        if (requireSelectedGpuActivity &&
+            Gpu3dUsageForProcess(bestSelection.processId) < kGpu3dActiveThresholdPercent) {
+            ResetSelectionLocked();
+            sample.available = false;
+            sample.processId = bestSelection.processId;
+            sample.processName = ResolveProcessNameLocked(bestSelection.processId);
+            sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
+            sample.diagnostics = BuildDiagnosticsLocked(
+                FormatText(RES_STR(" selected adapter has no active GPU Engine 3D presenter. process=%s source=%s "
+                                   "window_count=%zu raw_fps=value=%.1f%s"),
+                    sample.processName.c_str(),
+                    PresentEventSourceName(bestSelection.source),
+                    bestSelection.count,
+                    rawFps,
+                    GpuUsageDiagnosticsForProcess(bestSelection.processId).c_str()));
+            return sample;
+        }
         const double fps = SmoothFpsLocked(rawFps, bestSelection);
         sample.processId = bestSelection.processId;
         sample.processName = ResolveProcessNameLocked(bestSelection.processId);
@@ -388,7 +442,8 @@ private:
         CompactPresentEvents(bucket);
     }
 
-    ProcessEventSelection SelectBestProcessLocked(ProcessPresentEventBuckets& eventsByProcess, uint64_t minimumQpc) {
+    ProcessEventSelection SelectBestProcessLocked(
+        ProcessPresentEventBuckets& eventsByProcess, uint64_t minimumQpc, bool requireGpu3dActivity) {
         ProcessEventSelection selection;
         selection.source =
             &eventsByProcess == &runtimeEventsByProcess_ ? PresentEventSource::Runtime : PresentEventSource::Kernel;
@@ -403,7 +458,9 @@ private:
             }
 
             const std::string& processName = ResolveProcessNameLocked(it->processId);
-            if (!IsExcludedProcessName(processName) && IsBetterSelectionLocked(it->processId, eventCount, selection)) {
+            if (!IsExcludedProcessName(processName) &&
+                (!requireGpu3dActivity || Gpu3dUsageForProcess(it->processId) >= kGpu3dActiveThresholdPercent) &&
+                IsBetterSelectionLocked(it->processId, eventCount, selection)) {
                 selection.processId = it->processId;
                 selection.count = eventCount;
             }
@@ -480,8 +537,12 @@ private:
         return true;
     }
 
-    ProcessEventSelection ApplyProcessHysteresisLocked(const ProcessEventSelection& candidate, uint64_t minimumQpc) {
+    ProcessEventSelection ApplyProcessHysteresisLocked(
+        const ProcessEventSelection& candidate, uint64_t minimumQpc, bool requireGpu3dActivity) {
         if (selectedProcessId_ == 0 || candidate.processId == selectedProcessId_) {
+            return candidate;
+        }
+        if (requireGpu3dActivity && Gpu3dUsageForProcess(selectedProcessId_) < kGpu3dActiveThresholdPercent) {
             return candidate;
         }
 
@@ -627,7 +688,7 @@ private:
         }
     }
 
-    void UpdateGpu3dUsageLocked() {
+    void UpdateGpu3dUsageLocked(const FpsTelemetrySampleOptions& options) {
         InitializeGpu3dUsageLocked();
         gpu3dUsageByProcess_.clear();
         topGpu3dProcessId_ = 0;
@@ -655,6 +716,8 @@ private:
             return;
         }
 
+        const std::string_view instanceFilter(options.gpuAdapterLuidToken);
+        DWORD matchedInstances = 0;
         currentGpuRawByInstance_.Clear();
         currentGpuRawByInstance_.Reserve(itemCount);
         for (DWORD i = 0; i < itemCount; ++i) {
@@ -663,6 +726,11 @@ private:
                 continue;
             }
             currentGpuRawByInstance_.Set(instance, items[i].RawValue);
+
+            if (!ContainsAsciiInsensitive(instance, instanceFilter)) {
+                continue;
+            }
+            ++matchedInstances;
 
             const DWORD processId = ExtractProcessIdFromGpuEngineInstance(instance);
             if (processId == 0 || IsExcludedProcessName(ResolveProcessNameLocked(processId))) {
@@ -684,7 +752,7 @@ private:
             }
 
             const double value = formatted.doubleValue;
-            if (value <= 0.0) {
+            if (!std::isfinite(value) || value <= 0.0) {
                 continue;
             }
             double& total = Gpu3dUsageSlot(processId);
@@ -697,9 +765,11 @@ private:
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
         AssignFormat(gpuUsageDiagnostics_,
-            RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld top_gpu3d_process="),
+            RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld gpu3d_filter=\"%s\" gpu3d_matched=%lu top_gpu3d_process="),
             static_cast<long>(collectStatus),
-            static_cast<long>(status));
+            static_cast<long>(status),
+            options.gpuAdapterLuidToken.empty() ? kAllGpuAdaptersFilterLabel : options.gpuAdapterLuidToken.c_str(),
+            static_cast<unsigned long>(matchedInstances));
         AppendFormat(gpuUsageDiagnostics_, RES_STR("%s"), ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
         AppendFormat(gpuUsageDiagnostics_,
             RES_STR(" top_gpu3d_pid=%lu top_gpu3d=value=%.1f"),
@@ -872,11 +942,9 @@ private:
     ProcessPresentEventBuckets kernelEventsByProcess_;
     std::vector<ProcessNameCacheEntry> processNames_;
     std::vector<ProcessGpuUsage> gpu3dUsageByProcess_;
-    // Size/perf: GPU Engine exposes hundreds of per-engine instances on process-heavy machines; use a narrow
-    // open-addressed table instead of general STL hash maps.
+    std::vector<unsigned char> gpuCounterArrayBuffer_;
     GpuRawCounterMap previousGpuRawByInstance_;
     GpuRawCounterMap currentGpuRawByInstance_;
-    std::vector<unsigned char> gpuCounterArrayBuffer_;
     std::optional<double> smoothedFps_;
     PDH_HQUERY gpuQuery_ = nullptr;
     PDH_HCOUNTER gpu3dCounter_ = nullptr;

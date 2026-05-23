@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -24,6 +25,9 @@ struct GpuAdapterInfo : GpuVendorInfo {
     unsigned int deviceId = 0;
     unsigned int subSysId = 0;
     unsigned int revision = 0;
+    bool hasAdapterLuid = false;
+    std::uint32_t adapterLuidHighPart = 0;
+    std::uint32_t adapterLuidLowPart = 0;
     bool hasPciAddress = false;
     unsigned int pciDomain = 0;
     unsigned int pciBus = 0;
@@ -41,6 +45,7 @@ struct GpuAdapterCandidate {
 
 const char* GpuVendorName(GpuVendor vendor);
 GpuVendor SelectGpuVendor(const GpuVendorInfo& info);
+std::optional<std::string> GpuAdapterPdhLuidToken(const GpuAdapterInfo& info);
 bool HasUsableGpuPciAddress(const GpuAdapterInfo& info);
 bool GpuAdapterViewsReferToSameHardware(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs);
 std::string GpuAdapterSelectionName(const GpuAdapterInfo& info);

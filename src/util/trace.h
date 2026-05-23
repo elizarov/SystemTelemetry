@@ -25,6 +25,7 @@ enum class TracePrefix : unsigned char {
     GigabyteSiv,
     GpuVendor,
     IntelLevelZero,
+    LenovoDiagnosticsDriver,
     LayoutEditDialog,
     LayoutEditDrag,
     LayoutEditHover,
