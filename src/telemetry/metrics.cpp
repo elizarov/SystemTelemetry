@@ -418,6 +418,22 @@ MetricValue ResolveOptionalScalarMetric(const SystemSnapshot& snapshot,
         snapshot, definition, metricRef, FormatMetricValueText(definition, metricRef, metricValue), ratio);
 }
 
+MetricValue ResolveScalarMetric(const SystemSnapshot& snapshot,
+    const MetricDefinitionConfig& definition,
+    const std::string& metricRef,
+    const ScalarMetric& metric) {
+    if (!metric.value.has_value() && metric.issue == ScalarMetricIssue::PermissionRequired) {
+        return BuildResolvedMetric(snapshot,
+            definition,
+            metricRef,
+            std::string(kPermissionRequiredText),
+            0.0,
+            0.0,
+            MetricValueState::PermissionRequired);
+    }
+    return ResolveOptionalScalarMetric(snapshot, definition, metricRef, metric.value);
+}
+
 MetricValue ResolveMemoryMetric(const SystemSnapshot& snapshot,
     const MetricDefinitionConfig& definition,
     const std::string& metricRef,
@@ -483,11 +499,11 @@ MetricValue ResolveMetricByKind(const SystemSnapshot& snapshot,
         case MetricBindingKind::GpuLoad:
             return ResolvePercentMetric(snapshot, definition, metricRef, snapshot.gpu.loadPercent);
         case MetricBindingKind::GpuTemperature:
-            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.temperature.value);
+            return ResolveScalarMetric(snapshot, definition, metricRef, snapshot.gpu.temperature);
         case MetricBindingKind::GpuClock:
             return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.clock.value);
         case MetricBindingKind::GpuFan:
-            return ResolveOptionalScalarMetric(snapshot, definition, metricRef, snapshot.gpu.fan.value);
+            return ResolveScalarMetric(snapshot, definition, metricRef, snapshot.gpu.fan);
         case MetricBindingKind::GpuFps:
             return ResolveGpuFpsMetric(snapshot, definition, metricRef, logicalName);
         case MetricBindingKind::GpuMemory:

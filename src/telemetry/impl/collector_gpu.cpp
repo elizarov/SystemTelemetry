@@ -132,10 +132,12 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     }
     state.snapshot_.gpu.temperature.value = FiniteOptional(sample.temperatureC);
     state.snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
+    state.snapshot_.gpu.temperature.issue = ScalarMetricIssue::None;
     state.snapshot_.gpu.clock.value = FiniteOptional(sample.coreClockMhz);
     state.snapshot_.gpu.clock.unit = ScalarMetricUnit::Megahertz;
     state.snapshot_.gpu.fan.value = FiniteOptional(sample.fanRpm);
     state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    state.snapshot_.gpu.fan.issue = ScalarMetricIssue::None;
     state.snapshot_.gpu.fps.value = FiniteOptional(sample.fps);
     state.snapshot_.gpu.fps.unit = ScalarMetricUnit::Fps;
     state.snapshot_.gpu.fps.issue =
@@ -152,10 +154,16 @@ void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTel
     }
 }
 
-std::optional<double> FindBoardFanRpm(const SystemSnapshot& snapshot, const std::string& logicalName) {
+std::optional<ScalarMetric> FindBoardFanMetric(const SystemSnapshot& snapshot, const std::string& logicalName) {
     for (const auto& fan : snapshot.boardFans) {
         if (fan.name == logicalName) {
-            return FiniteOptional(fan.metric.value);
+            ScalarMetric metric = fan.metric;
+            metric.value = FiniteOptional(metric.value);
+            metric.unit = ScalarMetricUnit::Rpm;
+            if (metric.value.has_value() || metric.issue != ScalarMetricIssue::None) {
+                return metric;
+            }
+            return std::nullopt;
         }
     }
     return std::nullopt;
@@ -174,17 +182,22 @@ void ApplyBoardGpuFanFallback(RealTelemetryCollectorState& state) {
     if (!target.has_value() || target->kind != BoardMetricBindingKind::Fan) {
         return;
     }
-    if (auto fanRpm = FindBoardFanRpm(state.snapshot_, target->logicalName); fanRpm.has_value()) {
-        state.snapshot_.gpu.fan.value = *fanRpm;
-        state.snapshot_.gpu.fan.unit = ScalarMetricUnit::Rpm;
+    if (auto fanMetric = FindBoardFanMetric(state.snapshot_, target->logicalName); fanMetric.has_value()) {
+        state.snapshot_.gpu.fan = *fanMetric;
         RecordActiveMetricBoardBinding(state, kGpuFanMetricId, *target);
     }
 }
 
-std::optional<double> FindBoardTemperatureC(const SystemSnapshot& snapshot, const std::string& logicalName) {
+std::optional<ScalarMetric> FindBoardTemperatureMetric(const SystemSnapshot& snapshot, const std::string& logicalName) {
     for (const auto& temperature : snapshot.boardTemperatures) {
         if (temperature.name == logicalName) {
-            return FiniteOptional(temperature.metric.value);
+            ScalarMetric metric = temperature.metric;
+            metric.value = FiniteOptional(metric.value);
+            metric.unit = ScalarMetricUnit::Celsius;
+            if (metric.value.has_value() || metric.issue != ScalarMetricIssue::None) {
+                return metric;
+            }
+            return std::nullopt;
         }
     }
     return std::nullopt;
@@ -202,13 +215,18 @@ void ApplyIntelCpuTemperatureFallback(RealTelemetryCollectorState& state) {
     if (!target.has_value() || target->kind != BoardMetricBindingKind::Temperature) {
         return;
     }
-    if (auto cpuTemperatureC = FindBoardTemperatureC(state.snapshot_, target->logicalName);
-        cpuTemperatureC.has_value()) {
-        state.snapshot_.gpu.temperature.value = *cpuTemperatureC;
-        state.snapshot_.gpu.temperature.unit = ScalarMetricUnit::Celsius;
+    if (auto cpuTemperature = FindBoardTemperatureMetric(state.snapshot_, target->logicalName);
+        cpuTemperature.has_value()) {
+        state.snapshot_.gpu.temperature = *cpuTemperature;
         RecordActiveMetricBoardBinding(state, kGpuTemperatureMetricId, *target);
-        state.trace_.WriteFmt(
-            TracePrefix::Telemetry, RES_STR("gpu_temperature_cpu_fallback temperature_c=value=%.1f"), *cpuTemperatureC);
+        if (cpuTemperature->value.has_value()) {
+            state.trace_.WriteFmt(TracePrefix::Telemetry,
+                RES_STR("gpu_temperature_cpu_fallback temperature_c=value=%.1f"),
+                *cpuTemperature->value);
+        } else if (cpuTemperature->issue == ScalarMetricIssue::PermissionRequired) {
+            state.trace_.Write(
+                TracePrefix::Telemetry, RES_STR("gpu_temperature_cpu_fallback issue=permission_required"));
+        }
     }
 }
 

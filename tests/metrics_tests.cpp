@@ -231,6 +231,35 @@ TEST(Metrics, ResolvesNativeFpsFallbackPermissionIssueAsWarningAnnotation) {
     EXPECT_DOUBLE_EQ(fps.ratio, 0.375);
 }
 
+TEST(Metrics, ResolvesGpuFanPermissionIssueAsAdminIndicator) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.gpu.fan = ScalarMetric{std::nullopt, ScalarMetricUnit::Rpm, ScalarMetricIssue::PermissionRequired};
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& fan = source.ResolveMetric("gpu.fan");
+    EXPECT_EQ(fan.label, "Fan");
+    EXPECT_EQ(fan.valueText, "!admin");
+    EXPECT_EQ(fan.state, MetricValueState::PermissionRequired);
+    EXPECT_DOUBLE_EQ(fan.ratio, 0.0);
+}
+
+TEST(Metrics, ResolvesGpuTemperaturePermissionIssueAsAdminIndicator) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.gpu.temperature =
+        ScalarMetric{std::nullopt, ScalarMetricUnit::Celsius, ScalarMetricIssue::PermissionRequired};
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& temperature = source.ResolveMetric("gpu.temp");
+    EXPECT_EQ(temperature.label, "Temp");
+    EXPECT_EQ(temperature.valueText, "!admin");
+    EXPECT_EQ(temperature.state, MetricValueState::PermissionRequired);
+    EXPECT_DOUBLE_EQ(temperature.ratio, 0.0);
+}
+
 TEST(Metrics, ResolvesBoardMetricUsingConfiguredLabelAndUnit) {
     const MetricsSectionConfig metrics = BuildMetricsConfig();
     SystemSnapshot snapshot;
@@ -256,6 +285,21 @@ TEST(Metrics, ResolvesBoardPermissionIssueAsAdminIndicator) {
 
     const MetricValue& metric = source.ResolveMetric("board.temp.cpu");
     EXPECT_EQ(metric.label, "Temp");
+    EXPECT_EQ(metric.valueText, "!admin");
+    EXPECT_EQ(metric.state, MetricValueState::PermissionRequired);
+    EXPECT_DOUBLE_EQ(metric.ratio, 0.0);
+}
+
+TEST(Metrics, ResolvesBoardFanPermissionIssueAsAdminIndicator) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.boardFans.push_back(
+        {"system", ScalarMetric{std::nullopt, ScalarMetricUnit::Rpm, ScalarMetricIssue::PermissionRequired}});
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& metric = source.ResolveMetric("board.fan.system");
+    EXPECT_EQ(metric.label, "System Fan");
     EXPECT_EQ(metric.valueText, "!admin");
     EXPECT_EQ(metric.state, MetricValueState::PermissionRequired);
     EXPECT_DOUBLE_EQ(metric.ratio, 0.0);

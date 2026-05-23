@@ -1335,6 +1335,7 @@ private:
         ResetBoardMetricValues(sample.fans);
         MarkMissingMetricsPermissionRequired(sample.temperatures);
         ApplyFanOnlySample(sample);
+        MarkMissingMetricsPermissionRequired(sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
     }

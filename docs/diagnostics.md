@@ -106,7 +106,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - The current snapshot dump format version is `casedash_snapshot_v12`.
 - Snapshot dump GPU FPS fields include the optional cleaned presenting application name as `gpu.fps.app_name`.
 - Snapshot dump scalar-unit fields use only the canonical snapshot dump tokens: the empty string plus `C`, `GHz`, `MHz`, `FPS`, and `RPM`.
-- Snapshot dump scalar issue fields, including named board temperature and fan metric issue fields, use `none` or `permission_required`.
+- Snapshot dump scalar issue fields, including GPU temperature, GPU fan, and named board temperature and fan metric issue fields, use `none` or `permission_required`.
 - Provider-specific diagnostics and trace-only debug details do not appear in the snapshot dump schema.
 
 ## Single-Instance Interaction

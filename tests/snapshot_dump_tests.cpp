@@ -8,9 +8,10 @@
 TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     TelemetryDump dump;
     dump.snapshot.cpu.clock = ScalarMetric{4.75, ScalarMetricUnit::Gigahertz};
-    dump.snapshot.gpu.temperature = ScalarMetric{68.0, ScalarMetricUnit::Celsius};
+    dump.snapshot.gpu.temperature =
+        ScalarMetric{std::nullopt, ScalarMetricUnit::Celsius, ScalarMetricIssue::PermissionRequired};
     dump.snapshot.gpu.clock = ScalarMetric{2450.0, ScalarMetricUnit::Megahertz};
-    dump.snapshot.gpu.fan = ScalarMetric{1500.0, ScalarMetricUnit::Rpm};
+    dump.snapshot.gpu.fan = ScalarMetric{std::nullopt, ScalarMetricUnit::Rpm, ScalarMetricIssue::PermissionRequired};
     dump.snapshot.gpu.fps = ScalarMetric{std::nullopt, ScalarMetricUnit::Fps, ScalarMetricIssue::PermissionRequired};
     dump.snapshot.gpu.fpsAppName = "dota";
     dump.snapshot.boardTemperatures.push_back(
@@ -21,8 +22,10 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     ASSERT_TRUE(WriteTelemetryDumpText(text, dump));
     EXPECT_NE(text.find("cpu.clock.unit=\"GHz\""), std::string::npos);
     EXPECT_NE(text.find("gpu.temperature.unit=\"C\""), std::string::npos);
+    EXPECT_NE(text.find("gpu.temperature.issue=\"permission_required\""), std::string::npos);
     EXPECT_NE(text.find("gpu.clock.unit=\"MHz\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fan.unit=\"RPM\""), std::string::npos);
+    EXPECT_NE(text.find("gpu.fan.issue=\"permission_required\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.unit=\"FPS\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.issue=\"permission_required\""), std::string::npos);
     EXPECT_NE(text.find("gpu.fps.app_name=\"dota\""), std::string::npos);
@@ -34,8 +37,10 @@ TEST(SnapshotDump, RoundTripsScalarMetricUnitsThroughDumpText) {
     ASSERT_TRUE(LoadTelemetryDump(text, loaded, &error)) << error;
     EXPECT_EQ(loaded.snapshot.cpu.clock.unit, ScalarMetricUnit::Gigahertz);
     EXPECT_EQ(loaded.snapshot.gpu.temperature.unit, ScalarMetricUnit::Celsius);
+    EXPECT_EQ(loaded.snapshot.gpu.temperature.issue, ScalarMetricIssue::PermissionRequired);
     EXPECT_EQ(loaded.snapshot.gpu.clock.unit, ScalarMetricUnit::Megahertz);
     EXPECT_EQ(loaded.snapshot.gpu.fan.unit, ScalarMetricUnit::Rpm);
+    EXPECT_EQ(loaded.snapshot.gpu.fan.issue, ScalarMetricIssue::PermissionRequired);
     EXPECT_EQ(loaded.snapshot.gpu.fps.unit, ScalarMetricUnit::Fps);
     EXPECT_EQ(loaded.snapshot.gpu.fps.issue, ScalarMetricIssue::PermissionRequired);
     EXPECT_EQ(loaded.snapshot.gpu.fpsAppName, "dota");
