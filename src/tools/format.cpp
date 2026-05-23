@@ -3394,6 +3394,7 @@ private:
             "const",
             "enum",
             "long",
+            "mutable",
             "short",
             "signed",
             "static",

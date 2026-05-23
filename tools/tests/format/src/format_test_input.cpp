@@ -37,6 +37,8 @@ class FormattingExample{
 
 
 	int & reference;
+mutable ID2D1RenderTarget * cachedD2DBitmapTarget_=nullptr;
+mutable RenderState & cachedRenderState_;
 	FormattingExample(int * pointerValue,int & referenceValue):pointer(pointerValue),reference(referenceValue){}
 	private:
 	int value;
