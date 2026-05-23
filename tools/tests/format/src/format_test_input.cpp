@@ -332,6 +332,10 @@ activeTheme,
 constexpr int kPrimaryFlag=1;
 constexpr int kSecondaryFlag=2;
 constexpr int kTertiaryFlag=4;
+// Shared telemetry update cadence and live animation duration.
+inline constexpr auto kTelemetryRefreshInterval=std::chrono::milliseconds(250);
+inline constexpr double kTelemetryRefreshIntervalSeconds=static_cast<double>(kTelemetryRefreshInterval.count())/1000.0;
+
 constexpr std::string_view kRuntimePlaceholderMetricId="nothing";
 const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{std::string(kRuntimePlaceholderMetricId),MetricDisplayStyle::Scalar,false,1.0,"","Nothing",};
 constexpr FormatTableRow kFormatRows[]={{"alpha.metric.row.with.extra.detail.and.column.limit.coverage",100,200,kPrimaryFlag | kSecondaryFlag | kTertiaryFlag},{"beta.metric.row.with.extra.detail",300,400,kPrimaryFlag | kTertiaryFlag},{"gamma.metric.row",500,600,kSecondaryFlag}};

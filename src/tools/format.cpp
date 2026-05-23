@@ -971,7 +971,7 @@ private:
         BlockKind kind = BlockKind::Other;
         bool indentsBody = true;
         DeclarationKind previousDeclarationKind = DeclarationKind::None;
-        bool previousDeclarationWasMultilineField = false;
+        bool previousDeclarationBreaksSiblingGroup = false;
         int previousCaseBodyIndentLevel = -1;
     };
 
@@ -1134,11 +1134,11 @@ private:
             BlockKind::Other,
             true,
             previousDeclarationKind_,
-            previousDeclarationWasMultilineField_,
+            previousDeclarationBreaksSiblingGroup_,
             caseBodyIndentLevel_
         });
         previousDeclarationKind_ = DeclarationKind::None;
-        previousDeclarationWasMultilineField_ = false;
+        previousDeclarationBreaksSiblingGroup_ = false;
         ++indentLevel_;
     }
 
@@ -1182,14 +1182,14 @@ private:
             blockKind,
             indentsBody,
             previousDeclarationKind_,
-            previousDeclarationWasMultilineField_,
+            previousDeclarationBreaksSiblingGroup_,
             caseBodyIndentLevel_
         });
         if (blockKind == BlockKind::SwitchStatement) {
             caseBodyIndentLevel_ = -1;
         }
         previousDeclarationKind_ = DeclarationKind::None;
-        previousDeclarationWasMultilineField_ = false;
+        previousDeclarationBreaksSiblingGroup_ = false;
         if (indentsBody) {
             ++indentLevel_;
         } else {
@@ -1202,7 +1202,7 @@ private:
         const BlockState closedBlock = PopBlockState();
         const bool closedCaseScope = closedBlock.kind == BlockKind::CaseScope;
         previousDeclarationKind_ = closedBlock.previousDeclarationKind;
-        previousDeclarationWasMultilineField_ = closedBlock.previousDeclarationWasMultilineField;
+        previousDeclarationBreaksSiblingGroup_ = closedBlock.previousDeclarationBreaksSiblingGroup;
         if (closedBlock.indentsBody) {
             indentLevel_ = std::max(0, indentLevel_ - 1);
         } else {
@@ -1556,13 +1556,35 @@ private:
             return;
         }
         std::vector<std::string> lines = FormatPendingLines({});
-        const bool multilineField = declarationKind == DeclarationKind::Field && lines.size() > 1;
-        EmitBlankBeforeDeclarationKind(declarationKind, separateSameKind, multilineField);
+        const bool fieldBreaksSiblingGroup = declarationKind == DeclarationKind::Field &&
+            lines.size() > 1 &&
+            FieldDeclarationBreaksSiblingGroup(pendingTokens_);
+        EmitBlankBeforeDeclarationKind(declarationKind, separateSameKind, fieldBreaksSiblingGroup);
         for (std::string& line : lines) {
             EmitLine(std::move(line));
         }
         ClearPending();
-        NoteDeclarationKind(declarationKind, multilineField);
+        NoteDeclarationKind(declarationKind, fieldBreaksSiblingGroup);
+    }
+
+    bool FieldDeclarationBreaksSiblingGroup(const std::vector<Token>& tokens) const {
+        return IsTypeAliasFieldDeclaration(tokens) || HasTopLevelBrace(tokens);
+    }
+
+    bool IsTypeAliasFieldDeclaration(const std::vector<Token>& tokens) const {
+        const size_t first = NextSignificantIndex(tokens, 0);
+        return first < tokens.size() && (tokens[first].text == "using" || tokens[first].text == "typedef");
+    }
+
+    bool HasTopLevelBrace(const std::vector<Token>& tokens) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (depth == 0 && tokens[index].text == "{") {
+                return true;
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return false;
     }
 
     bool IsInsideEnumDeclaration() const {
@@ -1613,7 +1635,7 @@ private:
         EmitFormattedAtIndent(pendingTokens_, labelIndent, {});
         if (IsAccessSpecifierLabel()) {
             previousDeclarationKind_ = DeclarationKind::None;
-            previousDeclarationWasMultilineField_ = false;
+            previousDeclarationBreaksSiblingGroup_ = false;
         }
         ClearPending();
     }
@@ -1626,11 +1648,11 @@ private:
             BlockKind::CaseScope,
             true,
             previousDeclarationKind_,
-            previousDeclarationWasMultilineField_,
+            previousDeclarationBreaksSiblingGroup_,
             caseBodyIndentLevel_
         });
         previousDeclarationKind_ = DeclarationKind::None;
-        previousDeclarationWasMultilineField_ = false;
+        previousDeclarationBreaksSiblingGroup_ = false;
         justEmittedCaseLabel_ = false;
     }
 
@@ -1676,7 +1698,7 @@ private:
     void EmitBlankBeforeDeclarationKind(
         DeclarationKind declarationKind,
         bool separateSameKind,
-        bool currentDeclarationIsMultilineField = false
+        bool currentDeclarationBreaksSiblingGroup = false
     ) {
         if (declarationKind == DeclarationKind::None || !IsDeclarationContext()) {
             return;
@@ -1687,20 +1709,20 @@ private:
         if (
             previousDeclarationKind_ == declarationKind &&
             !separateSameKind &&
-            !previousDeclarationWasMultilineField_ &&
-            !currentDeclarationIsMultilineField
+            !previousDeclarationBreaksSiblingGroup_ &&
+            !currentDeclarationBreaksSiblingGroup
         ) {
             return;
         }
         EmitBlankBeforeSiblingGroupIfNeeded();
     }
 
-    void NoteDeclarationKind(DeclarationKind declarationKind, bool multilineField = false) {
+    void NoteDeclarationKind(DeclarationKind declarationKind, bool breaksSiblingGroup = false) {
         if (declarationKind == DeclarationKind::None || !IsDeclarationContext()) {
             return;
         }
         previousDeclarationKind_ = declarationKind;
-        previousDeclarationWasMultilineField_ = declarationKind == DeclarationKind::Field && multilineField;
+        previousDeclarationBreaksSiblingGroup_ = declarationKind == DeclarationKind::Field && breaksSiblingGroup;
     }
 
     void EmitBlankBeforeSiblingGroupIfNeeded() {
@@ -4951,7 +4973,7 @@ private:
     int groupDepth_ = 0;
     int caseBodyIndentLevel_ = -1;
     DeclarationKind previousDeclarationKind_ = DeclarationKind::None;
-    bool previousDeclarationWasMultilineField_ = false;
+    bool previousDeclarationBreaksSiblingGroup_ = false;
     bool pendingLogicalBlank_ = false;
     bool pendingPreprocessorBlank_ = false;
     bool pendingPragmaOnceBlank_ = false;

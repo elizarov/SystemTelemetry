@@ -508,6 +508,11 @@ const auto guideSheetLookup = [
 constexpr int kPrimaryFlag = 1;
 constexpr int kSecondaryFlag = 2;
 constexpr int kTertiaryFlag = 4;
+// Shared telemetry update cadence and live animation duration.
+inline constexpr auto kTelemetryRefreshInterval = std::chrono::milliseconds(250);
+inline constexpr double kTelemetryRefreshIntervalSeconds =
+    static_cast<double>(kTelemetryRefreshInterval.count()) / 1000.0;
+
 constexpr std::string_view kRuntimePlaceholderMetricId = "nothing";
 
 const MetricDefinitionConfig kRuntimePlaceholderMetricDefinition{
