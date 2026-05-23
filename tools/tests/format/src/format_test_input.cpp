@@ -372,6 +372,11 @@ while(RegEnumKeyExA(uninstallKey,index,childName,&childNameLength,nullptr,nullpt
 }
 }
 
+bool HasMissingReflectionMembers(const ReflectionContext* context){
+if(context->initializeMethod==nullptr||context->getCurrentMethod==nullptr||context->titleProperty==nullptr||context->valueProperty==nullptr){return true;}
+return false;
+}
+
 void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
 if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
 }
