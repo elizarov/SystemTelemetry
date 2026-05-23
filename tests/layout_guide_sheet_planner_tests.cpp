@@ -155,7 +155,7 @@ TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetr
             EXPECT_TRUE(callout.hoverAnchorKey.has_value());
             EXPECT_NE(callout.parameterLine.find("[metrics] cpu."), std::string::npos) << callout.parameterLine;
         }
-        if (callout.parameterLine.find("[card.cpu] layout = metric_list(") != std::string::npos) {
+        if (callout.parameterLine.find("[card.cpu_metrics] layout = metric_list(") != std::string::npos) {
             ++cpuMetricListLayoutCallouts;
             EXPECT_NE(callout.parameterLine.find("metric_list(cpu.ram)"), std::string::npos) << callout.parameterLine;
         }

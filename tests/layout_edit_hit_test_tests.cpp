@@ -382,7 +382,7 @@ TEST(LayoutEditHitTest, CpuMetricListClockRowAndContainerReorderAnchorsDoNotOver
         if (anchor == nullptr) {
             continue;
         }
-        if (anchor->key.widget.editCardId != "cpu") {
+        if (anchor->key.widget.renderCardId != "cpu") {
             continue;
         }
         if (const auto* nodeField = std::get_if<LayoutNodeFieldEditKey>(&anchor->key.subject);
