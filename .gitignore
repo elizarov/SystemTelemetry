@@ -6,3 +6,4 @@ $null
 __pycache__/
 *.py[cod]
 .claude/
+.codex/

@@ -5,8 +5,8 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 
 ## Mode Lifecycle
 
-- `Edit Layout` toggles interactive layout-edit mode from the popup menu, `Layout Editor...` starts layout-edit mode when needed and opens the `Edit Configuration` window, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
-- Layout-edit mode stays active across move mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
+- `Edit Layout` toggles interactive layout-edit mode from the popup menu and hover titlebar edit-layout button, `Layout Editor...` starts layout-edit mode when needed and opens the `Edit Configuration` window, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
+- Layout-edit mode stays active across move mode, corner resize mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
 - Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.
 - Turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
 - Turning off layout-edit mode, exiting the app, reloading config, or restarting as administrator while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
@@ -17,9 +17,10 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 - Hovering actionable text, card chrome, bars, metric rows, reorder handles, or widget-local geometry exposes the matching highlight and edit affordance for that target class.
 - Hovering actionable text or pill bar targets draws the dotted outline around that text or pill bar target regardless of which overlapping handle, wedge, color region, or context action wins the focused edit action.
 - While any layout-edit drag is active, hover hit testing and tooltip refresh for other edit targets are paused; the dragged target's active affordance and the dragged widget or card highlight remain visible until release.
+- Dashboard corner resize affordances have the same priority as move mode in layout-edit mode: starting resize cancels active edit drags, suppresses layout-edit tooltips, shows the placement overlay while resizing, and returns layout-edit hover behavior after release.
 - Drag feedback redraws immediately for each processed pointer move instead of waiting for queued idle paint delivery, so the visible guide, handle, or dragged child tracks the latest mouse position during continuous input.
 - When a square text or icon handle overlaps a metric-binding wedge near the same text corner, the square handle wins hover and the wedge stays tucked close to the text corner with a smaller hit area.
-- Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target.
+- Hovering actionable targets also shows a standard Win32 tooltip whose first line matches the edited config shape and whose second line uses the shared localized description for that target. The dashboard uses the same tooltip engine for titlebar control tooltips and layout-edit tooltips, so moving between the titlebar and dashboard updates the tooltip in place.
 - Spurious mouse-leave notifications that arrive while the pointer is still inside the dashboard do not clear or rebuild layout-edit hover state until the next real pointer movement or explicit hover refresh.
 - Once the pointer leaves the dashboard client area, layout-edit tooltips do not reappear from stale hover or color-hit state until the pointer re-enters and produces a new in-client hover target.
 - Right-clicking an actionable target prepends one focused `Edit ...` action for that exact target.

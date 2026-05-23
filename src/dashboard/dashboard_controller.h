@@ -19,6 +19,8 @@ struct DashboardSessionState {
     TelemetryUpdate telemetryUpdate;
     std::unique_ptr<DiagnosticsSession> diagnostics;
     std::chrono::steady_clock::time_point lastDiagnosticsOutput{};
+    std::optional<DisplayConfig> committedDisplayConfig;
+    std::optional<AppConfig> committedWallpaperOwnerConfig;
     UINT currentDpi = kDefaultDpi;
     bool placementWatchActive = false;
     bool isMoving = false;
@@ -55,6 +57,7 @@ public:
     // handoff and marshal any UI work back to the UI thread.
     virtual void EnqueueTelemetryUpdate(const TelemetryUpdate& update) = 0;
     virtual MonitorPlacementInfo GetWindowPlacementInfo() const = 0;
+    virtual MonitorPlacementInfo GetWindowPlacementInfoForScale(double scale) const = 0;
     virtual std::optional<FilePath> PromptDiagnosticsSavePath(
         std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const = 0;
     virtual void ShowError(std::string_view message) const = 0;
@@ -119,8 +122,11 @@ public:
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
         LayoutGuideAxis axis);
-    AppConfig BuildCurrentConfigForSaving(DashboardShellHost& shell) const;
-    bool UpdateConfigFromCurrentPlacement(DashboardShellHost& shell);
+    AppConfig BuildCurrentConfigForSaving() const;
+    void UpdateConfigFromMovePlacement(DashboardShellHost& shell);
+    void UpdateConfigFromResizePlacement(DashboardShellHost& shell);
+    bool SaveCurrentConfig(DashboardShellHost& shell);
+    bool ApplyConfiguredWallpaper(Trace& trace);
 
 private:
     void BeginLayoutEditSessionTracking();
@@ -129,7 +135,10 @@ private:
     void MarkLayoutEditSessionSaved();
     void SyncRenderer(DashboardShellHost& shell, bool showLayoutEditGuides, bool refreshThemedIcons = true);
     __declspec(noinline) bool FinishConfigMutation(DashboardShellHost& shell, bool refreshThemedIcons = true);
-    bool ApplyConfiguredWallpaper(Trace& trace);
+    void RefreshCommittedDisplayConfig(const AppConfig& config);
+    void RefreshCommittedWallpaperOwner(const AppConfig& config);
+    std::optional<AppConfig> CommittedWallpaperConfigToClear(const AppConfig& nextConfig) const;
+    bool CommitDisplayWallpaperTransition(const AppConfig& nextConfig, Trace& trace, bool applyNextWallpaper);
 
     DashboardSessionState state_{};
 };

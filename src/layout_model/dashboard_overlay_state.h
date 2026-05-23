@@ -12,11 +12,19 @@ enum class LayoutSimilarityIndicatorMode {
     AllVertical,
 };
 
+enum class DashboardPlacementOverlayMode {
+    Move,
+    Resize,
+};
+
 struct DashboardMoveOverlayState {
     bool visible = false;
+    DashboardPlacementOverlayMode mode = DashboardPlacementOverlayMode::Move;
+    bool placeOnRelease = false;
     std::string monitorName;
     RenderPoint relativePosition{};
-    double monitorScale = 1.0;
+    double displayScale = 1.0;
+    double monitorDefaultScale = 1.0;
 };
 
 struct DashboardOverlayState {

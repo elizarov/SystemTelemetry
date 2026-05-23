@@ -86,6 +86,17 @@ TEST(ConfigParser, ParsesGpuAdapterSelection) {
     RemoveFileIfExists(path);
 }
 
+TEST(ConfigParser, ParsesDisplayAutohideSelection) {
+    const FilePath path = WriteTestConfig("[display]\n"
+                                          "autohide = left\n");
+
+    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+
+    EXPECT_EQ(config.display.autohide, "left");
+
+    RemoveFileIfExists(path);
+}
+
 TEST(ConfigParser, ParsesEightDigitColorAlphaAndRejectsSixDigitColors) {
     const FilePath path = WriteTestConfig("[colors]\n"
                                           "accent_color = #12345678\n"

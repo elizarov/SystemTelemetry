@@ -8,9 +8,13 @@
 #include <shellapi.h>
 #include <string>
 #include <string_view>
+#include <vector>
 
 #include "config/diagnostics_options.h"
 #include "dashboard/dashboard_controller.h"
+#include "dashboard/dashboard_titlebar.h"
+#include "dashboard/dashboard_tooltip.h"
+#include "dashboard/dashboard_window_chrome.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_trace_session.h"
@@ -49,6 +53,7 @@ public:
     void RedrawShellNow() override;
     void EnqueueTelemetryUpdate(const TelemetryUpdate& update) override;
     MonitorPlacementInfo GetWindowPlacementInfo() const override;
+    MonitorPlacementInfo GetWindowPlacementInfoForScale(double scale) const override;
     std::optional<FilePath> PromptDiagnosticsSavePath(
         std::string_view defaultFileName, std::string_view filter, std::string_view defaultExtension) const override;
     void ShowError(std::string_view message) const override;
@@ -56,9 +61,32 @@ public:
 private:
     friend class DashboardShellUi;
 
+    enum class NativeTitlebarButton {
+        None,
+        AppMenu,
+        EditLayout,
+        Display,
+        Close,
+    };
+
+    enum class DashboardTooltipOwner {
+        None,
+        LayoutEdit,
+        Titlebar,
+    };
+
+    enum class PlacementInteractionMode {
+        None,
+        Move,
+        Resize,
+    };
+
     static LRESULT CALLBACK WndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     static LRESULT CALLBACK WndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK TitlebarProbeWndProcSetup(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
+    static LRESULT CALLBACK TitlebarProbeWndProcThunk(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     LRESULT HandleMessage(UINT message, WPARAM wParam, LPARAM lParam);
+    LRESULT HandleTitlebarProbeMessage(HWND hwnd, UINT message, WPARAM wParam, LPARAM lParam);
     void Paint();
     void BringOnTop();
     void ScheduleBringToFrontRetries();
@@ -75,12 +103,16 @@ private:
         LayoutGuideAxis axis) override;
     void StartMoveMode();
     void StartMoveModeAt(POINT cursorAnchorClientPoint);
+    void StartResizeModeAt(POINT cursorClientPoint, DisplayResizeCorner corner);
     void StopMoveMode();
     void UpdateMoveTracking();
+    void UpdateResizeTracking();
     void SyncDashboardMoveOverlayState();
-    bool CreateLayoutEditTooltip();
-    void DestroyLayoutEditTooltip();
-    void HideLayoutEditTooltip();
+    bool CreateDashboardTooltip();
+    void DestroyDashboardTooltip();
+    void HideLayoutEditTooltip(std::string_view reason = "layout_edit_inactive");
+    void HideTitlebarTooltip(std::string_view reason = "titlebar_inactive");
+    void HideTooltipForLayoutEditUpdate(std::string_view reason);
     void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
@@ -105,8 +137,86 @@ private:
     void StartPlacementWatch();
     void StopPlacementWatch();
     void RetryConfigPlacementIfPending();
+    void SyncAutohideState();
+    void OpenAutohideDrawerAfterDisplayConfiguration();
+    void StartAutohideTimer();
+    void StopAutohideTimer();
+    void UpdateAutohideFromCursor();
+    void SetAutohideTopmost(bool topmost);
+    void ShowAutohideDrawer(bool forceAnimation);
+    void HideAutohideDrawer();
+    bool RefreshAutohideSnapshot();
+    void ClearAutohideSnapshot();
+    bool AnimateAutohideSnapshot(bool show);
+    bool AutohideCursorInTriggerBand(POINT screenPoint) const;
+    bool AutohideCursorInDashboard(POINT screenPoint) const;
     bool DrainPendingTelemetryUpdate(TelemetryUpdate& update);
-    void StartMoveMode(bool hasCursorAnchorClientPoint, POINT cursorAnchorClientPoint);
+    RECT DashboardClientScreenRect() const;
+    DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMarginsForDpi(
+        int clientWidth, int clientHeight, UINT dpi) const;
+    DashboardTitlebarFrameMargins ComputeNativeTitlebarFrameMargins(int clientWidth, int clientHeight) const;
+    DashboardTitlebarGeometry ResolveNativeTitlebarGeometry(const RECT& dashboardClientRect) const;
+    RECT ResolveWindowRectForDashboardClientRect(const RECT& dashboardClientRect) const;
+    void UpdateNativeTitlebarHoverFromCursor();
+    void UpdateNativeTitlebarProbe();
+    bool CreateNativeTitlebarProbe();
+    void DestroyNativeTitlebarProbe();
+    bool ShouldSuppressNativeTitlebarRepaint() const;
+    void RedrawNativeTitlebarNow() const;
+    void ClearNativeTitlebarProbeRegion(bool redraw = true);
+    void UpdateNativeTitlebarProbeRegion(int width, int height, bool redraw = true);
+    void ShowNativeTitlebar(const DashboardTitlebarGeometry& geometry);
+    void HideNativeTitlebar();
+    bool CreateNativeTitlebarControls();
+    void DestroyNativeTitlebarControls();
+    void SyncNativeTitlebarControls();
+    void UpdateNativeTitlebarControls();
+    void ShowNativeTitlebarControls(bool show);
+    int NativeTitlebarComboClosedHeight(HWND combo) const;
+    int NativeTitlebarComboWindowHeight(HWND combo, const RECT& closedRect) const;
+    void PositionNativeTitlebarCombo(HWND combo, const RECT& closedRect);
+    DashboardTitlebarControlLayout NativeTitlebarControlLayout() const;
+    RECT NativeTitlebarLayoutComboRect() const;
+    RECT NativeTitlebarThemeComboRect() const;
+    RECT NativeTitlebarButtonRect(NativeTitlebarButton button) const;
+    RECT NativeTitlebarButtonRect(NativeTitlebarButton button, const DashboardTitlebarControlLayout& layout) const;
+    void PopulateNativeTitlebarCombo(HWND combo,
+        const std::vector<std::string>& values,
+        std::string_view selected,
+        std::vector<std::string>& cache,
+        std::string& selectedCache);
+    std::vector<std::string> NativeTitlebarLayoutNames() const;
+    std::vector<std::string> NativeTitlebarThemeNames() const;
+    std::optional<size_t> NativeTitlebarComboSelectionIndex(HWND combo) const;
+    NativeTitlebarButton HitTestNativeTitlebarButton(POINT clientPoint) const;
+    NativeTitlebarButton HitTestNativeTitlebarButton(
+        POINT clientPoint, const DashboardTitlebarControlLayout& layout) const;
+    void PaintNativeTitlebar(HDC hdc) const;
+    void PaintNativeTitlebarButton(HDC hdc, NativeTitlebarButton button) const;
+    void PaintNativeTitlebarButton(
+        HDC hdc, NativeTitlebarButton button, const DashboardTitlebarControlLayout& layout) const;
+    void RefreshNativeTitlebarChrome();
+    void InvalidateNativeTitlebar() const;
+    void SetNativeTitlebarButtonState(NativeTitlebarButton hovered, NativeTitlebarButton pressed);
+    void ResetNativeTitlebarButtonState();
+    void UpdateNativeTitlebarButtonHover(POINT screenPoint);
+    void UpdateNativeTitlebarTooltip(POINT screenPoint);
+    void InvokeNativeTitlebarButton(NativeTitlebarButton button);
+    void StartNativeTitlebarHoverTimer();
+    void StopNativeTitlebarHoverTimer();
+    void StartMoveMode(bool hasCursorAnchorClientPoint,
+        POINT cursorAnchorClientPoint,
+        bool clampCursorAnchorClientPoint,
+        bool placeOnRelease,
+        bool keepNativeTitlebarDuringMove);
+    void StartMoveModeFromNativeTitlebar(POINT screenPoint);
+    void StartResizeModeFromNativeTitlebar(POINT screenPoint, DisplayResizeCorner corner);
+    std::optional<DisplayPlacementTarget> ResolveConfiguredDisplayPlacementTarget() const;
+    bool IsDashboardAtConfiguredDisplayPlacement() const;
+    bool CanUseDashboardResizeHandles() const;
+    RECT DashboardResizeHandleRect(DisplayResizeCorner corner) const;
+    std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
+    std::optional<DisplayResizeCorner> HitTestNativeTitlebarResizeHandle(POINT clientPoint) const;
 
     void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
@@ -146,19 +256,65 @@ private:
     UINT currentDpi_ = kDefaultDpi;
     LayoutEditController layoutEditController_;
     std::unique_ptr<DashboardShellUi> shellUi_;
-    HWND layoutEditTooltipHwnd_ = nullptr;
-    std::string layoutEditTooltipText_;
+    DashboardTooltip dashboardTooltip_;
+    DashboardTooltipOwner dashboardTooltipOwner_ = DashboardTooltipOwner::None;
     std::string lastError_;
-    bool layoutEditTooltipVisible_ = false;
     bool layoutEditMouseTracking_ = false;
-    RECT layoutEditTooltipRect_{};
-    bool layoutEditTooltipRectValid_ = false;
     bool layoutEditTooltipRefreshSuppressed_ = false;
     bool sessionNotificationsRegistered_ = false;
     int layoutEditModalUiDepth_ = 0;
     POINT moveCursorAnchorClientPoint_{};
+    POINT resizeAnchorScreenPoint_{};
+    POINT resizeDraggedCornerCursorOffset_{};
+    DisplayResizeCorner resizeCorner_ = DisplayResizeCorner::BottomRight;
+    PlacementInteractionMode placementInteractionMode_ = PlacementInteractionMode::None;
     bool hasMoveCursorAnchorClientPoint_ = false;
+    bool clampMoveCursorAnchorClientPoint_ = true;
     bool suppressMoveStopOnNextLeftButtonUp_ = false;
+    bool stopMoveModeWhenLeftButtonReleased_ = false;
+    bool nativeTitlebarDragMoveActive_ = false;
+    bool autohideEligible_ = false;
+    bool autohideHidden_ = false;
+    bool autohideTimerActive_ = false;
+    bool autohideClosePending_ = false;
+    bool autohideTopmost_ = false;
+    bool autohideAnimating_ = false;
+    ULONGLONG autohideCloseDeadlineMs_ = 0;
+    DisplayPlacementMode autohideMode_ = DisplayPlacementMode::FullScreen;
+    RECT autohideMonitorRect_{};
+    RECT autohideTargetClientRect_{};
+    HBITMAP autohideSnapshotBitmap_ = nullptr;
+    SIZE autohideSnapshotSize_{};
+    HWND titlebarHoverProbeHwnd_ = nullptr;
+    HWND titlebarLayoutComboHwnd_ = nullptr;
+    HWND titlebarThemeComboHwnd_ = nullptr;
+    RECT nativeTitlebarProbeRect_{};
+    bool nativeTitlebarVisible_ = false;
+    bool nativeTitlebarProbeVisible_ = false;
+    bool nativeTitlebarProbeRectValid_ = false;
+    bool nativeTitlebarProbeRounded_ = false;
+    int nativeTitlebarProbeRegionWidth_ = 0;
+    int nativeTitlebarProbeRegionHeight_ = 0;
+    bool nativeTitlebarHoverInside_ = false;
+    bool nativeTitlebarHoverTimerActive_ = false;
+    bool nativeTitlebarHidePending_ = false;
+    ULONGLONG nativeTitlebarHideDeadlineMs_ = 0;
+    bool nativeTitlebarControlsVisible_ = false;
+    bool nativeTitlebarComboDropdownOpen_ = false;
+    HWND nativeTitlebarOpenComboHwnd_ = nullptr;
+    DashboardTitlebarControlLayout nativeTitlebarLastControlLayout_{};
+    bool nativeTitlebarLastControlLayoutValid_ = false;
+    DashboardTitlebarTooltipControl nativeTitlebarTooltipControl_ = DashboardTitlebarTooltipControl::None;
+    RECT nativeTitlebarTooltipRect_{};
+    bool nativeTitlebarTooltipRectValid_ = false;
+    BYTE nativeTitlebarProbeAlpha_ = 0;
+    NativeTitlebarButton nativeTitlebarHoveredButton_ = NativeTitlebarButton::None;
+    NativeTitlebarButton nativeTitlebarPressedButton_ = NativeTitlebarButton::None;
+    std::vector<std::string> nativeTitlebarLayoutItems_;
+    std::vector<std::string> nativeTitlebarThemeItems_;
+    std::string nativeTitlebarSelectedLayout_;
+    std::string nativeTitlebarSelectedTheme_;
+    DashboardTitlebarPalette nativeTitlebarPalette_{};
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;

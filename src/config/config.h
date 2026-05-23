@@ -8,6 +8,7 @@ struct DisplayConfig {
     std::string layout{};
     std::string theme{};
     std::string wallpaper{};
+    std::string autohide{};
     LogicalPointConfig position{};
     double scale{};
 
