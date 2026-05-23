@@ -1415,15 +1415,16 @@ private:
             std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(*assignment + 1), tokens.end());
             std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
             const bool compactCallFitsOnContinuation = CanKeepCallRhsCompactOnContinuation(rhs, indentLevel, suffix);
-            if (
-                !compactCallFitsOnContinuation &&
-                SelectChainKind(rhs) != ChainKind::Ternary &&
+            if (!compactCallFitsOnContinuation && (
                 (
-                    CanAttachAssignmentToWrappedCall(rhs, indentLevel, attachedPrefix) ||
-                        CanAttachAssignmentToWrappedLeadingGroup(rhs, indentLevel, attachedPrefix) ||
-                        CanAttachAssignmentToWrappedLambda(rhs, indentLevel, attachedPrefix)
-                )
-            ) {
+                    SelectChainKind(rhs) != ChainKind::Ternary &&
+                        (
+                            CanAttachAssignmentToWrappedCall(rhs, indentLevel, attachedPrefix) ||
+                                CanAttachAssignmentToWrappedLeadingGroup(rhs, indentLevel, attachedPrefix) ||
+                                CanAttachAssignmentToWrappedLambda(rhs, indentLevel, attachedPrefix)
+                        )
+                ) || CanAttachAssignmentToWrappedParenthesizedTernary(rhs, indentLevel, attachedPrefix)
+            )) {
                 return FormatRange(rhs, indentLevel, std::move(attachedPrefix), std::move(suffix), indentSplitChains);
             }
             lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs));
@@ -1536,6 +1537,26 @@ private:
             return false;
         }
         std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(group->open + 1));
+        return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(firstLineTokens));
+    }
+
+    bool CanAttachAssignmentToWrappedParenthesizedTernary(
+        const std::vector<Token>& rhs,
+        int indentLevel,
+        std::string_view attachedPrefix
+    ) const {
+        if (SelectChainKind(rhs) != ChainKind::Ternary) {
+            return false;
+        }
+        const std::optional<size_t> question = FindTopLevelToken(rhs, "?");
+        if (!question) {
+            return false;
+        }
+        const size_t valueStart = NextSignificantIndex(rhs, *question + 1);
+        if (valueStart >= rhs.size() || rhs[valueStart].text != "(") {
+            return false;
+        }
+        std::vector<Token> firstLineTokens(rhs.begin(), rhs.begin() + static_cast<std::ptrdiff_t>(valueStart + 1));
         return Fits(indentLevel, std::string(attachedPrefix) + FormatInline(firstLineTokens));
     }
 

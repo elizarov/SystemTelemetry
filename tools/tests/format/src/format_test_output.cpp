@@ -552,15 +552,14 @@ int MeasureHexLabelWidth(HWND hwnd) {
 
 size_t CountLeftCards(
     const std::vector<int>& cardPlanned,
-    const std::vector<Callout>& plannedCallouts,
+    const std::vector<Callout>& plannedCalloutDetails,
     const std::vector<CardPlacement>& cardPlacements,
     size_t cardIndex
 ) {
-    const size_t leftCount =
-        cardPlanned.size() == 1 ? (
-            plannedCallouts[cardPlanned.front()].target.Center().x <
-                cardPlacements[cardIndex].sourceRect.Center().x ? 1 : 0
-        ) : cardPlanned.size() / 2;
+    const size_t leftCount = cardPlanned.size() == 1 ? (
+        plannedCalloutDetails[cardPlanned.front()].target.Center().x <
+            cardPlacements[cardIndex].sourceRect.Center().x ? 1 : 0
+    ) : cardPlanned.size() / 2;
     return leftCount;
 }
 
