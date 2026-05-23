@@ -7,9 +7,9 @@
 
 namespace {
 
-constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;      // "CDRQ" little-endian.
-constexpr uint32_t kCashDashServiceResponseMagic = 0x53524443;     // "CDRS" little-endian.
-constexpr uint32_t kFpsServicePayloadMagic = 0x31535046;           // "FPS1" little-endian.
+constexpr uint32_t kCashDashServiceRequestMagic = 0x51524443;  // "CDRQ" little-endian.
+constexpr uint32_t kCashDashServiceResponseMagic = 0x53524443;  // "CDRS" little-endian.
+constexpr uint32_t kFpsServicePayloadMagic = 0x31535046;  // "FPS1" little-endian.
 constexpr uint32_t kBoardSensorsServicePayloadMagic = 0x31534442;  // "BDS1" little-endian.
 constexpr uint32_t kFpsServiceProtocolVersion = 2;
 constexpr uint32_t kFpsServiceFlagAvailable = 1u << 0u;
@@ -197,13 +197,15 @@ std::string RequestName(CashDashServiceRequestId id) {
 
 bool IsKnownRequestId(uint32_t id) {
     return id == static_cast<uint32_t>(CashDashServiceRequestId::PresentedFpsSample) ||
-           id == static_cast<uint32_t>(CashDashServiceRequestId::BoardSensorsSample);
+        id == static_cast<uint32_t>(CashDashServiceRequestId::BoardSensorsSample);
 }
 
 }  // namespace
 
 std::vector<char> BuildCashDashServiceRequest(
-    CashDashServiceRequestId id, const FpsTelemetrySampleOptions& fpsOptions) {
+    CashDashServiceRequestId id,
+    const FpsTelemetrySampleOptions& fpsOptions
+) {
     const std::string name = RequestName(id);
     const uint32_t nameBytes = StringSizeOrMax(name);
     const uint32_t adapterLuidTokenBytes =
@@ -223,7 +225,10 @@ std::vector<char> BuildCashDashServiceRequest(
 }
 
 std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
-    const void* data, size_t size, std::string& diagnostics) {
+    const void* data,
+    size_t size,
+    std::string& diagnostics
+) {
     diagnostics.clear();
     const char* cursor = static_cast<const char*>(data);
     size_t remaining = size;
@@ -248,9 +253,11 @@ std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
 
     CashDashServiceRequest request;
     request.id = static_cast<CashDashServiceRequestId>(header.requestId);
-    if (!ReadString(cursor, remaining, header.nameBytes, request.name) ||
+    if (
+        !ReadString(cursor, remaining, header.nameBytes, request.name) ||
         !ReadString(cursor, remaining, header.fpsAdapterLuidTokenBytes, request.fpsOptions.gpuAdapterLuidToken) ||
-        remaining != 0) {
+        remaining != 0
+    ) {
         diagnostics = ResourceStringText(RES_STR("CashDash service request payload is malformed."));
         return std::nullopt;
     }
@@ -285,8 +292,8 @@ std::vector<char> SerializeFpsServiceSample(const FpsTelemetrySample& sample) {
 
     FpsServiceResponseHeader payloadHeader;
     payloadHeader.flags = (sample.available ? kFpsServiceFlagAvailable : 0u) |
-                          (sample.permissionRequired ? kFpsServiceFlagPermissionRequired : 0u) |
-                          (sample.fps.has_value() ? kFpsServiceFlagHasFps : 0u);
+        (sample.permissionRequired ? kFpsServiceFlagPermissionRequired : 0u) |
+        (sample.fps.has_value() ? kFpsServiceFlagHasFps : 0u);
     payloadHeader.fps = sample.fps.value_or(0.0);
     payloadHeader.processId = sample.processId;
     payloadHeader.processNameBytes = processNameBytes;
@@ -355,8 +362,11 @@ std::optional<FpsTelemetrySample> ParseFpsServiceResponse(const void* data, size
     }
     sample.processId = payloadHeader.processId;
 
-    if (!ReadString(cursor, remaining, payloadHeader.processNameBytes, sample.processName) ||
-        !ReadString(cursor, remaining, payloadHeader.diagnosticsBytes, sample.diagnostics) || remaining != 0) {
+    if (
+        !ReadString(cursor, remaining, payloadHeader.processNameBytes, sample.processName) ||
+        !ReadString(cursor, remaining, payloadHeader.diagnosticsBytes, sample.diagnostics) ||
+        remaining != 0
+    ) {
         diagnostics = ResourceStringText(RES_STR("FPS service response string payload is malformed."));
         return std::nullopt;
     }
@@ -417,7 +427,10 @@ std::vector<char> SerializeBoardSensorsServiceSample(const BoardVendorTelemetryS
 }
 
 std::optional<BoardVendorTelemetrySample> ParseBoardSensorsServiceResponse(
-    const void* data, size_t size, std::string& diagnostics) {
+    const void* data,
+    size_t size,
+    std::string& diagnostics
+) {
     diagnostics.clear();
     const char* cursor = static_cast<const char*>(data);
     size_t remaining = size;
@@ -459,11 +472,11 @@ std::optional<BoardVendorTelemetrySample> ParseBoardSensorsServiceResponse(
     }
 
     const bool countsAreSane = payloadHeader.requestedFanCount <= kMaximumBoardSensorCount &&
-                               payloadHeader.requestedTemperatureCount <= kMaximumBoardSensorCount &&
-                               payloadHeader.availableFanCount <= kMaximumBoardSensorCount &&
-                               payloadHeader.availableTemperatureCount <= kMaximumBoardSensorCount &&
-                               payloadHeader.fanCount <= kMaximumBoardSensorCount &&
-                               payloadHeader.temperatureCount <= kMaximumBoardSensorCount;
+        payloadHeader.requestedTemperatureCount <= kMaximumBoardSensorCount &&
+        payloadHeader.availableFanCount <= kMaximumBoardSensorCount &&
+        payloadHeader.availableTemperatureCount <= kMaximumBoardSensorCount &&
+        payloadHeader.fanCount <= kMaximumBoardSensorCount &&
+        payloadHeader.temperatureCount <= kMaximumBoardSensorCount;
     if (!countsAreSane) {
         diagnostics = "Board sensor service response contains too many metrics.";
         return std::nullopt;
@@ -471,19 +484,30 @@ std::optional<BoardVendorTelemetrySample> ParseBoardSensorsServiceResponse(
 
     BoardVendorTelemetrySample sample;
     sample.available = (payloadHeader.flags & kBoardSensorsServiceFlagAvailable) != 0;
-    if (!ReadString(cursor, remaining, payloadHeader.boardManufacturerBytes, sample.boardManufacturer) ||
+    if (
+        !ReadString(cursor, remaining, payloadHeader.boardManufacturerBytes, sample.boardManufacturer) ||
         !ReadString(cursor, remaining, payloadHeader.boardProductBytes, sample.boardProduct) ||
         !ReadString(cursor, remaining, payloadHeader.driverLibraryBytes, sample.driverLibrary) ||
         !ReadString(cursor, remaining, payloadHeader.providerNameBytes, sample.providerName) ||
         !ReadString(cursor, remaining, payloadHeader.diagnosticsBytes, sample.diagnostics) ||
         !ReadStringVector(cursor, remaining, payloadHeader.requestedFanCount, sample.requestedFanNames) ||
         !ReadStringVector(
-            cursor, remaining, payloadHeader.requestedTemperatureCount, sample.requestedTemperatureNames) ||
+            cursor,
+            remaining,
+            payloadHeader.requestedTemperatureCount,
+            sample.requestedTemperatureNames
+        ) ||
         !ReadStringVector(cursor, remaining, payloadHeader.availableFanCount, sample.availableFanNames) ||
         !ReadStringVector(
-            cursor, remaining, payloadHeader.availableTemperatureCount, sample.availableTemperatureNames) ||
+            cursor,
+            remaining,
+            payloadHeader.availableTemperatureCount,
+            sample.availableTemperatureNames
+        ) ||
         !ReadMetricVector(cursor, remaining, payloadHeader.fanCount, sample.fans) ||
-        !ReadMetricVector(cursor, remaining, payloadHeader.temperatureCount, sample.temperatures) || remaining != 0) {
+        !ReadMetricVector(cursor, remaining, payloadHeader.temperatureCount, sample.temperatures) ||
+        remaining != 0
+    ) {
         diagnostics = "Board sensor service response string payload is malformed.";
         return std::nullopt;
     }

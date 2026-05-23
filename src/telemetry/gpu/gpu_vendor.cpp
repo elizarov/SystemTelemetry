@@ -62,8 +62,14 @@ using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
 
 class UnsupportedGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
-    UnsupportedGpuTelemetryProvider(Trace& trace, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps)
-        : trace_(trace), adapter_(std::move(adapter)), collectPresentedFps_(collectPresentedFps) {}
+    UnsupportedGpuTelemetryProvider(
+        Trace& trace,
+        std::optional<GpuAdapterInfo> adapter,
+        bool collectPresentedFps
+    ) :
+        trace_(trace),
+        adapter_(std::move(adapter)),
+        collectPresentedFps_(collectPresentedFps) {}
 
     bool Initialize() override {
         sample_.providerName = "Unsupported GPU";
@@ -77,9 +83,8 @@ public:
             } else {
                 const FpsTelemetrySample fpsSample =
                     fpsProvider_ != nullptr ? fpsProvider_->Sample() : FpsTelemetrySample{};
-                fpsDiagnostics_ = fpsSample.diagnostics.empty()
-                                      ? ResourceStringText(RES_STR("Presented FPS ETW provider unavailable."))
-                                      : fpsSample.diagnostics;
+                fpsDiagnostics_ = fpsSample.diagnostics.empty() ?
+                    ResourceStringText(RES_STR("Presented FPS ETW provider unavailable.")) : fpsSample.diagnostics;
             }
         } else {
             fpsDiagnostics_ = ResourceStringText(RES_STR("Presented FPS collection not requested by layout."));
@@ -87,11 +92,13 @@ public:
 
         const std::string adapterName = adapter_.has_value() ? adapter_->adapterName : std::string();
         const unsigned int vendorId = adapter_.has_value() ? adapter_->vendorId : 0;
-        trace_.WriteFmt(TracePrefix::UnsupportedGpu,
+        trace_.WriteFmt(
+            TracePrefix::UnsupportedGpu,
             RES_STR("initialize vendor_id=0x%04X name=\"%s\" fps=\"%s\""),
             vendorId,
             adapterName.c_str(),
-            fpsDiagnostics_.c_str());
+            fpsDiagnostics_.c_str()
+        );
         return true;
     }
 
@@ -109,12 +116,14 @@ public:
             if (trace_.Enabled(TracePrefix::UnsupportedGpu)) {
                 const std::string fpsText =
                     fpsSample.fps.has_value() ? Trace::FormatValueDouble("fps", *fpsSample.fps, 1) : "fps=N/A";
-                trace_.WriteFmt(TracePrefix::UnsupportedGpu,
+                trace_.WriteFmt(
+                    TracePrefix::UnsupportedGpu,
                     RES_STR("get_presented_fps available=%s value=%s process=\"%s\" diagnostics=\"%s\""),
                     Trace::BoolText(fpsSample.fps.has_value()),
                     fpsText.c_str(),
                     fpsSample.processName.c_str(),
-                    fpsSample.diagnostics.c_str());
+                    fpsSample.diagnostics.c_str()
+                );
             }
         }
 
@@ -132,7 +141,11 @@ private:
 };
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(
-    Trace& trace, GpuVendor vendor, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
+    Trace& trace,
+    GpuVendor vendor,
+    std::optional<GpuAdapterInfo> adapter,
+    bool collectPresentedFps
+) {
     if (vendor == GpuVendor::Nvidia) {
         return CreateNvidiaGpuTelemetryProvider(trace, adapter, collectPresentedFps);
     }
@@ -150,7 +163,9 @@ double DedicatedVideoMemoryGb(std::uint64_t bytes) {
 }
 
 std::optional<size_t> FindDuplicateGpuAdapterIndex(
-    const std::vector<EnumeratedGpuAdapter>& adapters, const GpuAdapterInfo& info) {
+    const std::vector<EnumeratedGpuAdapter>& adapters,
+    const GpuAdapterInfo& info
+) {
     for (size_t i = 0; i < adapters.size(); ++i) {
         if (GpuAdapterViewsReferToSameHardware(adapters[i].info, info)) {
             return i;
@@ -220,7 +235,10 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
     const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
     if (FAILED(factoryHr) || factory == nullptr) {
         trace.WriteFmt(
-            TracePrefix::GpuVendor, RES_STR("adapter_factory hr=0x%08X"), static_cast<unsigned int>(factoryHr));
+            TracePrefix::GpuVendor,
+            RES_STR("adapter_factory hr=0x%08X"),
+            static_cast<unsigned int>(factoryHr)
+        );
         return selection;
     }
 
@@ -232,10 +250,12 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             break;
         }
         if (FAILED(enumHr) || adapter == nullptr) {
-            trace.WriteFmt(TracePrefix::GpuVendor,
+            trace.WriteFmt(
+                TracePrefix::GpuVendor,
                 RES_STR("adapter_enum index=%u hr=0x%08X"),
                 adapterIndex,
-                static_cast<unsigned int>(enumHr));
+                static_cast<unsigned int>(enumHr)
+            );
             break;
         }
 
@@ -261,10 +281,13 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             if (duplicateIndex.has_value()) {
                 const bool replace =
                     !HasUsableGpuPciAddress(adapters[*duplicateIndex].info) && HasUsableGpuPciAddress(info);
-                trace.WriteFmt(TracePrefix::GpuVendor,
-                    RES_STR("adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
-                            "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
-                            "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
+                trace.WriteFmt(
+                    TracePrefix::GpuVendor,
+                    RES_STR(
+                        "adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
+                        "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
+                        "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""
+                    ),
                     adapterIndex,
                     adapters[*duplicateIndex].info.adapterIndex,
                     Trace::BoolText(replace),
@@ -279,7 +302,8 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
                     GpuVendorName(vendor),
                     GpuAdapterSelectionMatchRank(info, preferredAdapterName),
                     DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
-                    adapterName.c_str());
+                    adapterName.c_str()
+                );
                 if (replace) {
                     adapters[*duplicateIndex] = EnumeratedGpuAdapter{info, vendor};
                 }
@@ -289,11 +313,13 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
 
             adapters.push_back(EnumeratedGpuAdapter{info, vendor});
 
-            trace.WriteFmt(TracePrefix::GpuVendor,
+            trace.WriteFmt(
+                TracePrefix::GpuVendor,
                 RES_STR(
                     "adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
                     "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
-                    "name=\"%s\""),
+                    "name=\"%s\""
+                ),
                 adapterIndex,
                 desc.VendorId,
                 desc.DeviceId,
@@ -308,17 +334,20 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
                 GpuVendorName(vendor),
                 GpuAdapterSelectionMatchRank(info, preferredAdapterName),
                 DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
-                adapterName.c_str());
+                adapterName.c_str()
+            );
             adapter->Release();
             continue;
         }
 
-        trace.WriteFmt(TracePrefix::GpuVendor,
+        trace.WriteFmt(
+            TracePrefix::GpuVendor,
             RES_STR("adapter_skip index=%u hr=0x%08X software=%s name=\"%s\""),
             adapterIndex,
             static_cast<unsigned int>(descHr),
             Trace::BoolText(software),
-            adapterName.c_str());
+            adapterName.c_str()
+        );
         adapter->Release();
     }
 
@@ -347,15 +376,20 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
         }
     }
     for (size_t i = 0; i < adapters.size(); ++i) {
-        selection.candidates.push_back(
-            MakeGpuAdapterCandidate(adapters[i], selectedCandidateIndex.has_value() && i == *selectedCandidateIndex));
+        selection.candidates.push_back(MakeGpuAdapterCandidate(
+            adapters[i],
+            selectedCandidateIndex.has_value() && i == *selectedCandidateIndex
+        ));
     }
 
     if (selection.selectedAdapter.has_value()) {
         const GpuVendor vendor = SelectGpuVendor(*selection.selectedAdapter);
-        trace.WriteFmt(TracePrefix::GpuVendor,
-            RES_STR("adapter_selected index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
-                    "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""),
+        trace.WriteFmt(
+            TracePrefix::GpuVendor,
+            RES_STR(
+                "adapter_selected index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
+                "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s preferred=\"%s\" name=\"%s\""
+            ),
             selection.selectedAdapter->adapterIndex,
             selection.selectedAdapter->vendorId,
             selection.selectedAdapter->deviceId,
@@ -369,7 +403,8 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
             selection.selectedAdapter->pciFunction,
             GpuVendorName(vendor),
             std::string(preferredAdapterName).c_str(),
-            selection.selectedAdapter->adapterName.c_str());
+            selection.selectedAdapter->adapterName.c_str()
+        );
     } else {
         trace.Write(TracePrefix::GpuVendor, RES_STR("adapter_selected none"));
     }
@@ -381,12 +416,17 @@ std::optional<GpuAdapterInfo> ExtractPrimaryGpuAdapterInfo(Trace& trace) {
 }
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
-    Trace& trace, const std::optional<GpuAdapterInfo>& adapter, bool collectPresentedFps) {
+    Trace& trace,
+    const std::optional<GpuAdapterInfo>& adapter,
+    bool collectPresentedFps
+) {
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
-    trace.WriteFmt(TracePrefix::GpuVendor,
+    trace.WriteFmt(
+        TracePrefix::GpuVendor,
         RES_STR("create vendor=%s adapter=\"%s\" collect_presented_fps=%s"),
         GpuVendorName(vendor),
         adapter.has_value() ? adapter->adapterName.c_str() : "",
-        Trace::BoolText(collectPresentedFps));
+        Trace::BoolText(collectPresentedFps)
+    );
     return CreateGpuVendorProviderForVendor(trace, vendor, adapter, collectPresentedFps);
 }

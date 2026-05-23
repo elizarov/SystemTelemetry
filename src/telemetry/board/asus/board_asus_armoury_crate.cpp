@@ -76,51 +76,76 @@ bool IsSaneCelsius(double value) {
 }
 
 UniqueHandle OpenAsusAtkDevice() {
-    return UniqueHandle(CreateFileA(kAsusAtkDevicePath,
+    return UniqueHandle(CreateFileA(
+        kAsusAtkDevicePath,
         GENERIC_READ | GENERIC_WRITE,
         FILE_SHARE_READ | FILE_SHARE_WRITE,
         nullptr,
         OPEN_EXISTING,
         FILE_ATTRIBUTE_NORMAL,
-        nullptr));
+        nullptr
+    ));
 }
 
 bool QueryAsusAtkDsts(
-    HANDLE device, std::uint32_t deviceId, std::uint32_t& status, DWORD& error, DWORD& bytesReturned) {
+    HANDLE device,
+    std::uint32_t deviceId,
+    std::uint32_t& status,
+    DWORD& error,
+    DWORD& bytesReturned
+) {
     AsusAtkDstsInput input;
     input.deviceId = deviceId;
     status = 0;
     bytesReturned = 0;
     SetLastError(ERROR_SUCCESS);
     const BOOL result = DeviceIoControl(
-        device, kAsusAtkIoControl, &input, sizeof(input), &status, sizeof(status), &bytesReturned, nullptr);
+        device,
+        kAsusAtkIoControl,
+        &input,
+        sizeof(input),
+        &status,
+        sizeof(status),
+        &bytesReturned,
+        nullptr
+    );
     error = result != FALSE ? ERROR_SUCCESS : GetLastError();
     return result != FALSE && bytesReturned >= sizeof(status);
 }
 
-void TraceAtkDriverResult(Trace& trace,
+void TraceAtkDriverResult(
+    Trace& trace,
     const char* kind,
     std::uint32_t deviceId,
     const char* name,
     bool ok,
     DWORD error,
     DWORD bytesReturned,
-    std::uint32_t status) {
+    std::uint32_t status
+) {
     std::string text = FormatText("atk_driver_%s id=0x%08x", kind, deviceId);
     if (name != nullptr && name[0] != '\0') {
         AppendFormat(text, " name=\"%s\"", name);
     }
-    AppendFormat(text,
+    AppendFormat(
+        text,
         " ok=%d error=%lu bytes=%lu status=0x%08x",
         ok ? 1 : 0,
         static_cast<unsigned long>(error),
         static_cast<unsigned long>(bytesReturned),
-        status);
+        status
+    );
     trace.Write(TracePrefix::AsusArmouryCrate, text);
 }
 
 bool CaptureAtkDriverStatus(
-    Trace& trace, HANDLE device, const char* kind, std::uint32_t deviceId, const char* name, std::uint32_t& status) {
+    Trace& trace,
+    HANDLE device,
+    const char* kind,
+    std::uint32_t deviceId,
+    const char* name,
+    std::uint32_t& status
+) {
     DWORD error = ERROR_SUCCESS;
     DWORD bytesReturned = 0;
     const bool ok = QueryAsusAtkDsts(device, deviceId, status, error, bytesReturned);
@@ -129,7 +154,12 @@ bool CaptureAtkDriverStatus(
 }
 
 void CaptureAtkDriverFan(
-    Trace& trace, HANDLE device, std::uint32_t deviceId, const char* name, std::vector<BoardSensorReading>& fans) {
+    Trace& trace,
+    HANDLE device,
+    std::uint32_t deviceId,
+    const char* name,
+    std::vector<BoardSensorReading>& fans
+) {
     std::uint32_t status = 0;
     if (!CaptureAtkDriverStatus(trace, device, "fan", deviceId, name, status) || !HasDstsPresence(status)) {
         return;
@@ -143,8 +173,10 @@ void CaptureAtkDriverFan(
 
 void CaptureAtkDriverTemperature(Trace& trace, HANDLE device, std::vector<BoardSensorReading>& temperatures) {
     std::uint32_t status = 0;
-    if (!CaptureAtkDriverStatus(trace, device, "temp", kAsusAtkCpuTemperature, "cpu", status) ||
-        !HasDstsPresence(status)) {
+    if (
+        !CaptureAtkDriverStatus(trace, device, "temp", kAsusAtkCpuTemperature, "cpu", status) ||
+        !HasDstsPresence(status)
+    ) {
         return;
     }
 
@@ -161,9 +193,11 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
         const DWORD error = GetLastError();
         snapshot.diagnostics =
             FormatText(RES_STR("ASUS ATKACPI device open failed: %lu"), static_cast<unsigned long>(error));
-        trace.WriteFmt(TracePrefix::AsusArmouryCrate,
+        trace.WriteFmt(
+            TracePrefix::AsusArmouryCrate,
             RES_STR("atk_driver_open_failed error=%lu"),
-            static_cast<unsigned long>(error));
+            static_cast<unsigned long>(error)
+        );
         return snapshot;
     }
 
@@ -172,21 +206,28 @@ AsusArmouryCrateSnapshot CaptureAsusAtkDriverSensors(Trace& trace) {
     CaptureAtkDriverFan(trace, device.Get(), kAsusAtkGpuFan, kAsusGpuFanName, snapshot.fans);
 
     snapshot.success = true;
-    snapshot.diagnostics =
-        FormatText(RES_STR("ASUS Armoury Crate ATKACPI query completed. fan_count=%zu temp_count=%zu"),
-            snapshot.fans.size(),
-            snapshot.temperatures.size());
-    trace.WriteFmt(TracePrefix::AsusArmouryCrate,
+    snapshot.diagnostics = FormatText(
+        RES_STR("ASUS Armoury Crate ATKACPI query completed. fan_count=%zu temp_count=%zu"),
+        snapshot.fans.size(),
+        snapshot.temperatures.size()
+    );
+    trace.WriteFmt(
+        TracePrefix::AsusArmouryCrate,
         RES_STR("atk_driver_snapshot_done fan_count=%zu temp_count=%zu"),
         snapshot.fans.size(),
-        snapshot.temperatures.size());
+        snapshot.temperatures.size()
+    );
     return snapshot;
 }
 
 class AsusArmouryCrateBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    AsusArmouryCrateBoardTelemetryProvider(Trace& trace, BoardVendorInfo info)
-        : trace_(trace), info_(std::move(info)) {}
+    AsusArmouryCrateBoardTelemetryProvider(
+        Trace& trace,
+        BoardVendorInfo info
+    ) :
+        trace_(trace),
+        info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
@@ -194,10 +235,12 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace_.WriteFmt(TracePrefix::AsusArmouryCrate,
+        trace_.WriteFmt(
+            TracePrefix::AsusArmouryCrate,
             RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
-            boardProduct_.c_str());
+            boardProduct_.c_str()
+        );
 
         if (SelectBoardVendor(info_) != BoardVendor::Asus) {
             diagnostics_ = ResourceStringText(RES_STR("Baseboard manufacturer is not ASUS."));
@@ -212,24 +255,33 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            AppendRequestedBoardMetricIndex(requestedTemperatureIndexBySourceName_,
+            AppendRequestedBoardMetricIndex(
+                requestedTemperatureIndexBySourceName_,
                 ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name),
-                i);
+                i
+            );
         }
         for (size_t i = 0; i < fanMetricTemplate_.size(); ++i) {
             AppendRequestedBoardMetricIndex(
-                requestedFanIndexBySourceName_, ResolveFanSensorName(fanMetricTemplate_[i].name), i);
+                requestedFanIndexBySourceName_,
+                ResolveFanSensorName(fanMetricTemplate_[i].name),
+                i
+            );
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
-            AppendFormat(requestedDiagnosticsSuffix_,
+            AppendFormat(
+                requestedDiagnosticsSuffix_,
                 RES_STR(" requested_temps=%s"),
-                JoinNames(settings_.requestedTemperatureNames).c_str());
+                JoinNames(settings_.requestedTemperatureNames).c_str()
+            );
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(requestedDiagnosticsSuffix_,
+            AppendFormat(
+                requestedDiagnosticsSuffix_,
                 RES_STR(" requested_fans=%s"),
-                JoinNames(settings_.requestedFanNames).c_str());
+                JoinNames(settings_.requestedFanNames).c_str()
+            );
         }
         initialized_ = true;
         return true;
@@ -272,7 +324,10 @@ public:
         ResetBoardMetricValues(sample.temperatures);
         ResetBoardMetricValues(sample.fans);
         ApplyBoardSensorReadingsToMetrics(
-            snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
+            snapshot.temperatures,
+            requestedTemperatureIndexBySourceName_,
+            sample.temperatures
+        );
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());

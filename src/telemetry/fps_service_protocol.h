@@ -24,9 +24,14 @@ struct CashDashServiceRequest {
 };
 
 std::vector<char> BuildCashDashServiceRequest(
-    CashDashServiceRequestId id, const FpsTelemetrySampleOptions& fpsOptions = {});
+    CashDashServiceRequestId id,
+    const FpsTelemetrySampleOptions& fpsOptions = {}
+);
 std::optional<CashDashServiceRequest> ParseCashDashServiceRequest(
-    const void* data, size_t size, std::string& diagnostics);
+    const void* data,
+    size_t size,
+    std::string& diagnostics
+);
 std::vector<char> BuildFpsServiceRequest(const FpsTelemetrySampleOptions& options = {});
 std::vector<char> BuildBoardSensorsServiceRequest();
 bool IsFpsServiceRequest(const void* data, size_t size);
@@ -34,4 +39,7 @@ std::vector<char> SerializeFpsServiceSample(const FpsTelemetrySample& sample);
 std::optional<FpsTelemetrySample> ParseFpsServiceResponse(const void* data, size_t size, std::string& diagnostics);
 std::vector<char> SerializeBoardSensorsServiceSample(const BoardVendorTelemetrySample& sample);
 std::optional<BoardVendorTelemetrySample> ParseBoardSensorsServiceResponse(
-    const void* data, size_t size, std::string& diagnostics);
+    const void* data,
+    size_t size,
+    std::string& diagnostics
+);

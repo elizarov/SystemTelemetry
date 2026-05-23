@@ -43,8 +43,10 @@ std::optional<FilePath> FindInstalledMsiCenterDirectory() {
     DWORD index = 0;
     char childName[256];
     DWORD childNameLength = ARRAYSIZE(childName);
-    while (RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
-           ERROR_SUCCESS) {
+    while (
+        RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
+            ERROR_SUCCESS
+    ) {
         HKEY childKey = nullptr;
         if (RegOpenKeyExA(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
             const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
@@ -95,7 +97,11 @@ public:
 
     void TraceQuerySuccess(int fanCount, int temperatureCount) override {
         trace_.WriteFmt(
-            TracePrefix::MsiCenter, RES_STR("snapshot_done fan_count=%d temp_count=%d"), fanCount, temperatureCount);
+            TracePrefix::MsiCenter,
+            RES_STR("snapshot_done fan_count=%d temp_count=%d"),
+            fanCount,
+            temperatureCount
+        );
     }
 
     void TraceInitializeException(const wchar_t* diagnostics) override {
@@ -114,10 +120,11 @@ public:
 
     MsiCenterSnapshot FinishSuccess() {
         snapshot_.success = true;
-        snapshot_.diagnostics =
-            FormatText(RES_STR("MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu"),
-                snapshot_.fans.size(),
-                snapshot_.temperatures.size());
+        snapshot_.diagnostics = FormatText(
+            RES_STR("MSI Center hardware-monitor query completed. fan_count=%zu temp_count=%zu"),
+            snapshot_.fans.size(),
+            snapshot_.temperatures.size()
+        );
         return std::move(snapshot_);
     }
 
@@ -140,10 +147,12 @@ public:
 
         boardManufacturer_ = info_.manufacturer;
         boardProduct_ = info_.product;
-        trace().WriteFmt(TracePrefix::MsiCenter,
+        trace().WriteFmt(
+            TracePrefix::MsiCenter,
             RES_STR("board manufacturer=\"%s\" product=\"%s\""),
             boardManufacturer_.c_str(),
-            boardProduct_.c_str());
+            boardProduct_.c_str()
+        );
 
         if (SelectBoardVendor(info_) != BoardVendor::Msi) {
             diagnostics_ = ResourceStringText(RES_STR("Baseboard manufacturer is not MSI."));
@@ -164,24 +173,33 @@ public:
         requestedTemperatureIndexBySourceName_.clear();
         requestedFanIndexBySourceName_.clear();
         for (size_t i = 0; i < temperatureMetricTemplate_.size(); ++i) {
-            AppendRequestedBoardMetricIndex(requestedTemperatureIndexBySourceName_,
+            AppendRequestedBoardMetricIndex(
+                requestedTemperatureIndexBySourceName_,
                 ResolveTemperatureSensorName(temperatureMetricTemplate_[i].name),
-                i);
+                i
+            );
         }
         for (size_t i = 0; i < fanMetricTemplate_.size(); ++i) {
             AppendRequestedBoardMetricIndex(
-                requestedFanIndexBySourceName_, ResolveFanSensorName(fanMetricTemplate_[i].name), i);
+                requestedFanIndexBySourceName_,
+                ResolveFanSensorName(fanMetricTemplate_[i].name),
+                i
+            );
         }
         requestedDiagnosticsSuffix_.clear();
         if (!settings_.requestedTemperatureNames.empty()) {
-            AppendFormat(requestedDiagnosticsSuffix_,
+            AppendFormat(
+                requestedDiagnosticsSuffix_,
                 RES_STR(" requested_temps=%s"),
-                JoinNames(settings_.requestedTemperatureNames).c_str());
+                JoinNames(settings_.requestedTemperatureNames).c_str()
+            );
         }
         if (!settings_.requestedFanNames.empty()) {
-            AppendFormat(requestedDiagnosticsSuffix_,
+            AppendFormat(
+                requestedDiagnosticsSuffix_,
                 RES_STR(" requested_fans=%s"),
-                JoinNames(settings_.requestedFanNames).c_str());
+                JoinNames(settings_.requestedFanNames).c_str()
+            );
         }
         initialized_ = true;
         return true;
@@ -227,7 +245,10 @@ public:
         ResetBoardMetricValues(sample.temperatures);
         ResetBoardMetricValues(sample.fans);
         ApplyBoardSensorReadingsToMetrics(
-            snapshot.temperatures, requestedTemperatureIndexBySourceName_, sample.temperatures);
+            snapshot.temperatures,
+            requestedTemperatureIndexBySourceName_,
+            sample.temperatures
+        );
         ApplyBoardSensorReadingsToMetrics(snapshot.fans, requestedFanIndexBySourceName_, sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());

@@ -183,6 +183,12 @@ const sockaddr * address = gateway->Address.lpSockaddr;
 Use(address);
 }
 
+void ClearHistoryKeyIndexes(SystemSnapshot& snapshot){
+for(uint16_t & encodedIndex:snapshot.retainedHistoryIndexByKey){
+encodedIndex=0;
+}
+}
+
 void ManagedReferenceSpacing(NativeType & nativeRef,NativeType && nativeRvalueRef,NativeType * & pointerRef,NativeType * && pointerRvalueRef,NativeType * * pointerPointer,ManagedWidget ^ managedHandle,ManagedWidget ^ % managedTrackingRef,ManagedWidget % managedReference){
 Use(nativeRef,nativeRvalueRef,pointerRef,pointerRvalueRef,pointerPointer,managedHandle,managedTrackingRef,managedReference);
 }

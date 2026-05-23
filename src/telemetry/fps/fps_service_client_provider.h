@@ -7,4 +7,6 @@
 #include "telemetry/gpu/gpu_vendor_selection.h"
 
 std::unique_ptr<FpsTelemetryProvider> CreatePresentedFpsProvider(
-    Trace& trace, const std::optional<GpuAdapterInfo>& adapter = std::nullopt);
+    Trace& trace,
+    const std::optional<GpuAdapterInfo>& adapter = std::nullopt
+);

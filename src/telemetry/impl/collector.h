@@ -34,4 +34,7 @@ protected:
 };
 
 std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const FilePath& workingDirectory, Trace& trace);
+    const TelemetryCollectorOptions& options,
+    const FilePath& workingDirectory,
+    Trace& trace
+);

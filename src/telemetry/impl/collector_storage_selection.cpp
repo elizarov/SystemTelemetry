@@ -67,7 +67,9 @@ std::vector<std::string> SelectFixedDriveLetters(const std::vector<StorageDriveC
 }  // namespace
 
 std::vector<std::string> ResolveConfiguredStorageDriveLetters(
-    const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives) {
+    const std::vector<std::string>& configuredDrives,
+    const std::vector<StorageDriveCandidate>& availableDrives
+) {
     std::vector<std::string> resolvedDrives = NormalizeConfiguredStorageDriveLetters(configuredDrives);
     if (!resolvedDrives.empty() || !configuredDrives.empty()) {
         return resolvedDrives;

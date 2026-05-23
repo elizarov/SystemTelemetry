@@ -17,14 +17,19 @@ constexpr unsigned int kMaxPciDevice = 31;
 constexpr unsigned int kMaxPciFunction = 7;
 
 bool SameAdapterDescriptor(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs) {
-    return lhs.vendorId == rhs.vendorId && lhs.deviceId == rhs.deviceId && lhs.subSysId == rhs.subSysId &&
-           lhs.revision == rhs.revision && lhs.dedicatedVideoMemoryBytes == rhs.dedicatedVideoMemoryBytes &&
-           EqualsInsensitive(lhs.adapterName, rhs.adapterName);
+    return lhs.vendorId == rhs.vendorId &&
+        lhs.deviceId == rhs.deviceId &&
+        lhs.subSysId == rhs.subSysId &&
+        lhs.revision == rhs.revision &&
+        lhs.dedicatedVideoMemoryBytes == rhs.dedicatedVideoMemoryBytes &&
+        EqualsInsensitive(lhs.adapterName, rhs.adapterName);
 }
 
 bool SameUsablePciAddress(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs) {
-    return lhs.pciDomain == rhs.pciDomain && lhs.pciBus == rhs.pciBus && lhs.pciDevice == rhs.pciDevice &&
-           lhs.pciFunction == rhs.pciFunction;
+    return lhs.pciDomain == rhs.pciDomain &&
+        lhs.pciBus == rhs.pciBus &&
+        lhs.pciDevice == rhs.pciDevice &&
+        lhs.pciFunction == rhs.pciFunction;
 }
 
 bool GpuAdapterStableOrderLess(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs) {
@@ -34,19 +39,24 @@ bool GpuAdapterStableOrderLess(const GpuAdapterInfo& lhs, const GpuAdapterInfo& 
         return lhsHasPciAddress;
     }
     const auto descriptorOrder = [](const GpuAdapterInfo& left, const GpuAdapterInfo& right) {
-        return std::tie(left.vendorId,
-                   left.deviceId,
-                   left.subSysId,
-                   left.revision,
-                   left.dedicatedVideoMemoryBytes,
-                   left.adapterIndex,
-                   left.adapterName) < std::tie(right.vendorId,
-                                           right.deviceId,
-                                           right.subSysId,
-                                           right.revision,
-                                           right.dedicatedVideoMemoryBytes,
-                                           right.adapterIndex,
-                                           right.adapterName);
+        return std::tie(
+            left.vendorId,
+            left.deviceId,
+            left.subSysId,
+            left.revision,
+            left.dedicatedVideoMemoryBytes,
+            left.adapterIndex,
+            left.adapterName
+        ) <
+            std::tie(
+                right.vendorId,
+                right.deviceId,
+                right.subSysId,
+                right.revision,
+                right.dedicatedVideoMemoryBytes,
+                right.adapterIndex,
+                right.adapterName
+            );
     };
     if (lhsHasPciAddress && rhsHasPciAddress) {
         const auto lhsPci = std::tie(lhs.pciDomain, lhs.pciBus, lhs.pciDevice, lhs.pciFunction);
@@ -82,8 +92,11 @@ GpuVendor SelectGpuVendor(const GpuVendorInfo& info) {
     if (info.vendorId == kNvidiaVendorId || ContainsInsensitive(info.adapterName, "nvidia")) {
         return GpuVendor::Nvidia;
     }
-    if (info.vendorId == kAmdVendorId || ContainsInsensitive(info.adapterName, "amd") ||
-        ContainsInsensitive(info.adapterName, "radeon")) {
+    if (
+        info.vendorId == kAmdVendorId ||
+        ContainsInsensitive(info.adapterName, "amd") ||
+        ContainsInsensitive(info.adapterName, "radeon")
+    ) {
         return GpuVendor::Amd;
     }
     if (info.vendorId == kIntelVendorId || ContainsInsensitive(info.adapterName, "intel")) {
@@ -96,14 +109,18 @@ std::optional<std::string> GpuAdapterPdhLuidToken(const GpuAdapterInfo& info) {
     if (!info.hasAdapterLuid) {
         return std::nullopt;
     }
-    return FormatText("luid_0x%08x_0x%08x",
+    return FormatText(
+        "luid_0x%08x_0x%08x",
         static_cast<unsigned int>(info.adapterLuidHighPart),
-        static_cast<unsigned int>(info.adapterLuidLowPart));
+        static_cast<unsigned int>(info.adapterLuidLowPart)
+    );
 }
 
 bool HasUsableGpuPciAddress(const GpuAdapterInfo& info) {
-    return info.hasPciAddress && info.pciBus <= kMaxPciBus && info.pciDevice <= kMaxPciDevice &&
-           info.pciFunction <= kMaxPciFunction;
+    return info.hasPciAddress &&
+        info.pciBus <= kMaxPciBus &&
+        info.pciDevice <= kMaxPciDevice &&
+        info.pciFunction <= kMaxPciFunction;
 }
 
 bool GpuAdapterViewsReferToSameHardware(const GpuAdapterInfo& lhs, const GpuAdapterInfo& rhs) {

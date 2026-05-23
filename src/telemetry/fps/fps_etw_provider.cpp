@@ -140,8 +140,11 @@ bool ContainsAsciiInsensitive(const char* value, std::string_view needle) {
     }
     for (const char* cursor = value; *cursor != '\0'; ++cursor) {
         size_t matched = 0;
-        while (matched < needle.size() && cursor[matched] != '\0' &&
-               LowerAscii(cursor[matched]) == LowerAscii(needle[matched])) {
+        while (
+            matched < needle.size() &&
+            cursor[matched] != '\0' &&
+            LowerAscii(cursor[matched]) == LowerAscii(needle[matched])
+        ) {
             ++matched;
         }
         if (matched == needle.size()) {
@@ -211,7 +214,10 @@ public:
             status = StartTraceA(&sessionHandle_, sessionName_.c_str(), &sessionProps.properties);
             if (trace_.Enabled(TracePrefix::FpsEtw)) {
                 trace_.WriteFmt(
-                    TracePrefix::FpsEtw, RES_STR("start_trace_retry status=%s"), FormatWin32Error(status).c_str());
+                    TracePrefix::FpsEtw,
+                    RES_STR("start_trace_retry status=%s"),
+                    FormatWin32Error(status).c_str()
+                );
             }
         }
         if (status != ERROR_SUCCESS) {
@@ -231,19 +237,23 @@ public:
             const std::string dxgiText = FormatWin32Error(dxgiStatus);
             const std::string d3d9Text = FormatWin32Error(d3d9Status);
             const std::string dxgkrnlText = FormatWin32Error(dxgkrnlStatus);
-            trace_.WriteFmt(TracePrefix::FpsEtw,
+            trace_.WriteFmt(
+                TracePrefix::FpsEtw,
                 RES_STR("enable dxgi=%s d3d9=%s dxgkrnl=%s"),
                 dxgiText.c_str(),
                 d3d9Text.c_str(),
-                dxgkrnlText.c_str());
+                dxgkrnlText.c_str()
+            );
         }
         if (!dxgiEnabled_ && !d3d9Enabled_ && !dxgkrnlEnabled_) {
             permissionRequired_ =
                 IsPermissionDenied(dxgiStatus) || IsPermissionDenied(d3d9Status) || IsPermissionDenied(dxgkrnlStatus);
-            diagnostics_ = FormatText(RES_STR("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s"),
+            diagnostics_ = FormatText(
+                RES_STR("Failed to enable FPS ETW providers: dxgi=%s d3d9=%s dxgkrnl=%s"),
                 FormatWin32Error(dxgiStatus).c_str(),
                 FormatWin32Error(d3d9Status).c_str(),
-                FormatWin32Error(dxgkrnlStatus).c_str());
+                FormatWin32Error(dxgkrnlStatus).c_str()
+            );
             StopLocked();
             return false;
         }
@@ -265,7 +275,9 @@ public:
         processingThread_ = CreateThread(nullptr, 0, &PresentedFpsEtwProvider::ProcessTraceThread, this, 0, nullptr);
         if (processingThread_ == nullptr) {
             diagnostics_ = FormatText(
-                RES_STR("Failed to create FPS ETW processing thread: %s"), FormatWin32Error(GetLastError()).c_str());
+                RES_STR("Failed to create FPS ETW processing thread: %s"),
+                FormatWin32Error(GetLastError()).c_str()
+            );
             StopLocked();
             return false;
         }
@@ -273,11 +285,13 @@ public:
         diagnostics_ = ResourceStringText(RES_STR("Presented FPS ETW provider active."));
         permissionRequired_ = false;
         initialized_ = true;
-        trace_.WriteFmt(TracePrefix::FpsEtw,
+        trace_.WriteFmt(
+            TracePrefix::FpsEtw,
             RES_STR("initialize_done dxgi=%s d3d9=%s dxgkrnl=%s"),
             Trace::BoolText(dxgiEnabled_),
             Trace::BoolText(d3d9Enabled_),
-            Trace::BoolText(dxgkrnlEnabled_));
+            Trace::BoolText(dxgkrnlEnabled_)
+        );
         return true;
     }
 
@@ -318,32 +332,40 @@ public:
             if (requireSelectedGpuActivity && topGpu3dUsage_ < kGpu3dActiveThresholdPercent) {
                 sample.available = true;
                 sample.fps = 0.0;
-                sample.diagnostics = BuildDiagnosticsLocked(
-                    FormatText(RES_STR(" selected adapter idle/off; fps=value=0.0%s"), GpuUsageDiagnostics().c_str()));
+                sample.diagnostics = BuildDiagnosticsLocked(FormatText(
+                    RES_STR(" selected adapter idle/off; fps=value=0.0%s"),
+                    GpuUsageDiagnostics().c_str()
+                ));
                 return sample;
             }
             sample.available = false;
-            sample.diagnostics = BuildDiagnosticsLocked(
-                FormatText(RES_STR(" No presenting application selected.%s"), GpuUsageDiagnostics().c_str()));
+            sample.diagnostics = BuildDiagnosticsLocked(FormatText(
+                RES_STR(" No presenting application selected.%s"),
+                GpuUsageDiagnostics().c_str()
+            ));
             return sample;
         }
 
         const double rawFps = static_cast<double>(bestSelection.count) / kFpsWindowSeconds;
-        if (requireSelectedGpuActivity &&
-            Gpu3dUsageForProcess(bestSelection.processId) < kGpu3dActiveThresholdPercent) {
+        if (
+            requireSelectedGpuActivity && Gpu3dUsageForProcess(bestSelection.processId) < kGpu3dActiveThresholdPercent
+        ) {
             ResetSelectionLocked();
             sample.available = false;
             sample.processId = bestSelection.processId;
             sample.processName = ResolveProcessNameLocked(bestSelection.processId);
             sample.permissionRequired = IsProcessNamePermissionRequiredLocked(bestSelection.processId);
-            sample.diagnostics = BuildDiagnosticsLocked(
-                FormatText(RES_STR(" selected adapter has no active GPU Engine 3D presenter. process=%s source=%s "
-                                   "window_count=%zu raw_fps=value=%.1f%s"),
-                    sample.processName.c_str(),
-                    PresentEventSourceName(bestSelection.source),
-                    bestSelection.count,
-                    rawFps,
-                    GpuUsageDiagnosticsForProcess(bestSelection.processId).c_str()));
+            sample.diagnostics = BuildDiagnosticsLocked(FormatText(
+                RES_STR(
+                    " selected adapter has no active GPU Engine 3D presenter. process=%s source=%s "
+                    "window_count=%zu raw_fps=value=%.1f%s"
+                ),
+                sample.processName.c_str(),
+                PresentEventSourceName(bestSelection.source),
+                bestSelection.count,
+                rawFps,
+                GpuUsageDiagnosticsForProcess(bestSelection.processId).c_str()
+            ));
             return sample;
         }
         const double fps = SmoothFpsLocked(rawFps, bestSelection);
@@ -353,12 +375,14 @@ public:
         sample.available = true;
         sample.fps = fps;
         std::string detail = FormatText(RES_STR(" process=%s"), sample.processName.c_str());
-        AppendFormat(detail,
+        AppendFormat(
+            detail,
             RES_STR(" source=%s window_count=%zu raw_fps=value=%.1f smoothed_fps=value=%.1f"),
             PresentEventSourceName(bestSelection.source),
             bestSelection.count,
             rawFps,
-            fps);
+            fps
+        );
         AppendFormat(detail, RES_STR("%s"), GpuUsageDiagnostics().c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return sample;
@@ -422,7 +446,9 @@ private:
         }
         if (bucket.firstEvent >= 256 && bucket.firstEvent * 2 >= bucket.events.size()) {
             bucket.events.erase(
-                bucket.events.begin(), bucket.events.begin() + static_cast<std::ptrdiff_t>(bucket.firstEvent));
+                bucket.events.begin(),
+                bucket.events.begin() + static_cast<std::ptrdiff_t>(bucket.firstEvent)
+            );
             bucket.firstEvent = 0;
         }
     }
@@ -443,7 +469,10 @@ private:
     }
 
     ProcessEventSelection SelectBestProcessLocked(
-        ProcessPresentEventBuckets& eventsByProcess, uint64_t minimumQpc, bool requireGpu3dActivity) {
+        ProcessPresentEventBuckets& eventsByProcess,
+        uint64_t minimumQpc,
+        bool requireGpu3dActivity
+    ) {
         ProcessEventSelection selection;
         selection.source =
             &eventsByProcess == &runtimeEventsByProcess_ ? PresentEventSource::Runtime : PresentEventSource::Kernel;
@@ -458,9 +487,11 @@ private:
             }
 
             const std::string& processName = ResolveProcessNameLocked(it->processId);
-            if (!IsExcludedProcessName(processName) &&
+            if (
+                !IsExcludedProcessName(processName) &&
                 (!requireGpu3dActivity || Gpu3dUsageForProcess(it->processId) >= kGpu3dActiveThresholdPercent) &&
-                IsBetterSelectionLocked(it->processId, eventCount, selection)) {
+                IsBetterSelectionLocked(it->processId, eventCount, selection)
+            ) {
                 selection.processId = it->processId;
                 selection.count = eventCount;
             }
@@ -471,7 +502,9 @@ private:
     }
 
     ProcessEventSelection SelectBestSourceLocked(
-        const ProcessEventSelection& runtimeSelection, const ProcessEventSelection& kernelSelection) const {
+        const ProcessEventSelection& runtimeSelection,
+        const ProcessEventSelection& kernelSelection
+    ) const {
         if (runtimeSelection.processId == 0) {
             return kernelSelection;
         }
@@ -481,8 +514,10 @@ private:
 
         const double kernelGpu3d = Gpu3dUsageForProcess(kernelSelection.processId);
         const double runtimeGpu3d = Gpu3dUsageForProcess(runtimeSelection.processId);
-        if (kernelGpu3d >= kGpu3dActiveThresholdPercent &&
-            kernelGpu3d >= (std::max)(runtimeGpu3d, 0.1) * kGpu3dDominanceRatio) {
+        if (
+            kernelGpu3d >= kGpu3dActiveThresholdPercent &&
+            kernelGpu3d >= (std::max)(runtimeGpu3d, 0.1) * kGpu3dDominanceRatio
+        ) {
             return kernelSelection;
         }
         return runtimeSelection;
@@ -495,12 +530,16 @@ private:
 
         const double candidateGpu3d = Gpu3dUsageForProcess(processId);
         const double currentGpu3d = Gpu3dUsageForProcess(current.processId);
-        if (candidateGpu3d >= kGpu3dActiveThresholdPercent &&
-            candidateGpu3d >= (std::max)(currentGpu3d, 0.1) * kGpu3dDominanceRatio) {
+        if (
+            candidateGpu3d >= kGpu3dActiveThresholdPercent &&
+            candidateGpu3d >= (std::max)(currentGpu3d, 0.1) * kGpu3dDominanceRatio
+        ) {
             return true;
         }
-        if (currentGpu3d >= kGpu3dActiveThresholdPercent &&
-            currentGpu3d >= (std::max)(candidateGpu3d, 0.1) * kGpu3dDominanceRatio) {
+        if (
+            currentGpu3d >= kGpu3dActiveThresholdPercent &&
+            currentGpu3d >= (std::max)(candidateGpu3d, 0.1) * kGpu3dDominanceRatio
+        ) {
             return false;
         }
         return count > current.count;
@@ -512,8 +551,10 @@ private:
         }
 
         const double selectedGpu3d = Gpu3dUsageForProcess(selected.processId);
-        if (topGpu3dProcessId_ != selected.processId &&
-            topGpu3dUsage_ < (std::max)(selectedGpu3d, 0.1) * kGpu3dDominanceRatio) {
+        if (
+            topGpu3dProcessId_ != selected.processId &&
+            topGpu3dUsage_ < (std::max)(selectedGpu3d, 0.1) * kGpu3dDominanceRatio
+        ) {
             return false;
         }
         if (topGpu3dProcessId_ == selected.processId && selected.count >= 2) {
@@ -524,21 +565,27 @@ private:
         sample.processName = ResolveProcessNameLocked(topGpu3dProcessId_);
         sample.available = false;
         sample.permissionRequired = IsProcessNamePermissionRequiredLocked(topGpu3dProcessId_);
-        std::string detail = FormatText(RES_STR(" top GPU 3D application has no matching present events. process=%s "
-                                                "selected_process=%s"),
+        std::string detail = FormatText(
+            RES_STR(" top GPU 3D application has no matching present events. process=%s selected_process=%s"),
             sample.processName.c_str(),
-            ResolveProcessNameLocked(selected.processId).c_str());
-        AppendFormat(detail,
+            ResolveProcessNameLocked(selected.processId).c_str()
+        );
+        AppendFormat(
+            detail,
             RES_STR(" selected_source=%s selected_window_count=%zu"),
             PresentEventSourceName(selected.source),
-            selected.count);
+            selected.count
+        );
         AppendFormat(detail, RES_STR("%s"), GpuUsageDiagnosticsForProcess(selected.processId).c_str());
         sample.diagnostics = BuildDiagnosticsLocked(detail);
         return true;
     }
 
     ProcessEventSelection ApplyProcessHysteresisLocked(
-        const ProcessEventSelection& candidate, uint64_t minimumQpc, bool requireGpu3dActivity) {
+        const ProcessEventSelection& candidate,
+        uint64_t minimumQpc,
+        bool requireGpu3dActivity
+    ) {
         if (selectedProcessId_ == 0 || candidate.processId == selectedProcessId_) {
             return candidate;
         }
@@ -564,8 +611,10 @@ private:
         previous.count = previousCount;
         previous.source = selectedSource_;
         // Preserve the active presenter through short ETW delivery bursts and near-ties between presenting apps.
-        if (candidate.processId == 0 || static_cast<double>(candidate.count) <
-                                            static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio) {
+        if (
+            candidate.processId == 0 ||
+            static_cast<double>(candidate.count) < static_cast<double>(previous.count) * kProcessSwitchHysteresisRatio
+        ) {
             return previous;
         }
         return candidate;
@@ -703,7 +752,11 @@ private:
         PDH_STATUS status = PdhGetRawCounterArrayA(gpu3dCounter_, &bufferSize, &itemCount, nullptr);
         if (status != PDH_MORE_DATA) {
             SetGpuUsageTwoStatusText(
-                gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_prepare", static_cast<long>(status));
+                gpuUsageDiagnostics_,
+                static_cast<long>(collectStatus),
+                "gpu3d_prepare",
+                static_cast<long>(status)
+            );
             return;
         }
 
@@ -712,7 +765,11 @@ private:
         status = PdhGetRawCounterArrayA(gpu3dCounter_, &bufferSize, &itemCount, items);
         if (status != ERROR_SUCCESS) {
             SetGpuUsageTwoStatusText(
-                gpuUsageDiagnostics_, static_cast<long>(collectStatus), "gpu3d_fetch", static_cast<long>(status));
+                gpuUsageDiagnostics_,
+                static_cast<long>(collectStatus),
+                "gpu3d_fetch",
+                static_cast<long>(status)
+            );
             return;
         }
 
@@ -764,17 +821,21 @@ private:
         }
         previousGpuRawByInstance_.Swap(currentGpuRawByInstance_);
 
-        AssignFormat(gpuUsageDiagnostics_,
+        AssignFormat(
+            gpuUsageDiagnostics_,
             RES_STR(" gpu3d_collect=%ld gpu3d_fetch=%ld gpu3d_filter=\"%s\" gpu3d_matched=%lu top_gpu3d_process="),
             static_cast<long>(collectStatus),
             static_cast<long>(status),
             options.gpuAdapterLuidToken.empty() ? kAllGpuAdaptersFilterLabel : options.gpuAdapterLuidToken.c_str(),
-            static_cast<unsigned long>(matchedInstances));
+            static_cast<unsigned long>(matchedInstances)
+        );
         AppendFormat(gpuUsageDiagnostics_, RES_STR("%s"), ResolveProcessNameLocked(topGpu3dProcessId_).c_str());
-        AppendFormat(gpuUsageDiagnostics_,
+        AppendFormat(
+            gpuUsageDiagnostics_,
             RES_STR(" top_gpu3d_pid=%lu top_gpu3d=value=%.1f"),
             static_cast<unsigned long>(topGpu3dProcessId_),
-            topGpu3dUsage_);
+            topGpu3dUsage_
+        );
     }
 
     std::string GpuUsageDiagnostics() const {
@@ -792,7 +853,15 @@ private:
 
     ULONG EnableProvider(const GUID& providerGuid, uint64_t anyKeyword, UCHAR level) const {
         return EnableTraceEx2(
-            sessionHandle_, &providerGuid, EVENT_CONTROL_CODE_ENABLE_PROVIDER, level, anyKeyword, 0, 0, nullptr);
+            sessionHandle_,
+            &providerGuid,
+            EVENT_CONTROL_CODE_ENABLE_PROVIDER,
+            level,
+            anyKeyword,
+            0,
+            0,
+            nullptr
+        );
     }
 
     void Stop() {
@@ -858,10 +927,12 @@ private:
 
     std::string BuildDiagnosticsLocked(const std::string& suffix) const {
         std::string text = diagnostics_;
-        AppendFormat(text,
+        AppendFormat(
+            text,
             RES_STR(" runtime_events=%llu dxgkrnl_events=%llu"),
             static_cast<unsigned long long>(runtimePresentEvents_),
-            static_cast<unsigned long long>(kernelPresentEvents_));
+            static_cast<unsigned long long>(kernelPresentEvents_)
+        );
         AppendFormat(text, RES_STR("%s"), suffix.c_str());
         return text;
     }
@@ -875,7 +946,7 @@ private:
         const bool isDxgiPresent =
             header.ProviderId == kDxgiProviderGuid && header.EventDescriptor.Id == kDxgiPresentStartEventId;
         const bool isDxgiPresentMpo = header.ProviderId == kDxgiProviderGuid &&
-                                      header.EventDescriptor.Id == kDxgiPresentMultiplaneOverlayStartEventId;
+            header.EventDescriptor.Id == kDxgiPresentMultiplaneOverlayStartEventId;
         const bool isD3d9Present =
             header.ProviderId == kD3d9ProviderGuid && header.EventDescriptor.Id == kD3d9PresentStartEventId;
         const bool isDxgKrnlPresent =
@@ -899,12 +970,14 @@ private:
         uint64_t& sourceCount = source == PresentEventSource::Runtime ? runtimePresentEvents_ : kernelPresentEvents_;
         ++sourceCount;
         if (sourceCount <= 5 || sourceCount % 300 == 0) {
-            trace_.WriteFmt(TracePrefix::FpsEtw,
+            trace_.WriteFmt(
+                TracePrefix::FpsEtw,
                 RES_STR("present source=%s pid=%lu event_id=%u source_events=%llu"),
                 PresentEventSourceName(source),
                 static_cast<unsigned long>(header.ProcessId),
                 static_cast<unsigned>(header.EventDescriptor.Id),
-                static_cast<unsigned long long>(sourceCount));
+                static_cast<unsigned long long>(sourceCount)
+            );
         }
     }
 
@@ -928,7 +1001,10 @@ private:
         }
         const ULONG processStatus = ProcessTrace(&handle, 1, nullptr, nullptr);
         trace_.WriteFmt(
-            TracePrefix::FpsEtw, RES_STR("process_trace_done status=%s"), FormatWin32Error(processStatus).c_str());
+            TracePrefix::FpsEtw,
+            RES_STR("process_trace_done status=%s"),
+            FormatWin32Error(processStatus).c_str()
+        );
     }
 
     Trace& trace_;

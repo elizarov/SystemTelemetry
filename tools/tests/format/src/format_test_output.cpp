@@ -255,6 +255,12 @@ void GatewayAddress(const Gateway* gateway) {
     Use(address);
 }
 
+void ClearHistoryKeyIndexes(SystemSnapshot& snapshot) {
+    for (uint16_t& encodedIndex : snapshot.retainedHistoryIndexByKey) {
+        encodedIndex = 0;
+    }
+}
+
 void ManagedReferenceSpacing(
     NativeType& nativeRef,
     NativeType&& nativeRvalueRef,

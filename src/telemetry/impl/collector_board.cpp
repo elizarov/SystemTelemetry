@@ -45,7 +45,9 @@ bool HasConfiguredSensorName(const std::unordered_map<std::string, std::string>&
 }
 
 std::optional<std::string> FindAutoBoardSensorName(
-    const std::string& logicalName, const std::vector<std::string>& availableSensorNames) {
+    const std::string& logicalName,
+    const std::vector<std::string>& availableSensorNames
+) {
     const auto findContaining = [&](const std::string& text) -> std::optional<std::string> {
         const auto it = std::find_if(availableSensorNames.begin(), availableSensorNames.end(), [&](const auto& name) {
             return ContainsInsensitive(name, text);
@@ -80,8 +82,10 @@ bool ResolveAutoBoardSensorBindings(RealTelemetryCollectorState& state) {
         if (HasConfiguredSensorName(state.settings_.board.temperatureSensorNames, name)) {
             continue;
         }
-        if (auto sensorName = FindAutoBoardSensorName(name, state.board_.availableTemperatureNames);
-            sensorName.has_value()) {
+        if (
+            auto sensorName = FindAutoBoardSensorName(name, state.board_.availableTemperatureNames);
+            sensorName.has_value()
+        ) {
             state.settings_.board.temperatureSensorNames[name] = *sensorName;
             state.resolvedSelections_.boardTemperatureSensorNames[name] = *sensorName;
             resolved = true;
@@ -131,7 +135,9 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
     if (!HasRequestedBoardMetrics(settings)) {
         ClearBoardProviderState(state, ResourceStringText(RES_STR("No board metrics requested by layout.")));
         state.trace_.Write(
-            TracePrefix::Telemetry, RES_STR("board_provider_initialize_skipped reason=no_requested_metrics"));
+            TracePrefix::Telemetry,
+            RES_STR("board_provider_initialize_skipped reason=no_requested_metrics")
+        );
         return;
     }
 
@@ -144,17 +150,21 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
                 state.board_.provider->Initialize(state.settings_.board);
                 ApplyBoardVendorSample(state, state.board_.provider->Sample());
             }
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("board_provider_initialize_done provider=%s available=%s diagnostics=\"%s\""),
                 state.board_.providerName.c_str(),
                 Trace::BoolText(state.board_.providerAvailable),
-                state.board_.providerDiagnostics.c_str());
+                state.board_.providerDiagnostics.c_str()
+            );
         } else {
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
-            state.trace_.WriteFmt(TracePrefix::Telemetry,
+            state.trace_.WriteFmt(
+                TracePrefix::Telemetry,
                 RES_STR("board_provider_initialize_failed provider=%s diagnostics=\"%s\""),
                 state.board_.providerName.c_str(),
-                state.board_.providerDiagnostics.c_str());
+                state.board_.providerDiagnostics.c_str()
+            );
         }
     } else {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_create result=null"));
@@ -167,7 +177,9 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
     if (!HasRequestedBoardMetrics(settings)) {
         ClearBoardProviderState(state, ResourceStringText(RES_STR("No board metrics requested by layout.")));
         state.trace_.Write(
-            TracePrefix::Telemetry, RES_STR("board_provider_reconfigure_skipped reason=no_requested_metrics"));
+            TracePrefix::Telemetry,
+            RES_STR("board_provider_reconfigure_skipped reason=no_requested_metrics")
+        );
         return;
     }
 
@@ -186,17 +198,21 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
             state.board_.provider->Initialize(state.settings_.board);
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
         }
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("board_provider_reconfigure_done provider=%s available=%s diagnostics=\"%s\""),
             state.board_.providerName.c_str(),
             Trace::BoolText(state.board_.providerAvailable),
-            state.board_.providerDiagnostics.c_str());
+            state.board_.providerDiagnostics.c_str()
+        );
     } else {
         ApplyBoardVendorSample(state, state.board_.provider->Sample());
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("board_provider_reconfigure_failed provider=%s diagnostics=\"%s\""),
             state.board_.providerName.c_str(),
-            state.board_.providerDiagnostics.c_str());
+            state.board_.providerDiagnostics.c_str()
+        );
     }
 }
 
@@ -207,11 +223,13 @@ void UpdateBoardMetrics(RealTelemetryCollectorState& state) {
             state.board_.provider->Initialize(state.settings_.board);
             ApplyBoardVendorSample(state, state.board_.provider->Sample());
         }
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
+        state.trace_.WriteFmt(
+            TracePrefix::Telemetry,
             RES_STR("board_vendor_sample provider=%s available=%s diagnostics=\"%s\""),
             state.board_.providerName.c_str(),
             Trace::BoolText(state.board_.providerAvailable),
-            state.board_.providerDiagnostics.c_str());
+            state.board_.providerDiagnostics.c_str()
+        );
     }
     state.retainedHistoryStore_.PushBoardMetricSamples(state.snapshot_);
 }

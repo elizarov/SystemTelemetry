@@ -12,4 +12,6 @@ std::string NormalizeStorageDriveLetter(const std::string& drive);
 void SortStorageDriveCandidatesByLetter(std::vector<StorageDriveCandidate>& candidates);
 std::vector<std::string> NormalizeConfiguredStorageDriveLetters(const std::vector<std::string>& drives);
 std::vector<std::string> ResolveConfiguredStorageDriveLetters(
-    const std::vector<std::string>& configuredDrives, const std::vector<StorageDriveCandidate>& availableDrives);
+    const std::vector<std::string>& configuredDrives,
+    const std::vector<StorageDriveCandidate>& availableDrives
+);

@@ -38,9 +38,11 @@ void NormalizeThroughputState(RetainedHistorySeries& history) {
         history.throughputLiveSamples.insert(history.throughputLiveSamples.begin(), 0.0);
     }
     if (history.throughputLiveSamples.size() > kThroughputHistorySmoothingSamples) {
-        history.throughputLiveSamples.erase(history.throughputLiveSamples.begin(),
+        history.throughputLiveSamples.erase(
+            history.throughputLiveSamples.begin(),
             history.throughputLiveSamples.begin() +
-                static_cast<std::ptrdiff_t>(history.throughputLiveSamples.size() - kThroughputHistorySmoothingSamples));
+                static_cast<std::ptrdiff_t>(history.throughputLiveSamples.size() - kThroughputHistorySmoothingSamples)
+        );
     }
     if (history.throughputBucketSampleCount > kThroughputHistorySmoothingSamples) {
         history.throughputBucketTotal = 0.0;
@@ -59,7 +61,9 @@ void PushThroughputSample(RetainedHistorySeries& history, double value) {
     ++history.throughputBucketSampleCount;
     if (history.throughputBucketSampleCount >= kThroughputHistorySmoothingSamples) {
         PushHistorySample(
-            history.samples, history.throughputBucketTotal / static_cast<double>(history.throughputBucketSampleCount));
+            history.samples,
+            history.throughputBucketTotal / static_cast<double>(history.throughputBucketSampleCount)
+        );
         history.throughputBucketTotal = 0.0;
         history.throughputBucketSampleCount = 0;
     }
@@ -71,7 +75,11 @@ bool IsThroughputSeriesRef(std::string_view seriesRef) {
 }
 
 bool TryGetCachedHistoryIndex(
-    const SystemSnapshot& snapshot, RetainedHistoryKey key, std::string_view seriesRef, size_t& index) {
+    const SystemSnapshot& snapshot,
+    RetainedHistoryKey key,
+    std::string_view seriesRef,
+    size_t& index
+) {
     const uint16_t encodedIndex = snapshot.retainedHistoryIndexByKey[HistoryKeyIndex(key)];
     if (encodedIndex == 0) {
         return false;

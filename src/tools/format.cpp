@@ -3504,6 +3504,9 @@ private:
         if (std::find(std::begin(kTypeWords), std::end(kTypeWords), token.text) != std::end(kTypeWords)) {
             return true;
         }
+        if (IsTypedefStyleTypeName(token.text)) {
+            return true;
+        }
         if (!token.text.empty() && token.text.front() >= 'A' && token.text.front() <= 'Z') {
             return true;
         }
@@ -3512,6 +3515,10 @@ private:
             return true;
         }
         return beforeType && tokens[*beforeType].text == "::";
+    }
+
+    static bool IsTypedefStyleTypeName(std::string_view text) {
+        return text.size() > 2 && text.ends_with("_t");
     }
 
     static bool IsCallingConventionToken(std::string_view text) {
