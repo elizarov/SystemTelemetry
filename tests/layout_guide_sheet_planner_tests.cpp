@@ -102,7 +102,7 @@ TEST(LayoutGuideSheetPlanner, BuiltInCardSelectionDoesNotSelectNetworkWhenStorag
     EXPECT_EQ(selected, (std::vector<std::string>{"cpu", "storage", "time"}));
 }
 
-TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPlacement) {
+TEST(LayoutGuideSheetPlanner, BuiltInTimeCardReferencesUseConfiguredHeader) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     Trace trace;
     DashboardRenderer renderer(trace);
@@ -122,6 +122,26 @@ TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPla
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
     cards = renderer.CollectLayoutGuideSheetCardSummaries();
     timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
+    ASSERT_NE(timeCard, cards.end());
+    EXPECT_EQ(timeCard->title, "Time");
+    EXPECT_EQ(timeCard->iconName, "time");
+    EXPECT_TRUE(timeCard->chromeLayout.hasHeader);
+}
+
+TEST(LayoutGuideSheetPlanner, TitlelessCardReferenceOmitsHeaderForThatPlacement) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    ASSERT_TRUE(SelectLayout(config, "5x3"));
+    config.layout.structure.cards = LayoutNodeConfig{};
+    config.layout.structure.cards.name = "time";
+    config.layout.structure.cards.parameter = "!title";
+    config.layout.structure.cards.cardReference = true;
+
+    Trace trace;
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(config);
+    ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
+    std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    const auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
     EXPECT_TRUE(timeCard->title.empty());
     EXPECT_TRUE(timeCard->iconName.empty());
