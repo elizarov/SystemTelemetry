@@ -441,6 +441,16 @@ void ManagedReferenceSpacing(
     );
 }
 
+void RegisterStaticTextAnchor(
+    const RenderRect&,
+    const std::string&,
+    TextStyleId,
+    const TextLayoutOptions&,
+    const LayoutEditAnchorBinding&,
+    std::optional<LayoutEditParameter>,
+    LayoutEditTargetOutline
+) override {}
+
 struct NetworkFooterWidgetConfig {
     int bottomGap{};  // config_meta: policy=non_negative_int
 

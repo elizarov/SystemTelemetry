@@ -5170,18 +5170,16 @@ private:
             return false;
         }
         const size_t nextIndex = NextSignificantIndex(tokens, index + 1);
-        if (nextIndex >= tokens.size()) {
-            return false;
-        }
-        const Token* next = &tokens[nextIndex];
-        const bool beforeDeclaratorName = next->kind == TokenKind::Word;
-        const bool beforeTemplateClose = IsTemplateAngleCloseToken(tokens, nextIndex);
-        const bool beforeStructuredBinding = tokens[index].text != "*" && next->text == "[";
+        const Token* next = nextIndex < tokens.size() ? &tokens[nextIndex] : nullptr;
+        const bool beforeDeclaratorName = next != nullptr && next->kind == TokenKind::Word;
+        const bool beforeTemplateClose = next != nullptr && IsTemplateAngleCloseToken(tokens, nextIndex);
+        const bool beforeStructuredBinding = next != nullptr && tokens[index].text != "*" && next->text == "[";
         const bool beforeUnnamedDeclaratorEnd =
-            next->text == ")" || next->text == "," || next->text == "=" || next->text == ";";
-        const bool beforePointerOrReferenceDeclarator = IsPointerOrReferenceDeclaratorToken(next->text);
+            next == nullptr || next->text == ")" || next->text == "," || next->text == "=" || next->text == ";";
+        const bool beforePointerOrReferenceDeclarator =
+            next != nullptr && IsPointerOrReferenceDeclaratorToken(next->text);
         const bool beforeFunctionPointerDeclarator =
-            tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
+            next != nullptr && tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
         const bool beforeDeclarator = beforeDeclaratorName ||
             beforeTemplateClose ||
             beforeStructuredBinding ||
