@@ -199,6 +199,14 @@ using ZesDriver=void *;
 using ZesInitFn=ZeResult(__cdecl *)(std::uint32_t);
 using DumpValues=std::vector<std::pair<std::string,std::string>>;
 using LayoutEditActiveRegionPayload=std::variant<LayoutEditCardRegion,LayoutEditWidgetRegion,LayoutEditGuide,LayoutEditContainerChildReorderRegion,LayoutEditGapAnchor,LayoutEditWidgetGuide,LayoutEditAnchorRegion,LayoutEditColorRegion>;
+struct LayoutEditAnchorKey{
+LayoutEditWidgetIdentity widget;
+std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> subject=LayoutEditParameter::MetricListBarHeight;
+std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> fallbackSubject;
+int anchorId=0;
+};
+std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> DefaultLayoutEditSubject();
+void UseLayoutEditSubject(std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> subject);
 using RuntimeConfigForEachDynamicItem=void(
 *
 )(const AppConfig& config,void* context,RuntimeConfigDynamicItemVisitor visitor);

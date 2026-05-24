@@ -2136,6 +2136,19 @@ private:
         std::vector<std::string> lines;
         std::vector<Token> lhs(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1));
         std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1), tokens.end());
+        if (!Fits(indentLevel, prefix + FormatInline(lhs))) {
+            if (std::optional<std::vector<std::string>> splitLhs = TryFormatSplitAssignmentLhsTemplate(
+                lhs,
+                rhs,
+                indentLevel,
+                prefix,
+                suffix,
+                indentSplitChains,
+                indentLogicalSplitChains
+            )) {
+                return *splitLhs;
+            }
+        }
         std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
         if (
             !CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
@@ -2153,6 +2166,50 @@ private:
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs));
         std::vector<std::string> rhsLines =
             FormatRange(rhs, indentLevel + 1, {}, std::move(suffix), indentSplitChains, indentLogicalSplitChains);
+        lines.insert(lines.end(), rhsLines.begin(), rhsLines.end());
+        return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatSplitAssignmentLhsTemplate(
+        const std::vector<Token>& lhs,
+        const std::vector<Token>& rhs,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix,
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
+    ) const {
+        const std::optional<size_t> assignment = PreviousNonNewlineIndex(lhs, lhs.size());
+        if (!assignment || lhs[*assignment].text != "=") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> declarator = PreviousNonNewlineIndex(lhs, *assignment);
+        if (!declarator || lhs[*declarator].kind != TokenKind::Word) {
+            return std::nullopt;
+        }
+        if (!IsLikelyDeclarationTypeBeforeName(lhs, *declarator)) {
+            return std::nullopt;
+        }
+        std::vector<Token> typeTokens(lhs.begin(), lhs.begin() + static_cast<std::ptrdiff_t>(*declarator));
+        const std::optional<GroupPair> templateGroup = FindFirstWrappableTemplateAngleGroup(typeTokens);
+        if (!templateGroup || !Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(lhs, *templateGroup))) {
+            return std::nullopt;
+        }
+        std::vector<std::string> lines = FormatSplitGroup(lhs, *templateGroup, indentLevel, std::string(prefix), {});
+        if (lines.empty()) {
+            return std::nullopt;
+        }
+        std::string rhsText = FormatInline(rhs);
+        AppendSuffix(rhsText, suffix);
+        if (!rhsText.empty() && !ShouldForceSplit(rhs)) {
+            std::string candidate = TrimRight(lines.back()) + " " + rhsText;
+            if (Fits(indentLevel, candidate)) {
+                lines.back() = std::move(candidate);
+                return lines;
+            }
+        }
+        std::vector<std::string> rhsLines =
+            FormatRange(rhs, indentLevel + 1, {}, std::string(suffix), indentSplitChains, indentLogicalSplitChains);
         lines.insert(lines.end(), rhsLines.begin(), rhsLines.end());
         return lines;
     }
@@ -4226,6 +4283,21 @@ private:
                         !IsNonWrappablePrefixGroup(tokens, index, *close) &&
                         !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
+                        return GroupPair{index, *close};
+                    }
+                }
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return std::nullopt;
+    }
+
+    std::optional<GroupPair> FindFirstWrappableTemplateAngleGroup(const std::vector<Token>& tokens) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (depth == 0 && IsWrappableTemplateAngleOpen(tokens, index)) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
+                    if (!IsEmptyGroupPair(tokens, index, *close)) {
                         return GroupPair{index, *close};
                     }
                 }

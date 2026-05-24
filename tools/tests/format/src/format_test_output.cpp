@@ -278,6 +278,42 @@ using LayoutEditActiveRegionPayload = std::variant<
     LayoutEditColorRegion
 >;
 
+struct LayoutEditAnchorKey {
+    LayoutEditWidgetIdentity widget;
+    std::variant<
+        LayoutEditParameter,
+        LayoutMetricEditKey,
+        LayoutCardTitleEditKey,
+        LayoutNodeFieldEditKey,
+        LayoutContainerChildOrderEditKey
+    > subject = LayoutEditParameter::MetricListBarHeight;
+    std::variant<
+        LayoutEditParameter,
+        LayoutMetricEditKey,
+        LayoutCardTitleEditKey,
+        LayoutNodeFieldEditKey,
+        LayoutContainerChildOrderEditKey
+    > fallbackSubject;
+    int anchorId = 0;
+};
+
+std::variant<
+    LayoutEditParameter,
+    LayoutMetricEditKey,
+    LayoutCardTitleEditKey,
+    LayoutNodeFieldEditKey,
+    LayoutContainerChildOrderEditKey
+> DefaultLayoutEditSubject();
+void UseLayoutEditSubject(
+    std::variant<
+        LayoutEditParameter,
+        LayoutMetricEditKey,
+        LayoutCardTitleEditKey,
+        LayoutNodeFieldEditKey,
+        LayoutContainerChildOrderEditKey
+    > subject
+);
+
 using RuntimeConfigForEachDynamicItem =
     void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 
