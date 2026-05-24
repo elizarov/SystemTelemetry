@@ -4,8 +4,24 @@
 
 #include "config/color_format.h"
 #include "layout_edit/layout_edit_service.h"
+#include "layout_edit/layout_edit_target_descriptor.h"
 #include "util/numeric_format.h"
 #include "util/text_format.h"
+
+namespace {
+
+std::string LayoutNodeFieldTooltipSectionName(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
+    if (key.editCardId.empty() && !config.display.layout.empty()) {
+        return FormatText("layout.%s", config.display.layout.c_str());
+    }
+    return key.editCardId.empty() ? "layout" : FormatText("card.%s", key.editCardId.c_str());
+}
+
+const char* LayoutNodeFieldTooltipMemberName(const LayoutNodeFieldEditKey& key) {
+    return key.editCardId.empty() ? "cards" : "layout";
+}
+
+}  // namespace
 
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format) {
     if (format == configschema::ValueFormat::String || format == configschema::ValueFormat::FontSpec ||
@@ -71,14 +87,11 @@ std::optional<std::string> BuildMetricListOrderTooltipLine(
         return std::nullopt;
     }
 
-    const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
-                                        ? FormatText("layout.%s", config.display.layout.c_str())
-                                    : key.editCardId.empty() ? "layout"
-                                                             : FormatText("card.%s", key.editCardId.c_str());
-    const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
+    const std::string sectionName = LayoutNodeFieldTooltipSectionName(config, key);
+    const char* memberName = LayoutNodeFieldTooltipMemberName(key);
     return FormatText("[%s] %s = metric_list(%s)",
         sectionName.c_str(),
-        memberName.c_str(),
+        memberName,
         metricRefs[static_cast<size_t>(rowIndex)].c_str());
 }
 
@@ -89,12 +102,27 @@ std::optional<std::string> BuildMetricListAddRowTooltipLine(
         return std::nullopt;
     }
 
-    const std::string sectionName = key.editCardId.empty() && !config.display.layout.empty()
-                                        ? FormatText("layout.%s", config.display.layout.c_str())
-                                    : key.editCardId.empty() ? "layout"
-                                                             : FormatText("card.%s", key.editCardId.c_str());
-    const std::string memberName = key.editCardId.empty() ? "cards" : "layout";
-    return FormatText("[%s] %s = metric_list()", sectionName.c_str(), memberName.c_str());
+    const std::string sectionName = LayoutNodeFieldTooltipSectionName(config, key);
+    return FormatText("[%s] %s = metric_list()", sectionName.c_str(), LayoutNodeFieldTooltipMemberName(key));
+}
+
+std::optional<std::string> BuildDateTimeFormatTooltipLine(const AppConfig& config, const LayoutNodeFieldEditKey& key) {
+    const LayoutNodeFieldEditDescriptor* descriptor = FindLayoutNodeFieldEditDescriptor(key);
+    if (descriptor == nullptr || descriptor->editorKind != LayoutEditEditorKind::DateTimeFormat) {
+        return std::nullopt;
+    }
+
+    const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, key);
+    if (node == nullptr) {
+        return std::nullopt;
+    }
+
+    const std::string sectionName = LayoutNodeFieldTooltipSectionName(config, key);
+    return FormatText("[%s] %s = %s(%s)",
+        sectionName.c_str(),
+        LayoutNodeFieldTooltipMemberName(key),
+        node->name.c_str(),
+        ReadLayoutNodeFieldValue(*node, key.field).c_str());
 }
 
 std::optional<std::string> BuildContainerChildOrderTooltipLine(
