@@ -316,6 +316,20 @@ bool BuildNodeFieldLeaf(const std::string& sectionName,
     return true;
 }
 
+bool BuildDescriptorBackedWidgetLeaf(const std::string& sectionName,
+    const std::string& memberName,
+    const std::string& editCardId,
+    const LayoutNodeConfig& node,
+    const std::vector<size_t>& nodePath,
+    LayoutEditTreeNode& leafNode) {
+    if (node.cardReference) {
+        return false;
+    }
+    const auto widgetClass = node.name.empty() ? std::nullopt : EnumFromString<WidgetClass>(node.name);
+    return widgetClass.has_value() &&
+           BuildNodeFieldLeaf(sectionName, memberName, editCardId, nodePath, *widgetClass, leafNode);
+}
+
 bool BuildContainerNode(const std::string& sectionName,
     const std::string& memberName,
     const std::string& editCardId,
@@ -341,18 +355,10 @@ bool BuildContainerNode(const std::string& sectionName,
         LayoutEditTreeNode childNode;
         if (BuildContainerNode(sectionName, memberName, editCardId, child, childPath, childNode)) {
             treeNode.children.push_back(std::move(childNode));
-        } else if (child.name == "metric_list") {
+        } else {
             LayoutEditTreeNode leafNode;
-            if (BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, WidgetClass::MetricList, leafNode)) {
+            if (BuildDescriptorBackedWidgetLeaf(sectionName, memberName, editCardId, child, childPath, leafNode)) {
                 treeNode.children.push_back(std::move(leafNode));
-            }
-        } else if (child.name == "clock_time" || child.name == "clock_date") {
-            const auto widgetClass = EnumFromString<WidgetClass>(child.name);
-            if (widgetClass.has_value()) {
-                LayoutEditTreeNode leafNode;
-                if (BuildNodeFieldLeaf(sectionName, memberName, editCardId, childPath, *widgetClass, leafNode)) {
-                    treeNode.children.push_back(std::move(leafNode));
-                }
             }
         }
         childPath.pop_back();
@@ -409,6 +415,11 @@ bool BuildStructureGroup(const std::string& sectionName,
             groupNode.children = std::move(containerNode.children);
         } else {
             groupNode.children.push_back(std::move(containerNode));
+        }
+    } else {
+        LayoutEditTreeNode leafNode;
+        if (BuildDescriptorBackedWidgetLeaf(sectionName, memberName, editCardId, node, {}, leafNode)) {
+            groupNode.children.push_back(std::move(leafNode));
         }
     }
     if (groupNode.children.empty()) {
