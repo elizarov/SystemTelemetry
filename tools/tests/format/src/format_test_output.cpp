@@ -83,6 +83,7 @@ public:
         std::string_view defaultExtension
     ) const = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
+    virtual void Draw(::Renderer& renderer, const WidgetAnimationState& state) const = 0;
 };
 
 class DialogRedrawScope {

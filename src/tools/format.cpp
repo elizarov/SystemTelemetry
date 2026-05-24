@@ -3723,11 +3723,33 @@ private:
         if (text == "=") {
             return HasWordBefore(tokens, *beforeType, "using");
         }
+        if (text == "::") {
+            return IsLeadingGlobalQualifierInDeclaratorContext(tokens, *beforeType);
+        }
         return text == "(" ||
             text == "[" ||
             text == "{" ||
             text == "," ||
             text == "<" ||
+            IsPointerOrReferenceDeclaratorToken(text) ||
+            text == ":";
+    }
+
+    bool IsLeadingGlobalQualifierInDeclaratorContext(const std::vector<Token>& tokens, size_t qualifier) const {
+        const std::optional<size_t> beforeQualifier = PreviousNonNewlineIndex(tokens, qualifier);
+        if (!beforeQualifier) {
+            return true;
+        }
+        const std::string& text = tokens[*beforeQualifier].text;
+        if (tokens[*beforeQualifier].kind == TokenKind::Word) {
+            return IsTypeContextWord(text);
+        }
+        return text == "(" ||
+            text == "[" ||
+            text == "{" ||
+            text == "," ||
+            text == "<" ||
+            text == "=" ||
             IsPointerOrReferenceDeclaratorToken(text) ||
             text == ":";
     }
