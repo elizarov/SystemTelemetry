@@ -147,7 +147,7 @@ void ExpectJoinedHexEscapeFragment() {
         output,
         testing::HasSubstr(
             "gpu.temp = 100,\xC2\xB0"
-            "C,Core Temp\r\n"
+                "C,Core Temp\r\n"
         )
     );
 }
@@ -157,12 +157,32 @@ void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
         TracePrefix::GpuVendor,
         RES_STR(
             "adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X "
-            "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
-            "name=\"%s\""
+                "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
+                "name=\"%s\""
         ),
         adapterIndex,
         adapterName
     );
+}
+
+std::string FormatLayoutEditTraceText(const LayoutEditTraceState& state, const char* captureText) {
+    std::string trace = FormatText(
+        "layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
+            "tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",
+        state.config.display.layout.c_str(),
+        Trace::BoolText(state.isEditingLayout),
+        Trace::BoolText(state.isMoving),
+        layoutEditModalUiDepth_,
+        Trace::BoolText(dashboardTooltipOwner_ == DashboardTooltipOwner::LayoutEdit && dashboardTooltip_.Visible()),
+        Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
+        Trace::BoolText(
+            dashboardTooltipOwner_ == DashboardTooltipOwner::LayoutEdit && dashboardTooltip_.TargetRectValid()
+        ),
+        Trace::BoolText(layoutEditMouseTracking_),
+        Trace::BoolText(layoutEditController_.HasActiveDrag()),
+        captureText
+    );
+    return trace;
 }
 
 void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
@@ -194,23 +214,23 @@ void ExpectRectNoOverlap(RECT* rects) {
 void WriteMetricConfig() {
     const FilePath path = WriteTestConfig(
         "[metrics]\n"
-        "nothing = 7,ignored,Overridden Placeholder\n"
-        "cpu.load = *,%,Processor Load\n"
+            "nothing = 7,ignored,Overridden Placeholder\n"
+            "cpu.load = *,%,Processor Load\n"
     );
 }
 
 void WriteInitialConfigText() {
     const std::string initialText =
         "[display]\r\n"
-        "monitor_name = TL160ADMP03-0\r\n"
-        "position = 258,117\r\n"
-        "scale = 2\r\n"
-        "\r\n"
-        "[network]\r\n"
-        "adapter_name = Wi-Fi\r\n"
-        "\r\n"
-        "[storage]\r\n"
-        "drives = C\r\n";
+            "monitor_name = TL160ADMP03-0\r\n"
+            "position = 258,117\r\n"
+            "scale = 2\r\n"
+            "\r\n"
+            "[network]\r\n"
+            "adapter_name = Wi-Fi\r\n"
+            "\r\n"
+            "[storage]\r\n"
+            "drives = C\r\n";
 }
 
 struct OklabColor {

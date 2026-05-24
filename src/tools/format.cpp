@@ -3222,7 +3222,8 @@ private:
             if (lastStringLiteral && index == *lastStringLiteral) {
                 AppendSuffix(line, suffix);
             }
-            lines.push_back(Indent(indentLevel) + line);
+            const int lineIndent = lines.empty() ? indentLevel : indentLevel + 1;
+            lines.push_back(Indent(lineIndent) + line);
         }
         return lines;
     }

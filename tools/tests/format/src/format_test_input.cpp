@@ -123,6 +123,12 @@ trace.WriteFmt(TracePrefix::GpuVendor,RES_STR("adapter_candidate index=%u vendor
 "name=\"%s\""),adapterIndex,adapterName);
 }
 
+std::string FormatLayoutEditTraceText(const LayoutEditTraceState& state,const char* captureText){
+std::string trace=FormatText("layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s tooltip_suppressed=%s "
+"tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s capture=\"%s\"",state.config.display.layout.c_str(),Trace::BoolText(state.isEditingLayout),Trace::BoolText(state.isMoving),layoutEditModalUiDepth_,Trace::BoolText(dashboardTooltipOwner_==DashboardTooltipOwner::LayoutEdit&&dashboardTooltip_.Visible()),Trace::BoolText(layoutEditTooltipRefreshSuppressed_),Trace::BoolText(dashboardTooltipOwner_==DashboardTooltipOwner::LayoutEdit&&dashboardTooltip_.TargetRectValid()),Trace::BoolText(layoutEditMouseTracking_),Trace::BoolText(layoutEditController_.HasActiveDrag()),captureText);
+return trace;
+}
+
 void ReportUnknownBenchmark(const std::string& firstArg,std::istream& input){
 std::cerr<<"unknown benchmark \""<<firstArg<<"\"; supported benchmarks: "<<SupportedBenchmarkNames()<<"\n";
 input>>firstBenchmarkName>>secondBenchmarkNameWithLongName>>thirdBenchmarkNameWithLongName>>fourthBenchmarkNameWithLongName;
