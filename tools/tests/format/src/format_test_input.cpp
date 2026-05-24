@@ -501,6 +501,10 @@ void DrawGuideDotFromAdapter(RenderHost& renderer,RenderState& state,int x,int y
 RenderHostAdapter{renderer,state}.Renderer().FillSolidRect(RenderRect{x,y,std::min(x+dotLength,right),y+strokeWidth},RenderColorId::LayoutGuide);
 }
 
+void RegisterStaticEditAnchor(RenderHost& renderer,Widget& widget,const RenderRect& barRect,const RenderRect& anchorRect,const Config& config,int rowIndex,int anchorCenterX,int anchorCenterY){
+renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{.key=LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId,widget.editCardId,widget.nodePath},WidgetHost::LayoutEditParameter::MetricListBarHeight,rowIndex},.targetRect=barRect,.anchorRect=anchorRect,.shape=AnchorShape::Circle,.value=config.barHeight,.drag=LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Horizontal,RenderPoint{anchorCenterX,anchorCenterY})});
+}
+
 void AddThemeColorLeaf(Theme* theme,std::string token,LayoutEditTreeNode& leafNode,const LayoutEditTreeNode& sectionNode){
 leafNode.leaf.emplace(LayoutEditTreeLeaf{ThemeColorEditKey{theme->name,token},sectionNode.label,token,leafNode.descriptionKey,configschema::ValueFormat::ColorHex,});
 }

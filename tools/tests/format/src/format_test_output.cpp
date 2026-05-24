@@ -837,12 +837,11 @@ void BuildTrianglePoints(const RECT& rect, const Geometry& geometry) {
 }
 
 void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState) {
-    WidgetAnimationsForLayer(currentWidgetAnimationLayer_)
-        .push_back(DashboardPresentationAnimation{
-            std::move(animation),
-            std::move(targetState),
-            currentWidgetAnimationTranslation_
-        });
+    WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{
+        std::move(animation),
+        std::move(targetState),
+        currentWidgetAnimationTranslation_
+    });
 }
 
 int BracedReceiverChain(
@@ -879,6 +878,30 @@ void DrawGuideDotFromAdapter(
         RenderRect{x, y, std::min(x + dotLength, right), y + strokeWidth},
         RenderColorId::LayoutGuide
     );
+}
+
+void RegisterStaticEditAnchor(
+    RenderHost& renderer,
+    Widget& widget,
+    const RenderRect& barRect,
+    const RenderRect& anchorRect,
+    const Config& config,
+    int rowIndex,
+    int anchorCenterX,
+    int anchorCenterY
+) {
+    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
+        .key = LayoutEditAnchorKey{
+            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
+            WidgetHost::LayoutEditParameter::MetricListBarHeight,
+            rowIndex
+        },
+        .targetRect = barRect,
+        .anchorRect = anchorRect,
+        .shape = AnchorShape::Circle,
+        .value = config.barHeight,
+        .drag = LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Horizontal, RenderPoint{anchorCenterX, anchorCenterY})
+    });
 }
 
 void AddThemeColorLeaf(

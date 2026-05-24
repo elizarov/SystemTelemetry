@@ -1824,6 +1824,11 @@ private:
         GroupPair group{};
     };
 
+    struct CombinedNestedGroup {
+        GroupPair nested{};
+        std::string firstLine;
+    };
+
     std::vector<std::string> FormatRange(
         const std::vector<Token>& tokens,
         int indentLevel,
@@ -2693,6 +2698,60 @@ private:
         std::string_view prefix,
         std::string_view suffix
     ) const {
+        const std::optional<CombinedNestedGroup> candidate =
+            FindCombinedNestedGroupCandidate(tokens, group, indentLevel, prefix);
+        if (!candidate) {
+            return std::nullopt;
+        }
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        const GroupPair nested = candidate->nested;
+        std::vector<Token> nestedInner(
+            inner.begin() + static_cast<std::ptrdiff_t>(nested.open + 1),
+            inner.begin() + static_cast<std::ptrdiff_t>(nested.close)
+        );
+        std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + candidate->firstLine);
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
+        if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
+            std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
+            lines.insert(lines.end(), childLines.begin(), childLines.end());
+        } else {
+            for (size_t index = 0; index < elements.size(); ++index) {
+                if (elements[index].empty()) {
+                    continue;
+                }
+                std::string elementSuffix;
+                if (index + 1 < elements.size()) {
+                    elementSuffix = ",";
+                }
+                std::vector<std::string> elementLines;
+                if (inner[nested.open].text == "{") {
+                    elementLines = FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
+                } else {
+                    elementLines = FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                }
+                AppendSplitElementLines(lines, elementLines, inner[nested.open].text == "{");
+            }
+        }
+        std::vector<Token> closeTokens;
+        closeTokens.push_back(inner[nested.close]);
+        closeTokens.insert(closeTokens.end(), suffixTokens.begin(), suffixTokens.end());
+        std::string closeLine = FormatInline(closeTokens);
+        AppendSuffix(closeLine, suffix);
+        lines.push_back(Indent(indentLevel) + closeLine);
+        return lines;
+    }
+
+    std::optional<CombinedNestedGroup> FindCombinedNestedGroupCandidate(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
         std::vector<Token> outerPrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
         std::vector<Token> inner(
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
@@ -2714,42 +2773,7 @@ private:
         if (!Fits(indentLevel, firstLine)) {
             return std::nullopt;
         }
-        std::vector<Token> nestedInner(
-            inner.begin() + static_cast<std::ptrdiff_t>(nested->open + 1),
-            inner.begin() + static_cast<std::ptrdiff_t>(nested->close)
-        );
-        std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
-        std::vector<std::string> lines;
-        lines.push_back(Indent(indentLevel) + firstLine);
-        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
-        if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
-            std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
-            lines.insert(lines.end(), childLines.begin(), childLines.end());
-        } else {
-            for (size_t index = 0; index < elements.size(); ++index) {
-                if (elements[index].empty()) {
-                    continue;
-                }
-                std::string elementSuffix;
-                if (index + 1 < elements.size()) {
-                    elementSuffix = ",";
-                }
-                std::vector<std::string> elementLines;
-                if (inner[nested->open].text == "{") {
-                    elementLines = FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
-                } else {
-                    elementLines = FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
-                }
-                AppendSplitElementLines(lines, elementLines, inner[nested->open].text == "{");
-            }
-        }
-        std::vector<Token> closeTokens;
-        closeTokens.push_back(inner[nested->close]);
-        closeTokens.insert(closeTokens.end(), suffixTokens.begin(), suffixTokens.end());
-        std::string closeLine = FormatInline(closeTokens);
-        AppendSuffix(closeLine, suffix);
-        lines.push_back(Indent(indentLevel) + closeLine);
-        return lines;
+        return CombinedNestedGroup{*nested, std::move(firstLine)};
     }
 
     std::optional<std::vector<std::string>> TryFormatSplitDirectInitializedDeclaration(
@@ -2896,7 +2920,10 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
             tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
         );
-        if (!ContainsTopLevelSeparator(inner, ',')) {
+        if (
+            !ContainsTopLevelSeparator(inner, ',') &&
+            !FindCombinedNestedGroupCandidate(tokens, *group, indentLevel, prefix)
+        ) {
             return std::nullopt;
         }
         std::vector<Token> firstLineTokens(
