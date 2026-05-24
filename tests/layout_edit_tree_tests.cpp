@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "config/config.h"
+#include "layout_edit/layout_edit_tooltip_payload.h"
 #include "layout_edit/layout_edit_tree.h"
 #include "util/file_path.h"
 #include "util/localization_catalog.h"
@@ -354,6 +355,36 @@ TEST(LayoutEditTree, WeightLabelsAndFocusLookupResolveParameterAndWeightLeaves) 
     ASSERT_NE(metricListLeaf, nullptr);
     EXPECT_EQ(metricListLeaf->sectionName, "card.alpha");
     EXPECT_EQ(metricListLeaf->memberName, "layout");
+}
+
+TEST(LayoutEditTree, FindsRootMetricListLayoutLeafFromReorderHandleFocusKey) {
+    AppConfig config;
+    config.display.layout = "primary";
+    config.layout.structure.cards = MakeDashboardCardNode("cpu");
+    config.layout.cards.push_back(MakeCard("cpu",
+        MakeContainerNode("rows",
+            {MakeWidgetNode("text"),
+                MakeContainerNode("columns", {MakeWidgetNode("gauge"), MakeCardRefNode("cpu_metrics")})})));
+    config.layout.cards.push_back(MakeCard("cpu_metrics", MakeWidgetNode("metric_list")));
+
+    LayoutEditAnchorRegion reorderHandle;
+    reorderHandle.key = LayoutEditAnchorKey{
+        LayoutEditWidgetIdentity{"cpu", "cpu_metrics", {}},
+        LayoutNodeFieldEditKey{"cpu_metrics", {}, WidgetClass::MetricList, LayoutNodeField::Parameter},
+        0,
+    };
+
+    const auto focusKey = TooltipPayloadFocusKey(TooltipPayload{reorderHandle});
+    ASSERT_TRUE(focusKey.has_value());
+
+    const LayoutEditTreeModel model = BuildLayoutEditTreeModel(config, ReadTemplateText());
+    const LayoutEditTreeLeaf* metricListLeaf = FindLayoutEditTreeLeaf(model, *focusKey);
+
+    ASSERT_NE(metricListLeaf, nullptr);
+    EXPECT_EQ(metricListLeaf->sectionName, "card.cpu_metrics");
+    EXPECT_EQ(metricListLeaf->memberName, "layout");
+    ASSERT_NE(FindNodeForLeaf(model.roots, metricListLeaf), nullptr);
+    EXPECT_EQ(FindNodeForLeaf(model.roots, metricListLeaf)->label, "metric_list");
 }
 
 TEST(LayoutEditTree, IncludesDateTimeFormatLeavesForClockWidgets) {
