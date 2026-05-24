@@ -581,6 +581,10 @@ void SnapGaugeWidth(){
 const bool snapped=layout_snap_solver::FindNearestSnapWeight(kCurrentGaugeWeight,kCombinedWeight,kThreshold,{layout_snap_solver::SnapCandidate{targetExtent,targetExtent-startExtent,0}},[](int firstWeight,int& extent)->bool{extent=ComputeCpuGaugeWidth(firstWeight);return true;},snappedWeight);
 }
 
+int CountPlusAnchors(RenderHost& renderer){
+return static_cast<int>(std::count_if(renderer.editArtifacts.staticAnchors.begin(),renderer.editArtifacts.staticAnchors.end(),[](const LayoutEditAnchorRegion& region){return region.shape==AnchorShape::Plus;}));
+}
+
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }

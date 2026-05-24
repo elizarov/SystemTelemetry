@@ -4775,9 +4775,8 @@ private:
         const std::vector<Token>& tokens,
         char separator
     ) const {
-        int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
-            if (IsGroupOpen(tokens[index].text) && depth == 0) {
+            if (IsGroupOpen(tokens[index].text)) {
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
                     if (
                         !IsEmptyGroupPair(tokens, index, *close) &&
@@ -4794,7 +4793,6 @@ private:
                     }
                 }
             }
-            UpdateDepth(tokens, index, depth);
         }
         return std::nullopt;
     }

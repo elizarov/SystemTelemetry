@@ -1077,6 +1077,14 @@ void SnapGaugeWidth() {
     );
 }
 
+int CountPlusAnchors(RenderHost& renderer) {
+    return static_cast<int>(std::count_if(
+        renderer.editArtifacts.staticAnchors.begin(),
+        renderer.editArtifacts.staticAnchors.end(),
+        [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }
+    ));
+}
+
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
     TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditUi,
