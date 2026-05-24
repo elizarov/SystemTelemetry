@@ -5,7 +5,7 @@ This document owns executable-size constraints, the map workflow, current size s
 ## Constraints
 
 - Optimize `build\CaseDash.exe`; benchmark binary size is not a release goal.
-- Keep CaseDash as one executable with the full feature set. Do not split payloads into side files or remove supported hardware, diagnostics, layout-edit, localization, or default-config behavior.
+- Keep CaseDash as one executable with the shipped feature set. Do not split payloads into side files or remove supported hardware, production diagnostics, layout-edit, localization, or default-config behavior. The layout guide sheet generator is a non-shipped `CaseDashHeadless.exe` tool feature.
 - Preserve runtime performance. Prefer cold-path, resource, metadata, and linker-shape wins before touching renderer, widget draw, layout resolver, or telemetry hot paths.
 - Keep embedded `resources/config.ini` and `resources/localization.ini` available through the executable.
 - Keep normal builds free of map generation. Use `build_maps.cmd` for app maps and `build_maps.cmd /benchmarks` only when benchmark maps matter.
@@ -14,11 +14,11 @@ This document owns executable-size constraints, the map workflow, current size s
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,104,896` bytes.
+- Current measured `build\CaseDash.exe`: `1,048,064` bytes, below binary 1 MiB and above the stricter decimal `1,000,000` byte threshold.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `904.2 KiB`, `.rdata` about `69.8 KiB`, `.pdata` about `41.4 KiB`, `.rsrc$02` about `21.6 KiB`, and `.xdata` about `16.9 KiB`.
-- Current largest project objects: `dashboard_app.cpp.obj`, `diagnostics.cpp.obj`, `board_lenovo_vantage.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `d2d_renderer.cpp.obj`, `editors.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `pane.cpp.obj`, `CaseDash.rc.res`, `dashboard_shell_ui.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `render_thread.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `collector_fake.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, `fps_etw_provider.cpp.obj`, `drive_usage_list.cpp.obj`, and `config_meta.generated.cpp.obj`.
-- Last validation: `format.cmd changed`, `build.cmd`, `build_maps.cmd`, `lint.cmd includes changed`, `test.cmd`, `git diff --check`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
+- Current largest sections: `.text$mn` about `852.3 KiB`, `.rdata` about `68.0 KiB`, `.pdata` about `40.1 KiB`, `.rsrc$02` about `21.2 KiB`, and `.xdata` about `16.8 KiB`.
+- Current largest project objects: `dashboard_app.cpp.obj`, `board_lenovo_vantage.cpp.obj`, `diagnostics.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_resolver.cpp.obj`, `editors.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, `CaseDash.rc.res`, `dashboard_shell_ui.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `render_thread.cpp.obj`, `collector_fake.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, and `layout_edit_hit_test.cpp.obj`.
+- Last validation: `format.cmd changed`, `lint.cmd`, `python -m unittest tools.tests.lint.lint_test`, `build.cmd`, `test.cmd`, production screenshot and layout-guide-sheet rejection smokes, `CaseDashHeadless.exe` combined export smoke, `web-build.cmd clean`, `build_maps.cmd`, and final size check.
 
 ## Workflow
 
@@ -45,7 +45,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 
 ### Resources And Text
 
-- The embedded default config, localization catalog, and generated resource-string catalog share one CDLZ text atlas. The atlas keeps config, localization, and first-source-use resource strings in deterministic order, with extended 12-bit-offset LZSS token parsing.
+- The embedded default config, localization catalog, and generated resource-string catalog use CDLZ text atlases. The shipped app uses a production atlas that excludes headless-only source strings, and every text atlas excludes the headless-only `[layout_guide_sheet]` config section. `CaseDashHeadless.exe` alone links a separate raw `RCDATA` resource for that section and loads it as a diagnostics config extension. Each atlas keeps config, localization, and first-source-use resource strings in deterministic order, with extended 12-bit-offset LZSS token parsing.
 - `RES_STR("...")` literals compile to collision-checked FNV-1a ids, not generated literal tables. Runtime lookup uses the loaded text atlas plus an open-addressed hash table so trace and diagnostics paths keep O(1) catalog access after their prefix gate passes.
 - User-visible UI copy belongs in `resources/localization.ini`. Direct `RES_STR` text is reserved for trace formats, compact localization keys, telemetry diagnostics payloads, and diagnostics-only errors.
 - Fixed trace helper vocabulary uses `ResourceStringId` and `RES_STR`; dynamic trace values stay in outer resource-string-aware format strings, including their quote marks, instead of shared trace quote or color wrapper helpers.
@@ -57,6 +57,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 
 - Config parsing, config writing, color resolution, layout-edit parameter edits, and snapshot dump scalar I/O use shared reflected descriptors rather than duplicated field paths.
 - Runtime config descriptor arrays are constexpr where possible. Fixed descriptor keys use literal pointer plus byte length when the source arrays own the lifetime.
+- Layout guide sheet config descriptors, renderer palette callout slots, dashboard-renderer guide-sheet bridge code, and derived-color resolution are compiled only into targets that enable layout guide sheet output.
 - Layout-edit parameter metadata stays in one ordered metadata array. Do not reintroduce per-parameter function-local statics, unused info-table field pointers, or a parameter-only mirror table.
 - Byte-backed enum storage is useful only in measured fixed domains under 256 entries, such as `ValueFormat` and selected layout-edit anchor, guide, identity, field, and selection-highlight enums.
 
@@ -80,7 +81,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 - Layout-edit previews mutate the live config through controller methods when the edit is no-fail and local, instead of copying full `AppConfig` snapshots.
 - Large cold payloads cross layout-edit and diagnostics boundaries as borrowed pointers or bool/out-parameters when that avoids copying optional records. Small optional values stay idiomatic `std::optional`.
 - Layout-edit dirty tracking marks mutations as possibly dirty during the edit loop and performs exact saved-layout comparison only at prompt boundaries through config-difference metadata and selected-layout structure comparison.
-- Layout guide sheet planning, placement, trace, and rendering share compact callout records, bitmask coverage scoring, and trace-only sidecars that are populated only when a trace sink is supplied.
+- Layout guide sheet planning, placement, trace, and rendering live outside the shipped app in `CaseDashHeadless.exe`; they share compact callout records, bitmask coverage scoring, and trace-only sidecars that are populated only when a trace sink is supplied.
 
 ### Runtime And Providers
 
@@ -124,7 +125,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 ### Current Split And Boundary Trials
 
 - Keep `dashboard_shell_ui.cpp` on the maintained speed-source list and off the cold `/Ob0` list unless a broader menu payload pass proves a win.
-- Keep layout guide sheet renderer sources on the current optimization split unless benchmark data says the direct placement and rendering paths no longer need it.
+- Keep layout guide sheet renderer sources out of the shipped app target. They belong in `CaseDashHeadless.exe`, tests, and benchmark builds unless a future product decision makes layout guide sheets part of the shipped dashboard executable again.
 - Keep `diagnostics.cpp`, `app_icon_export.cpp`, `crash_report.cpp`, `display_config.cpp`, `dashboard_app.cpp`, `dashboard_controller.cpp`, and `collector_fake.cpp` on the cold `/Ob0` list. Removing `/Ob0` from those sources regresses the current noinline shape.
 - Keep dynamic WTS loading out of the current session-notification path; both retained-module and load/call/free variants regressed the current baseline.
 

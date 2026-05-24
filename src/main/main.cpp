@@ -106,7 +106,11 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         return *elevatedExitCode;
     }
 
-    if (!ValidateDiagnosticsOptions(diagnosticsOptions)) {
+    const DiagnosticsValidationResult diagnosticsValidation = ValidateDiagnosticsOptions(diagnosticsOptions);
+    if (!diagnosticsValidation.ok) {
+        if (!diagnosticsOptions.trace) {
+            ShowAppMessageBox(diagnosticsValidation.message, MB_ICONERROR);
+        }
         return 2;
     }
 

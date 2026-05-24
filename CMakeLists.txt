@@ -78,9 +78,19 @@ endif()
 
 set(CASEDASH_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashCompressedResources.rc")
 set(CASEDASH_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources")
+set(CASEDASH_APP_COMPRESSED_RESOURCE_RC "${CASEDASH_GENERATED_DIR}/CaseDashAppCompressedResources.rc")
+set(CASEDASH_APP_COMPRESSED_RESOURCE_DIR "${CASEDASH_GENERATED_DIR}/compressed_resources_app")
+set(CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC
+    "${CASEDASH_GENERATED_DIR}/CaseDashHeadlessLayoutGuideSheetConfig.rc")
+set(CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_DIR
+    "${CASEDASH_GENERATED_DIR}/layout_guide_sheet_config")
 set(CASEDASH_RESOURCE_STRING_HEADER "${CASEDASH_GENERATED_DIR}/resource_strings.generated.h")
 file(GLOB_RECURSE CASEDASH_RESOURCE_STRING_SCAN_SOURCES CONFIGURE_DEPENDS
     "${CMAKE_SOURCE_DIR}/src/*.cpp"
+)
+set(CASEDASH_APP_RESOURCE_STRING_SCAN_SOURCES ${CASEDASH_RESOURCE_STRING_SCAN_SOURCES})
+list(FILTER CASEDASH_APP_RESOURCE_STRING_SCAN_SOURCES EXCLUDE REGEX
+    "[/\\\\]src[/\\\\](headless|layout_guide_sheet)[/\\\\]"
 )
 add_custom_command(
     OUTPUT
@@ -96,6 +106,7 @@ add_custom_command(
         --resource-root "${CMAKE_SOURCE_DIR}/resources"
         --resource-string-header "${CASEDASH_RESOURCE_STRING_HEADER}"
         --source-root "${CMAKE_SOURCE_DIR}"
+        --exclude-config-section "layout_guide_sheet"
     DEPENDS
         "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
         "${CMAKE_SOURCE_DIR}/resources/config.ini"
@@ -111,6 +122,63 @@ add_custom_target(CaseDashGeneratedResources DEPENDS
     "${CASEDASH_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
     "${CASEDASH_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
     "${CASEDASH_RESOURCE_STRING_HEADER}"
+)
+
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_APP_COMPRESSED_RESOURCE_RC}"
+        "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+        "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        --output-dir "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}"
+        --output-rc "${CASEDASH_APP_COMPRESSED_RESOURCE_RC}"
+        --resource-root "${CMAKE_SOURCE_DIR}/resources"
+        --source-root "${CMAKE_SOURCE_DIR}"
+        --exclude-config-section "layout_guide_sheet"
+        --exclude-source-prefix "src/headless"
+        --exclude-source-prefix "src/layout_guide_sheet"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/compress_resources.py"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        "${CMAKE_SOURCE_DIR}/resources/localization.ini"
+        "${CASEDASH_RESOURCE_STRING_HEADER}"
+        ${CASEDASH_APP_RESOURCE_STRING_SCAN_SOURCES}
+    VERBATIM
+)
+set_source_files_properties("${CASEDASH_APP_COMPRESSED_RESOURCE_RC}" PROPERTIES
+    OBJECT_DEPENDS "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+)
+add_custom_target(CaseDashGeneratedAppResources DEPENDS
+    "${CASEDASH_APP_COMPRESSED_RESOURCE_RC}"
+    "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}/text_atlas.cdlz"
+    "${CASEDASH_APP_COMPRESSED_RESOURCE_DIR}/resource_strings.txt"
+)
+
+add_custom_command(
+    OUTPUT
+        "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}"
+        "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_DIR}/layout_guide_sheet.ini"
+    COMMAND
+        "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/tools/extract_config_section.py"
+        --input "${CMAKE_SOURCE_DIR}/resources/config.ini"
+        --section "layout_guide_sheet"
+        --output-ini "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_DIR}/layout_guide_sheet.ini"
+        --output-rc "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}"
+        --resource-id "IDR_LAYOUT_GUIDE_SHEET_CONFIG"
+    DEPENDS
+        "${CMAKE_SOURCE_DIR}/tools/extract_config_section.py"
+        "${CMAKE_SOURCE_DIR}/resources/config.ini"
+    VERBATIM
+)
+set_source_files_properties("${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}" PROPERTIES
+    OBJECT_DEPENDS "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_DIR}/layout_guide_sheet.ini"
+)
+add_custom_target(CaseDashGeneratedHeadlessLayoutGuideSheetConfig DEPENDS
+    "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}"
+    "${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_DIR}/layout_guide_sheet.ini"
 )
 
 set(CASEDASH_CONFIG_META_DIR "${CASEDASH_GENERATED_DIR}/config")
@@ -148,15 +216,13 @@ add_custom_target(CaseDashGeneratedConfigMeta DEPENDS
 
 add_executable(CaseDash WIN32
     resources/CaseDash.rc
-    ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_APP_COMPRESSED_RESOURCE_RC}
     ${CASEDASH_CONFIG_META_CPP}
     ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_VERSION_RC}
     src/main/main.cpp
     src/diagnostics/diagnostics.cpp
     src/diagnostics/crash_report.cpp
-    src/layout_guide_sheet/layout_guide_sheet.cpp
-    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/dashboard/autostart.cpp
     src/diagnostics/app_icon_export.cpp
     src/dashboard/fps_service.cpp
@@ -299,8 +365,6 @@ add_executable(CaseDash WIN32
     src/widget/impl/clock_time.cpp
     src/widget/impl/clock_date.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
-    src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
-    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/high_precision_timer.cpp
     src/util/text_encoding.cpp
@@ -510,7 +574,7 @@ target_include_directories(CaseDash PRIVATE
     "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CASEDASH_GENERATED_DIR}"
 )
-add_dependencies(CaseDash CaseDashGeneratedResources CaseDashGeneratedConfigMeta)
+add_dependencies(CaseDash CaseDashGeneratedResources CaseDashGeneratedAppResources CaseDashGeneratedConfigMeta)
 
 target_compile_definitions(CaseDash PRIVATE
     NOMINMAX
@@ -573,6 +637,216 @@ target_link_libraries(CaseDash PRIVATE
 
 set_target_properties(CaseDash PROPERTIES
     OUTPUT_NAME "CaseDash"
+    VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
+)
+
+add_executable(CaseDashHeadless
+    ${CASEDASH_COMPRESSED_RESOURCE_RC}
+    ${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}
+    ${CASEDASH_CONFIG_META_CPP}
+    ${CASEDASH_LAYOUT_EDIT_META_CPP}
+    ${CASEDASH_VERSION_RC}
+    src/headless/headless_main.cpp
+    src/headless/layout_guide_sheet_output.cpp
+    src/diagnostics/diagnostics.cpp
+    src/diagnostics/crash_report.cpp
+    src/diagnostics/app_icon_export.cpp
+    src/util/command_line.cpp
+    src/widget/app_icon_geometry.cpp
+    src/config/config_io.cpp
+    src/config/diagnostics_options.cpp
+    src/util/elevated_process.cpp
+    src/util/file_path.cpp
+    src/util/numeric_format.cpp
+    src/util/text_format.cpp
+    src/util/paths.cpp
+    src/util/resource_strings.cpp
+    src/util/scale.cpp
+    src/util/lightweight_mutex.cpp
+    src/util/strings.cpp
+    src/util/win32_format.cpp
+    src/config/metric_board_binding.cpp
+    src/layout_edit/layout_edit_hit_test.cpp
+    src/layout_edit/layout_edit_active_region_trace.cpp
+    src/layout_edit/layout_edit_controller.cpp
+    src/layout_edit/layout_edit_trace_session.cpp
+    src/layout_model/layout_edit_active_region.cpp
+    src/layout_model/layout_edit_helpers.cpp
+    src/layout_model/layout_edit_hit_priority.cpp
+    src/layout_model/layout_edit_layout_target.cpp
+    src/layout_model/layout_edit_service.cpp
+    src/layout_edit/layout_edit_tree.cpp
+    src/layout_model/layout_edit_parameter_metadata.cpp
+    src/layout_edit/layout_edit_tooltip.cpp
+    src/layout_edit/layout_edit_parameter_edit.cpp
+    src/layout_edit/layout_edit_target_descriptor.cpp
+    src/layout_edit/layout_edit_service.cpp
+    src/layout_edit/layout_edit_tooltip_payload.cpp
+    src/layout_edit/layout_edit_tooltip_text.cpp
+    src/config/config_telemetry.cpp
+    src/config/config_primitives.cpp
+    src/config/color_format.cpp
+    src/config/color_expression.cpp
+    src/config/color_math.cpp
+    src/config/color_resolver.cpp
+    src/config/config_file_io.cpp
+    src/config/metric_catalog.cpp
+    src/config/config_parser.cpp
+    src/config/config_runtime_fields.cpp
+    src/config/config_writer.cpp
+    src/config/config_resolution.cpp
+    src/util/localization_catalog.cpp
+    src/util/resource_loader.cpp
+    src/layout_edit/impl/layout_snap_solver.cpp
+    src/util/numeric_safety.cpp
+    src/telemetry/impl/system_info_support.cpp
+    src/telemetry/telemetry.cpp
+    src/telemetry/impl/collector.cpp
+    src/telemetry/impl/collector_state.cpp
+    src/telemetry/impl/collector_board.cpp
+    src/telemetry/impl/collector_cpu.cpp
+    src/telemetry/impl/collector_gpu.cpp
+    src/telemetry/impl/collector_support.cpp
+    src/telemetry/impl/retained_history.cpp
+    src/telemetry/impl/collector_storage.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
+    src/telemetry/impl/collector_network.cpp
+    src/telemetry/impl/collector_real.cpp
+    src/telemetry/impl/collector_fake.cpp
+    src/diagnostics/snapshot_dump.cpp
+    src/telemetry/fps_provider.cpp
+    src/telemetry/board_service_sample.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/fps/fps_service_client_provider.cpp
+    src/telemetry/fps_service_protocol.cpp
+    src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
+    src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
+    src/telemetry/gpu/amd/gpu_amd_adl.cpp
+    src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/board_vendor_selection.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
+    src/telemetry/board/msi/board_msi_center.cpp
+    src/telemetry/metrics.cpp
+    src/layout_model/dashboard_overlay_state.cpp
+    src/widget/card_chrome_layout.cpp
+    src/renderer/renderer.cpp
+    src/renderer/png_export.cpp
+    src/renderer/layout_guide_sheet_palette.cpp
+    src/renderer/render_types.cpp
+    src/renderer/impl/d2d_renderer.cpp
+    src/renderer/impl/d2d_cache.cpp
+    src/renderer/impl/d2d_render_conversions.cpp
+    src/layout_model/layout_edit_anchor_shape.cpp
+    src/dashboard_renderer/impl/metric_lookup_cache.cpp
+    src/dashboard_renderer/impl/animation_timeline.cpp
+    src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
+    src/dashboard_renderer/impl/render_thread.cpp
+    src/renderer/impl/palette.cpp
+    src/renderer/impl/text_width_cache.cpp
+    src/widget/animation.cpp
+    src/widget/animation_types.cpp
+    src/widget/widget.cpp
+    src/widget/widget_host.cpp
+    src/widget/layout_edit_types.cpp
+    src/widget/impl/animation_primitives.cpp
+    src/widget/impl/card_chrome.cpp
+    src/widget/impl/pill_bar.cpp
+    src/widget/impl/text.cpp
+    src/widget/impl/gauge.cpp
+    src/widget/impl/metric_list.cpp
+    src/widget/impl/throughput.cpp
+    src/widget/impl/network_footer.cpp
+    src/widget/impl/vertical_spacer.cpp
+    src/widget/impl/vertical_spring.cpp
+    src/widget/impl/drive_usage_list.cpp
+    src/widget/impl/clock_time.cpp
+    src/widget/impl/clock_date.cpp
+    src/dashboard_renderer/impl/layout_resolver.cpp
+    src/dashboard_renderer/layout_guide_sheet_support.cpp
+    src/layout_guide_sheet/layout_guide_sheet.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
+    src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
+    src/dashboard_renderer/dashboard_renderer.cpp
+    src/util/high_precision_timer.cpp
+    src/util/text_encoding.cpp
+    src/util/trace.cpp
+    src/util/trace_timing.cpp
+    src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
+    src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
+)
+target_sources(CaseDashHeadless PRIVATE
+    $<TARGET_OBJECTS:CaseDashGigabyte>
+    $<TARGET_OBJECTS:CaseDashMsi>
+)
+target_include_directories(CaseDashHeadless PRIVATE
+    "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/resources"
+    "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
+    "${CASEDASH_GENERATED_DIR}"
+)
+add_dependencies(CaseDashHeadless
+    CaseDashGeneratedResources
+    CaseDashGeneratedHeadlessLayoutGuideSheetConfig
+    CaseDashGeneratedConfigMeta
+)
+target_compile_definitions(CaseDashHeadless PRIVATE
+    NOMINMAX
+    WIN32_LEAN_AND_MEAN
+    _HAS_EXCEPTIONS=0
+    _USE_STD_VECTOR_ALGORITHMS=0
+    CASEDASH_ENABLE_LAYOUT_GUIDE_SHEET_OUTPUT=1
+)
+target_compile_options(CaseDashHeadless PRIVATE
+    /W4
+    /wd4530
+    /permissive-
+    /GR-
+    $<$<CONFIG:Release>:/GS->
+    /w14505
+    /we4505
+    /Zi
+    $<$<CONFIG:Release>:/Zc:threadSafeInit->
+    $<$<CONFIG:Release>:/Os>
+    $<$<CONFIG:Release>:/GL>
+)
+target_link_options(CaseDashHeadless PRIVATE
+    $<$<CONFIG:Debug>:/DEBUG>
+    $<$<CONFIG:Debug>:/INCREMENTAL>
+    $<$<CONFIG:Release>:/OPT:REF>
+    $<$<CONFIG:Release>:/LTCG>
+    $<$<CONFIG:Release>:/MERGE:.nep=.text>
+    $<$<CONFIG:Release>:/DYNAMICBASE:NO>
+    $<$<CONFIG:Release>:/INCREMENTAL:NO>
+    $<$<CONFIG:RelWithDebInfo>:/DEBUG>
+    $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+    /MANIFEST:NO
+)
+target_link_libraries(CaseDashHeadless PRIVATE
+    user32
+    gdi32
+    d3d11
+    d2d1
+    dwrite
+    pdh
+    iphlpapi
+    dxgi
+    ws2_32
+    ole32
+    oleaut32
+    wbemuuid
+    advapi32
+    dbghelp
+    wtsapi32
+    ${MSCOREE_LIB}
+)
+set_target_properties(CaseDashHeadless PROPERTIES
+    OUTPUT_NAME "CaseDashHeadless"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
 
@@ -734,6 +1008,7 @@ add_executable(CaseDashTests
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/renderer/png_export.cpp
+    src/renderer/layout_guide_sheet_palette.cpp
     src/widget/widget.cpp
     src/widget/widget_host.cpp
     src/widget/layout_edit_types.cpp
@@ -762,6 +1037,7 @@ add_executable(CaseDashTests
     src/dashboard_renderer/impl/layout_edit_overlay_renderer.cpp
     src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
+    src/dashboard_renderer/layout_guide_sheet_support.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_placement.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
@@ -789,6 +1065,7 @@ target_compile_definitions(CaseDashTests PRIVATE
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
     CASEDASH_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    CASEDASH_ENABLE_LAYOUT_GUIDE_SHEET_OUTPUT=1
 )
 target_compile_options(CaseDashTests PRIVATE
     /EHsc
@@ -913,6 +1190,7 @@ add_executable(CaseDashBenchmarks
     src/widget/card_chrome_layout.cpp
     src/renderer/renderer.cpp
     src/renderer/png_export.cpp
+    src/renderer/layout_guide_sheet_palette.cpp
     src/renderer/render_types.cpp
     src/renderer/impl/d2d_renderer.cpp
     src/renderer/impl/d2d_cache.cpp
@@ -948,6 +1226,7 @@ add_executable(CaseDashBenchmarks
     src/layout_guide_sheet/impl/layout_guide_sheet_planner.cpp
     src/layout_guide_sheet/impl/layout_guide_sheet_renderer.cpp
     src/dashboard_renderer/impl/dashboard_renderer_benchmark.cpp
+    src/dashboard_renderer/layout_guide_sheet_support.cpp
     src/dashboard_renderer/dashboard_renderer.cpp
     src/util/localization_catalog.cpp
     src/util/resource_loader.cpp
@@ -966,7 +1245,9 @@ target_sources(CaseDashBenchmarks PRIVATE
 )
 
 get_target_property(casedash_release_inline_limited_sources CaseDash SOURCES)
+get_target_property(casedash_headless_sources CaseDashHeadless SOURCES)
 get_target_property(casedash_benchmarks_sources CaseDashBenchmarks SOURCES)
+list(APPEND casedash_release_inline_limited_sources ${casedash_headless_sources})
 list(APPEND casedash_release_inline_limited_sources ${casedash_benchmarks_sources})
 list(FILTER casedash_release_inline_limited_sources INCLUDE REGEX "\\.cpp$")
 list(REMOVE_DUPLICATES casedash_release_inline_limited_sources)
@@ -988,6 +1269,7 @@ target_compile_definitions(CaseDashBenchmarks PRIVATE
     WIN32_LEAN_AND_MEAN
     _USE_STD_VECTOR_ALGORITHMS=0
     CASEDASH_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    CASEDASH_ENABLE_LAYOUT_GUIDE_SHEET_OUTPUT=1
 )
 target_compile_options(CaseDashBenchmarks PRIVATE
     /W4

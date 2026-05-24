@@ -11,6 +11,8 @@ class Trace;
 struct AppConfig;
 struct SystemSnapshot;
 
+void ResolveLayoutGuideSheetColors(AppConfig& config);
+
 struct LayoutGuideSheetPipelineStats {
     std::chrono::nanoseconds activeRegions{};
     std::chrono::nanoseconds plan{};

@@ -7,6 +7,7 @@
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
 #include "config/config_telemetry.h"
+#include "layout_guide_sheet/layout_guide_sheet.h"
 #include "telemetry/metrics.h"
 
 namespace {
@@ -192,7 +193,8 @@ TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
                                           "callout_border_color = guide(rotate_hue: 53)\n"
                                           "callout_description_color = muted_text_color\n");
 
-    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+    AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+    ResolveLayoutGuideSheetColors(config);
 
     EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xFFAC84E6u);
     EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xC19C00FFu);

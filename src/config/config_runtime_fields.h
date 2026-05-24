@@ -64,6 +64,7 @@ struct RuntimeConfigSectionDescriptor {
     std::uint32_t rootOffset = 0;
     std::uint32_t keyOffset = 0;
     std::uint32_t itemSize = 0;
+    std::uint16_t defaultOrder = 0;
     std::uint8_t nameLength = 0;
     RuntimeConfigSectionKind kind = RuntimeConfigSectionKind::Static;
     RuntimeConfigSectionCodec codec = RuntimeConfigSectionCodec::Structured;

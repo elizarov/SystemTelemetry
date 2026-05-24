@@ -1,9 +1,14 @@
 #include "layout_guide_sheet/layout_guide_sheet.h"
 
 #include <chrono>
+#include <optional>
 #include <string>
+#include <string_view>
 
+#include "config/color_resolver.h"
+#include "config/config_runtime_fields.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/layout_guide_sheet_support.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
 #include "layout_model/dashboard_overlay_state.h"
@@ -45,7 +50,7 @@ bool BuildLayoutGuideSheetPipelineInputs(DashboardRenderer& renderer,
         }
         return false;
     }
-    const std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    const std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(renderer);
     const LayoutEditActiveRegions activeRegions = renderer.CollectLayoutEditActiveRegions(overlayState);
     LayoutGuideSheetRenderer sheetRenderer(renderer);
     const LayoutEditActiveRegions overviewActiveRegions = sheetRenderer.CollectOverviewActiveRegions(snapshot);
@@ -95,6 +100,33 @@ void WritePipelineStatsTrace(Trace& trace, const LayoutGuideSheetPipelineStats& 
 }
 
 }  // namespace
+
+void ResolveLayoutGuideSheetColors(AppConfig& config) {
+    const RuntimeConfigSectionDescriptor* guideSheetSection = FindRuntimeConfigSection("layout_guide_sheet");
+    if (guideSheetSection == nullptr) {
+        return;
+    }
+
+    const ThemeConfig* activeTheme = ResolveConfiguredTheme(config.layout, config.display.theme);
+    if (activeTheme == nullptr) {
+        return;
+    }
+
+    const RuntimeConfigSectionDescriptor* colorsSection = FindRuntimeConfigSection("colors");
+    if (colorsSection == nullptr) {
+        return;
+    }
+
+    const auto guideSheetLookup = [&config, activeTheme, colorsSection](
+                                      std::string_view name) -> std::optional<ColorConfig> {
+        if (std::optional<ColorConfig> themeColor = FindThemeColorToken(*activeTheme, name); themeColor.has_value()) {
+            return themeColor;
+        }
+        return FindConfigColorFieldByKey(RuntimeConfigFields(*colorsSection), &config.layout.colors, name);
+    };
+    ResolveConfigColorFieldsInPlace(
+        RuntimeConfigFields(*guideSheetSection), &config.layout.layoutGuideSheet, guideSheetLookup);
+}
 
 bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,

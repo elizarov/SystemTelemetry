@@ -10,10 +10,11 @@
 - Plan overview callouts, draw-free callout side geometry, leader routing, and final sheet rendering.
 - Place callout stacks, promote top and bottom callouts, score leaders, repair side splits, and expose placement trace data.
 - Report benchmark stages as `active_regions`, `sheet_plan`, `sheet_measure`, `sheet_place`, and `sheet_draw`.
-- Preserve widget-owned edit affordances through the dashboard renderer's layout guide sheet render mode.
+- Resolve layout guide sheet color expressions from active theme tokens and resolved `[colors]` roles.
+- Preserve widget-owned edit affordances through dashboard-renderer guide-sheet support linked only by headless, tests, and benchmarks.
 
 ## Boundaries
 
-- Diagnostics invokes the pipeline and owns export command handling and trace records.
-- `dashboard_renderer` exposes only the resolved-card summaries, card-chrome artifact hooks, and rendering hooks that the `layout_guide_sheet` package needs.
+- `headless` invokes the pipeline through the diagnostics output-handler boundary. Diagnostics owns export command handling, path resolution, and trace records without depending on this package.
+- `dashboard_renderer` exposes only the resolved-card summaries, card-chrome artifact hooks, and rendering hooks that the `layout_guide_sheet` package needs; their implementations are kept in a guide-sheet support source file that the shipped app does not link.
 - Layout guide sheet styling uses `LayoutGuideSheetConfig` and a separate renderer palette path rather than adding edit-dialog color targets for diagnostics-only colors.

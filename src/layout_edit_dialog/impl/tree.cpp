@@ -120,7 +120,7 @@ std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutE
 
 std::string BuildTreeItemTraceText(LayoutEditDialogState* state, HWND tree, HTREEITEM item) {
     if (state == nullptr || tree == nullptr || item == nullptr) {
-        return "location=\"none\"";
+        return ResourceStringText(RES_STR("location=\"none\""));
     }
     const LayoutEditTreeNode* node = TreeNodeFromItem(tree, item);
     const std::string location = TreeNodeViewportLocation(state, node);
@@ -132,7 +132,7 @@ std::string BuildTreeItemTraceText(LayoutEditDialogState* state, HWND tree, HTRE
 
 std::string BuildTreeViewportTraceText(LayoutEditDialogState* state, HWND tree) {
     if (state == nullptr || tree == nullptr) {
-        return "tree=\"none\"";
+        return ResourceStringText(RES_STR("tree=\"none\""));
     }
 
     const HTREEITEM firstVisible = TreeView_GetFirstVisible(tree);

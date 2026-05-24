@@ -34,7 +34,7 @@ The language is divided by responsibility:
 - `[card_style]` owns shared card chrome and in-card spacing.
 - `[colors]` owns the shared dashboard palette.
 - Color values use the literal and derived color syntax defined in [docs/theme_configuration.md](theme_configuration.md).
-- `[layout_guide_sheet]` owns diagnostics-only layout guide sheet callout colors and layout constants; these fields are loaded from config but are not editable through the layout-edit dialog.
+- `[layout_guide_sheet]` owns diagnostics-only layout guide sheet callout colors and layout constants; these fields are loaded by `CaseDashHeadless.exe` from its headless-only embedded resource for layout guide sheet exports and are not editable through the layout-edit dialog.
 - `[fonts]` owns the shared font roles.
 - `[card.<id>]` owns card-local title, icon, and inner layout composition.
 

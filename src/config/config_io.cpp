@@ -13,7 +13,15 @@ FilePath GetRuntimeConfigPath() {
 }
 
 AppConfig LoadRuntimeConfig(const DiagnosticsOptions& options, const ConfigParseContext& context) {
-    AppConfig config = LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context);
+    return LoadRuntimeConfigWithExtraTemplate(options, context, {});
+}
+
+AppConfig LoadRuntimeConfigWithExtraTemplate(
+    const DiagnosticsOptions& options, const ConfigParseContext& context, std::string_view extraTemplate) {
+    AppConfig config =
+        extraTemplate.empty()
+            ? LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context)
+            : LoadConfigWithExtraTemplate(GetRuntimeConfigPath(), !options.defaultConfig, context, extraTemplate);
     ApplyDiagnosticsScaleOverride(config, options);
     return config;
 }

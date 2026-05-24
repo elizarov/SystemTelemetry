@@ -11,7 +11,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - `/trace-prefixes:<names>` filters trace output to a comma-separated list of exact trace prefix names such as `profile` or `profile,renderer`. This switch also enables `/trace` to the default trace file when `/trace` is not specified separately.
 - `/dump[:path]` writes the machine-parseable snapshot dump.
 - `/screenshot[:path]` writes the rendered dashboard PNG.
-- `/layout-guide-sheet[:path]` writes a diagnostics PNG that shows a compact selected-layout overview plus representative cards with layout-edit guides and tooltip-style callouts for documented editable targets.
+- `/layout-guide-sheet[:path]` writes a diagnostics PNG that shows a compact selected-layout overview plus representative cards with layout-edit guides and tooltip-style callouts for documented editable targets. This switch is supported by `CaseDashHeadless.exe`; `CaseDash.exe` rejects it so the shipped dashboard executable does not link the layout guide sheet renderer.
 - `/app-icon[:path]` writes the runtime-rendered app icon PNG for the current resolved theme.
 - `/save-config[:path]` writes the minimal config overlay export.
 - `/save-full-config[:path]` writes the full embedded-template-shaped config export.
@@ -46,6 +46,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - `/blank` cannot be combined with `/layout-guide-sheet`.
 - `/app-icon-size:<pixels>` must be between `16` and `1024`.
 - `/trace-prefixes:<names>` accepts only exact supported trace prefix names.
+- `CaseDash.exe` rejects `/layout-guide-sheet` and reports that layout guide sheets are produced by `CaseDashHeadless.exe`.
 - With `/trace`, diagnostics validation failures append `diagnostics:validation_failed` with the reason and message before exit.
 
 ## Output Paths And File Behavior
@@ -57,17 +58,18 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - Intel GPU traces use `intel_level_zero:load_done` to show available Sysman/core enumeration and component API groups, `intel_level_zero:wddm_clock_init` to show whether the selected adapter LUID opened for WDDM node-frequency queries, and `intel_level_zero:get_clock source=...` to show whether `gpu.clock` came from Sysman frequency domains, WDDM node performance data, Level Zero core device properties, or no clock source.
 - The `dashboard_tooltip` trace prefix records shared tooltip `show`, `update`, `update_noop`, and `hide` lifecycle events with the owning surface, target, hide reason, geometry, position, width, and text.
 - The `display_placement` trace prefix records display position config updates from move completion, display configuration, display scale changes, config reload, and config snapshot application.
-- Snapshot dump, screenshot, layout guide sheet, app icon, minimal config overlay, and full config exports overwrite only their requested target file.
+- Snapshot dump, screenshot, app icon, minimal config overlay, and full config exports overwrite only their requested target file. Layout guide sheet exports follow the same overwrite behavior when produced by `CaseDashHeadless.exe`.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file. The built-in baseline uses the themed `fluxsim` FPS application label.
 - `/fake:<path>` reads only the selected snapshot dump file.
-- The UI diagnostics save dialogs use the same snapshot dump, screenshot, layout guide sheet, and full config formats as the CLI outputs.
+- The UI diagnostics save dialogs use the same snapshot dump, screenshot, and full config formats as the CLI outputs. Layout guide sheet export has no production UI menu item.
 
 ## Runtime Mode Behavior
 
 - Without `/exit`, the application starts the normal dashboard UI and keeps requested diagnostics outputs refreshed while the process runs.
-- In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, layout guide sheet, app icon, and config outputs refresh once per second from the latest runtime state.
-- With `/exit`, the application loads config, performs the first update, optionally exports the requested outputs once, and exits without entering the normal GUI lifetime.
-- With `/elevate`, trace, snapshot dump, screenshot, layout guide sheet, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
+- In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, app icon, and config outputs refresh once per second from the latest runtime state.
+- With `/exit`, `CaseDash.exe` loads config, performs the first update, optionally exports the requested non-layout-guide outputs once, and exits without entering the normal GUI lifetime.
+- `CaseDashHeadless.exe` always runs the one-shot diagnostics path, as if `/exit` were supplied, and additionally supports `/layout-guide-sheet`.
+- With `/elevate`, trace, snapshot dump, screenshot, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
 - `/fake` without `/exit` advances the built-in synthetic source on the telemetry-owned 250 ms refresh path so the dashboard exercises live fake values and the same retained-throughput smoothing as real telemetry.
@@ -77,11 +79,11 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - App-icon exports use the same programmatic icon renderer as the live window, tray, and dialog icons, write compressed PNG files from the generated icon bitmap, use the current resolved theme colors including the dashboard card fill composited over the app background, and do not depend on dashboard render scale.
 - App-icon exports create the target parent directory when it is missing.
 - Unhandled native process crashes write a best-effort minidump and text report named `casedash_crash_<timestamp>_<pid>.dmp` and `casedash_crash_<timestamp>_<pid>.txt`. Crash files are created in the launch working directory when it is writable, otherwise in the process temp directory.
-- Layout guide sheet exports follow the feature contract in [docs/layout_guide_sheet.md](layout_guide_sheet.md) and refresh once per second in UI-attached diagnostics mode.
+- Layout guide sheet exports follow the feature contract in [docs/layout_guide_sheet.md](layout_guide_sheet.md) and are produced by `CaseDashHeadless.exe`. The shipped app's embedded default config excludes `[layout_guide_sheet]`; headless loads that section from its own embedded resource when the guide-sheet output handler is available.
 - When `/trace` and `/screenshot` are both enabled, each screenshot export writes `diagnostics:active_region` trace lines from the `LayoutEditActiveRegions` snapshot for mouse-reactive dashboard regions that are present in the exported frame, including card and widget hover regions, layout guides, container-child reorder targets, gap handles, widget guides, text anchors, and color targets. Each line includes the client-coordinate box, visual type, config or layout path, and a short detail string; a `diagnostics:active_regions` summary records the exported count.
-- Headless trace output writes one `diagnostics:resolved_color` line per resolved `[colors]` and `[layout_guide_sheet]` color after startup config resolution and after a successful `/reload`. Each line includes the config section, color name, resolved `#RRGGBBAA` value, and source expression when the color came from a config expression.
+- Headless trace output writes one `diagnostics:resolved_color` line per resolved `[colors]` color after startup config resolution and after a successful `/reload`. Each line includes the config section, color name, resolved `#RRGGBBAA` value, and source expression when the color came from a config expression.
 - When `/trace` is enabled with the `profile` prefix included, the app collects high-precision timing samples for the real runtime operations that mirror benchmark phases and writes `profile:timing` summaries about every 10 seconds, plus a final partial flush when the trace stream closes. Each summary line reports one operation with `op`, `samples`, `total_ms`, `avg_ms`, and `interval_ms`; current operations include `telemetry_update`, `hover_hit_test`, `snap`, `apply`, `paint_total`, `paint_draw`, `presentation_frame_build`, `presentation_resolve_metrics`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `dynamic_edit_collisions`, `overlay_layer_bitmap`, `overlay_layer_content`, `presentation_frame_publish`, and `animation_frame`. The `animation_frame` operation measures animation sampling and composition work only; it excludes the live DXGI vsync wait. Use `/trace-prefixes:profile` for timing-only trace output without verbose provider logging.
-- When `/trace` and `/layout-guide-sheet` are both enabled, each layout guide sheet export writes a `diagnostics:layout_guide_sheet` start marker, one `diagnostics:layout_guide_sheet detail` line per collected render detail such as canvas dimensions, leader scores, selected cards, placed callout count, and remaining leader intersections, one detail line per remaining intersection with its card, kind, sides, and callout keys, one `diagnostics:layout_guide_sheet stats` line with selected-card and callout counts plus active-region, planning, measurement, placement, and draw timings, and then an end marker.
+- When `/trace` and `/layout-guide-sheet` are both enabled in `CaseDashHeadless.exe`, each layout guide sheet export writes a `diagnostics:layout_guide_sheet` start marker, one `diagnostics:layout_guide_sheet detail` line per collected render detail such as canvas dimensions, leader scores, selected cards, placed callout count, and remaining leader intersections, one detail line per remaining intersection with its card, kind, sides, and callout keys, one `diagnostics:layout_guide_sheet stats` line with selected-card and callout counts plus active-region, planning, measurement, placement, and draw timings, and then an end marker.
 - When `/trace` and `/app-icon` are both enabled, each successful icon export writes `diagnostics:app_icon_saved`; failures write `diagnostics:app_icon_save_failed` with the target path, size, and error detail when available.
 - When `/hover:<x>,<y>` is active during a traced screenshot export, the trace writes one `diagnostics:hover` line with the hover point, resolved target kind, and tooltip text that the live layout-edit UI would show. If no hover target resolves, the line reports `target="none"`.
 - Live layout-edit tooltips use a separate Win32 tooltip window and therefore do not appear in diagnostics screenshots.
@@ -122,17 +124,17 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
 - Prefer the smallest traced `/exit` command that exercises the changed behavior.
-- Add only the modifiers that matter to the change: `/reload`, `/blank`, `/layout:<name>`, `/theme:<name>`, `/edit-layout`, `/edit-layout:<widget-name>`, `/hover:<x>,<y>`, `/layout-guide-sheet`, `/app-icon`, `/save-config`, or `/save-full-config`.
+- Add only the modifiers that matter to the change: `/reload`, `/blank`, `/layout:<name>`, `/theme:<name>`, `/edit-layout`, `/edit-layout:<widget-name>`, `/hover:<x>,<y>`, `/app-icon`, `/save-config`, or `/save-full-config`. Use `CaseDashHeadless.exe` for `/layout-guide-sheet`.
 
 Recommended coverage:
 
 - Trace plus snapshot dump validates snapshot content and provider state.
 - Trace plus screenshot validates rendered output and active-region trace data.
 - Trace plus config export validates minimal or full config output.
-- Trace plus layout guide sheet validates layout guide sheet planning, placement, and trace details.
+- Trace plus layout guide sheet through `CaseDashHeadless.exe` validates layout guide sheet planning, placement, and trace details.
 - Trace plus app icon validates themed icon rendering and output paths.
 - UI-attached diagnostics validate once-per-second refresh behavior when live refresh, hover-only behavior, drag-only behavior, or interactive fake-runtime reloads changed.
-- Headless `/fake /exit` and interactive `/fake` both matter when fake-runtime startup or reload behavior changed.
+- `CaseDashHeadless.exe /fake` and interactive `CaseDash.exe /fake` both matter when fake-runtime startup or reload behavior changed.
 
 Layout-edit validation:
 

@@ -332,7 +332,7 @@ bool ApplyMetricsSectionValue(MetricsSectionConfig& metrics,
     return true;
 }
 
-void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigParseContext& context) {
+void ApplyConfigText(std::string_view text, AppConfig& config, const ConfigParseContext& context) {
     std::string section;
 
     size_t lineStart = 0;
@@ -342,7 +342,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
             lineEnd = text.size();
         }
 
-        std::string line = text.substr(lineStart, lineEnd - lineStart);
+        std::string line(text.substr(lineStart, lineEnd - lineStart));
         line = Trim(line);
         if (line.empty() || line[0] == '#' || line[0] == ';') {
             if (lineEnd == text.size()) {
@@ -387,8 +387,16 @@ std::string LoadEmbeddedConfigTemplate() {
 }
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigParseContext& context) {
+    return LoadConfigWithExtraTemplate(path, includeOverlay, context, {});
+}
+
+AppConfig LoadConfigWithExtraTemplate(
+    const FilePath& path, bool includeOverlay, const ConfigParseContext& context, std::string_view extraTemplate) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config, context);
+    if (!extraTemplate.empty()) {
+        ApplyConfigText(extraTemplate, config, context);
+    }
     if (includeOverlay) {
         ApplyConfigText(ReadConfigFile(path), config, context);
     }

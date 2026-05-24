@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/layout_guide_sheet_support.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
+#include "renderer/layout_guide_sheet_palette.h"
 #include "util/text_format.h"
 
 namespace {
@@ -540,8 +542,8 @@ LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(c
     PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
     const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-            card.id, card.rect, &metrics, card.suppressTitle);
+        card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
+            dashboardRenderer_, card.id, card.rect, &metrics, card.suppressTitle);
     }
     return CollectActiveRegionsFromPackedOverview(overview);
 }
@@ -558,7 +560,7 @@ bool LayoutGuideSheetRenderer::SavePng(const FilePath& imagePath,
         callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.SaveLayoutGuideSheetSurfacePng(imagePath, width, height, draw);
+            return SaveLayoutGuideSheetSurfacePng(dashboardRenderer_, imagePath, width, height, draw);
         },
         traceDetails,
         errorText,
@@ -576,7 +578,7 @@ bool LayoutGuideSheetRenderer::RenderOffscreen(const SystemSnapshot& snapshot,
         callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.RenderLayoutGuideSheetSurfaceOffscreen(width, height, draw);
+            return RenderLayoutGuideSheetSurfaceOffscreen(dashboardRenderer_, width, height, draw);
         },
         traceDetails,
         errorText,
@@ -607,6 +609,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     if (errorText != nullptr) {
         errorText->clear();
     }
+    ApplyLayoutGuideSheetRendererPalette(
+        dashboardRenderer_.Renderer(), dashboardRenderer_.Config().layout.layoutGuideSheet);
 
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
@@ -625,11 +629,11 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     using CardPlacement = LayoutGuideSheetCardPlacement;
     std::vector<CardPlacement> cardPlacements;
     cardPlacements.reserve(selectedCardIds.size() + 1);
-    const std::vector<LayoutGuideSheetCardSummary> cards = dashboardRenderer_.CollectLayoutGuideSheetCardSummaries();
+    const std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(dashboardRenderer_);
     PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-            card.id, card.rect, nullptr, card.suppressTitle);
+        card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
+            dashboardRenderer_, card.id, card.rect, nullptr, card.suppressTitle);
     }
     for (const std::string& selectedCardId : selectedCardIds) {
         const auto cardIt =
@@ -863,21 +867,10 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
 
     const auto drawStart = std::chrono::steady_clock::now();
 
-    struct RenderModeScope {
-        DashboardRenderer& renderer;
-        RenderMode previous;
-
-        ~RenderModeScope() {
-            renderer.renderMode_ = previous;
-        }
-    };
-
-    const RenderModeScope renderModeScope{dashboardRenderer_, dashboardRenderer_.renderMode_};
-    dashboardRenderer_.renderMode_ = RenderMode::LayoutGuideSheet;
     const bool saved = renderSurface(sheetWidth, sheetHeight, [&] {
         dashboardRenderer_.Renderer().FillSolidRect(
             RenderRect{0, 0, sheetWidth, sheetHeight}, RenderColorId::Background);
-        dashboardRenderer_.BeginLayoutGuideSheetDynamicArtifacts(overlayState);
+        BeginLayoutGuideSheetDynamicArtifacts(dashboardRenderer_, overlayState);
         const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
         for (const CardPlacement& placement : cardPlacements) {
             if (placement.overview) {
@@ -887,15 +880,15 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                         static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.overviewBorderWidth, 1))));
                 for (const PackedOverviewCard& card : overview.cards) {
                     const RenderRect cardRect = TransformRect(card.rect, placement.sourceRect, placement.destRect);
-                    dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-                        card.id, cardRect, &metrics, card.suppressTitle);
+                    BuildLayoutGuideSheetCardChromeArtifacts(
+                        dashboardRenderer_, card.id, cardRect, &metrics, card.suppressTitle);
                 }
                 continue;
             }
-            dashboardRenderer_.DrawLayoutGuideSheetCard(
-                placement.id, placement.sourceRect, placement.destRect, metrics);
+            DrawLayoutGuideSheetCard(
+                dashboardRenderer_, placement.id, placement.sourceRect, placement.destRect, metrics);
         }
-        dashboardRenderer_.ResolveLayoutGuideSheetDynamicArtifactCollisions();
+        ResolveLayoutGuideSheetDynamicArtifactCollisions(dashboardRenderer_);
         DashboardOverlayState drawOverlayState;
         drawOverlayState.showLayoutEditGuides = true;
         drawOverlayState.forceLayoutEditAffordances = true;
@@ -919,8 +912,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
             drawOverlayState.hoveredEditableWidget.reset();
             drawOverlayState.hoveredLayoutEditGuide.reset();
             drawOverlayState.hoveredGapEditAnchor.reset();
-            dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                drawOverlayState, placement.sourceRect, placement.destRect, metrics);
+            DrawLayoutGuideSheetOverlay(
+                dashboardRenderer_, drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             for (const Callout& callout : callouts) {
                 if (callout.sourceCardId != placement.id) {
                     continue;
@@ -936,11 +929,11 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                 }
                 drawOverlayState.hoveredLayoutEditGuide = callout.hoverLayoutGuide;
                 drawOverlayState.hoveredGapEditAnchor = callout.hoverGapAnchorKey;
-                dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                    drawOverlayState, placement.sourceRect, placement.destRect, metrics);
+                DrawLayoutGuideSheetOverlay(
+                    dashboardRenderer_, drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             }
         }
-        dashboardRenderer_.EndLayoutGuideSheetDynamicArtifacts();
+        EndLayoutGuideSheetDynamicArtifacts(dashboardRenderer_);
         for (const Callout& callout : callouts) {
             dashboardRenderer_.Renderer().DrawSolidLine(callout.targetAttachment,
                 callout.bubbleAttachment,

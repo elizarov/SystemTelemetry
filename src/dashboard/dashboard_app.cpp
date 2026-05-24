@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <commctrl.h>
+#include <commdlg.h>
 #include <cstdarg>
 #include <cstring>
 #include <vector>
@@ -66,6 +67,34 @@ int RectHeight(const RECT& rect) {
 
 bool IsRectUsable(const RECT& rect) {
     return RectWidth(rect) > 0 && RectHeight(rect) > 0;
+}
+
+std::optional<FilePath> PromptSavePath(HWND owner,
+    const FilePath& initialDirectory,
+    std::string_view defaultFileName,
+    std::string_view filter,
+    std::string_view defaultExtension) {
+    char fileBuffer[MAX_PATH] = {};
+    const std::string defaultFileNameText(defaultFileName);
+    strncpy_s(fileBuffer, defaultFileNameText.c_str(), _TRUNCATE);
+
+    const std::string initialDirectoryText = initialDirectory.string();
+    const std::string filterText(filter);
+    const std::string defaultExtensionText(defaultExtension);
+    OPENFILENAMEA dialog{};
+    dialog.lStructSize = sizeof(dialog);
+    dialog.hwndOwner = owner;
+    dialog.lpstrFilter = filterText.empty() ? nullptr : filterText.c_str();
+    dialog.lpstrFile = fileBuffer;
+    dialog.nMaxFile = ARRAYSIZE(fileBuffer);
+    dialog.lpstrInitialDir = initialDirectoryText.empty() ? nullptr : initialDirectoryText.c_str();
+    dialog.lpstrDefExt = defaultExtensionText.empty() ? nullptr : defaultExtensionText.c_str();
+    dialog.Flags = OFN_OVERWRITEPROMPT | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+
+    if (!GetSaveFileNameA(&dialog)) {
+        return std::nullopt;
+    }
+    return FilePath(dialog.lpstrFile);
 }
 
 POINT ResizeDraggedCornerPoint(const RECT& rect, DisplayResizeCorner corner) {
@@ -2183,7 +2212,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
 }
 
 bool DashboardApp::WriteDiagnosticsOutputs() {
-    return controller_.WriteDiagnosticsOutputs();
+    return controller_.WriteDiagnosticsOutputs(*this);
 }
 
 std::optional<FilePath> DashboardApp::PromptDiagnosticsSavePath(

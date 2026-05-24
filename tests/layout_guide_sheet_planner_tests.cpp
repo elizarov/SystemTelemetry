@@ -10,6 +10,7 @@
 #include "config/config_resolution.h"
 #include "config/config_telemetry.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/layout_guide_sheet_support.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
@@ -69,7 +70,7 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
     return BuiltInLayoutGuideSheetContext{config,
         renderer.CollectLayoutEditActiveRegions(overlayState),
         sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
-        renderer.CollectLayoutGuideSheetCardSummaries()};
+        CollectLayoutGuideSheetCardSummaries(renderer)};
 }
 
 LayoutGuideSheetCardSummary TestCardSummary(std::string id, std::vector<WidgetClass> widgetClasses) {
@@ -110,7 +111,7 @@ TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPla
     ASSERT_TRUE(SelectLayout(config, "5x3"));
     renderer.SetConfig(config);
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
-    std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(renderer);
     auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
     EXPECT_EQ(timeCard->title, "Time");
@@ -120,7 +121,7 @@ TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPla
     ASSERT_TRUE(SelectLayout(config, "1x4"));
     renderer.SetConfig(config);
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
-    cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    cards = CollectLayoutGuideSheetCardSummaries(renderer);
     timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
     EXPECT_TRUE(timeCard->title.empty());

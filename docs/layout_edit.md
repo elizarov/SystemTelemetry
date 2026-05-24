@@ -66,5 +66,5 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 
 ## Layout Guide Sheet
 
-- Diagnostics can export a layout guide sheet built from live layout-edit active-region geometry and tooltip text.
+- `CaseDashHeadless.exe` can export a layout guide sheet built from live layout-edit active-region geometry and tooltip text.
 - The layout guide sheet feature contract, callout selection, visual styling, placement behavior, and diagnostics export behavior are defined in [docs/layout_guide_sheet.md](layout_guide_sheet.md).

@@ -15,7 +15,10 @@
 
 class DashboardRenderer;
 class DashboardLayoutEditOverlayRenderer;
+class MetricSource;
 struct DashboardOverlayState;
+struct LayoutGuideSheetCardChromeArtifacts;
+struct LayoutGuideSheetCardSummary;
 
 class DashboardLayoutResolver : public WidgetEditArtifactRegistrar {
 public:
@@ -122,6 +125,21 @@ public:
 private:
     friend class DashboardRenderer;
     friend class DashboardLayoutEditOverlayRenderer;
+    friend std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries(
+        const DashboardRenderer& renderer);
+    friend void BeginLayoutGuideSheetDynamicArtifacts(
+        DashboardRenderer& renderer, const DashboardOverlayState& overlayState);
+    friend void EndLayoutGuideSheetDynamicArtifacts(DashboardRenderer& renderer);
+    friend void DrawLayoutGuideSheetCard(DashboardRenderer& renderer,
+        const std::string& cardId,
+        const RenderRect& sourceRect,
+        const RenderRect& destRect,
+        const MetricSource& metrics);
+    friend LayoutGuideSheetCardChromeArtifacts BuildLayoutGuideSheetCardChromeArtifacts(DashboardRenderer& renderer,
+        const std::string& cardId,
+        const RenderRect& rect,
+        const MetricSource* metrics,
+        bool suppressTitle);
 
     void RegisterEditableAnchorRegion(
         std::vector<LayoutEditAnchorRegion>& regions, const LayoutEditAnchorRegistration& registration);

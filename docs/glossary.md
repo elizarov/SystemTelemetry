@@ -32,6 +32,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 |---|---|
 | CaseDash | The app and project name. |
 | dashboard | The live always-on telemetry window rendered by `CaseDash.exe`. |
+| CaseDashHeadless.exe | The non-shipped diagnostics executable used by CI and website tooling for one-shot exports, including layout guide sheets. |
 | live dashboard | The interactive dashboard UI path, as opposed to headless diagnostics or deterministic offscreen renders. |
 | dashboard UI | The normal interactive shell with popup menus, tray icon, telemetry updates, and rendering. |
 | tray icon | The notification-area icon exposing the same menu action set as the dashboard menu. |

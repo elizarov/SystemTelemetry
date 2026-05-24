@@ -1078,9 +1078,6 @@ void DashboardShellUi::ExecuteCommand(
         case kCommandSaveScreenshotAs:
             app_.controller_.SaveScreenshotAs(app_, app_.diagnosticsOptions_);
             break;
-        case kCommandSaveLayoutGuideSheetAs:
-            app_.controller_.SaveLayoutGuideSheetAs(app_);
-            break;
         case kCommandSaveFullConfigAs:
             app_.controller_.SaveFullConfigAs(app_);
             break;
@@ -1331,7 +1328,6 @@ void DashboardShellUi::ShowContextMenu(
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveDumpAs, "Export Snapshot Dump...");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, "Save Screenshot...");
-        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, "Save Layout Guide Sheet...");
     }
     if (layoutEditTarget != nullptr) {
         std::string label;

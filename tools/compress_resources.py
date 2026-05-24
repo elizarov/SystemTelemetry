@@ -119,6 +119,19 @@ def read_utf8_bytes(path: Path) -> bytes:
     return data
 
 
+def remove_ini_sections(text: str, excluded_sections: set[str]) -> str:
+    output: list[str] = []
+    skip_section = False
+    for line in text.splitlines(keepends=True):
+        stripped = line.strip()
+        if stripped.startswith("[") and stripped.endswith("]"):
+            section_name = stripped[1:-1].strip()
+            skip_section = section_name in excluded_sections
+        if not skip_section:
+            output.append(line)
+    return "".join(output)
+
+
 def is_identifier_char(ch: str) -> bool:
     return ch == "_" or ch.isalnum()
 
@@ -215,9 +228,12 @@ def parse_c_string_literal_sequence(text: str, index: int, path: Path) -> tuple[
     return "".join(pieces), index
 
 
-def collect_resource_strings(source_root: Path) -> list[str]:
+def collect_resource_strings(source_root: Path, excluded_prefixes: list[str]) -> list[str]:
     strings: dict[str, None] = {}
     for path in sorted((source_root / "src").rglob("*.cpp")):
+        relative_path = path.relative_to(source_root).as_posix()
+        if any(relative_path.startswith(prefix) for prefix in excluded_prefixes):
+            continue
         text = path.read_text(encoding="utf-8")
         index = 0
         while True:
@@ -283,20 +299,26 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--output-rc", required=True, type=Path)
     parser.add_argument("--resource-root", required=True, type=Path)
-    parser.add_argument("--resource-string-header", required=True, type=Path)
+    parser.add_argument("--resource-string-header", type=Path)
+    parser.add_argument("--exclude-config-section", action="append", default=[])
+    parser.add_argument("--exclude-source-prefix", action="append", default=[])
     parser.add_argument("--source-root", required=True, type=Path)
     args = parser.parse_args()
 
     config = read_utf8_bytes(args.resource_root / "config.ini")
+    if args.exclude_config_section:
+        config = remove_ini_sections(config.decode("utf-8"), set(args.exclude_config_section)).encode("utf-8")
     localization = read_utf8_bytes(args.resource_root / "localization.ini")
-    resource_strings = collect_resource_strings(args.source_root)
+    excluded_prefixes = [prefix.replace("\\", "/").rstrip("/") + "/" for prefix in args.exclude_source_prefix]
+    resource_strings = collect_resource_strings(args.source_root, excluded_prefixes)
     resource_string_text = "\n".join(resource_strings)
     if resource_strings:
         resource_string_text += "\n"
     resource_string_bytes = resource_string_text.encode("utf-8")
     resource_string_text_path = args.output_dir / "resource_strings.txt"
     write_if_changed(resource_string_text_path, resource_string_bytes)
-    write_if_changed(args.resource_string_header, build_resource_string_header(resource_strings).encode("utf-8"))
+    if args.resource_string_header is not None:
+        write_if_changed(args.resource_string_header, build_resource_string_header(resource_strings).encode("utf-8"))
 
     atlas = struct.pack("<II", len(config), len(localization)) + config + localization + resource_string_bytes
     compressed = MAGIC + struct.pack("<I", len(atlas)) + lzss_compress(atlas)

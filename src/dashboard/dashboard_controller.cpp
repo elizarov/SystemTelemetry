@@ -330,10 +330,13 @@ bool DashboardController::CommitDisplayWallpaperTransition(
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     state_.lastError.clear();
     state_.config = LoadRuntimeConfig(diagnosticsOptions, ConfigParseContext{TelemetryMetricCatalog()});
-    if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
+    std::string diagnosticsOverrideError;
+    if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions, nullptr, &diagnosticsOverrideError)) {
+        state_.lastError = diagnosticsOverrideError;
         return false;
     }
-    if (!ApplyDiagnosticsThemeOverride(state_.config, diagnosticsOptions)) {
+    if (!ApplyDiagnosticsThemeOverride(state_.config, diagnosticsOptions, nullptr, &diagnosticsOverrideError)) {
+        state_.lastError = diagnosticsOverrideError;
         return false;
     }
     shell.RendererDashboardOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
@@ -384,7 +387,7 @@ bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const
     ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     if (state_.diagnostics != nullptr &&
         std::chrono::steady_clock::now() - state_.lastDiagnosticsOutput >= std::chrono::seconds(1)) {
-        if (!WriteDiagnosticsOutputs()) {
+        if (!WriteDiagnosticsOutputs(shell)) {
             return false;
         }
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
@@ -393,7 +396,7 @@ bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const
     return true;
 }
 
-bool DashboardController::WriteDiagnosticsOutputs() {
+bool DashboardController::WriteDiagnosticsOutputs(DashboardShellHost& shell) {
     if (state_.diagnostics == nullptr || state_.telemetry == nullptr) {
         return true;
     }
@@ -401,6 +404,9 @@ bool DashboardController::WriteDiagnosticsOutputs() {
     const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump, state_.config);
     state_.diagnostics->WriteTraceMarker(
         TracePrefix::Diagnostics, ok ? RES_STR("write_outputs_done") : RES_STR("write_outputs_failed"));
+    if (!ok && state_.diagnostics->ShouldShowDialogs() && !state_.diagnostics->LastError().empty()) {
+        shell.ShowError(state_.diagnostics->LastError());
+    }
     return ok;
 }
 
@@ -418,6 +424,9 @@ bool DashboardController::ReloadConfigFromDisk(
             &telemetryError)) {
         if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
             shell.ShowError(FormatTelemetryInitializeError(telemetryError));
+        } else if (state_.diagnostics != nullptr && !state_.diagnostics->LastError().empty() &&
+                   state_.diagnostics->ShouldShowDialogs()) {
+            shell.ShowError(state_.diagnostics->LastError());
         }
         shell.ReleaseFonts();
         shell.InitializeFonts();
@@ -492,31 +501,6 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
             &errorText)) {
         const std::string pathText = path->string();
         std::string message = FormatText("Failed to save screenshot:\n%s", pathText.c_str());
-        if (!errorText.empty()) {
-            AppendFormat(message, "\n\n%s", errorText.c_str());
-        }
-        shell.ShowError(message);
-    }
-}
-
-void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
-    if (state_.telemetry == nullptr) {
-        return;
-    }
-    const auto path =
-        shell.PromptDiagnosticsSavePath(kDefaultLayoutGuideSheetFileName, StringViewWithTerminator(kPngFilter), "png");
-    if (!path.has_value()) {
-        return;
-    }
-    std::string errorText;
-    if (!SaveLayoutGuideSheet(*path,
-            state_.telemetryUpdate.dump.snapshot,
-            BuildCurrentConfigForSaving(),
-            shell.CurrentRenderScale(),
-            shell.TraceLog(),
-            &errorText)) {
-        const std::string pathText = path->string();
-        std::string message = FormatText("Failed to save layout guide sheet:\n%s", pathText.c_str());
         if (!errorText.empty()) {
             AppendFormat(message, "\n\n%s", errorText.c_str());
         }

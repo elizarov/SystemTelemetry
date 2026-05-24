@@ -139,6 +139,29 @@ TEST(ConfigWriter, MinimalSaveInsertsMissingGpuSectionWithKeyBeforeSectionSepara
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("[gpu]\r\n\r\nadapter_name")));
 }
 
+TEST(ConfigWriter, MinimalSaveInsertsMissingSectionsByDefaultConfigOrder) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.layout.colors.accentColor = ColorConfig::FromRgba(0x123456FFu);
+
+    const std::string initialText = "[display]\r\n"
+                                    "layout = 5x3\r\n"
+                                    "\r\n"
+                                    "[fonts]\r\n"
+                                    "title = Segoe UI,18,600\r\n";
+
+    const std::string output = BuildSavedConfigText(initialText, currentConfig, &compareConfig);
+
+    EXPECT_THAT(output,
+        testing::HasSubstr("[display]\r\n"
+                           "layout = 5x3\r\n"
+                           "\r\n"
+                           "[colors]\r\n"
+                           "accent_color = #123456FF\r\n"
+                           "\r\n"
+                           "[fonts]\r\n"));
+}
+
 TEST(ConfigWriter, MinimalSavePersistsResolvedBoardBindingsAgainstEmptySourceConfig) {
     AppConfig compareConfig;
     compareConfig.layout.board.requestedTemperatureNames = {"cpu"};
@@ -274,6 +297,25 @@ TEST(ConfigWriter, FullExportWritesThemeSections) {
                            "accent = #00BFFFFF\r\n"
                            "guide = #FF6A00FF\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("panel_border_color = background(mix: 0.34 accent)\r\n"));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("[layout_guide_sheet]")));
+}
+
+TEST(ConfigWriter, MinimalSaveRemovesLayoutGuideSheetSection) {
+    AppConfig compareConfig;
+    AppConfig currentConfig = compareConfig;
+    currentConfig.display.theme = "light_blue";
+
+    const std::string output = BuildSavedConfigText("[display]\r\n"
+                                                    "theme = dark_cyan\r\n"
+                                                    "\r\n"
+                                                    "[layout_guide_sheet]\r\n"
+                                                    "sheet_margin = 24\r\n",
+        currentConfig,
+        &compareConfig);
+
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("[layout_guide_sheet]")));
+    EXPECT_THAT(output, testing::Not(testing::HasSubstr("sheet_margin")));
+    EXPECT_THAT(output, testing::HasSubstr("[display]\r\ntheme = light_blue\r\n"));
 }
 
 TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {

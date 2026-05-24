@@ -1,5 +1,7 @@
 #include "config/config_writer.h"
 
+#include <string_view>
+
 #include "config/config_file_io.h"
 #include "config/config_parser.h"
 #include "config/config_runtime_fields.h"
@@ -8,6 +10,10 @@
 #include "util/text_format.h"
 
 namespace {
+
+constexpr std::string_view kLayoutGuideSheetSectionName = "layout_guide_sheet";
+constexpr std::string_view kLayoutGuideSheetHeader = "[layout_guide_sheet]";
+constexpr size_t kUnknownConfigSectionOrder = static_cast<size_t>(-1);
 
 std::string RuntimeSectionName(const RuntimeConfigSectionDescriptor& section) {
     return FormatText("[%.*s]", static_cast<int>(section.nameLength), section.name);
@@ -142,6 +148,9 @@ template <typename UpdateKeyFn> void SaveDynamicSectionItem(void* context, std::
 template <typename UpdateKeyFn>
 void SaveKnownSectionDifferences(const AppConfig& config, const AppConfig* compareConfig, UpdateKeyFn& updateKey) {
     for (const RuntimeConfigSectionDescriptor& section : RuntimeConfigSectionDescriptors()) {
+        if (std::string_view(section.name, section.nameLength) == kLayoutGuideSheetSectionName) {
+            continue;
+        }
         if (section.kind == RuntimeConfigSectionKind::Dynamic) {
             DynamicSectionSaveContext<UpdateKeyFn> context{&section, compareConfig, &updateKey};
             section.dynamic.forEach(config, &context, SaveDynamicSectionItem<UpdateKeyFn>);
@@ -206,6 +215,121 @@ std::vector<std::string> SplitConfigLines(const std::string& text) {
     return lines;
 }
 
+bool IsConfigSectionHeader(const std::string& line) {
+    const std::string trimmed = Trim(line);
+    return !trimmed.empty() && trimmed.front() == '[' && trimmed.back() == ']';
+}
+
+size_t FindConfigSectionIndex(const std::vector<std::string>& lines, std::string_view sectionName) {
+    for (size_t i = 0; i < lines.size(); ++i) {
+        if (Trim(lines[i]) == sectionName) {
+            return i;
+        }
+    }
+    return lines.size();
+}
+
+size_t FindConfigSectionEnd(const std::vector<std::string>& lines, size_t sectionStart) {
+    size_t sectionEnd = lines.size();
+    for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
+        if (IsConfigSectionHeader(lines[j])) {
+            sectionEnd = j;
+            break;
+        }
+    }
+    return sectionEnd;
+}
+
+std::string_view UnwrapConfigSectionName(std::string_view sectionName) {
+    if (sectionName.size() >= 2 && sectionName.front() == '[' && sectionName.back() == ']') {
+        sectionName.remove_prefix(1);
+        sectionName.remove_suffix(1);
+    }
+    return sectionName;
+}
+
+bool RuntimeConfigSectionMatchesName(const RuntimeConfigSectionDescriptor& section, std::string_view sectionName) {
+    const std::string_view descriptorName(section.name, section.nameLength);
+    if (section.kind == RuntimeConfigSectionKind::Dynamic) {
+        return sectionName.starts_with(descriptorName) && sectionName.size() > descriptorName.size();
+    }
+    return sectionName == descriptorName;
+}
+
+size_t ConfigSectionOrderIndex(std::string_view sectionName) {
+    const std::string_view unwrappedName = UnwrapConfigSectionName(sectionName);
+    for (const RuntimeConfigSectionDescriptor& section : RuntimeConfigSectionDescriptors()) {
+        if (RuntimeConfigSectionMatchesName(section, unwrappedName)) {
+            return section.defaultOrder;
+        }
+    }
+    return kUnknownConfigSectionOrder;
+}
+
+size_t InsertConfigSection(std::vector<std::string>& lines, size_t insertIndex, const std::string& sectionName) {
+    std::vector<std::string> insertedLines;
+    if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
+        insertedLines.push_back("");
+    }
+    insertedLines.push_back(sectionName);
+    if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
+        insertedLines.push_back("");
+    }
+
+    lines.insert(lines.begin() + static_cast<std::ptrdiff_t>(insertIndex), insertedLines.begin(), insertedLines.end());
+    return insertIndex + (insertedLines.front().empty() ? 1 : 0);
+}
+
+size_t EnsureConfigSectionInDefaultOrder(
+    std::vector<std::string>& lines, const std::string& sectionName, ConfigSaveShape shape) {
+    const size_t existingIndex = FindConfigSectionIndex(lines, sectionName);
+    if (existingIndex < lines.size()) {
+        return existingIndex;
+    }
+    if (shape == ConfigSaveShape::ExistingTemplateOnly) {
+        return lines.size();
+    }
+
+    const size_t targetOrder = ConfigSectionOrderIndex(sectionName);
+    if (targetOrder != kUnknownConfigSectionOrder) {
+        size_t insertAfterKnownSectionEnd = lines.size();
+        for (size_t i = 0; i < lines.size(); ++i) {
+            if (!IsConfigSectionHeader(lines[i])) {
+                continue;
+            }
+            const std::string existingSection = Trim(lines[i]);
+            const size_t existingOrder = ConfigSectionOrderIndex(existingSection);
+            if (existingOrder > targetOrder && existingOrder != kUnknownConfigSectionOrder) {
+                return InsertConfigSection(lines, i, sectionName);
+            }
+            if (existingOrder < targetOrder) {
+                insertAfterKnownSectionEnd = FindConfigSectionEnd(lines, i);
+            }
+        }
+        return InsertConfigSection(lines, insertAfterKnownSectionEnd, sectionName);
+    }
+
+    if (!lines.empty() && !lines.back().empty()) {
+        lines.push_back("");
+    }
+    lines.push_back(sectionName);
+    return lines.size() - 1;
+}
+
+void RemoveConfigSection(std::vector<std::string>& lines, std::string_view sectionName) {
+    const size_t sectionStart = FindConfigSectionIndex(lines, sectionName);
+    if (sectionStart >= lines.size()) {
+        return;
+    }
+    size_t eraseStart = sectionStart;
+    size_t eraseEnd = FindConfigSectionEnd(lines, sectionStart);
+    if (eraseStart > 0 && lines[eraseStart - 1].empty()) {
+        --eraseStart;
+    }
+    lines.erase(
+        lines.begin() + static_cast<std::ptrdiff_t>(eraseStart), lines.begin() + static_cast<std::ptrdiff_t>(eraseEnd));
+}
+
 std::string JoinConfigLines(const std::vector<std::string>& lines) {
     std::string output;
     for (const std::string& line : lines) {
@@ -231,100 +355,18 @@ void SaveKnownStructuredSectionDifferences(
 std::string BuildSavedConfigText(
     const std::string& initialText, const AppConfig& config, const AppConfig* compareConfig, ConfigSaveShape shape) {
     std::vector<std::string> lines = SplitConfigLines(initialText);
+    RemoveConfigSection(lines, kLayoutGuideSheetHeader);
 
-    const auto findSectionIndex = [&lines](const std::string& sectionName) -> size_t {
-        for (size_t i = 0; i < lines.size(); ++i) {
-            if (Trim(lines[i]) == sectionName) {
-                return i;
-            }
-        }
-        return lines.size();
-    };
-
-    const auto ensureSection = [&lines, &findSectionIndex, shape](const std::string& sectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-        if (shape == ConfigSaveShape::ExistingTemplateOnly) {
-            return lines.size();
-        }
-        if (!lines.empty() && !lines.back().empty()) {
-            lines.push_back("");
-        }
-        lines.push_back(sectionName);
-        return lines.size() - 1;
-    };
-
-    const auto ensureSectionAfter = [&lines, &findSectionIndex, shape](
-                                        const std::string& sectionName, const std::string& afterSectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
-        if (shape == ConfigSaveShape::ExistingTemplateOnly) {
-            return lines.size();
-        }
-
-        const size_t afterIndex = findSectionIndex(afterSectionName);
-        if (afterIndex >= lines.size()) {
-            if (!lines.empty() && !lines.back().empty()) {
-                lines.push_back("");
-            }
-            lines.push_back(sectionName);
-            return lines.size() - 1;
-        }
-
-        size_t insertIndex = afterIndex + 1;
-        while (insertIndex < lines.size()) {
-            const std::string next = Trim(lines[insertIndex]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                break;
-            }
-            ++insertIndex;
-        }
-
-        std::vector<std::string> insertedLines;
-        if (insertIndex > 0 && !lines[insertIndex - 1].empty()) {
-            insertedLines.push_back("");
-        }
-        insertedLines.push_back(sectionName);
-        if (insertIndex < lines.size() && !lines[insertIndex].empty()) {
-            insertedLines.push_back("");
-        }
-
-        lines.insert(
-            lines.begin() + static_cast<std::ptrdiff_t>(insertIndex), insertedLines.begin(), insertedLines.end());
-        return insertIndex + (insertedLines.front().empty() ? 1 : 0);
-    };
-
-    const auto findSectionEnd = [&lines](size_t sectionStart) -> size_t {
-        size_t sectionEnd = lines.size();
-        for (size_t j = sectionStart + 1; j < lines.size(); ++j) {
-            const std::string next = Trim(lines[j]);
-            if (!next.empty() && next.front() == '[' && next.back() == ']') {
-                sectionEnd = j;
-                break;
-            }
-        }
-        return sectionEnd;
-    };
-
-    const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
+    const auto updateKey = [&lines, shape](
                                const std::string& sectionName, const std::string& key, const std::string& value) {
-        size_t sectionStart = sectionName == "[gpu]"       ? ensureSectionAfter(sectionName, "[display]")
-                              : sectionName == "[network]" ? ensureSectionAfter(sectionName, "[gpu]")
-                              : sectionName == "[storage]" ? ensureSectionAfter(sectionName, "[network]")
-                              : sectionName == "[board]"   ? ensureSectionAfter(sectionName, "[storage]")
-                              : sectionName == "[metrics]" ? ensureSectionAfter(sectionName, "[board]")
-                                                           : ensureSection(sectionName);
+        size_t sectionStart = EnsureConfigSectionInDefaultOrder(lines, sectionName, shape);
         if (sectionStart >= lines.size()) {
             return;
         }
         if (Trim(lines[sectionStart]) != sectionName) {
             lines[sectionStart] = sectionName;
         }
-        const size_t sectionEnd = findSectionEnd(sectionStart);
+        const size_t sectionEnd = FindConfigSectionEnd(lines, sectionStart);
         ReplaceOrAppendKey(lines, sectionStart, sectionEnd, key, value, shape == ConfigSaveShape::UpdateOrAppend);
     };
 

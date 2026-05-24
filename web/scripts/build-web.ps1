@@ -22,7 +22,7 @@ $assetDir = Join-Path $distDir 'assets'
 $generatedDir = Join-Path $assetDir 'generated'
 $configPath = Join-Path $repoRoot 'resources\config.ini'
 $versionPath = Join-Path $repoRoot 'VERSION'
-$exePath = Join-Path $repoRoot 'build\CaseDash.exe'
+$headlessExePath = Join-Path $repoRoot 'build\CaseDashHeadless.exe'
 
 function Remove-DirectoryIfPresent {
     param([string]$Path)
@@ -166,11 +166,10 @@ function Invoke-CaseDashThemeAssetExport {
         "/screenshot:$DashboardPath",
         "/layout-guide-sheet:$GuidePath",
         "/app-icon:$IconPath",
-        '/app-icon-size:128',
-        '/exit')
-    $process = Start-Process -FilePath $exePath -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+        '/app-icon-size:128')
+    $process = Start-Process -FilePath $headlessExePath -ArgumentList $arguments -Wait -PassThru -NoNewWindow
     if ($process.ExitCode -ne 0) {
-        throw "CaseDash website asset export failed for theme '$Theme' with exit code $($process.ExitCode)."
+        throw "CaseDashHeadless website asset export failed for theme '$Theme' with exit code $($process.ExitCode)."
     }
     foreach ($path in $outputPaths) {
         Wait-GeneratedFile $path
@@ -183,8 +182,8 @@ if ($LASTEXITCODE -ne 0) {
     throw "build.cmd failed with exit code $LASTEXITCODE."
 }
 
-if (-not (Test-Path -LiteralPath $exePath)) {
-    throw "CaseDash.exe was not found at $exePath."
+if (-not (Test-Path -LiteralPath $headlessExePath)) {
+    throw "CaseDashHeadless.exe was not found at $headlessExePath."
 }
 
 $themeConfig = Read-ThemeConfig $configPath

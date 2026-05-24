@@ -1479,7 +1479,8 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
         return 1;
     }
 
-    const AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
+    ResolveLayoutGuideSheetColors(runtimeConfig);
     DashboardRenderer renderer(trace);
     renderer.SetRenderScale(renderScale);
     renderer.SetConfig(runtimeConfig);

@@ -18,4 +18,6 @@
 
 - Dashboard composes lower-layer config, telemetry, renderer, diagnostics, display, layout-edit, and dialog services.
 - Reusable config, telemetry, rendering, and layout-edit logic stays in the owning lower package instead of shell modules.
+- Dashboard owns diagnostics save-file prompts and user-visible diagnostics error dialogs; no-window diagnostics code returns errors for the shell to present.
+- Dashboard does not depend on `layout_guide_sheet` and does not expose layout guide sheet save UI.
 - Shell dialogs use Win32 dialog templates and control ids from `resources/CaseDash.rc` and `resources/resource.h`.

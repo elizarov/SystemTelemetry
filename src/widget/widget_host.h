@@ -15,7 +15,6 @@ struct MetricDefinitionConfig;
 enum class RenderMode {
     Normal,
     Blank,
-    LayoutGuideSheet,
 };
 
 class WidgetEditArtifactRegistrar {
