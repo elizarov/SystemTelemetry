@@ -314,6 +314,14 @@ void UseLayoutEditSubject(
     > subject
 );
 
+struct LayoutEditAnchorBinding {
+    LayoutEditAnchorKey key;
+    int value = 0;
+    AnchorShape shape = AnchorShape::Circle;
+    std::optional<LayoutEditAnchorDragSpec> drag =
+        LayoutEditAnchorDragSpec{AnchorDragAxis::Vertical, AnchorDragMode::AxisDelta, 1.0};
+};
+
 using RuntimeConfigForEachDynamicItem =
     void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 

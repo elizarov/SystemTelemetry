@@ -207,6 +207,12 @@ int anchorId=0;
 };
 std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> DefaultLayoutEditSubject();
 void UseLayoutEditSubject(std::variant<LayoutEditParameter,LayoutMetricEditKey,LayoutCardTitleEditKey,LayoutNodeFieldEditKey,LayoutContainerChildOrderEditKey> subject);
+struct LayoutEditAnchorBinding{
+LayoutEditAnchorKey key;
+int value=0;
+AnchorShape shape=AnchorShape::Circle;
+std::optional<LayoutEditAnchorDragSpec> drag=LayoutEditAnchorDragSpec{AnchorDragAxis::Vertical,AnchorDragMode::AxisDelta,1.0};
+};
 using RuntimeConfigForEachDynamicItem=void(
 *
 )(const AppConfig& config,void* context,RuntimeConfigDynamicItemVisitor visitor);

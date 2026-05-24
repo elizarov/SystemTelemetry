@@ -1612,7 +1612,7 @@ private:
         std::vector<std::string> lines = FormatPendingLines({});
         const bool fieldBreaksSiblingGroup = declarationKind == DeclarationKind::Field &&
             lines.size() > 1 &&
-            FieldDeclarationBreaksSiblingGroup(pendingTokens_);
+            FieldDeclarationBreaksSiblingGroup(pendingTokens_, lines);
         EmitBlankBeforeDeclarationKind(declarationKind, separateSameKind, fieldBreaksSiblingGroup);
         for (std::string& line : lines) {
             EmitLine(std::move(line));
@@ -1621,8 +1621,11 @@ private:
         NoteDeclarationKind(declarationKind, fieldBreaksSiblingGroup);
     }
 
-    bool FieldDeclarationBreaksSiblingGroup(const std::vector<Token>& tokens) const {
-        return IsTypeAliasFieldDeclaration(tokens) || HasTopLevelBrace(tokens);
+    bool FieldDeclarationBreaksSiblingGroup(
+        const std::vector<Token>& tokens,
+        const std::vector<std::string>& lines
+    ) const {
+        return IsTypeAliasFieldDeclaration(tokens) || FieldHasSameIndentDelimiterClose(lines);
     }
 
     bool IsTypeAliasFieldDeclaration(const std::vector<Token>& tokens) const {
@@ -1630,15 +1633,35 @@ private:
         return first < tokens.size() && (tokens[first].text == "using" || tokens[first].text == "typedef");
     }
 
-    bool HasTopLevelBrace(const std::vector<Token>& tokens) const {
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            if (depth == 0 && tokens[index].text == "{") {
+    bool FieldHasSameIndentDelimiterClose(const std::vector<std::string>& lines) const {
+        if (lines.size() < 3) {
+            return false;
+        }
+        const std::string declarationIndent = LeadingWhitespace(lines.front());
+        for (size_t index = 1; index < lines.size(); ++index) {
+            if (tools::lint::Trim(lines[index]).empty()) {
+                continue;
+            }
+            if (LeadingWhitespace(lines[index]) != declarationIndent) {
+                continue;
+            }
+            const std::string trimmed = TrimLeft(lines[index]);
+            if (trimmed.empty()) {
+                continue;
+            }
+            if (trimmed.front() == '}' || trimmed.front() == ')' || trimmed.front() == ']') {
                 return true;
             }
-            UpdateDepth(tokens, index, depth);
         }
         return false;
+    }
+
+    std::string LeadingWhitespace(std::string_view value) const {
+        size_t end = 0;
+        while (end < value.size() && IsSpaceButNotNewline(value[end])) {
+            ++end;
+        }
+        return std::string(value.substr(0, end));
     }
 
     bool IsInsideEnumDeclaration() const {
