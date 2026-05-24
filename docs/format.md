@@ -95,6 +95,8 @@ void Helper();
 
 Macro continuation backslashes are formatter-owned. A multi-line macro definition is parsed as a single replacement list, then emitted with continuation backslashes on every physical macro line except the last replacement line.
 
+When a macro replacement list is a coherent declaration fragment, such as an `enum`, `struct`, `class`, or `template` declaration sequence, the formatter recursively formats the replacement with normal declaration, block, enum-list, spacing, and wrapping rules before adding continuation backslashes. Empty structural lines produced by declaration grouping are omitted inside the macro body.
+
 When a function-like macro has a parameter listed in `macro_categories.statement_like_parameters` in `tools\format_config.json`, top-level invocations of that parameter inside the replacement list are statement-like macro elements. Each invocation is emitted as its own continuation line, regardless of whether several invocations could fit on one line. The formatter still applies normal spacing inside each invocation.
 
 ```cpp

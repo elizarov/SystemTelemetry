@@ -1394,13 +1394,15 @@ private:
                 std::vector<std::string> formattedStatement = FormatRange(statement, 1, {}, {});
                 statementLines.insert(statementLines.end(), formattedStatement.begin(), formattedStatement.end());
             }
-            for (size_t index = 0; index < statementLines.size(); ++index) {
-                std::string line = statementLines[index];
-                if (index + 1 < statementLines.size()) {
-                    line += " \\";
-                }
-                EmitLine(std::move(line));
-            }
+            EmitDefineReplacementLines(statementLines);
+            pendingPreprocessorBlank_ = true;
+            return;
+        }
+        if (std::optional<std::vector<std::string>> structuredLines = FormatStructuredMacroReplacement(
+            replacementTokens
+        )) {
+            EmitLine(defineLine + " \\");
+            EmitDefineReplacementLines(*structuredLines);
             pendingPreprocessorBlank_ = true;
             return;
         }
@@ -1412,6 +1414,11 @@ private:
         }
         EmitLine(defineLine + " \\");
         std::vector<std::string> replacementLines = FormatRange(Tokenize(normalizedReplacement), 1, {}, {});
+        EmitDefineReplacementLines(replacementLines);
+        pendingPreprocessorBlank_ = true;
+    }
+
+    void EmitDefineReplacementLines(const std::vector<std::string>& replacementLines) {
         for (size_t index = 0; index < replacementLines.size(); ++index) {
             std::string line = replacementLines[index];
             if (index + 1 < replacementLines.size()) {
@@ -1419,7 +1426,31 @@ private:
             }
             EmitLine(std::move(line));
         }
-        pendingPreprocessorBlank_ = true;
+    }
+
+    std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(
+        const std::vector<Token>& replacementTokens
+    ) const {
+        if (!IsStructuredMacroReplacement(replacementTokens)) {
+            return std::nullopt;
+        }
+        PrettyFormatter formatter(config_, 1);
+        std::vector<std::string> lines = tools::lint::SplitLines(formatter.Format(replacementTokens));
+        lines.erase(std::remove(lines.begin(), lines.end(), std::string{}), lines.end());
+        if (lines.empty()) {
+            return std::nullopt;
+        }
+        return lines;
+    }
+
+    bool IsStructuredMacroReplacement(const std::vector<Token>& replacementTokens) const {
+        return ContainsTopLevelToken(replacementTokens, ";") &&
+            (
+                ContainsWord(replacementTokens, "class") ||
+                ContainsWord(replacementTokens, "enum") ||
+                ContainsWord(replacementTokens, "struct") ||
+                ContainsWord(replacementTokens, "template")
+            );
     }
 
     std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
