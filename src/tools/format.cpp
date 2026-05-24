@@ -2315,6 +2315,9 @@ private:
         if (chainKind == ChainKind::Ternary) {
             return AttachableTernaryPrefix(tokens, indentLevel, attachedPrefix);
         }
+        if (chainKind == ChainKind::Shift) {
+            return AttachableShiftOperatorChainPrefix(tokens, indentLevel, attachedPrefix);
+        }
         std::vector<Token> firstPart = FirstOperatorChainPart(tokens, chainKind);
         if (firstPart.empty()) {
             return std::nullopt;
@@ -2331,6 +2334,24 @@ private:
         }
         if (std::optional<size_t> memberAccess = FindTopLevelMemberAccess(firstPart)) {
             return AttachableMemberAccessPrefix(firstPart, *memberAccess, indentLevel, attachedPrefix);
+        }
+        return std::nullopt;
+    }
+
+    std::optional<std::string> AttachableShiftOperatorChainPrefix(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view attachedPrefix
+    ) const {
+        std::vector<Token> receiver;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                return AcceptAttachablePrefix(FormatInline(receiver), indentLevel, attachedPrefix);
+            }
+            receiver.push_back(token);
         }
         return std::nullopt;
     }
@@ -3302,6 +3323,9 @@ private:
         if (chainKind == ChainKind::Ternary) {
             return FormatTernaryChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains);
         }
+        if (chainKind == ChainKind::Shift) {
+            return FormatShiftOperatorChain(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
         std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
         int depth = 0;
@@ -3344,6 +3368,52 @@ private:
                 break;
             }
             lines.insert(lines.end(), partLines.begin(), partLines.end());
+        }
+        return lines;
+    }
+
+    std::vector<std::string> FormatShiftOperatorChain(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<Token> receiver;
+        std::vector<std::vector<Token>> segments;
+        std::vector<Token> current;
+        bool sawShiftOperator = false;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                if (!sawShiftOperator) {
+                    receiver = current;
+                    sawShiftOperator = true;
+                } else {
+                    segments.push_back(current);
+                }
+                current.clear();
+                current.push_back(token);
+                continue;
+            }
+            current.push_back(token);
+        }
+        if (!sawShiftOperator) {
+            return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
+        if (!current.empty()) {
+            segments.push_back(current);
+        }
+        std::vector<std::string> lines = FormatRange(receiver, indentLevel, std::move(prefix), {}, true);
+        for (size_t index = 0; index < segments.size(); ++index) {
+            std::string segmentSuffix;
+            if (index + 1 == segments.size()) {
+                segmentSuffix = suffix;
+            }
+            std::vector<std::string> segmentLines =
+                FormatChainPart(segments[index], indentLevel + 1, {}, std::move(segmentSuffix));
+            lines.insert(lines.end(), segmentLines.begin(), segmentLines.end());
         }
         return lines;
     }

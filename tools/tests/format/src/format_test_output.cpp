@@ -155,6 +155,20 @@ void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
     );
 }
 
+void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
+    std::cerr
+        << "unknown benchmark \""
+        << firstArg
+        << "\"; supported benchmarks: "
+        << SupportedBenchmarkNames()
+        << "\n";
+    input
+        >> firstBenchmarkName
+        >> secondBenchmarkNameWithLongName
+        >> thirdBenchmarkNameWithLongName
+        >> fourthBenchmarkNameWithLongName;
+}
+
 struct OklabColor {
     double l;
     double a;
