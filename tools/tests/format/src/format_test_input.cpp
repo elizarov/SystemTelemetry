@@ -148,6 +148,10 @@ EXPECT_FALSE(IntersectRect(&intersection,&rects[i],&rects[j]))<<"rect "<<i<<" ov
 }
 }
 
+void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions){
+regions.Reserve(layoutResolver_->resolvedLayout_.cards.size()*4+layoutResolver_->layoutEditGuides_.size()+containerChildTargetCount+layoutResolver_->gapEditAnchors_.size()+layoutResolver_->widgetEditGuides_.size()+(layoutResolver_->staticEditableAnchorRegions_.size()+layoutResolver_->dynamicEditableAnchorRegions_.size())*2+layoutResolver_->staticColorEditRegions_.size()+layoutResolver_->dynamicColorEditRegions_.size());
+}
+
 void WriteMetricConfig(){
 const FilePath path=WriteTestConfig("[metrics]\n" "nothing = 7,ignored,Overridden Placeholder\n" "cpu.load = *,%,Processor Load\n");
 }

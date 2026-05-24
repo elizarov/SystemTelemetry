@@ -216,6 +216,22 @@ void ExpectRectNoOverlap(RECT* rects) {
     }
 }
 
+void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
+    regions.Reserve(
+        layoutResolver_->resolvedLayout_.cards.size() * 4 +
+            layoutResolver_->layoutEditGuides_.size() +
+            containerChildTargetCount +
+            layoutResolver_->gapEditAnchors_.size() +
+            layoutResolver_->widgetEditGuides_.size() +
+            (
+                layoutResolver_->staticEditableAnchorRegions_.size() +
+                layoutResolver_->dynamicEditableAnchorRegions_.size()
+            ) * 2 +
+            layoutResolver_->staticColorEditRegions_.size() +
+            layoutResolver_->dynamicColorEditRegions_.size()
+    );
+}
+
 void WriteMetricConfig() {
     const FilePath path = WriteTestConfig(
         "[metrics]\n"
@@ -962,7 +978,7 @@ RenderRect BuildGuideSheetTargetRect(
 double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double sampleY, double denom) {
     const double backgroundWeight = (
         (geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-            (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
+        (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
     ) / denom;
     return backgroundWeight;
 }

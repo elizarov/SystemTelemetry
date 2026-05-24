@@ -247,6 +247,8 @@ const int width = MeasureTextWidthForControl(
 ) + 8;
 ```
 
+Inside a plain parenthesized expression, split chains stay at the expression indent.
+
 Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, or compiler declaration prefix groups.
 
 Defaulted, deleted, and pure-virtual method markers stay with the declaration tail.

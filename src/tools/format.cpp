@@ -180,8 +180,7 @@ bool IsSpaceButNotNewline(char ch) {
 }
 
 bool IsCommentOrNewline(const Token& token) {
-    return token.kind == TokenKind::Newline ||
-        token.kind == TokenKind::LineComment ||
+    return token.kind == TokenKind::Newline || token.kind == TokenKind::LineComment ||
         token.kind == TokenKind::BlockComment;
 }
 
@@ -369,8 +368,7 @@ std::vector<Token> Tokenize(std::string_view text) {
         if (matched) {
             continue;
         }
-        static constexpr std::string_view kTwoCharOps[] = {
-            "::",
+        static constexpr std::string_view kTwoCharOps[] = {"::",
             "->",
             "++",
             "--",
@@ -391,8 +389,7 @@ std::vector<Token> Tokenize(std::string_view text) {
             "<<",
             ">>",
             "##",
-            ".*"
-        };
+            ".*"};
         for (std::string_view op : kTwoCharOps) {
             if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
                 tokens.push_back({TokenKind::Symbol, std::string(op)});
@@ -453,23 +450,15 @@ void AppendTokenRange(const std::vector<Token>& tokens, size_t begin, size_t end
     if (begin >= end) {
         return;
     }
-    output.insert(
-        output.end(),
+    output.insert(output.end(),
         tokens.begin() + static_cast<std::ptrdiff_t>(begin),
-        tokens.begin() + static_cast<std::ptrdiff_t>(end)
-    );
+        tokens.begin() + static_cast<std::ptrdiff_t>(end));
 }
 
 bool IsBraceRequiredControlToken(const Token& token) {
     return token.kind == TokenKind::Word &&
-        (
-            token.text == "if" ||
-            token.text == "else" ||
-            token.text == "for" ||
-            token.text == "while" ||
-            token.text == "do" ||
-            token.text == "switch"
-        );
+        (token.text == "if" || token.text == "else" || token.text == "for" || token.text == "while" ||
+            token.text == "do" || token.text == "switch");
 }
 
 std::optional<size_t> FindControlHeaderEnd(const std::vector<Token>& tokens, size_t controlIndex, size_t end) {
@@ -488,18 +477,10 @@ std::optional<size_t> FindControlHeaderEnd(const std::vector<Token>& tokens, siz
 void RewriteControlBracesRange(const std::vector<Token>& tokens, size_t begin, size_t end, std::vector<Token>& output);
 
 size_t RewriteControlBracesStatement(
-    const std::vector<Token>& tokens,
-    size_t begin,
-    size_t end,
-    std::vector<Token>& output
-);
+    const std::vector<Token>& tokens, size_t begin, size_t end, std::vector<Token>& output);
 
 size_t RewriteIfControlStatement(
-    const std::vector<Token>& tokens,
-    size_t ifIndex,
-    size_t end,
-    std::vector<Token>& output
-);
+    const std::vector<Token>& tokens, size_t ifIndex, size_t end, std::vector<Token>& output);
 
 size_t FindControlBracesStatementEnd(const std::vector<Token>& tokens, size_t begin, size_t end);
 
@@ -598,33 +579,22 @@ size_t FindControlBracesStatementEnd(const std::vector<Token>& tokens, size_t be
     if (tokens[statementStart].text == "do") {
         return FindDoControlBracesStatementEnd(tokens, statementStart, end);
     }
-    if (
-        tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
-    ) {
+    if (tokens[statementStart].text == "for" || tokens[statementStart].text == "while" ||
+        tokens[statementStart].text == "switch") {
         return FindHeaderBodyControlBracesStatementEnd(tokens, statementStart, end);
     }
     return FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
 }
 
 void AppendRewrittenControlBody(
-    const std::vector<Token>& tokens,
-    size_t bodyBegin,
-    size_t bodyEnd,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t bodyBegin, size_t bodyEnd, std::vector<Token>& output) {
     output.push_back({TokenKind::Symbol, "{"});
     RewriteControlBracesStatement(tokens, bodyBegin, bodyEnd, output);
     output.push_back({TokenKind::Symbol, "}"});
 }
 
 size_t RewriteHeaderBodyControlStatement(
-    const std::vector<Token>& tokens,
-    size_t controlIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t controlIndex, size_t end, std::vector<Token>& output) {
     const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, controlIndex, end);
     if (!headerEnd) {
         output.push_back(tokens[controlIndex]);
@@ -642,11 +612,7 @@ size_t RewriteHeaderBodyControlStatement(
 }
 
 size_t RewriteElseControlStatement(
-    const std::vector<Token>& tokens,
-    size_t elseIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t elseIndex, size_t end, std::vector<Token>& output) {
     output.push_back(tokens[elseIndex]);
     const size_t bodyBegin = elseIndex + 1;
     const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
@@ -660,11 +626,8 @@ size_t RewriteElseControlStatement(
             const size_t innerStart = NextCodeIndex(tokens, bodyStart + 1, *bodyClose);
             if (innerStart < *bodyClose && tokens[innerStart].text == "if") {
                 const size_t innerEnd = FindIfControlBracesStatementEnd(tokens, innerStart, *bodyClose);
-                if (
-                    innerEnd <= *bodyClose &&
-                    ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
-                    ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)
-                ) {
+                if (innerEnd <= *bodyClose && ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
+                    ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)) {
                     RewriteIfControlStatement(tokens, innerStart, *bodyClose, output);
                     return *bodyClose + 1;
                 }
@@ -678,11 +641,7 @@ size_t RewriteElseControlStatement(
 }
 
 size_t RewriteIfControlStatement(
-    const std::vector<Token>& tokens,
-    size_t ifIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t ifIndex, size_t end, std::vector<Token>& output) {
     size_t next = RewriteHeaderBodyControlStatement(tokens, ifIndex, end, output);
     const size_t elseIndex = NextCodeIndex(tokens, next, end);
     if (elseIndex < end && tokens[elseIndex].text == "else") {
@@ -693,11 +652,7 @@ size_t RewriteIfControlStatement(
 }
 
 size_t RewriteDoControlStatement(
-    const std::vector<Token>& tokens,
-    size_t doIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t doIndex, size_t end, std::vector<Token>& output) {
     output.push_back(tokens[doIndex]);
     const size_t bodyBegin = doIndex + 1;
     const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
@@ -717,11 +672,7 @@ size_t RewriteDoControlStatement(
 }
 
 size_t RewriteControlBracesStatement(
-    const std::vector<Token>& tokens,
-    size_t begin,
-    size_t end,
-    std::vector<Token>& output
-) {
+    const std::vector<Token>& tokens, size_t begin, size_t end, std::vector<Token>& output) {
     const size_t statementStart = NextCodeIndex(tokens, begin, end);
     AppendTokenRange(tokens, begin, statementStart, output);
     if (statementStart >= end) {
@@ -739,11 +690,8 @@ size_t RewriteControlBracesStatement(
     if (tokens[statementStart].text == "do") {
         return RewriteDoControlStatement(tokens, statementStart, end, output);
     }
-    if (
-        tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
-    ) {
+    if (tokens[statementStart].text == "for" || tokens[statementStart].text == "while" ||
+        tokens[statementStart].text == "switch") {
         return RewriteHeaderBodyControlStatement(tokens, statementStart, end, output);
     }
     const size_t statementEnd = FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
@@ -780,9 +728,7 @@ std::vector<Token> AddRequiredControlBraces(const std::vector<Token>& tokens) {
 }
 
 bool IsWordLike(const Token& token) {
-    return token.kind == TokenKind::Word ||
-        token.kind == TokenKind::Number ||
-        token.kind == TokenKind::StringLiteral ||
+    return token.kind == TokenKind::Word || token.kind == TokenKind::Number || token.kind == TokenKind::StringLiteral ||
         token.kind == TokenKind::CharLiteral;
 }
 
@@ -791,8 +737,7 @@ bool IsControlKeyword(std::string_view text) {
 }
 
 bool IsBinaryOperator(std::string_view text) {
-    static constexpr std::string_view kOperators[] = {
-        "=",
+    static constexpr std::string_view kOperators[] = {"=",
         "+",
         "-",
         "&",
@@ -819,8 +764,7 @@ bool IsBinaryOperator(std::string_view text) {
         "|",
         "^",
         "?",
-        ":"
-    };
+        ":"};
     return std::find(std::begin(kOperators), std::end(kOperators), text) != std::end(kOperators);
 }
 
@@ -829,30 +773,13 @@ bool IsPrefixOperator(std::string_view text) {
 }
 
 bool IsNoSpaceBefore(std::string_view text) {
-    return text == ")" ||
-        text == "]" ||
-        text == ";" ||
-        text == "," ||
-        text == "." ||
-        text == "->" ||
-        text == ".*" ||
-        text == "->*" ||
-        text == "::" ||
-        text == "++" ||
-        text == "--";
+    return text == ")" || text == "]" || text == ";" || text == "," || text == "." || text == "->" || text == ".*" ||
+        text == "->*" || text == "::" || text == "++" || text == "--";
 }
 
 bool IsNoSpaceAfter(std::string_view text) {
-    return text == "(" ||
-        text == "[" ||
-        text == "{" ||
-        text == "." ||
-        text == "->" ||
-        text == ".*" ||
-        text == "->*" ||
-        text == "::" ||
-        text == "~" ||
-        text == "!";
+    return text == "(" || text == "[" || text == "{" || text == "." || text == "->" || text == ".*" || text == "->*" ||
+        text == "::" || text == "~" || text == "!";
 }
 
 bool IsStringOrCharacterLiteralPrefix(std::string_view text) {
@@ -907,13 +834,9 @@ TSNode FindFirstErrorNode(TSNode node) {
 class PrettyFormatter {
 public:
     explicit PrettyFormatter(
-        const FormatterConfig& config,
-        int initialIndentLevel = 0,
-        bool executableBodyContext = false
-    ) :
+        const FormatterConfig& config, int initialIndentLevel = 0, bool executableBodyContext = false) :
         config_(config),
-        indentLevel_(initialIndentLevel)
-    {
+        indentLevel_(initialIndentLevel) {
         if (executableBodyContext) {
             blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
         }
@@ -1017,10 +940,7 @@ private:
     }
 
     bool ShouldForwardStandaloneLineCommentToPending(
-        const std::vector<Token>& tokens,
-        size_t newlineIndex,
-        size_t newlineCount
-    ) const {
+        const std::vector<Token>& tokens, size_t newlineIndex, size_t newlineCount) const {
         if (newlineCount == 0 || pendingTokens_.empty()) {
             return false;
         }
@@ -1039,20 +959,13 @@ private:
                 }
             }
         }
-        return std::any_of(
-            openGroups.begin(),
-            openGroups.end(),
-            [this](size_t index) {
-                return pendingTokens_[index].text == "{" && IsLambdaBodyOpenToken(pendingTokens_, index);
-            }
-        );
+        return std::any_of(openGroups.begin(), openGroups.end(), [this](size_t index) {
+            return pendingTokens_[index].text == "{" && IsLambdaBodyOpenToken(pendingTokens_, index);
+        });
     }
 
     bool ShouldPreserveOriginalBlankSeparator(
-        const std::vector<Token>& tokens,
-        size_t newlineIndex,
-        size_t newlineCount
-    ) const {
+        const std::vector<Token>& tokens, size_t newlineIndex, size_t newlineCount) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, newlineIndex);
         const bool hasBlankSeparator =
             newlineCount > 1 || (previous && tokens[*previous].kind == TokenKind::Preprocessor);
@@ -1158,13 +1071,11 @@ private:
             return;
         }
         EmitLine(Indent() + "{");
-        blockStack_.push_back({
-            BlockKind::Other,
+        blockStack_.push_back({BlockKind::Other,
             true,
             previousDeclarationKind_,
             previousDeclarationBreaksSiblingGroup_,
-            caseBodyIndentLevel_
-        });
+            caseBodyIndentLevel_});
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationBreaksSiblingGroup_ = false;
         ++indentLevel_;
@@ -1191,12 +1102,8 @@ private:
             EmitFormatted(pendingTokens_, suffix);
             ClearPending();
             NoteDeclarationKind(declarationKind);
-            if (
-                blockKind == BlockKind::EnumDeclaration ||
-                blockKind == BlockKind::TypeDeclaration ||
-                blockKind == BlockKind::FunctionDefinition ||
-                blockKind == BlockKind::NamespaceDeclaration
-            ) {
+            if (blockKind == BlockKind::EnumDeclaration || blockKind == BlockKind::TypeDeclaration ||
+                blockKind == BlockKind::FunctionDefinition || blockKind == BlockKind::NamespaceDeclaration) {
                 pendingLogicalBlank_ = true;
             }
             return;
@@ -1206,13 +1113,11 @@ private:
         ClearPending();
         NoteDeclarationKind(declarationKind);
         const bool indentsBody = blockKind != BlockKind::NamespaceDeclaration;
-        blockStack_.push_back({
-            blockKind,
+        blockStack_.push_back({blockKind,
             indentsBody,
             previousDeclarationKind_,
             previousDeclarationBreaksSiblingGroup_,
-            caseBodyIndentLevel_
-        });
+            caseBodyIndentLevel_});
         if (blockKind == BlockKind::SwitchStatement) {
             caseBodyIndentLevel_ = -1;
         }
@@ -1252,16 +1157,9 @@ private:
             pendingPrefix_ = "} ";
             return;
         }
-        if (
-            next < tokens.size() &&
-            tokens[next].kind == TokenKind::Word &&
-            (
-                tokens[next].text == "else" ||
-                tokens[next].text == "catch" ||
-                tokens[next].text == "finally" ||
-                (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
-            )
-        ) {
+        if (next < tokens.size() && tokens[next].kind == TokenKind::Word &&
+            (tokens[next].text == "else" || tokens[next].text == "catch" || tokens[next].text == "finally" ||
+                (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement))) {
             pendingPrefix_ = "} ";
             return;
         }
@@ -1277,12 +1175,8 @@ private:
 
     void EmitLineComment(const std::vector<Token>& tokens, size_t& index) {
         Token comment{TokenKind::LineComment, TrimRight(TrimLeft(tokens[index].text))};
-        if (
-            pendingTokens_.empty() &&
-            pendingPrefix_.empty() &&
-            IsTrailingCommentAfterEmittedClose(tokens, index) &&
-            !outputLines_.empty()
-        ) {
+        if (pendingTokens_.empty() && pendingPrefix_.empty() && IsTrailingCommentAfterEmittedClose(tokens, index) &&
+            !outputLines_.empty()) {
             outputLines_.back() = TrimRight(std::move(outputLines_.back())) + "  " + comment.text;
             return;
         }
@@ -1411,11 +1305,9 @@ private:
             return;
         }
         std::vector<Token> replacementTokens = Tokenize(replacement);
-        if (
-            std::vector<std::vector<Token>> statements =
+        if (std::vector<std::vector<Token>> statements =
                 SplitStatementLikeMacroReplacement(defineLine, replacementTokens);
-            statements.size() > 1
-        ) {
+            statements.size() > 1) {
             EmitLine(defineLine + " \\");
             std::vector<std::string> statementLines;
             for (const std::vector<Token>& statement : statements) {
@@ -1426,9 +1318,8 @@ private:
             pendingPreprocessorBlank_ = true;
             return;
         }
-        if (std::optional<std::vector<std::string>> structuredLines = FormatStructuredMacroReplacement(
-            replacementTokens
-        )) {
+        if (std::optional<std::vector<std::string>> structuredLines =
+                FormatStructuredMacroReplacement(replacementTokens)) {
             EmitLine(defineLine + " \\");
             EmitDefineReplacementLines(*structuredLines);
             pendingPreprocessorBlank_ = true;
@@ -1457,8 +1348,7 @@ private:
     }
 
     std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(
-        const std::vector<Token>& replacementTokens
-    ) const {
+        const std::vector<Token>& replacementTokens) const {
         if (!IsStructuredMacroReplacement(replacementTokens)) {
             return std::nullopt;
         }
@@ -1473,18 +1363,12 @@ private:
 
     bool IsStructuredMacroReplacement(const std::vector<Token>& replacementTokens) const {
         return ContainsTopLevelToken(replacementTokens, ";") &&
-            (
-                ContainsWord(replacementTokens, "class") ||
-                ContainsWord(replacementTokens, "enum") ||
-                ContainsWord(replacementTokens, "struct") ||
-                ContainsWord(replacementTokens, "template")
-            );
+            (ContainsWord(replacementTokens, "class") || ContainsWord(replacementTokens, "enum") ||
+                ContainsWord(replacementTokens, "struct") || ContainsWord(replacementTokens, "template"));
     }
 
     std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
-        std::string_view defineLine,
-        const std::vector<Token>& replacementTokens
-    ) const {
+        std::string_view defineLine, const std::vector<Token>& replacementTokens) const {
         std::vector<std::string> activeParameters = StatementLikeParametersForDefine(defineLine);
         if (activeParameters.empty()) {
             return {};
@@ -1506,10 +1390,8 @@ private:
             if (!close) {
                 return {};
             }
-            statements.emplace_back(
-                replacementTokens.begin() + static_cast<std::ptrdiff_t>(index),
-                replacementTokens.begin() + static_cast<std::ptrdiff_t>(*close + 1)
-            );
+            statements.emplace_back(replacementTokens.begin() + static_cast<std::ptrdiff_t>(index),
+                replacementTokens.begin() + static_cast<std::ptrdiff_t>(*close + 1));
             index = *close + 1;
         }
         return statements;
@@ -1562,18 +1444,13 @@ private:
     }
 
     bool IsConfiguredStatementLikeMacroParameter(std::string_view parameter) const {
-        return std::find(
-            config_.statementLikeMacroParameters.begin(),
-            config_.statementLikeMacroParameters.end(),
-            parameter
-        ) != config_.statementLikeMacroParameters.end();
+        return std::find(config_.statementLikeMacroParameters.begin(),
+                    config_.statementLikeMacroParameters.end(),
+                    parameter) != config_.statementLikeMacroParameters.end();
     }
 
     bool IsStatementLikeMacroInvocation(
-        const std::vector<Token>& tokens,
-        size_t index,
-        const std::vector<std::string>& activeParameters
-    ) const {
+        const std::vector<Token>& tokens, size_t index, const std::vector<std::string>& activeParameters) const {
         if (index >= tokens.size() || tokens[index].kind != TokenKind::Word) {
             return false;
         }
@@ -1721,13 +1598,11 @@ private:
         if (!outputLines_.empty()) {
             outputLines_.back() = TrimRight(std::move(outputLines_.back())) + " {";
         }
-        blockStack_.push_back({
-            BlockKind::CaseScope,
+        blockStack_.push_back({BlockKind::CaseScope,
             true,
             previousDeclarationKind_,
             previousDeclarationBreaksSiblingGroup_,
-            caseBodyIndentLevel_
-        });
+            caseBodyIndentLevel_});
         previousDeclarationKind_ = DeclarationKind::None;
         previousDeclarationBreaksSiblingGroup_ = false;
         justEmittedCaseLabel_ = false;
@@ -1773,22 +1648,15 @@ private:
     }
 
     void EmitBlankBeforeDeclarationKind(
-        DeclarationKind declarationKind,
-        bool separateSameKind,
-        bool currentDeclarationBreaksSiblingGroup = false
-    ) {
+        DeclarationKind declarationKind, bool separateSameKind, bool currentDeclarationBreaksSiblingGroup = false) {
         if (declarationKind == DeclarationKind::None || !IsDeclarationContext()) {
             return;
         }
         if (previousDeclarationKind_ == DeclarationKind::None) {
             return;
         }
-        if (
-            previousDeclarationKind_ == declarationKind &&
-            !separateSameKind &&
-            !previousDeclarationBreaksSiblingGroup_ &&
-            !currentDeclarationBreaksSiblingGroup
-        ) {
+        if (previousDeclarationKind_ == declarationKind && !separateSameKind &&
+            !previousDeclarationBreaksSiblingGroup_ && !currentDeclarationBreaksSiblingGroup) {
             return;
         }
         EmitBlankBeforeSiblingGroupIfNeeded();
@@ -1870,14 +1738,12 @@ private:
         std::string firstLine;
     };
 
-    std::vector<std::string> FormatRange(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatRange(const std::vector<Token>& tokens,
         int indentLevel,
         std::string prefix,
         std::string suffix,
         bool indentSplitChains = false,
-        bool indentLogicalSplitChains = false
-    ) const {
+        bool indentLogicalSplitChains = false) const {
         if (tokens.empty()) {
             if (!prefix.empty() || !suffix.empty()) {
                 return {Indent(indentLevel) + prefix + suffix};
@@ -1896,12 +1762,8 @@ private:
         if (!HasOriginalBlankSeparator(tokens) && !ShouldForceSplit(tokens) && Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
         }
-        if (std::optional<std::vector<std::string>> declarationLines = TryFormatSplitDirectInitializedDeclaration(
-            tokens,
-            indentLevel,
-            prefix,
-            suffix
-        )) {
+        if (std::optional<std::vector<std::string>> declarationLines =
+                TryFormatSplitDirectInitializedDeclaration(tokens, indentLevel, prefix, suffix)) {
             return *declarationLines;
         }
         if (owner && owner->kind == SplitOwnerKind::MemberAccess) {
@@ -1910,25 +1772,19 @@ private:
             }
         }
         if (owner && owner->kind == SplitOwnerKind::Group) {
-            if (std::optional<GroupPair> group = FindPreferredValueGroupAfterTemplateGroup(
-                tokens,
-                owner->group,
-                indentLevel,
-                prefix
-            )) {
+            if (std::optional<GroupPair> group =
+                    FindPreferredValueGroupAfterTemplateGroup(tokens, owner->group, indentLevel, prefix)) {
                 return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
             }
         }
         if (owner) {
-            return FormatSplitOwner(
-                tokens,
+            return FormatSplitOwner(tokens,
                 *owner,
                 indentLevel,
                 std::move(prefix),
                 std::move(suffix),
                 indentSplitChains,
-                indentLogicalSplitChains
-            );
+                indentLogicalSplitChains);
         }
         return {Indent(indentLevel) + inlineText};
     }
@@ -1937,10 +1793,8 @@ private:
         if (IsTemplateDeclarationPrefix(tokens)) {
             return SplitOwner{SplitOwnerKind::TemplateDeclaration};
         }
-        if (
-            std::optional<size_t> assignment = FindTopLevelAssignment(tokens);
-            assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)
-        ) {
+        if (std::optional<size_t> assignment = FindTopLevelAssignment(tokens);
+            assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)) {
             return SplitOwner{SplitOwnerKind::Assignment, *assignment};
         }
         if (std::optional<size_t> initializerColon = FindConstructorInitializerColon(tokens)) {
@@ -1970,47 +1824,36 @@ private:
         return std::nullopt;
     }
 
-    std::vector<std::string> FormatSplitOwner(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatSplitOwner(const std::vector<Token>& tokens,
         const SplitOwner& owner,
         int indentLevel,
         std::string prefix,
         std::string suffix,
         bool indentSplitChains,
-        bool indentLogicalSplitChains
-    ) const {
+        bool indentLogicalSplitChains) const {
         switch (owner.kind) {
             case SplitOwnerKind::TemplateDeclaration:
                 return FormatTemplateDeclaration(tokens, indentLevel, std::move(prefix), std::move(suffix));
             case SplitOwnerKind::Assignment:
-                return FormatAssignment(
-                    tokens,
+                return FormatAssignment(tokens,
                     owner.index,
                     indentLevel,
                     std::move(prefix),
                     std::move(suffix),
                     indentSplitChains,
-                    indentLogicalSplitChains
-                );
+                    indentLogicalSplitChains);
             case SplitOwnerKind::Lambda:
                 return FormatSplitLambda(tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
             case SplitOwnerKind::ConstructorInitializer:
                 return FormatConstructorInitializerList(
-                    tokens,
-                    owner.index,
-                    indentLevel,
-                    std::move(prefix),
-                    std::move(suffix)
-                );
+                    tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
             case SplitOwnerKind::OperatorChain:
-                return FormatOperatorChain(
-                    tokens,
+                return FormatOperatorChain(tokens,
                     indentLevel,
                     std::move(prefix),
                     std::move(suffix),
                     indentSplitChains,
-                    indentLogicalSplitChains
-                );
+                    indentLogicalSplitChains);
             case SplitOwnerKind::MemberAccess:
                 return FormatMemberAccessChain(tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
             case SplitOwnerKind::StringLiteralSequence:
@@ -2032,11 +1875,7 @@ private:
     }
 
     std::vector<std::string> FormatTemplateDeclaration(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string prefix, std::string suffix) const {
         const size_t open = NextSignificantIndex(tokens, 1);
         const std::optional<size_t> close = FindTemplateAngleClose(tokens, open);
         if (!close) {
@@ -2098,25 +1937,20 @@ private:
             return std::nullopt;
         }
         return RequiresClauseParts{
-            std::vector<Token>(
-                tokens.begin() + static_cast<std::ptrdiff_t>(open + 1),
-                tokens.begin() + static_cast<std::ptrdiff_t>(*close)
-            ),
-            std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end())
-        };
+            std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(open + 1),
+                tokens.begin() + static_cast<std::ptrdiff_t>(*close)),
+            std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end())};
     }
 
     std::string FormatInlineRequiresClause(const std::vector<Token>& condition) const {
         return "requires(" + FormatInline(condition) + ")";
     }
 
-    std::vector<std::string> FormatRequiresClause(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatRequiresClause(const std::vector<Token>& tokens,
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        std::optional<int> declarationIndentLevel = std::nullopt
-    ) const {
+        std::optional<int> declarationIndentLevel = std::nullopt) const {
         const std::optional<RequiresClauseParts> parts = SplitRequiresClause(tokens);
         if (!parts) {
             std::string inlineText = prefix + FormatInline(tokens);
@@ -2146,15 +1980,13 @@ private:
         return lines;
     }
 
-    std::vector<std::string> FormatAssignment(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatAssignment(const std::vector<Token>& tokens,
         size_t assignment,
         int indentLevel,
         std::string prefix,
         std::string suffix,
         bool indentSplitChains,
-        bool indentLogicalSplitChains
-    ) const {
+        bool indentLogicalSplitChains) const {
         if (StartsWithInitializerList(tokens, assignment + 1)) {
             return FormatInitializerAssignment(tokens, assignment, indentLevel, std::move(prefix), std::move(suffix));
         }
@@ -2163,30 +1995,19 @@ private:
         std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1), tokens.end());
         if (!Fits(indentLevel, prefix + FormatInline(lhs))) {
             if (std::optional<std::vector<std::string>> splitLhs = TryFormatSplitAssignmentLhsTemplate(
-                lhs,
-                rhs,
-                indentLevel,
-                prefix,
-                suffix,
-                indentSplitChains,
-                indentLogicalSplitChains
-            )) {
+                    lhs, rhs, indentLevel, prefix, suffix, indentSplitChains, indentLogicalSplitChains)) {
                 return *splitLhs;
             }
         }
         std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
-        if (
-            !CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
-            CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)
-        ) {
-            return FormatRange(
-                rhs,
+        if (!CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
+            CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)) {
+            return FormatRange(rhs,
                 indentLevel,
                 std::move(attachedPrefix),
                 std::move(suffix),
                 indentSplitChains,
-                indentLogicalSplitChains
-            );
+                indentLogicalSplitChains);
         }
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs));
         std::vector<std::string> rhsLines =
@@ -2195,15 +2016,13 @@ private:
         return lines;
     }
 
-    std::optional<std::vector<std::string>> TryFormatSplitAssignmentLhsTemplate(
-        const std::vector<Token>& lhs,
+    std::optional<std::vector<std::string>> TryFormatSplitAssignmentLhsTemplate(const std::vector<Token>& lhs,
         const std::vector<Token>& rhs,
         int indentLevel,
         std::string_view prefix,
         std::string_view suffix,
         bool indentSplitChains,
-        bool indentLogicalSplitChains
-    ) const {
+        bool indentLogicalSplitChains) const {
         const std::optional<size_t> assignment = PreviousNonNewlineIndex(lhs, lhs.size());
         if (!assignment || lhs[*assignment].text != "=") {
             return std::nullopt;
@@ -2240,10 +2059,7 @@ private:
     }
 
     bool CanKeepRhsCompactOnContinuation(
-        const std::vector<Token>& rhs,
-        int assignmentIndentLevel,
-        std::string_view suffix
-    ) const {
+        const std::vector<Token>& rhs, int assignmentIndentLevel, std::string_view suffix) const {
         if (ShouldForceSplit(rhs)) {
             return false;
         }
@@ -2253,18 +2069,12 @@ private:
     }
 
     bool CanAttachPrefixToOwnedSplit(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view attachedPrefix) const {
         return AttachableSplitPrefix(tokens, indentLevel, attachedPrefix).has_value();
     }
 
     std::optional<std::string> AttachableSplitPrefix(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view attachedPrefix) const {
         const std::optional<SplitOwner> owner = SelectSplitOwner(tokens);
         if (!owner) {
             return std::nullopt;
@@ -2288,27 +2098,16 @@ private:
     }
 
     std::optional<std::string> AttachableAssignmentPrefix(
-        const std::vector<Token>& tokens,
-        size_t assignment,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, size_t assignment, int indentLevel, std::string_view attachedPrefix) const {
         std::vector<Token> lhs(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1));
         return AcceptAttachablePrefix(FormatInline(lhs) + " ", indentLevel, attachedPrefix);
     }
 
     std::optional<std::string> AttachableLambdaPrefix(
-        const std::vector<Token>& tokens,
-        size_t bodyOpen,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, size_t bodyOpen, int indentLevel, std::string_view attachedPrefix) const {
         std::vector<Token> header(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(bodyOpen));
-        if (std::optional<std::string> fullHeader = AcceptAttachablePrefix(
-            FormatInline(header) + " {",
-            indentLevel,
-            attachedPrefix
-        )) {
+        if (std::optional<std::string> fullHeader =
+                AcceptAttachablePrefix(FormatInline(header) + " {", indentLevel, attachedPrefix)) {
             return fullHeader;
         }
         if (!header.empty() && header.front().text == "[") {
@@ -2318,10 +2117,7 @@ private:
     }
 
     std::optional<std::string> AttachableOperatorChainPrefix(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view attachedPrefix) const {
         const ChainKind chainKind = SelectChainKind(tokens);
         if (chainKind == ChainKind::Ternary) {
             return AttachableTernaryPrefix(tokens, indentLevel, attachedPrefix);
@@ -2333,11 +2129,8 @@ private:
         if (firstPart.empty()) {
             return std::nullopt;
         }
-        if (std::optional<std::string> compact = AcceptAttachablePrefix(
-            FormatInline(firstPart),
-            indentLevel,
-            attachedPrefix
-        )) {
+        if (std::optional<std::string> compact =
+                AcceptAttachablePrefix(FormatInline(firstPart), indentLevel, attachedPrefix)) {
             return compact;
         }
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(firstPart)) {
@@ -2350,10 +2143,7 @@ private:
     }
 
     std::optional<std::string> AttachableShiftOperatorChainPrefix(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view attachedPrefix) const {
         std::vector<Token> receiver;
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -2368,10 +2158,7 @@ private:
     }
 
     std::optional<std::string> AttachableTernaryPrefix(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view attachedPrefix) const {
         const std::optional<size_t> question = FindTopLevelToken(tokens, "?");
         if (!question) {
             return std::nullopt;
@@ -2379,25 +2166,17 @@ private:
         const std::optional<size_t> colon = FindTopLevelTokenAfter(tokens, ":", *question + 1);
         if (colon) {
             std::vector<Token> firstPart(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*colon + 1));
-            if (std::optional<std::string> accepted = AcceptAttachablePrefix(
-                FormatInline(firstPart),
-                indentLevel,
-                attachedPrefix
-            )) {
+            if (std::optional<std::string> accepted =
+                    AcceptAttachablePrefix(FormatInline(firstPart), indentLevel, attachedPrefix)) {
                 return accepted;
             }
         }
         const size_t valueStart = NextSignificantIndex(tokens, *question + 1);
         if (valueStart < tokens.size() && IsGroupOpen(tokens[valueStart].text)) {
             std::vector<Token> firstValueOpener(
-                tokens.begin(),
-                tokens.begin() + static_cast<std::ptrdiff_t>(valueStart + 1)
-            );
-            if (std::optional<std::string> accepted = AcceptAttachablePrefix(
-                FormatInline(firstValueOpener),
-                indentLevel,
-                attachedPrefix
-            )) {
+                tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(valueStart + 1));
+            if (std::optional<std::string> accepted =
+                    AcceptAttachablePrefix(FormatInline(firstValueOpener), indentLevel, attachedPrefix)) {
                 return accepted;
             }
         }
@@ -2406,21 +2185,13 @@ private:
     }
 
     std::optional<std::string> AttachableMemberAccessPrefix(
-        const std::vector<Token>& tokens,
-        size_t memberAccess,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, size_t memberAccess, int indentLevel, std::string_view attachedPrefix) const {
         std::vector<Token> receiver(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(memberAccess));
         return AcceptAttachablePrefix(FormatInline(receiver), indentLevel, attachedPrefix);
     }
 
     std::optional<std::string> AttachableGroupPrefix(
-        const std::vector<Token>& tokens,
-        GroupPair group,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        const std::vector<Token>& tokens, GroupPair group, int indentLevel, std::string_view attachedPrefix) const {
         return AcceptAttachablePrefix(FormatGroupOpeningLine(tokens, group), indentLevel, attachedPrefix);
     }
 
@@ -2434,17 +2205,12 @@ private:
             return beforeOpenText + "<";
         }
         std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
-        );
+            tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
         return FormatInline(firstLineTokens);
     }
 
     std::optional<std::string> AcceptAttachablePrefix(
-        std::string fragment,
-        int indentLevel,
-        std::string_view attachedPrefix
-    ) const {
+        std::string fragment, int indentLevel, std::string_view attachedPrefix) const {
         if (fragment.empty()) {
             return std::nullopt;
         }
@@ -2472,12 +2238,8 @@ private:
     }
 
     std::vector<std::string> FormatInitializerAssignment(
-        const std::vector<Token>& tokens,
-        size_t assignment,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, size_t assignment, int indentLevel, std::string prefix, std::string suffix)
+        const {
         const size_t open = NextSignificantIndex(tokens, assignment + 1);
         const std::optional<size_t> close = FindMatchingClose(tokens, open);
         if (!close) {
@@ -2486,19 +2248,11 @@ private:
             return {Indent(indentLevel) + inlineText};
         }
         std::vector<Token> lhs(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1));
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(*close)
-        );
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(*close));
         std::vector<Token> after(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
-        if (std::optional<std::vector<std::string>> combined = TryFormatCombinedNestedInitializerAssignment(
-            lhs,
-            inner,
-            after,
-            indentLevel,
-            prefix,
-            suffix
-        )) {
+        if (std::optional<std::vector<std::string>> combined =
+                TryFormatCombinedNestedInitializerAssignment(lhs, inner, after, indentLevel, prefix, suffix)) {
             return *combined;
         }
         std::vector<std::string> lines;
@@ -2506,15 +2260,13 @@ private:
         bool emittedElement = false;
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            std::vector<std::string> elementLines = FormatDelimitedElement(
-                elements[index],
+            std::vector<std::string> elementLines = FormatDelimitedElement(elements[index],
                 indentLevel + 1,
                 index + 1 < elements.size() ? "," : "",
                 true,
                 true,
                 false,
-                emittedElement
-            );
+                emittedElement);
             if (elementLines.empty()) {
                 continue;
             }
@@ -2527,14 +2279,12 @@ private:
         return lines;
     }
 
-    std::optional<std::vector<std::string>> TryFormatCombinedNestedInitializerAssignment(
-        const std::vector<Token>& lhs,
+    std::optional<std::vector<std::string>> TryFormatCombinedNestedInitializerAssignment(const std::vector<Token>& lhs,
         const std::vector<Token>& inner,
         const std::vector<Token>& after,
         int indentLevel,
         std::string_view prefix,
-        std::string_view suffix
-    ) const {
+        std::string_view suffix) const {
         const size_t nestedOpen = NextSignificantIndex(inner, 0);
         if (nestedOpen >= inner.size() || inner[nestedOpen].text != "{") {
             return std::nullopt;
@@ -2547,24 +2297,20 @@ private:
         if (!Fits(indentLevel, firstLine)) {
             return std::nullopt;
         }
-        std::vector<Token> nestedInner(
-            inner.begin() + static_cast<std::ptrdiff_t>(nestedOpen + 1),
-            inner.begin() + static_cast<std::ptrdiff_t>(*nestedClose)
-        );
+        std::vector<Token> nestedInner(inner.begin() + static_cast<std::ptrdiff_t>(nestedOpen + 1),
+            inner.begin() + static_cast<std::ptrdiff_t>(*nestedClose));
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + firstLine);
         bool emittedElement = false;
         std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            std::vector<std::string> elementLines = FormatDelimitedElement(
-                elements[index],
+            std::vector<std::string> elementLines = FormatDelimitedElement(elements[index],
                 indentLevel + 1,
                 index + 1 < elements.size() ? "," : "",
                 true,
                 true,
                 false,
-                emittedElement
-            );
+                emittedElement);
             if (elementLines.empty()) {
                 continue;
             }
@@ -2578,12 +2324,8 @@ private:
     }
 
     std::vector<std::string> FormatSplitLambda(
-        const std::vector<Token>& tokens,
-        size_t bodyOpen,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, size_t bodyOpen, int indentLevel, std::string prefix, std::string suffix)
+        const {
         const std::optional<size_t> bodyClose = FindMatchingClose(tokens, bodyOpen);
         if (!bodyClose) {
             std::string inlineText = prefix + FormatInline(tokens);
@@ -2591,10 +2333,8 @@ private:
             return {Indent(indentLevel) + inlineText};
         }
         std::vector<Token> header(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(bodyOpen));
-        std::vector<Token> body(
-            tokens.begin() + static_cast<std::ptrdiff_t>(bodyOpen + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(*bodyClose)
-        );
+        std::vector<Token> body(tokens.begin() + static_cast<std::ptrdiff_t>(bodyOpen + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(*bodyClose));
         std::vector<Token> after(tokens.begin() + static_cast<std::ptrdiff_t>(*bodyClose + 1), tokens.end());
         std::vector<std::string> lines = FormatLambdaHeader(header, indentLevel, std::move(prefix));
         PrettyFormatter bodyFormatter(config_, indentLevel + 1, true);
@@ -2610,43 +2350,28 @@ private:
     }
 
     std::vector<std::string> FormatLambdaHeader(
-        const std::vector<Token>& header,
-        int indentLevel,
-        std::string prefix
-    ) const {
+        const std::vector<Token>& header, int indentLevel, std::string prefix) const {
         const std::string inlineHeader = prefix + FormatInline(header) + " {";
         if (Fits(indentLevel, inlineHeader)) {
             return {Indent(indentLevel) + inlineHeader};
         }
-        if (std::optional<std::vector<std::string>> detachedParameters = TryFormatDetachedLambdaParameterLine(
-            header,
-            indentLevel,
-            prefix
-        )) {
+        if (std::optional<std::vector<std::string>> detachedParameters =
+                TryFormatDetachedLambdaParameterLine(header, indentLevel, prefix)) {
             return *detachedParameters;
         }
-        if (std::optional<std::vector<std::string>> splitParameters = TryFormatLambdaParameterGroup(
-            header,
-            indentLevel,
-            prefix
-        )) {
+        if (std::optional<std::vector<std::string>> splitParameters =
+                TryFormatLambdaParameterGroup(header, indentLevel, prefix)) {
             return *splitParameters;
         }
-        if (std::optional<std::vector<std::string>> splitCaptures = TryFormatLambdaCaptureGroup(
-            header,
-            indentLevel,
-            prefix
-        )) {
+        if (std::optional<std::vector<std::string>> splitCaptures =
+                TryFormatLambdaCaptureGroup(header, indentLevel, prefix)) {
             return *splitCaptures;
         }
         return {Indent(indentLevel) + inlineHeader};
     }
 
     std::optional<std::vector<std::string>> TryFormatDetachedLambdaParameterLine(
-        const std::vector<Token>& header,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& header, int indentLevel, std::string_view prefix) const {
         if (header.empty() || header.front().text != "[") {
             return std::nullopt;
         }
@@ -2665,16 +2390,11 @@ private:
             return std::nullopt;
         }
         return std::vector<std::string>{
-            Indent(indentLevel) + captureLine,
-            Indent(indentLevel + 1) + restLine,
-            Indent(indentLevel) + "{"
-        };
+            Indent(indentLevel) + captureLine, Indent(indentLevel + 1) + restLine, Indent(indentLevel) + "{"};
     }
 
     std::string FormatLambdaHeaderAfterCaptures(
-        const std::vector<Token>& header,
-        const std::vector<Token>& captures
-    ) const {
+        const std::vector<Token>& header, const std::vector<Token>& captures) const {
         const std::string fullHeader = FormatInline(header);
         const std::string captureText = FormatInline(captures);
         if (fullHeader.size() >= captureText.size() && fullHeader.compare(0, captureText.size(), captureText) == 0) {
@@ -2685,25 +2405,18 @@ private:
     }
 
     std::optional<std::vector<std::string>> TryFormatLambdaParameterGroup(
-        const std::vector<Token>& header,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& header, int indentLevel, std::string_view prefix) const {
         const std::optional<GroupPair> group = FindLambdaParameterGroup(header);
         if (!group) {
             return std::nullopt;
         }
-        std::vector<Token> inner(
-            header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-            header.begin() + static_cast<std::ptrdiff_t>(group->close)
-        );
+        std::vector<Token> inner(header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+            header.begin() + static_cast<std::ptrdiff_t>(group->close));
         if (!ContainsTopLevelSeparator(inner, ',')) {
             return std::nullopt;
         }
         std::vector<Token> firstLineTokens(
-            header.begin(),
-            header.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
-        );
+            header.begin(), header.begin() + static_cast<std::ptrdiff_t>(group->open + 1));
         const std::string firstLine = std::string(prefix) + FormatInline(firstLineTokens);
         if (!Fits(indentLevel, firstLine)) {
             return std::nullopt;
@@ -2716,10 +2429,7 @@ private:
     }
 
     std::optional<std::vector<std::string>> TryFormatLambdaCaptureGroup(
-        const std::vector<Token>& header,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& header, int indentLevel, std::string_view prefix) const {
         if (header.empty() || header.front().text != "[") {
             return std::nullopt;
         }
@@ -2728,9 +2438,7 @@ private:
             return std::nullopt;
         }
         std::vector<Token> captureInner(
-            header.begin() + 1,
-            header.begin() + static_cast<std::ptrdiff_t>(*captureClose)
-        );
+            header.begin() + 1, header.begin() + static_cast<std::ptrdiff_t>(*captureClose));
         if (!ContainsTopLevelSeparator(captureInner, ',')) {
             return std::nullopt;
         }
@@ -2753,15 +2461,11 @@ private:
                 lines.push_back(Indent(indentLevel) + "{");
                 return lines;
             }
-            std::vector<Token> inner(
-                header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1),
-                header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->close)
-            );
+            std::vector<Token> inner(header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1),
+                header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->close));
             if (ContainsTopLevelSeparator(inner, ',')) {
-                std::vector<Token> firstLineTokens(
-                    header.begin() + static_cast<std::ptrdiff_t>(*captureClose),
-                    header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1)
-                );
+                std::vector<Token> firstLineTokens(header.begin() + static_cast<std::ptrdiff_t>(*captureClose),
+                    header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1));
                 lines.push_back(Indent(indentLevel) + FormatInline(firstLineTokens));
                 AppendLambdaParameterLines(lines, inner, *parameterGroup, header, indentLevel);
                 lines.push_back(Indent(indentLevel) + "{");
@@ -2774,13 +2478,11 @@ private:
         return lines;
     }
 
-    void AppendLambdaParameterLines(
-        std::vector<std::string>& lines,
+    void AppendLambdaParameterLines(std::vector<std::string>& lines,
         const std::vector<Token>& inner,
         GroupPair group,
         const std::vector<Token>& header,
-        int indentLevel
-    ) const {
+        int indentLevel) const {
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
             if (elements[index].empty()) {
@@ -2823,18 +2525,14 @@ private:
         return GroupPair{open, *close};
     }
 
-    std::vector<std::string> FormatConstructorInitializerList(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatConstructorInitializerList(const std::vector<Token>& tokens,
         size_t initializerColon,
         int indentLevel,
         std::string prefix,
-        std::string suffix
-    ) const {
+        std::string suffix) const {
         std::vector<Token> header(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(initializerColon));
         std::vector<Token> initializers(
-            tokens.begin() + static_cast<std::ptrdiff_t>(initializerColon + 1),
-            tokens.end()
-        );
+            tokens.begin() + static_cast<std::ptrdiff_t>(initializerColon + 1), tokens.end());
         std::vector<std::string> lines = FormatConstructorInitializerHeader(header, indentLevel, std::move(prefix));
         std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
@@ -2859,15 +2557,10 @@ private:
     }
 
     std::vector<std::string> FormatConstructorInitializerHeader(
-        const std::vector<Token>& header,
-        int indentLevel,
-        std::string prefix
-    ) const {
+        const std::vector<Token>& header, int indentLevel, std::string prefix) const {
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(header)) {
-            std::vector<Token> inner(
-                header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-                header.begin() + static_cast<std::ptrdiff_t>(group->close)
-            );
+            std::vector<Token> inner(header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+                header.begin() + static_cast<std::ptrdiff_t>(group->close));
             if (header[group->open].text == "(" && ContainsTopLevelSeparator(inner, ',')) {
                 return FormatSplitGroup(header, *group, indentLevel, std::move(prefix), " :");
             }
@@ -2876,38 +2569,20 @@ private:
     }
 
     std::vector<std::string> FormatSplitGroup(
-        const std::vector<Token>& tokens,
-        GroupPair group,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
-        if (std::optional<std::vector<std::string>> singleElement = TryFormatSingleInlineElementGroup(
-            tokens,
-            group,
-            indentLevel,
-            prefix,
-            suffix
-        )) {
+        const std::vector<Token>& tokens, GroupPair group, int indentLevel, std::string prefix, std::string suffix)
+        const {
+        if (std::optional<std::vector<std::string>> singleElement =
+                TryFormatSingleInlineElementGroup(tokens, group, indentLevel, prefix, suffix)) {
             return *singleElement;
         }
-        if (std::optional<std::vector<std::string>> combined = TryFormatCombinedNestedGroup(
-            tokens,
-            group,
-            indentLevel,
-            prefix,
-            suffix
-        )) {
+        if (std::optional<std::vector<std::string>> combined =
+                TryFormatCombinedNestedGroup(tokens, group, indentLevel, prefix, suffix)) {
             return *combined;
         }
         std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
-        );
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
-        );
+            tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close));
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatGroupOpeningLine(tokens, group));
@@ -2918,7 +2593,10 @@ private:
         const char separator = splitForHeader ? ';' : ',';
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
-            std::vector<std::string> childLines = FormatRange(inner, indentLevel + 1, {}, {}, true);
+            const bool indentSingleExpressionChains =
+                !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
+            std::vector<std::string> childLines =
+                FormatRange(inner, indentLevel + 1, {}, {}, indentSingleExpressionChains);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
         } else {
             bool emittedElement = false;
@@ -2928,15 +2606,13 @@ private:
                     elementSuffix = std::string(1, separator);
                 }
                 const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
-                std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements[index],
+                std::vector<std::string> elementLines = FormatDelimitedElement(elements[index],
                     indentLevel + 1,
                     elementSuffix,
                     isInitializerElement,
                     indentElementChains,
                     startsWithControlFor,
-                    emittedElement
-                );
+                    emittedElement);
                 if (elementLines.empty()) {
                     continue;
                 }
@@ -2950,35 +2626,45 @@ private:
         return lines;
     }
 
-    std::optional<std::vector<std::string>> TryFormatSingleInlineElementGroup(
-        const std::vector<Token>& tokens,
+    bool IsPlainParenthesizedExpressionGroup(
+        const std::vector<Token>& tokens, GroupPair group, const std::vector<Token>& firstLineTokens) const {
+        if (group.open >= tokens.size() || tokens[group.open].text != "(") {
+            return false;
+        }
+        if (StartsWithControlHeader(firstLineTokens) || IsFunctionPointerDeclaratorGroupOpen(tokens, group.open)) {
+            return false;
+        }
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, group.open);
+        if (!previous) {
+            return true;
+        }
+        const Token& token = tokens[*previous];
+        if (token.kind == TokenKind::Word) {
+            return IsNonFunctionGroupOwnerWord(token.text) || IsGlobalQualifierPrefixWord(token.text);
+        }
+        if (token.text == ")" || token.text == "]" || IsTemplateAngleCloseToken(tokens, *previous)) {
+            return false;
+        }
+        return !IsOperatorFunctionNameToken(tokens, *previous) && !IsOperatorCallNameClose(tokens, *previous);
+    }
+
+    std::optional<std::vector<std::string>> TryFormatSingleInlineElementGroup(const std::vector<Token>& tokens,
         GroupPair group,
         int indentLevel,
         std::string_view prefix,
-        std::string_view suffix
-    ) const {
+        std::string_view suffix) const {
         if (group.open >= tokens.size() || tokens[group.open].text != "(") {
             return std::nullopt;
         }
         std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
-        );
+            tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
         if (StartsWithControlHeader(firstLineTokens)) {
             return std::nullopt;
         }
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
-        );
-        if (
-            inner.empty() ||
-            ContainsOnlyNewlines(inner, 0, inner.size()) ||
-            ContainsTopLevelSeparator(inner, ',') ||
-            HasOriginalBlankSeparator(inner) ||
-            HasLineComment(inner) ||
-            ShouldForceSplit(inner)
-        ) {
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close));
+        if (inner.empty() || ContainsOnlyNewlines(inner, 0, inner.size()) || ContainsTopLevelSeparator(inner, ',') ||
+            HasOriginalBlankSeparator(inner) || HasLineComment(inner) || ShouldForceSplit(inner)) {
             return std::nullopt;
         }
         const std::string elementLine = FormatInline(inner, InlineBudget(indentLevel + 1, {}, {}));
@@ -2991,31 +2677,24 @@ private:
         return std::vector<std::string>{
             Indent(indentLevel) + std::string(prefix) + FormatGroupOpeningLine(tokens, group),
             Indent(indentLevel + 1) + elementLine,
-            Indent(indentLevel) + closeLine
-        };
+            Indent(indentLevel) + closeLine};
     }
 
-    std::optional<std::vector<std::string>> TryFormatCombinedNestedGroup(
-        const std::vector<Token>& tokens,
+    std::optional<std::vector<std::string>> TryFormatCombinedNestedGroup(const std::vector<Token>& tokens,
         GroupPair group,
         int indentLevel,
         std::string_view prefix,
-        std::string_view suffix
-    ) const {
+        std::string_view suffix) const {
         const std::optional<CombinedNestedGroup> candidate =
             FindCombinedNestedGroupCandidate(tokens, group, indentLevel, prefix);
         if (!candidate) {
             return std::nullopt;
         }
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
-        );
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close));
         const GroupPair nested = candidate->nested;
-        std::vector<Token> nestedInner(
-            inner.begin() + static_cast<std::ptrdiff_t>(nested.open + 1),
-            inner.begin() + static_cast<std::ptrdiff_t>(nested.close)
-        );
+        std::vector<Token> nestedInner(inner.begin() + static_cast<std::ptrdiff_t>(nested.open + 1),
+            inner.begin() + static_cast<std::ptrdiff_t>(nested.close));
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + candidate->firstLine);
@@ -3032,14 +2711,7 @@ private:
                 }
                 const bool isInitializerElement = inner[nested.open].text == "{";
                 std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements[index],
-                    indentLevel + 1,
-                    elementSuffix,
-                    isInitializerElement,
-                    true,
-                    false,
-                    emittedElement
-                );
+                    elements[index], indentLevel + 1, elementSuffix, isInitializerElement, true, false, emittedElement);
                 if (elementLines.empty()) {
                     continue;
                 }
@@ -3057,16 +2729,10 @@ private:
     }
 
     std::optional<CombinedNestedGroup> FindCombinedNestedGroupCandidate(
-        const std::vector<Token>& tokens,
-        GroupPair group,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& tokens, GroupPair group, int indentLevel, std::string_view prefix) const {
         std::vector<Token> outerPrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1));
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
-        );
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close));
         const std::optional<GroupPair> nested = FindFirstWrappableGroupPair(inner);
         if (!nested || IsEmptyGroupPair(inner, nested->open, nested->close)) {
             return std::nullopt;
@@ -3087,17 +2753,9 @@ private:
     }
 
     std::optional<std::vector<std::string>> TryFormatSplitDirectInitializedDeclaration(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view prefix,
-        std::string_view suffix
-    ) const {
-        if (
-            IsDeclarationContext() ||
-            HasOriginalBlankSeparator(tokens) ||
-            ShouldForceSplit(tokens) ||
-            ContainsTopLevelAssignment(tokens)
-        ) {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view prefix, std::string_view suffix) const {
+        if (IsDeclarationContext() || HasOriginalBlankSeparator(tokens) || ShouldForceSplit(tokens) ||
+            ContainsTopLevelAssignment(tokens)) {
             return std::nullopt;
         }
         const std::optional<GroupPair> initializer = FindDirectInitializerGroup(tokens);
@@ -3195,11 +2853,7 @@ private:
     }
 
     std::vector<std::string> FormatStringLiteralSequence(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string prefix, std::string suffix) const {
         std::vector<std::string> lines;
         std::optional<size_t> lastStringLiteral;
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -3207,10 +2861,8 @@ private:
                 lastStringLiteral = index;
             }
         }
-        if (
-            std::optional<size_t> last = PreviousNonNewlineIndex(tokens, tokens.size());
-            last && tokens[*last].text == ";"
-        ) {
+        if (std::optional<size_t> last = PreviousNonNewlineIndex(tokens, tokens.size());
+            last && tokens[*last].text == ";") {
             suffix = ";" + suffix;
         }
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -3229,10 +2881,7 @@ private:
     }
 
     std::optional<GroupPair> FindPreferredCallChainArgumentGroup(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string_view prefix) const {
         const std::optional<size_t> memberAccess = FindTopLevelMemberAccess(tokens);
         if (!memberAccess) {
             return std::nullopt;
@@ -3244,29 +2893,19 @@ private:
         if (IsFunctionPointerDeclaratorGroupOpen(tokens, group->open)) {
             return std::nullopt;
         }
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
-        );
-        if (
-            !ContainsTopLevelSeparator(inner, ',') &&
-            !FindCombinedNestedGroupCandidate(tokens, *group, indentLevel, prefix)
-        ) {
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group->close));
+        if (!ContainsTopLevelSeparator(inner, ',') &&
+            !FindCombinedNestedGroupCandidate(tokens, *group, indentLevel, prefix)) {
             return std::nullopt;
         }
         std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
-        );
+            tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1));
         return Fits(indentLevel, std::string(prefix) + FormatInline(firstLineTokens)) ? group : std::nullopt;
     }
 
     std::optional<GroupPair> FindPreferredValueGroupAfterTemplateGroup(
-        const std::vector<Token>& tokens,
-        GroupPair templateGroup,
-        int indentLevel,
-        std::string_view prefix
-    ) const {
+        const std::vector<Token>& tokens, GroupPair templateGroup, int indentLevel, std::string_view prefix) const {
         if (!IsTemplateAngleGroup(tokens, templateGroup)) {
             return std::nullopt;
         }
@@ -3279,12 +2918,9 @@ private:
                         UpdateDepth(tokens, index, depth);
                         continue;
                     }
-                    if (
-                        !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                    if (!IsEmptyGroupPair(tokens, index, *close) && !IsNonWrappablePrefixGroup(tokens, index, *close) &&
                         !IsFunctionPointerDeclaratorGroupOpen(tokens, index) &&
-                        Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, group))
-                    ) {
+                        Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, group))) {
                         return group;
                     }
                 }
@@ -3299,11 +2935,8 @@ private:
         for (size_t index = begin; index < tokens.size(); ++index) {
             if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
-                    if (
-                        !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
-                    ) {
+                    if (!IsEmptyGroupPair(tokens, index, *close) && !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)) {
                         return GroupPair{index, *close};
                     }
                 }
@@ -3314,12 +2947,8 @@ private:
     }
 
     std::vector<std::string> FormatMemberAccessChain(
-        const std::vector<Token>& tokens,
-        size_t memberAccess,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, size_t memberAccess, int indentLevel, std::string prefix, std::string suffix)
+        const {
         std::vector<Token> receiver(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(memberAccess));
         std::vector<Token> member(tokens.begin() + static_cast<std::ptrdiff_t>(memberAccess), tokens.end());
         std::vector<std::string> lines;
@@ -3329,13 +2958,8 @@ private:
             if (TryAppendMemberAccessChainToLastLine(lines, member, suffix)) {
                 return lines;
             }
-            if (std::optional<std::vector<std::string>> splitReceiver = TryFormatSplitReceiverWithTrailingMemberChain(
-                receiver,
-                member,
-                indentLevel,
-                prefix,
-                suffix
-            )) {
+            if (std::optional<std::vector<std::string>> splitReceiver =
+                    TryFormatSplitReceiverWithTrailingMemberChain(receiver, member, indentLevel, prefix, suffix)) {
                 return *splitReceiver;
             }
         } else {
@@ -3355,8 +2979,7 @@ private:
         const std::vector<Token>& member,
         int indentLevel,
         std::string_view prefix,
-        std::string_view suffix
-    ) const {
+        std::string_view suffix) const {
         const std::optional<GroupPair> trailingGroup = FindTrailingWrappableGroupPair(receiver);
         if (!trailingGroup) {
             return std::nullopt;
@@ -3370,10 +2993,7 @@ private:
     }
 
     bool TryAppendMemberAccessChainToLastLine(
-        std::vector<std::string>& lines,
-        const std::vector<Token>& member,
-        std::string_view suffix
-    ) const {
+        std::vector<std::string>& lines, const std::vector<Token>& member, std::string_view suffix) const {
         if (lines.empty() || member.empty() || HasOriginalBlankSeparator(member) || ShouldForceSplit(member)) {
             return false;
         }
@@ -3394,14 +3014,12 @@ private:
         return true;
     }
 
-    std::vector<std::string> FormatOperatorChain(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatOperatorChain(const std::vector<Token>& tokens,
         int indentLevel,
         std::string prefix,
         std::string suffix,
         bool indentSplitChains,
-        bool indentLogicalSplitChains
-    ) const {
+        bool indentLogicalSplitChains) const {
         const ChainKind chainKind = SelectChainKind(tokens);
         if (chainKind == ChainKind::Ternary) {
             return FormatTernaryChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains);
@@ -3442,11 +3060,8 @@ private:
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             std::vector<std::string> partLines =
                 FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
-            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
-                partLines,
-                parts[index + 1],
-                suffix
-            )) {
+            if (index + 2 == parts.size() && partLines.size() > 1 &&
+                TryAppendFinalChainPartToLastLine(partLines, parts[index + 1], suffix)) {
                 lines.insert(lines.end(), partLines.begin(), partLines.end());
                 break;
             }
@@ -3456,11 +3071,7 @@ private:
     }
 
     std::vector<std::string> FormatShiftOperatorChain(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string prefix, std::string suffix) const {
         std::vector<Token> receiver;
         std::vector<std::vector<Token>> segments;
         std::vector<Token> current;
@@ -3497,13 +3108,7 @@ private:
             std::vector<std::string> groupedLines;
             size_t nextIndex = index + 1;
             if (TryFormatStreamShiftConfigurationGroup(
-                segments,
-                index,
-                indentLevel + 1,
-                suffix,
-                groupedLines,
-                nextIndex
-            )) {
+                    segments, index, indentLevel + 1, suffix, groupedLines, nextIndex)) {
                 lines.insert(lines.end(), groupedLines.begin(), groupedLines.end());
                 index = nextIndex;
                 continue;
@@ -3521,10 +3126,7 @@ private:
     }
 
     std::optional<std::string> CompactShiftOperatorTail(
-        const std::vector<std::vector<Token>>& segments,
-        int indentLevel,
-        std::string_view suffix
-    ) const {
+        const std::vector<std::vector<Token>>& segments, int indentLevel, std::string_view suffix) const {
         std::vector<Token> combined;
         for (const std::vector<Token>& segment : segments) {
             combined.insert(combined.end(), segment.begin(), segment.end());
@@ -3540,14 +3142,12 @@ private:
         return candidate;
     }
 
-    bool TryFormatStreamShiftConfigurationGroup(
-        const std::vector<std::vector<Token>>& segments,
+    bool TryFormatStreamShiftConfigurationGroup(const std::vector<std::vector<Token>>& segments,
         size_t index,
         int indentLevel,
         std::string_view suffix,
         std::vector<std::string>& lines,
-        size_t& nextIndex
-    ) const {
+        size_t& nextIndex) const {
         if (!IsStreamShiftConfigurationSegment(segments[index])) {
             return false;
         }
@@ -3614,18 +3214,13 @@ private:
     }
 
     bool IsConfiguredStreamShiftConfigurationMethod(std::string_view methodName) const {
-        return std::find(
-            config_.streamShiftConfigurationMethods.begin(),
-            config_.streamShiftConfigurationMethods.end(),
-            methodName
-        ) != config_.streamShiftConfigurationMethods.end();
+        return std::find(config_.streamShiftConfigurationMethods.begin(),
+                    config_.streamShiftConfigurationMethods.end(),
+                    methodName) != config_.streamShiftConfigurationMethods.end();
     }
 
     bool TryAppendFinalChainPartToLastLine(
-        std::vector<std::string>& lines,
-        const std::vector<Token>& finalPart,
-        std::string_view suffix
-    ) const {
+        std::vector<std::string>& lines, const std::vector<Token>& finalPart, std::string_view suffix) const {
         if (lines.empty() || finalPart.empty() || HasOriginalBlankSeparator(finalPart) || ShouldForceSplit(finalPart)) {
             return false;
         }
@@ -3647,12 +3242,8 @@ private:
     }
 
     std::vector<std::string> FormatTernaryPart(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        int valueIndentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, int valueIndentLevel, std::string prefix, std::string suffix)
+        const {
         std::string inlineText = prefix + FormatInline(tokens);
         AppendSuffix(inlineText, suffix);
         if (Fits(indentLevel, inlineText)) {
@@ -3678,13 +3269,11 @@ private:
             if (std::optional<size_t> valueClose = FindMatchingClose(value, valueStart)) {
                 std::string attachedGroupPrefix = conditionLine + " ";
                 if (Fits(indentLevel, attachedGroupPrefix + value[valueStart].text)) {
-                    return FormatSplitGroup(
-                        value,
+                    return FormatSplitGroup(value,
                         GroupPair{valueStart, *valueClose},
                         indentLevel,
                         std::move(attachedGroupPrefix),
-                        std::move(suffix)
-                    );
+                        std::move(suffix));
                 }
             }
         }
@@ -3695,13 +3284,11 @@ private:
         return lines;
     }
 
-    std::vector<std::string> FormatTernaryChain(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatTernaryChain(const std::vector<Token>& tokens,
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        bool indentSplitChains
-    ) const {
+        bool indentSplitChains) const {
         std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
         int depth = 0;
@@ -3732,17 +3319,9 @@ private:
             }
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             std::vector<std::string> partLines = FormatTernaryPart(
-                parts[index],
-                partIndent,
-                indentLevel + 1,
-                std::move(partPrefix),
-                std::move(partSuffix)
-            );
-            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
-                partLines,
-                parts[index + 1],
-                suffix
-            )) {
+                parts[index], partIndent, indentLevel + 1, std::move(partPrefix), std::move(partSuffix));
+            if (index + 2 == parts.size() && partLines.size() > 1 &&
+                TryAppendFinalChainPartToLastLine(partLines, parts[index + 1], suffix)) {
                 lines.insert(lines.end(), partLines.begin(), partLines.end());
                 break;
             }
@@ -3760,11 +3339,7 @@ private:
     }
 
     std::vector<std::string> FormatChainPart(
-        const std::vector<Token>& tokens,
-        int indentLevel,
-        std::string prefix,
-        std::string suffix
-    ) const {
+        const std::vector<Token>& tokens, int indentLevel, std::string prefix, std::string suffix) const {
         std::string inlineText = prefix + FormatInline(tokens);
         AppendSuffix(inlineText, suffix);
         if (Fits(indentLevel, inlineText)) {
@@ -3804,13 +3379,10 @@ private:
                 trailingStringLiteral.reset();
                 continue;
             }
-            if (
-                token.kind == TokenKind::StringLiteral &&
-                previous &&
-                previous->kind == TokenKind::StringLiteral &&
+            if (token.kind == TokenKind::StringLiteral && previous && previous->kind == TokenKind::StringLiteral &&
                 trailingStringLiteral &&
-                TryAppendConcatenatedStringLiteral(result, *trailingStringLiteral, token.text, tokens, index, maxLength)
-            ) {
+                TryAppendConcatenatedStringLiteral(
+                    result, *trailingStringLiteral, token.text, tokens, index, maxLength)) {
                 previous = Token{TokenKind::StringLiteral, *trailingStringLiteral};
                 continue;
             }
@@ -3828,14 +3400,12 @@ private:
         return result;
     }
 
-    bool TryAppendConcatenatedStringLiteral(
-        std::string& result,
+    bool TryAppendConcatenatedStringLiteral(std::string& result,
         std::string& trailingLiteral,
         std::string_view currentLiteral,
         const std::vector<Token>& tokens,
         size_t index,
-        std::optional<size_t> maxLength
-    ) const {
+        std::optional<size_t> maxLength) const {
         if (HasUserDefinedLiteralSuffix(tokens, index)) {
             return false;
         }
@@ -3856,9 +3426,7 @@ private:
     }
 
     std::optional<std::string> ConcatenatedStringLiteralTail(
-        std::string_view previousLiteral,
-        std::string_view currentLiteral
-    ) const {
+        std::string_view previousLiteral, std::string_view currentLiteral) const {
         if (!IsOrdinaryStringLiteralText(previousLiteral) || !IsOrdinaryStringLiteralText(currentLiteral)) {
             return std::nullopt;
         }
@@ -3976,11 +3544,8 @@ private:
         if (current == "(" && previous.kind == TokenKind::Word) {
             return IsControlKeyword(prev);
         }
-        if (
-            (token.kind == TokenKind::StringLiteral || token.kind == TokenKind::CharLiteral) &&
-            previous.kind == TokenKind::Word &&
-            IsStringOrCharacterLiteralPrefix(prev)
-        ) {
+        if ((token.kind == TokenKind::StringLiteral || token.kind == TokenKind::CharLiteral) &&
+            previous.kind == TokenKind::Word && IsStringOrCharacterLiteralPrefix(prev)) {
             return false;
         }
         if (current == "~" && previous.kind == TokenKind::Word && IsDestructorNameToken(tokens, index)) {
@@ -4033,11 +3598,8 @@ private:
         if ((current == "++" || current == "--") && prev == ")") {
             return true;
         }
-        if (
-            (current == "++" || current == "--") &&
-            IsUnaryPrefixOperator(tokens, index) &&
-            IsBinaryOperatorLike(prev)
-        ) {
+        if ((current == "++" || current == "--") && IsUnaryPrefixOperator(tokens, index) &&
+            IsBinaryOperatorLike(prev)) {
             return true;
         }
         if (current == "[" && prev == "auto") {
@@ -4096,8 +3658,7 @@ private:
     }
 
     bool IsGlobalQualifierPrefixWord(std::string_view text) const {
-        static constexpr std::string_view kWords[] = {
-            "alignas",
+        static constexpr std::string_view kWords[] = {"alignas",
             "case",
             "co_return",
             "consteval",
@@ -4109,8 +3670,7 @@ private:
             "inline",
             "new",
             "return",
-            "throw"
-        };
+            "throw"};
         return IsTypeContextWord(text) || std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
     }
 
@@ -4146,16 +3706,8 @@ private:
 
     bool IsUnaryPrefixOperator(const std::vector<Token>& tokens, size_t index) const {
         const std::string& text = tokens[index].text;
-        if (
-            text != "*" &&
-            text != "&" &&
-            text != "+" &&
-            text != "-" &&
-            text != "++" &&
-            text != "--" &&
-            text != "!" &&
-            text != "~"
-        ) {
+        if (text != "*" && text != "&" && text != "+" && text != "-" && text != "++" && text != "--" && text != "!" &&
+            text != "~") {
             return false;
         }
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
@@ -4166,16 +3718,8 @@ private:
             return false;
         }
         const std::string& prev = tokens[*previous].text;
-        return prev == "(" ||
-            prev == "[" ||
-            prev == "{" ||
-            prev == "," ||
-            prev == ";" ||
-            prev == "=" ||
-            prev == "?" ||
-            prev == ":" ||
-            IsBinaryOperatorLike(prev) ||
-            prev == "return";
+        return prev == "(" || prev == "[" || prev == "{" || prev == "," || prev == ";" || prev == "=" || prev == "?" ||
+            prev == ":" || IsBinaryOperatorLike(prev) || prev == "return";
     }
 
     bool IsCStyleCastCloseBeforeExpression(const std::vector<Token>& tokens, size_t close) const {
@@ -4202,15 +3746,8 @@ private:
         if (tokens[beforeOpen].kind == TokenKind::Word) {
             return before == "return" || before == "co_return" || before == "throw";
         }
-        return before == "(" ||
-            before == "[" ||
-            before == "{" ||
-            before == "," ||
-            before == ";" ||
-            before == "=" ||
-            before == "?" ||
-            before == ":" ||
-            IsBinaryOperatorLike(before);
+        return before == "(" || before == "[" || before == "{" || before == "," || before == ";" || before == "=" ||
+            before == "?" || before == ":" || IsBinaryOperatorLike(before);
     }
 
     bool IsLikelyCStyleCastType(const std::vector<Token>& tokens, size_t open, size_t close) const {
@@ -4223,18 +3760,9 @@ private:
             if (token.kind == TokenKind::Newline) {
                 continue;
             }
-            if (
-                token.kind != TokenKind::Word &&
-                token.text != "::" &&
-                token.text != "*" &&
-                token.text != "&" &&
-                token.text != "&&" &&
-                token.text != "^" &&
-                token.text != "%" &&
-                token.text != "<" &&
-                token.text != ">" &&
-                token.text != ","
-            ) {
+            if (token.kind != TokenKind::Word && token.text != "::" && token.text != "*" && token.text != "&" &&
+                token.text != "&&" && token.text != "^" && token.text != "%" && token.text != "<" &&
+                token.text != ">" && token.text != ",") {
                 return false;
             }
             last = index;
@@ -4251,10 +3779,8 @@ private:
         if (!previous) {
             return false;
         }
-        if (
-            IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
-            IsPointerOrReferenceDeclarator(tokens, *previous)
-        ) {
+        if (IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
+            IsPointerOrReferenceDeclarator(tokens, *previous)) {
             return true;
         }
         return IsLikelyTypeNameToken(tokens, *previous);
@@ -4277,8 +3803,7 @@ private:
         if (IsCallingConventionToken(token.text)) {
             return true;
         }
-        static constexpr std::string_view kTypeWords[] = {
-            "auto",
+        static constexpr std::string_view kTypeWords[] = {"auto",
             "bool",
             "char",
             "const",
@@ -4292,8 +3817,7 @@ private:
             "std",
             "unsigned",
             "void",
-            "wchar_t"
-        };
+            "wchar_t"};
         if (std::find(std::begin(kTypeWords), std::end(kTypeWords), token.text) != std::end(kTypeWords)) {
             return true;
         }
@@ -4316,13 +3840,7 @@ private:
 
     static bool IsCallingConventionToken(std::string_view text) {
         static constexpr std::string_view kCallingConventionTokens[] = {
-            "__cdecl",
-            "__clrcall",
-            "__fastcall",
-            "__stdcall",
-            "__thiscall",
-            "__vectorcall"
-        };
+            "__cdecl", "__clrcall", "__fastcall", "__stdcall", "__thiscall", "__vectorcall"};
         return std::find(std::begin(kCallingConventionTokens), std::end(kCallingConventionTokens), text) !=
             std::end(kCallingConventionTokens);
     }
@@ -4368,13 +3886,8 @@ private:
         if (text == "::") {
             return IsTypeQualifierStartInDeclaratorContext(tokens, *beforeType);
         }
-        return text == "(" ||
-            text == "[" ||
-            text == "{" ||
-            text == "," ||
-            text == "<" ||
-            IsPointerOrReferenceDeclaratorToken(text) ||
-            text == ":";
+        return text == "(" || text == "[" || text == "{" || text == "," || text == "<" ||
+            IsPointerOrReferenceDeclaratorToken(text) || text == ":";
     }
 
     bool IsTypeQualifierStartInDeclaratorContext(const std::vector<Token>& tokens, size_t qualifier) const {
@@ -4386,14 +3899,8 @@ private:
         if (tokens[*beforeQualifier].kind == TokenKind::Word) {
             return IsTypeContextWord(text);
         }
-        return text == "(" ||
-            text == "[" ||
-            text == "{" ||
-            text == "," ||
-            text == "<" ||
-            text == "=" ||
-            IsPointerOrReferenceDeclaratorToken(text) ||
-            text == ":";
+        return text == "(" || text == "[" || text == "{" || text == "," || text == "<" || text == "=" ||
+            IsPointerOrReferenceDeclaratorToken(text) || text == ":";
     }
 
     bool HasWordBefore(const std::vector<Token>& tokens, size_t before, std::string_view word) const {
@@ -4460,8 +3967,7 @@ private:
     }
 
     bool IsTypeContextWord(std::string_view text) const {
-        static constexpr std::string_view kWords[] = {
-            "class",
+        static constexpr std::string_view kWords[] = {"class",
             "const",
             "enum",
             "long",
@@ -4473,8 +3979,7 @@ private:
             "typename",
             "unsigned",
             "virtual",
-            "volatile"
-        };
+            "volatile"};
         return std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
     }
 
@@ -4511,15 +4016,13 @@ private:
         }
     }
 
-    std::vector<std::string> FormatDelimitedElement(
-        const std::vector<Token>& tokens,
+    std::vector<std::string> FormatDelimitedElement(const std::vector<Token>& tokens,
         int indentLevel,
         std::string_view suffix,
         bool isInitializerElement,
         bool indentSplitChains,
         bool indentLogicalSplitChains,
-        bool preserveLeadingBlankSeparator
-    ) const {
+        bool preserveLeadingBlankSeparator) const {
         std::vector<std::string> lines;
         size_t begin = 0;
         bool preserveBlankSeparator = preserveLeadingBlankSeparator;
@@ -4556,41 +4059,26 @@ private:
             remainingLines = FormatRange(remaining, indentLevel, {}, std::string(suffix), true);
         } else {
             remainingLines = FormatRange(
-                remaining,
-                indentLevel,
-                {},
-                std::string(suffix),
-                indentSplitChains,
-                indentLogicalSplitChains
-            );
+                remaining, indentLevel, {}, std::string(suffix), indentSplitChains, indentLogicalSplitChains);
         }
         lines.insert(lines.end(), remainingLines.begin(), remainingLines.end());
         return lines;
     }
 
-    void AppendSplitElementLines(
-        std::vector<std::string>& lines,
+    void AppendSplitElementLines(std::vector<std::string>& lines,
         const std::vector<std::string>& elementLines,
-        bool combineNestedInitializerBoundary
-    ) const {
+        bool combineNestedInitializerBoundary) const {
         if (elementLines.empty()) {
             return;
         }
         size_t firstElementLine = 0;
-        if (
-            combineNestedInitializerBoundary &&
-            !lines.empty() &&
-            tools::lint::Trim(lines.back()) == "}," &&
-            tools::lint::Trim(elementLines.front()) == "{"
-        ) {
+        if (combineNestedInitializerBoundary && !lines.empty() && tools::lint::Trim(lines.back()) == "}," &&
+            tools::lint::Trim(elementLines.front()) == "{") {
             lines.back() = TrimRight(lines.back()) + " " + TrimLeft(elementLines.front());
             firstElementLine = 1;
         }
         lines.insert(
-            lines.end(),
-            elementLines.begin() + static_cast<std::ptrdiff_t>(firstElementLine),
-            elementLines.end()
-        );
+            lines.end(), elementLines.begin() + static_cast<std::ptrdiff_t>(firstElementLine), elementLines.end());
     }
 
     bool ShouldForceSplit(const std::vector<Token>& tokens) const {
@@ -4640,10 +4128,8 @@ private:
                 previousStringLiteral = nullptr;
                 continue;
             }
-            if (previousStringLiteral != nullptr && HasExpandableEscapeStringLiteralBoundary(
-                previousStringLiteral->text,
-                token.text
-            )) {
+            if (previousStringLiteral != nullptr &&
+                HasExpandableEscapeStringLiteralBoundary(previousStringLiteral->text, token.text)) {
                 return true;
             }
             previousStringLiteral = &token;
@@ -4652,9 +4138,7 @@ private:
     }
 
     bool HasExpandableEscapeStringLiteralBoundary(
-        std::string_view previousLiteral,
-        std::string_view currentLiteral
-    ) const {
+        std::string_view previousLiteral, std::string_view currentLiteral) const {
         if (!IsOrdinaryStringLiteralText(previousLiteral) || !IsOrdinaryStringLiteralText(currentLiteral)) {
             return false;
         }
@@ -4729,11 +4213,9 @@ private:
     }
 
     bool HasLineComment(const std::vector<Token>& tokens) const {
-        return std::any_of(
-            tokens.begin(),
-            tokens.end(),
-            [](const Token& token) { return token.kind == TokenKind::LineComment; }
-        );
+        return std::any_of(tokens.begin(), tokens.end(), [](const Token& token) {
+            return token.kind == TokenKind::LineComment;
+        });
     }
 
     bool LineCommentBeforeTopLevelStatementTerminator(const std::vector<Token>& tokens) const {
@@ -4767,9 +4249,8 @@ private:
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
             const Token& token = tokens[index];
-            if (
-                index > 0 && depth == 0 && IsMemberAccessOperator(token.text) && IsMemberAccessSplitPoint(tokens, index)
-            ) {
+            if (index > 0 && depth == 0 && IsMemberAccessOperator(token.text) &&
+                IsMemberAccessSplitPoint(tokens, index)) {
                 return index;
             }
             UpdateDepth(token, depth);
@@ -4780,9 +4261,7 @@ private:
     bool IsMemberAccessSplitPoint(const std::vector<Token>& tokens, size_t index) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
         const size_t next = NextSignificantIndex(tokens, index + 1);
-        return previous &&
-            next < tokens.size() &&
-            tokens[next].kind == TokenKind::Word &&
+        return previous && next < tokens.size() && tokens[next].kind == TokenKind::Word &&
             HasTopLevelGroupBefore(tokens, index);
     }
 
@@ -4819,11 +4298,8 @@ private:
         for (size_t index = 0; index < tokens.size(); ++index) {
             if (IsWrappableGroupOpen(tokens, index) && depth == 0) {
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
-                    if (
-                        !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
-                    ) {
+                    if (!IsEmptyGroupPair(tokens, index, *close) && !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)) {
                         return GroupPair{index, *close};
                     }
                 }
@@ -4834,21 +4310,14 @@ private:
     }
 
     std::optional<GroupPair> FindFirstWrappableGroupPairWithTopLevelSeparatorAndLambda(
-        const std::vector<Token>& tokens,
-        char separator
-    ) const {
+        const std::vector<Token>& tokens, char separator) const {
         for (size_t index = 0; index < tokens.size(); ++index) {
             if (IsGroupOpen(tokens[index].text)) {
                 if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
-                    if (
-                        !IsEmptyGroupPair(tokens, index, *close) &&
-                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
-                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
-                    ) {
-                        std::vector<Token> inner(
-                            tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
-                            tokens.begin() + static_cast<std::ptrdiff_t>(*close)
-                        );
+                    if (!IsEmptyGroupPair(tokens, index, *close) && !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)) {
+                        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                            tokens.begin() + static_cast<std::ptrdiff_t>(*close));
                         if (ContainsTopLevelSeparator(inner, separator) && FindTopLevelLambdaBodyOpen(inner)) {
                             return GroupPair{index, *close};
                         }
@@ -4880,12 +4349,8 @@ private:
             return std::nullopt;
         }
         const std::optional<size_t> open = FindMatchingOpen(tokens, *close);
-        if (
-            !open ||
-            IsEmptyGroupPair(tokens, *open, *close) ||
-            IsNonWrappablePrefixGroup(tokens, *open, *close) ||
-            IsFunctionPointerDeclaratorGroupOpen(tokens, *open)
-        ) {
+        if (!open || IsEmptyGroupPair(tokens, *open, *close) || IsNonWrappablePrefixGroup(tokens, *open, *close) ||
+            IsFunctionPointerDeclaratorGroupOpen(tokens, *open)) {
             return std::nullopt;
         }
         return GroupPair{*open, *close};
@@ -4906,17 +4371,13 @@ private:
         if (!close || tokens[*close].text != ">") {
             return false;
         }
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(*close)
-        );
+        std::vector<Token> inner(tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(*close));
         return ContainsTopLevelSeparator(inner, ',');
     }
 
     bool IsTemplateAngleGroup(const std::vector<Token>& tokens, GroupPair group) const {
-        return group.open < tokens.size() &&
-            group.close < tokens.size() &&
-            tokens[group.open].text == "<" &&
+        return group.open < tokens.size() && group.close < tokens.size() && tokens[group.open].text == "<" &&
             IsTemplateAngleOpen(tokens, group.open);
     }
 
@@ -5205,9 +4666,7 @@ private:
     }
 
     std::optional<size_t> FindConstructorParameterListCloseBeforeColon(
-        const std::vector<Token>& tokens,
-        size_t colon
-    ) const {
+        const std::vector<Token>& tokens, size_t colon) const {
         size_t cursor = colon;
         while (std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, cursor)) {
             if (tokens[*previous].text == ")") {
@@ -5216,19 +4675,15 @@ private:
                     return std::nullopt;
                 }
                 const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
-                if (
-                    beforeOpen &&
-                    tokens[*beforeOpen].kind == TokenKind::Word &&
-                    IsConstructorTrailingQualifierGroup(tokens[*beforeOpen].text)
-                ) {
+                if (beforeOpen && tokens[*beforeOpen].kind == TokenKind::Word &&
+                    IsConstructorTrailingQualifierGroup(tokens[*beforeOpen].text)) {
                     cursor = *beforeOpen;
                     continue;
                 }
                 return *previous;
             }
-            if (
-                tokens[*previous].kind == TokenKind::Word && IsConstructorTrailingQualifierWord(tokens[*previous].text)
-            ) {
+            if (tokens[*previous].kind == TokenKind::Word &&
+                IsConstructorTrailingQualifierWord(tokens[*previous].text)) {
                 cursor = *previous;
                 continue;
             }
@@ -5301,14 +4756,9 @@ private:
             next != nullptr && IsPointerOrReferenceDeclaratorToken(next->text);
         const bool beforeFunctionPointerDeclarator =
             next != nullptr && tokens[index].text == "*" && IsFunctionPointerDeclaratorGroupOpen(tokens, nextIndex);
-        const bool beforeDeclarator = beforeDeclaratorName ||
-            beforeTemplateClose ||
-            beforeStructuredBinding ||
-            beforeUnnamedDeclaratorEnd ||
-            beforePointerOrReferenceDeclarator ||
-            beforeFunctionPointerDeclarator;
-        return beforeDeclarator &&
-            IsLikelyTypeBeforePointer(tokens, index) &&
+        const bool beforeDeclarator = beforeDeclaratorName || beforeTemplateClose || beforeStructuredBinding ||
+            beforeUnnamedDeclaratorEnd || beforePointerOrReferenceDeclarator || beforeFunctionPointerDeclarator;
+        return beforeDeclarator && IsLikelyTypeBeforePointer(tokens, index) &&
             IsLikelyDeclaratorContextBeforePointer(tokens, index);
     }
 
@@ -5335,11 +4785,8 @@ private:
                 continue;
             }
             sawSignificant = true;
-            if (
-                tokens[inner].kind != TokenKind::Word &&
-                tokens[inner].text != "::" &&
-                !IsPointerOrReferenceDeclaratorToken(tokens[inner].text)
-            ) {
+            if (tokens[inner].kind != TokenKind::Word && tokens[inner].text != "::" &&
+                !IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
                 return false;
             }
             if (IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
@@ -5357,25 +4804,20 @@ private:
         if (!previous) {
             return false;
         }
-        if (
-            IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
-            IsPointerOrReferenceDeclarator(tokens, *previous)
-        ) {
+        if (IsPointerOrReferenceDeclaratorToken(tokens[*previous].text) &&
+            IsPointerOrReferenceDeclarator(tokens, *previous)) {
             return true;
         }
         return IsLikelyTypeBeforePointer(tokens, index) && IsLikelyDeclaratorContextBeforePointer(tokens, index);
     }
 
     bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(
-        const std::vector<Token>& tokens,
-        size_t index
-    ) const {
+        const std::vector<Token>& tokens, size_t index) const {
         if (index >= tokens.size() || tokens[index].text != "(") {
             return false;
         }
         const size_t first = NextSignificantIndex(tokens, index + 1);
-        return first < tokens.size() &&
-            tokens[first].kind == TokenKind::Word &&
+        return first < tokens.size() && tokens[first].kind == TokenKind::Word &&
             IsCallingConventionToken(tokens[first].text);
     }
 
@@ -5384,28 +4826,13 @@ private:
             return false;
         }
         const std::string first = pendingTokens_.front().text;
-        if (
-            first == "namespace" ||
-            first == "class" ||
-            first == "struct" ||
-            first == "enum" ||
-            first == "if" ||
-            first == "for" ||
-            first == "while" ||
-            first == "switch" ||
-            first == "catch" ||
-            first == "try" ||
-            first == "finally" ||
-            first == "do" ||
-            first == "else"
-        ) {
+        if (first == "namespace" || first == "class" || first == "struct" || first == "enum" || first == "if" ||
+            first == "for" || first == "while" || first == "switch" || first == "catch" || first == "try" ||
+            first == "finally" || first == "do" || first == "else") {
             return true;
         }
-        if (
-            ContainsWord(pendingTokens_, "class") ||
-            ContainsWord(pendingTokens_, "struct") ||
-            ContainsWord(pendingTokens_, "enum")
-        ) {
+        if (ContainsWord(pendingTokens_, "class") || ContainsWord(pendingTokens_, "struct") ||
+            ContainsWord(pendingTokens_, "enum")) {
             return true;
         }
         if (IsBracedConstructorExpressionOpen()) {
@@ -5434,14 +4861,8 @@ private:
             return false;
         }
         const std::string& previous = pendingTokens_[*beforeType].text;
-        return previous == "?" ||
-            previous == ":" ||
-            previous == "(" ||
-            previous == "[" ||
-            previous == "{" ||
-            previous == "," ||
-            previous == "=" ||
-            IsBinaryOperatorLike(previous);
+        return previous == "?" || previous == ":" || previous == "(" || previous == "[" || previous == "{" ||
+            previous == "," || previous == "=" || IsBinaryOperatorLike(previous);
     }
 
     BlockKind ClassifyBlock(const std::vector<Token>& tokens) const {
@@ -5508,10 +4929,8 @@ private:
         if (FindTypeDeclarationKeyword(tokens)) {
             return DeclarationKind::TypeDeclaration;
         }
-        if (
-            (!ContainsTopLevelAssignment(tokens) || IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)) &&
-            ContainsTopLevelToken(tokens, ")")
-        ) {
+        if ((!ContainsTopLevelAssignment(tokens) || IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)) &&
+            ContainsTopLevelToken(tokens, ")")) {
             return DeclarationKind::Method;
         }
         return DeclarationKind::Field;
@@ -5555,13 +4974,9 @@ private:
     }
 
     bool IsDeclarationContext() const {
-        return std::none_of(
-            blockStack_.begin(),
-            blockStack_.end(),
-            [](const BlockState& block) {
-                return block.kind == BlockKind::FunctionDefinition || block.kind == BlockKind::Other;
-            }
-        );
+        return std::none_of(blockStack_.begin(), blockStack_.end(), [](const BlockState& block) {
+            return block.kind == BlockKind::FunctionDefinition || block.kind == BlockKind::Other;
+        });
     }
 
     bool IsFunctionDefinitionBlock(const std::vector<Token>& tokens) const {
@@ -5569,21 +4984,9 @@ private:
             return false;
         }
         const std::string& first = tokens.front().text;
-        if (
-            first == "namespace" ||
-            first == "class" ||
-            first == "struct" ||
-            first == "enum" ||
-            first == "if" ||
-            first == "for" ||
-            first == "while" ||
-            first == "switch" ||
-            first == "catch" ||
-            first == "try" ||
-            first == "finally" ||
-            first == "do" ||
-            first == "else"
-        ) {
+        if (first == "namespace" || first == "class" || first == "struct" || first == "enum" || first == "if" ||
+            first == "for" || first == "while" || first == "switch" || first == "catch" || first == "try" ||
+            first == "finally" || first == "do" || first == "else") {
             return false;
         }
         return ContainsTopLevelFunctionParameterList(tokens);
@@ -5640,15 +5043,7 @@ private:
 
     static bool IsNonFunctionGroupOwnerWord(std::string_view text) {
         static constexpr std::string_view kWords[] = {
-            "__declspec",
-            "__uuidof",
-            "alignas",
-            "alignof",
-            "decltype",
-            "requires",
-            "sizeof",
-            "typeid"
-        };
+            "__declspec", "__uuidof", "alignas", "alignof", "decltype", "requires", "sizeof", "typeid"};
         return std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
     }
 
@@ -5676,10 +5071,7 @@ private:
     }
 
     std::optional<size_t> FindTopLevelTokenAfter(
-        const std::vector<Token>& tokens,
-        std::string_view tokenText,
-        size_t begin
-    ) const {
+        const std::vector<Token>& tokens, std::string_view tokenText, size_t begin) const {
         int depth = 0;
         for (size_t index = begin; index < tokens.size(); ++index) {
             UpdateDepth(tokens[index], depth);
@@ -5700,11 +5092,9 @@ private:
     }
 
     bool ContainsWord(const std::vector<Token>& tokens, std::string_view text) const {
-        return std::any_of(
-            tokens.begin(),
-            tokens.end(),
-            [text](const Token& token) { return token.kind == TokenKind::Word && token.text == text; }
-        );
+        return std::any_of(tokens.begin(), tokens.end(), [text](const Token& token) {
+            return token.kind == TokenKind::Word && token.text == text;
+        });
     }
 
     bool IsLabelColon() const {
@@ -5822,8 +5212,7 @@ private:
     }
 
     bool IsTemplateAngleCloseToken(const std::vector<Token>& tokens, size_t index) const {
-        return index < tokens.size() &&
-            (tokens[index].text == ">" || tokens[index].text == ">>") &&
+        return index < tokens.size() && (tokens[index].text == ">" || tokens[index].text == ">>") &&
             IsTemplateAngleClose(tokens, index);
     }
 
@@ -5928,13 +5317,7 @@ private:
     }
 
     bool IsTemplateScanBoundary(std::string_view text) const {
-        return text == ";" ||
-            text == "{" ||
-            text == "}" ||
-            text == "=" ||
-            text == "?" ||
-            text == ":" ||
-            text == "&&" ||
+        return text == ";" || text == "{" || text == "}" || text == "=" || text == "?" || text == ":" || text == "&&" ||
             text == "||";
     }
 
@@ -6031,24 +5414,12 @@ private:
 
     static bool IsAssignmentOperator(std::string_view text) {
         static constexpr std::string_view kOperators[] = {
-            "=",
-            "+=",
-            "-=",
-            "*=",
-            "/=",
-            "%=",
-            "&=",
-            "|=",
-            "^=",
-            "<<=",
-            ">>="
-        };
+            "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>="};
         return std::find(std::begin(kOperators), std::end(kOperators), text) != std::end(kOperators);
     }
 
     static bool IsBinaryOperatorLike(std::string_view text) {
-        static constexpr std::string_view kOperators[] = {
-            "=",
+        static constexpr std::string_view kOperators[] = {"=",
             "+",
             "-",
             "*",
@@ -6078,8 +5449,7 @@ private:
             "|",
             "^",
             "?",
-            ":"
-        };
+            ":"};
         return std::find(std::begin(kOperators), std::end(kOperators), text) != std::end(kOperators);
     }
 
@@ -6240,23 +5610,16 @@ int IncludeGroupIndex(const IncludeLine& include, const FormatterConfig& config,
 }
 
 std::vector<std::string> FormatIncludeRun(
-    std::vector<IncludeLine> includes,
-    const FormatterConfig& config,
-    std::string_view sourcePath
-) {
+    std::vector<IncludeLine> includes, const FormatterConfig& config, std::string_view sourcePath) {
     for (IncludeLine& include : includes) {
         include.group = IncludeGroupIndex(include, config, sourcePath);
     }
-    std::sort(
-        includes.begin(),
-        includes.end(),
-        [](const IncludeLine& left, const IncludeLine& right) {
-            if (left.group != right.group) {
-                return left.group < right.group;
-            }
-            return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
+    std::sort(includes.begin(), includes.end(), [](const IncludeLine& left, const IncludeLine& right) {
+        if (left.group != right.group) {
+            return left.group < right.group;
         }
-    );
+        return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
+    });
     std::vector<std::string> lines;
     int lastGroup = -1;
     for (const IncludeLine& include : includes) {
@@ -6436,10 +5799,8 @@ bool IsInsideRootOrRoot(const std::string& root, const std::string& path) {
 }
 
 std::vector<std::string> GetAllFiles(const std::string& root) {
-    const std::optional<std::vector<std::string>> files = RunGit(
-        root,
-        {
-            "-c",
+    const std::optional<std::vector<std::string>> files = RunGit(root,
+        {"-c",
             "core.quotepath=off",
             "-c",
             "core.safecrlf=false",
@@ -6449,9 +5810,7 @@ std::vector<std::string> GetAllFiles(const std::string& root) {
             "--exclude-standard",
             "--",
             "*.cpp",
-            "*.h"
-        }
-    );
+            "*.h"});
     if (!files) {
         return {};
     }
@@ -6465,22 +5824,33 @@ bool GitHeadExists(const std::string& root) {
 std::vector<std::string> GetChangedFiles(const std::string& root) {
     std::vector<std::string> paths;
     if (GitHeadExists(root)) {
-        if (std::optional<std::vector<std::string>> changed = RunGit(
-            root,
-            {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "HEAD", "--", "*.cpp", "*.h"}
-        )) {
+        if (std::optional<std::vector<std::string>> changed = RunGit(root,
+                {"-c",
+                    "core.safecrlf=false",
+                    "diff",
+                    "--name-only",
+                    "--diff-filter=ACMR",
+                    "HEAD",
+                    "--",
+                    "*.cpp",
+                    "*.h"})) {
             paths.insert(paths.end(), changed->begin(), changed->end());
         }
-    } else if (std::optional<std::vector<std::string>> staged = RunGit(
-        root,
-        {"-c", "core.safecrlf=false", "diff", "--name-only", "--diff-filter=ACMR", "--cached", "--", "*.cpp", "*.h"}
-    )) {
+    } else if (
+        std::optional<std::vector<std::string>> staged = RunGit(root,
+            {"-c",
+                "core.safecrlf=false",
+                "diff",
+                "--name-only",
+                "--diff-filter=ACMR",
+                "--cached",
+                "--",
+                "*.cpp",
+                "*.h"})) {
         paths.insert(paths.end(), staged->begin(), staged->end());
     }
     if (std::optional<std::vector<std::string>> untracked = RunGit(
-        root,
-        {"-c", "core.safecrlf=false", "ls-files", "--others", "--exclude-standard", "--", "*.cpp", "*.h"}
-    )) {
+            root, {"-c", "core.safecrlf=false", "ls-files", "--others", "--exclude-standard", "--", "*.cpp", "*.h"})) {
         paths.insert(paths.end(), untracked->begin(), untracked->end());
     }
     return EligibleFromRelative(root, UniqueSorted(std::move(paths)));
@@ -6494,9 +5864,7 @@ std::optional<std::string> ResolveTargetFile(const std::string& root, std::strin
     const std::string normalizedRoot = tools::lint::NormalizeSeparators(tools::lint::AbsolutePath(root));
     const std::string normalizedFile = tools::lint::NormalizeSeparators(fullPath);
     if (!tools::lint::StartsWith(
-        tools::lint::ToLowerAscii(normalizedFile),
-        tools::lint::ToLowerAscii(normalizedRoot) + "/"
-    )) {
+            tools::lint::ToLowerAscii(normalizedFile), tools::lint::ToLowerAscii(normalizedRoot) + "/")) {
         return std::nullopt;
     }
     if (!IsEligibleCppPath(root, fullPath)) {
@@ -6633,11 +6001,9 @@ int RunFormat(int argc, char** argv) {
             return 0;
         }
         if (options.scope == Scope::Path) {
-            std::fprintf(
-                stderr,
+            std::fprintf(stderr,
                 "No eligible C++ source files were found under --path target: %s\n",
-                options.targetPath.c_str()
-            );
+                options.targetPath.c_str());
             return 1;
         }
         if (options.scope == Scope::All) {
@@ -6666,15 +6032,13 @@ int RunFormat(int argc, char** argv) {
             if (options.verbose) {
                 const std::string relative =
                     tools::lint::NormalizeSeparators(tools::lint::RelativePath(file, options.root));
-                std::fprintf(
-                    stderr,
+                std::fprintf(stderr,
                     "%s:%d:%d: tree-sitter parse recovery at %s: %s\n",
                     relative.c_str(),
                     result.parseErrorLine,
                     result.parseErrorColumn,
                     result.parseErrorNodeType.c_str(),
-                    result.parseErrorSnippet.c_str()
-                );
+                    result.parseErrorSnippet.c_str());
             }
         }
         if (options.stdoutMode) {
@@ -6701,17 +6065,12 @@ int RunFormat(int argc, char** argv) {
         }
         if (parseErrorCount > 0) {
             std::printf(
-                " (%d file%s parsed with tree-sitter errors)",
-                parseErrorCount,
-                parseErrorCount == 1 ? "" : "s"
-            );
+                " (%d file%s parsed with tree-sitter errors)", parseErrorCount, parseErrorCount == 1 ? "" : "s");
         }
-        std::printf(
-            ". Checked %d file%s in %s.\n",
+        std::printf(". Checked %d file%s in %s.\n",
             static_cast<int>(files.size()),
             files.size() == 1 ? "" : "s",
-            FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-        );
+            FormatElapsed(std::chrono::steady_clock::now() - start).c_str());
         return 1;
     }
     const char* mode = options.mode == Mode::Fix ? "Formatted" : "Checked";
@@ -6721,14 +6080,12 @@ int RunFormat(int argc, char** argv) {
     } else if (options.scope == Scope::Path) {
         scope = "path";
     }
-    std::printf(
-        "%s %d %s file%s with native tree-sitter formatter in %s.",
+    std::printf("%s %d %s file%s with native tree-sitter formatter in %s.",
         mode,
         static_cast<int>(files.size()),
         scope,
         files.size() == 1 ? "" : "s",
-        FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-    );
+        FormatElapsed(std::chrono::steady_clock::now() - start).c_str());
     if (parseErrorCount > 0) {
         std::printf(" %d file%s parsed with tree-sitter errors.", parseErrorCount, parseErrorCount == 1 ? "" : "s");
     }
