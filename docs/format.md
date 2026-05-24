@@ -379,15 +379,15 @@ if (
 }
 ```
 
-A long control condition that is one nested call keeps the control opener and nested call opener on the same line when that line fits. The call close and control close combine on the body-opening line.
+A long control condition that is one nested call keeps the control opener and nested call opener on the same line when that line fits. Nested call arguments use one indent. The call close and control close combine on the body-opening line.
 
 ```cpp
 if (!::ConfigureDisplay(
-        updatedConfig,
-        telemetryDump,
-        fittedScale,
-        traceLog,
-        hwnd
+    updatedConfig,
+    telemetryDump,
+    fittedScale,
+    traceLog,
+    hwnd
 )) {
     return false;
 }
