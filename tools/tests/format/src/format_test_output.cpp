@@ -982,6 +982,18 @@ int NestedSwitchIndent(int message, int wParam) {
     }
 }
 
+void LongForCondition() {
+    for (
+        int rowIndex = 0;
+        rowIndex < layoutState_.visibleRows &&
+            rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
+            rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());
+        ++rowIndex
+    ) {
+        Use(rowIndex);
+    }
+}
+
 void ControlFlowVariety(int* values, int count) {
     if (count > 0) {
         values[0] += 1;

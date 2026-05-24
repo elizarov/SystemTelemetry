@@ -1829,7 +1829,8 @@ private:
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        bool indentSplitChains = false
+        bool indentSplitChains = false,
+        bool indentLogicalSplitChains = false
     ) const {
         if (tokens.empty()) {
             if (!prefix.empty() || !suffix.empty()) {
@@ -1879,7 +1880,8 @@ private:
                 indentLevel,
                 std::move(prefix),
                 std::move(suffix),
-                indentSplitChains
+                indentSplitChains,
+                indentLogicalSplitChains
             );
         }
         return {Indent(indentLevel) + inlineText};
@@ -1922,7 +1924,8 @@ private:
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        bool indentSplitChains
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
     ) const {
         switch (owner.kind) {
             case SplitOwnerKind::TemplateDeclaration:
@@ -1934,7 +1937,8 @@ private:
                     indentLevel,
                     std::move(prefix),
                     std::move(suffix),
-                    indentSplitChains
+                    indentSplitChains,
+                    indentLogicalSplitChains
                 );
             case SplitOwnerKind::Lambda:
                 return FormatSplitLambda(tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
@@ -1952,7 +1956,8 @@ private:
                     indentLevel,
                     std::move(prefix),
                     std::move(suffix),
-                    indentSplitChains
+                    indentSplitChains,
+                    indentLogicalSplitChains
                 );
             case SplitOwnerKind::MemberAccess:
                 return FormatMemberAccessChain(tokens, owner.index, indentLevel, std::move(prefix), std::move(suffix));
@@ -2095,7 +2100,8 @@ private:
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        bool indentSplitChains
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
     ) const {
         if (StartsWithInitializerList(tokens, assignment + 1)) {
             return FormatInitializerAssignment(tokens, assignment, indentLevel, std::move(prefix), std::move(suffix));
@@ -2108,10 +2114,18 @@ private:
             !CanKeepRhsCompactOnContinuation(rhs, indentLevel, suffix) &&
             CanAttachPrefixToOwnedSplit(rhs, indentLevel, attachedPrefix)
         ) {
-            return FormatRange(rhs, indentLevel, std::move(attachedPrefix), std::move(suffix), indentSplitChains);
+            return FormatRange(
+                rhs,
+                indentLevel,
+                std::move(attachedPrefix),
+                std::move(suffix),
+                indentSplitChains,
+                indentLogicalSplitChains
+            );
         }
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs));
-        std::vector<std::string> rhsLines = FormatRange(rhs, indentLevel + 1, {}, std::move(suffix), indentSplitChains);
+        std::vector<std::string> rhsLines =
+            FormatRange(rhs, indentLevel + 1, {}, std::move(suffix), indentSplitChains, indentLogicalSplitChains);
         lines.insert(lines.end(), rhsLines.begin(), rhsLines.end());
         return lines;
     }
@@ -2632,9 +2646,10 @@ private:
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatGroupOpeningLine(tokens, group));
-        const bool splitForHeader = StartsWithControlFor(firstLineTokens) ||
-            (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
-        const bool indentElementChains = !StartsWithControlHeader(firstLineTokens);
+        const bool startsWithControlFor = StartsWithControlFor(firstLineTokens);
+        const bool splitForHeader =
+            startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
+        const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
@@ -2653,8 +2668,14 @@ private:
                 if (tokens[group.open].text == "{" && separator == ',') {
                     elementLines = FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
                 } else {
-                    elementLines =
-                        FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, indentElementChains);
+                    elementLines = FormatRange(
+                        elements[index],
+                        indentLevel + 1,
+                        {},
+                        elementSuffix,
+                        indentElementChains,
+                        startsWithControlFor
+                    );
                 }
                 AppendSplitElementLines(lines, elementLines, tokens[group.open].text == "{" && separator == ',');
             }
@@ -3023,7 +3044,8 @@ private:
         int indentLevel,
         std::string prefix,
         std::string suffix,
-        bool indentSplitChains
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
     ) const {
         const ChainKind chainKind = SelectChainKind(tokens);
         if (chainKind == ChainKind::Ternary) {
@@ -3049,7 +3071,8 @@ private:
             parts.push_back(current);
         }
         std::vector<std::string> lines;
-        const bool indentSplitChainContinuation = indentSplitChains && chainKind != ChainKind::Logical;
+        const bool indentSplitChainContinuation =
+            indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
         const bool indentContinuation =
             indentSplitChainContinuation || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
         for (size_t index = 0; index < parts.size(); ++index) {
