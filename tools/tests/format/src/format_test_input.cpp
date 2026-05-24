@@ -548,6 +548,10 @@ void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState)
 WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
 }
 
+void AddMetricDefinition(MetricsConfig& metrics){
+metrics.definitions.push_back(MetricDefinitionConfig{"gpu.load",MetricDisplayStyle::Percent,true,0.0,"%","Load"});
+}
+
 int BracedReceiverChain(int firstCoordinateWithLongName,int secondCoordinateWithLongName,int thirdCoordinateWithLongName,int y,int deltaX,int deltaY){
 return RenderPoint{firstCoordinateWithLongName+secondCoordinateWithLongName+thirdCoordinateWithLongName,y}.OffsetBy(deltaX,deltaY).x;
 }

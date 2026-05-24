@@ -2882,6 +2882,15 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
+        if (std::optional<std::vector<std::string>> singleElement = TryFormatSingleInlineElementGroup(
+            tokens,
+            group,
+            indentLevel,
+            prefix,
+            suffix
+        )) {
+            return *singleElement;
+        }
         if (std::optional<std::vector<std::string>> combined = TryFormatCombinedNestedGroup(
             tokens,
             group,
@@ -2939,6 +2948,51 @@ private:
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
         return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatSingleInlineElementGroup(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        if (group.open >= tokens.size() || tokens[group.open].text != "(") {
+            return std::nullopt;
+        }
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+        );
+        if (StartsWithControlHeader(firstLineTokens)) {
+            return std::nullopt;
+        }
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        if (
+            inner.empty() ||
+            ContainsOnlyNewlines(inner, 0, inner.size()) ||
+            ContainsTopLevelSeparator(inner, ',') ||
+            HasOriginalBlankSeparator(inner) ||
+            HasLineComment(inner) ||
+            ShouldForceSplit(inner)
+        ) {
+            return std::nullopt;
+        }
+        const std::string elementLine = FormatInline(inner, InlineBudget(indentLevel + 1, {}, {}));
+        if (elementLine.empty() || !Fits(indentLevel + 1, elementLine)) {
+            return std::nullopt;
+        }
+        std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
+        std::string closeLine = FormatInline(suffixTokens);
+        AppendSuffix(closeLine, suffix);
+        return std::vector<std::string>{
+            Indent(indentLevel) + std::string(prefix) + FormatGroupOpeningLine(tokens, group),
+            Indent(indentLevel + 1) + elementLine,
+            Indent(indentLevel) + closeLine
+        };
     }
 
     std::optional<std::vector<std::string>> TryFormatCombinedNestedGroup(
