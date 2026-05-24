@@ -14,7 +14,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `docs/layout_guide_sheet.md` owns the diagnostics layout guide sheet feature spec.
 - `docs/diagnostics.md` owns diagnostics CLI behavior, output contracts, and diagnostics validation recipes.
 - `docs/build.md` owns build prerequisites, developer commands, install flow, and tooling entrypoints.
-- `docs/format.md` owns the native formatter ideology, wrapping model, format constants, and include-sorting policy.
+- `docs/format.md` owns source formatting policy, wrapping model, format constants, and include-sorting policy.
 - `docs/source_policy_guardrails.md` owns short explanations for hard source-policy lessons, including lint-enforced bans and review-enforced rules that are too noisy to check mechanically.
 - `docs/architecture.md` and `docs/architecture/*.md` own subsystem structure, code boundaries, package notes, runtime flows, and build-graph shape.
 - `docs/web.md` owns public website behavior, content, generated-asset contracts, and website build flow.
@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
-- `docs\format.md`, `src\tools\format.cpp`, `tools\format_config.json`, and the vendored tree-sitter grammar under `src\tools\vendor\tree-sitter\` are the maintained source of truth for C++ formatting policy and parser support. The golden formatter fixture under `tools\tests\format\src` stays synchronized with native formatter output produced through `format.cmd --stdout`. The legacy `.clang-format` and `tools\run_clang_format.ps1` path remains only for staged pre-commit formatting until the native formatter owns an equivalent staged/restage workflow.
+- `docs\format.md`, `src\tools\format.cpp`, `tools\format_config.json`, and the vendored tree-sitter grammar under `src\tools\vendor\tree-sitter\` are the maintained source of truth for C++ formatting policy and parser support. The golden formatter fixture under `tools\tests\format\src` stays synchronized with formatter output produced through `format.cmd --stdout`.
 - `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
@@ -44,7 +44,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - Keep generated build outputs inside `build\`, with `web\dist\` as the generated website output and the repo-root `vcpkg\` directory as the deliberate persistent exception for manifest-installed dependencies.
 - Keep shared vcpkg download and registry caches outside the worktree in the user-local cache root that `build.cmd` exports through `VCPKG_DOWNLOADS` and `X_VCPKG_REGISTRIES_CACHE`.
 - Keep package-managed dependencies in `vcpkg.json` when practical. Tool-only grammar sources that must be generated or locally adapted live under `src\tools\vendor\`, outside maintained formatter and lint source discovery.
-- Keep project-specific format constants, macro names for the native formatter grammar, and include-sorting groups in `tools\format_config.json`; the formatter source owns style behavior, while `tools\regenerate_tree_sitter_grammar.py` consumes macro categories without hardcoding CaseDash or Windows SDK macro names in C++.
+- Keep project-specific format constants, macro names for the formatter grammar, and include-sorting groups in `tools\format_config.json`; the formatter source owns style behavior, while `tools\regenerate_tree_sitter_grammar.py` consumes macro categories without hardcoding CaseDash or Windows SDK macro names in C++.
 - Keep GitHub-restored dependency caches under `.github-cache\`, which is ignored and owned by the GitHub workflows.
 - Keep pull request merge protection tied to the GitHub `Validation` job so PR changes pass build, test, formatting, and unused-include checks on the Windows runner before merge.
 - Keep tracked text files checked out with CRLF line endings through the repo-level `.gitattributes` policy; binary assets are excluded from text normalization there.
