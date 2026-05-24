@@ -385,6 +385,7 @@ SecondStep();};
 
 const auto findSectionIndex=[&lines](const std::string& sectionName)->size_t{for(size_t i=0;i<lines.size();++i){if(Trim(lines[i])==sectionName){return i;}}return lines.size();};
 const auto ensureSection=[&lines,&findSectionIndex,shape](const std::string& sectionName)->size_t{const size_t existingIndex=findSectionIndex(sectionName);if(existingIndex<lines.size()){return existingIndex;}return lines.size();};
+const auto updateKey=[&lines,&ensureSection,&ensureSectionAfter,&findSectionEnd,shape](const std::string& sectionName,const std::string& key,const std::string& value){Use(sectionName,key,value);};
 const auto ensureSectionAfter=[&lines,&findSectionIndex,shape](const std::string& sectionName,const std::string& afterSectionName)->size_t{const size_t existingIndex=findSectionIndex(sectionName);if(existingIndex<lines.size()){return existingIndex;}
 
 

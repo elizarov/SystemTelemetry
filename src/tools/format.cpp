@@ -2586,52 +2586,169 @@ private:
         if (Fits(indentLevel, inlineHeader)) {
             return {Indent(indentLevel) + inlineHeader};
         }
-        if (!header.empty() && header.front().text == "[") {
-            if (std::optional<size_t> captureClose = FindMatchingClose(header, 0)) {
-                std::vector<Token> captureInner(
-                    header.begin() + 1,
-                    header.begin() + static_cast<std::ptrdiff_t>(*captureClose)
-                );
-                if (ContainsTopLevelSeparator(captureInner, ',')) {
-                    std::vector<std::string> lines;
-                    lines.push_back(Indent(indentLevel) + prefix + "[");
-                    std::vector<std::vector<Token>> captures = SplitTopLevel(captureInner, ',');
-                    for (size_t index = 0; index < captures.size(); ++index) {
-                        std::string line = FormatInline(captures[index]);
-                        if (index + 1 < captures.size()) {
-                            line += ",";
-                        }
-                        lines.push_back(Indent(indentLevel + 1) + line);
-                    }
-                    std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(*captureClose), header.end());
-                    lines.push_back(Indent(indentLevel) + FormatInline(rest) + " {");
-                    return lines;
-                }
-            }
+        if (std::optional<std::vector<std::string>> detachedParameters = TryFormatDetachedLambdaParameterLine(
+            header,
+            indentLevel,
+            prefix
+        )) {
+            return *detachedParameters;
         }
-        if (std::optional<GroupPair> parameterGroup = FindLambdaParameterGroup(header)) {
-            return FormatLambdaParameterGroup(header, *parameterGroup, indentLevel, std::move(prefix));
+        if (std::optional<std::vector<std::string>> splitParameters = TryFormatLambdaParameterGroup(
+            header,
+            indentLevel,
+            prefix
+        )) {
+            return *splitParameters;
+        }
+        if (std::optional<std::vector<std::string>> splitCaptures = TryFormatLambdaCaptureGroup(
+            header,
+            indentLevel,
+            prefix
+        )) {
+            return *splitCaptures;
         }
         return {Indent(indentLevel) + inlineHeader};
     }
 
-    std::vector<std::string> FormatLambdaParameterGroup(
+    std::optional<std::vector<std::string>> TryFormatDetachedLambdaParameterLine(
         const std::vector<Token>& header,
-        GroupPair group,
         int indentLevel,
-        std::string prefix
+        std::string_view prefix
     ) const {
+        if (header.empty() || header.front().text != "[") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> captureClose = FindMatchingClose(header, 0);
+        if (!captureClose) {
+            return std::nullopt;
+        }
+        const size_t restStart = NextSignificantIndex(header, *captureClose + 1);
+        if (restStart >= header.size() || header[restStart].text != "(") {
+            return std::nullopt;
+        }
+        std::vector<Token> captures(header.begin(), header.begin() + static_cast<std::ptrdiff_t>(*captureClose + 1));
+        const std::string captureLine = std::string(prefix) + FormatInline(captures);
+        const std::string restLine = FormatLambdaHeaderAfterCaptures(header, captures);
+        if (!Fits(indentLevel, captureLine) || !Fits(indentLevel + 1, restLine)) {
+            return std::nullopt;
+        }
+        return std::vector<std::string>{
+            Indent(indentLevel) + captureLine,
+            Indent(indentLevel + 1) + restLine,
+            Indent(indentLevel) + "{"
+        };
+    }
+
+    std::string FormatLambdaHeaderAfterCaptures(
+        const std::vector<Token>& header,
+        const std::vector<Token>& captures
+    ) const {
+        const std::string fullHeader = FormatInline(header);
+        const std::string captureText = FormatInline(captures);
+        if (fullHeader.size() >= captureText.size() && fullHeader.compare(0, captureText.size(), captureText) == 0) {
+            return fullHeader.substr(captureText.size());
+        }
+        std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(captures.size()), header.end());
+        return FormatInline(rest);
+    }
+
+    std::optional<std::vector<std::string>> TryFormatLambdaParameterGroup(
+        const std::vector<Token>& header,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
+        const std::optional<GroupPair> group = FindLambdaParameterGroup(header);
+        if (!group) {
+            return std::nullopt;
+        }
+        std::vector<Token> inner(
+            header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+            header.begin() + static_cast<std::ptrdiff_t>(group->close)
+        );
+        if (!ContainsTopLevelSeparator(inner, ',')) {
+            return std::nullopt;
+        }
         std::vector<Token> firstLineTokens(
             header.begin(),
-            header.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+            header.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
         );
-        std::vector<Token> inner(
-            header.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
-            header.begin() + static_cast<std::ptrdiff_t>(group.close)
-        );
-        std::vector<Token> afterTokens(header.begin() + static_cast<std::ptrdiff_t>(group.close + 1), header.end());
+        const std::string firstLine = std::string(prefix) + FormatInline(firstLineTokens);
+        if (!Fits(indentLevel, firstLine)) {
+            return std::nullopt;
+        }
         std::vector<std::string> lines;
-        lines.push_back(Indent(indentLevel) + prefix + FormatInline(firstLineTokens));
+        lines.push_back(Indent(indentLevel) + firstLine);
+        AppendLambdaParameterLines(lines, inner, *group, header, indentLevel);
+        lines.push_back(Indent(indentLevel) + "{");
+        return lines;
+    }
+
+    std::optional<std::vector<std::string>> TryFormatLambdaCaptureGroup(
+        const std::vector<Token>& header,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
+        if (header.empty() || header.front().text != "[") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> captureClose = FindMatchingClose(header, 0);
+        if (!captureClose) {
+            return std::nullopt;
+        }
+        std::vector<Token> captureInner(
+            header.begin() + 1,
+            header.begin() + static_cast<std::ptrdiff_t>(*captureClose)
+        );
+        if (!ContainsTopLevelSeparator(captureInner, ',')) {
+            return std::nullopt;
+        }
+        std::vector<std::string> lines;
+        lines.push_back(Indent(indentLevel) + std::string(prefix) + "[");
+        std::vector<std::vector<Token>> captures = SplitTopLevel(captureInner, ',');
+        for (size_t index = 0; index < captures.size(); ++index) {
+            std::string line = FormatInline(captures[index]);
+            if (index + 1 < captures.size()) {
+                line += ",";
+            }
+            lines.push_back(Indent(indentLevel + 1) + line);
+        }
+        const std::optional<GroupPair> parameterGroup = FindLambdaParameterGroup(header);
+        if (parameterGroup) {
+            std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(*captureClose), header.end());
+            const std::string restLine = FormatInline(rest);
+            if (Fits(indentLevel, restLine)) {
+                lines.push_back(Indent(indentLevel) + restLine);
+                lines.push_back(Indent(indentLevel) + "{");
+                return lines;
+            }
+            std::vector<Token> inner(
+                header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1),
+                header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->close)
+            );
+            if (ContainsTopLevelSeparator(inner, ',')) {
+                std::vector<Token> firstLineTokens(
+                    header.begin() + static_cast<std::ptrdiff_t>(*captureClose),
+                    header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1)
+                );
+                lines.push_back(Indent(indentLevel) + FormatInline(firstLineTokens));
+                AppendLambdaParameterLines(lines, inner, *parameterGroup, header, indentLevel);
+                lines.push_back(Indent(indentLevel) + "{");
+                return lines;
+            }
+        }
+        std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(*captureClose), header.end());
+        lines.push_back(Indent(indentLevel) + FormatInline(rest));
+        lines.push_back(Indent(indentLevel) + "{");
+        return lines;
+    }
+
+    void AppendLambdaParameterLines(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& inner,
+        GroupPair group,
+        const std::vector<Token>& header,
+        int indentLevel
+    ) const {
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
             if (elements[index].empty()) {
@@ -2645,15 +2762,14 @@ private:
                 FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
             AppendSplitElementLines(lines, elementLines, false);
         }
+        std::vector<Token> afterTokens(header.begin() + static_cast<std::ptrdiff_t>(group.close + 1), header.end());
         std::string closeLine = ")";
         std::string afterText = FormatInline(afterTokens);
         if (!afterText.empty()) {
             closeLine += " ";
             closeLine += afterText;
         }
-        closeLine += " {";
         lines.push_back(Indent(indentLevel) + closeLine);
-        return lines;
     }
 
     std::optional<GroupPair> FindLambdaParameterGroup(const std::vector<Token>& header) const {

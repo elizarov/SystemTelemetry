@@ -67,8 +67,10 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Put one empty line after `#pragma once` before the next include, preprocessor directive, comment, or declaration.
 - Put one empty line before and after each `#undef` directive. `#undef` directives are cleanup boundaries, not part of consecutive macro-definition groups.
 - Single-line lambda bodies are supported only when the body contains one statement and the complete lambda fits the configured line width. Multi-statement lambda bodies always split after `{`, format each statement on its own normal body line, and close on their own line.
-- When a wrapped lambda is assigned to a variable, keep the assignment prefix and lambda opener on the same line if the complete opener fits. If the opener does not fit but the assignment prefix plus `[` fits, keep `= [` on the assignment line and split the capture list like a multi-line function declaration without adding a second continuation indent.
-- After capture-list splitting is considered, long lambda parameter lists split like function parameter lists: keep the capture list and opening `(` on the first line when that fits, put each parameter on its own line, and put `) {` on the closing line.
+- When a wrapped lambda is assigned to a variable, keep the assignment prefix and lambda opener on the same line if the complete opener fits.
+- If the complete lambda opener does not fit, first keep the capture list compact and split between `]` and `(` when both resulting lines fit. The parameter line is indented one level, and the body `{` moves to its own line at the lambda indentation.
+- If splitting between `]` and `(` does not fit, split a multi-parameter lambda parameter list before splitting captures. Keep the compact capture list and opening `(` on the first line when that fits, put each parameter on its own line, put `)` on its own closing line, and put the body `{` on the next line.
+- Split the lambda capture list line-by-line only after the compact-capture and split-parameter forms are not viable. Capture splitting follows multi-line function declaration shape without adding a second continuation indent.
 
 ## Namespaces
 

@@ -563,7 +563,8 @@ const auto appendTrialLeaders = [&](
     LayoutGuideSheetExitSide side,
     const LayoutGuideSheetCardPlacement& placement,
     const BlockLayout& block
-) {
+)
+{
     Use(leaders, plannedIndexes, side, placement, block);
 };
 
@@ -590,11 +591,15 @@ const auto ensureSection = [&lines, &findSectionIndex, shape](const std::string&
     return lines.size();
 };
 
-const auto ensureSectionAfter = [
-    &lines,
-    &findSectionIndex,
-    shape
-](const std::string& sectionName, const std::string& afterSectionName) -> size_t {
+const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape]
+    (const std::string& sectionName, const std::string& key, const std::string& value)
+{
+    Use(sectionName, key, value);
+};
+
+const auto ensureSectionAfter = [&lines, &findSectionIndex, shape]
+    (const std::string& sectionName, const std::string& afterSectionName) -> size_t
+{
     const size_t existingIndex = findSectionIndex(sectionName);
     if (existingIndex < lines.size()) {
         return existingIndex;
@@ -604,11 +609,9 @@ const auto ensureSectionAfter = [
     return afterIndex;
 };
 
-const auto guideSheetLookup = [
-    &config,
-    activeTheme,
-    &colorsSection
-](std::string_view name) -> std::optional<ColorConfig> {
+const auto guideSheetLookup = [&config, activeTheme, &colorsSection]
+    (std::string_view name) -> std::optional<ColorConfig>
+{
     if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
         return themeColor;
     }
