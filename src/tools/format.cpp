@@ -3724,7 +3724,7 @@ private:
             return HasWordBefore(tokens, *beforeType, "using");
         }
         if (text == "::") {
-            return IsLeadingGlobalQualifierInDeclaratorContext(tokens, *beforeType);
+            return IsTypeQualifierStartInDeclaratorContext(tokens, *beforeType);
         }
         return text == "(" ||
             text == "[" ||
@@ -3735,7 +3735,7 @@ private:
             text == ":";
     }
 
-    bool IsLeadingGlobalQualifierInDeclaratorContext(const std::vector<Token>& tokens, size_t qualifier) const {
+    bool IsTypeQualifierStartInDeclaratorContext(const std::vector<Token>& tokens, size_t qualifier) const {
         const std::optional<size_t> beforeQualifier = PreviousNonNewlineIndex(tokens, qualifier);
         if (!beforeQualifier) {
             return true;
