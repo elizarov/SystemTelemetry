@@ -18,6 +18,6 @@
 - Diagnostics orchestrates exports but uses live runtime state and the shared renderer scene instead of a separate rendering implementation.
 - Diagnostics does not own HWND prompts, menu items, message boxes, or shell dialogs; dashboard and main own user-visible UI reporting.
 - Renderer owns generated pixel-buffer PNG encoding; diagnostics may delegate app icon bitmap writes to renderer instead of owning PNG compression details.
-- `src/util/trace.*` owns trace line emission plus generic trace value formatting and quoting helpers.
+- `src/util/trace.*` owns trace line emission plus compact shared trace value formatting helpers.
 - Layout guide sheet planning, config extension loading, color resolution, and rendering live outside diagnostics; `headless` supplies those callbacks and diagnostics owns option parsing, validation, output paths, and trace records.
 - Diagnostics behavior and validation recipes are specified in [docs/diagnostics.md](../diagnostics.md).

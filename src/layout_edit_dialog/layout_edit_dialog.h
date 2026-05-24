@@ -49,7 +49,6 @@ public:
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
     virtual void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const = 0;
     virtual void RestackLayoutEditDialogAnchor(HWND dialogHwnd) = 0;
-    virtual void TraceLayoutEditDialogEvent(ResourceStringId event, const std::string& details = {}) const = 0;
     virtual void OnLayoutEditDialogCloseRequested() = 0;
 };
 

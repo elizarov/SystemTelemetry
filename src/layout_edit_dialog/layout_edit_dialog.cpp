@@ -10,11 +10,8 @@
 #include "layout_edit_dialog/impl/state.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
-#include "layout_model/layout_edit_parameter_metadata.h"
 #include "resource.h"
-#include "util/resource_strings.h"
 #include "util/scale.h"
-#include "util/text_format.h"
 
 namespace {
 
@@ -234,29 +231,6 @@ bool LayoutEditDialog::Ensure(const std::optional<LayoutEditFocusKey>& focusKey,
         state_->initialFocus.emplace(*focusKey);
     }
 
-    std::string initialFocusTrace = "session";
-    if (focusKey.has_value()) {
-        if (const auto* parameter = std::get_if<LayoutEditParameter>(&*focusKey)) {
-            initialFocusTrace =
-                FindLayoutEditTooltipDescriptor(*parameter).value_or(LayoutEditTooltipDescriptor{}).configKey;
-        } else if (const auto* metricKey = std::get_if<LayoutMetricEditKey>(&*focusKey)) {
-            initialFocusTrace = FormatText(RES_STR("[metrics] %s"), metricKey->metricId.c_str());
-        } else if (const auto* cardTitleKey = std::get_if<LayoutCardTitleEditKey>(&*focusKey)) {
-            initialFocusTrace = FormatText(RES_STR("[card.%s] title"), cardTitleKey->cardId.c_str());
-        } else if (const auto* nodeFieldKey = std::get_if<LayoutNodeFieldEditKey>(&*focusKey)) {
-            initialFocusTrace = nodeFieldKey->editCardId.empty()
-                                    ? FormatText(RES_STR("[layout] %s"), EnumToString(nodeFieldKey->widgetClass))
-                                    : FormatText(RES_STR("[card.%s] %s"),
-                                          nodeFieldKey->editCardId.c_str(),
-                                          EnumToString(nodeFieldKey->widgetClass));
-        } else {
-            initialFocusTrace = "weight";
-        }
-    }
-    host_.TraceLayoutEditDialogEvent(RES_STR("open"),
-        FormatText(
-            RES_STR("initial_focus=\"%.*s\""), static_cast<int>(initialFocusTrace.size()), initialFocusTrace.data()));
-
     HWND dialog = CreateDialogParamA(host_.LayoutEditDialogInstance(),
         MAKEINTRESOURCEA(IDD_LAYOUT_EDIT_CONFIGURATION),
         nullptr,
@@ -393,7 +367,6 @@ INT_PTR CALLBACK LayoutEditDialog::DialogProc(HWND hwnd, UINT message, WPARAM wP
 
     if (message == WM_NCDESTROY) {
         if (auto* state = DialogStateFromWindow(hwnd); state != nullptr) {
-            state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("close"));
             SetWindowLongPtrA(hwnd, DWLP_USER, 0);
             state->dialog->HandleDestroyed(hwnd);
         }

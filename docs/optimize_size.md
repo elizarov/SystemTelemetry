@@ -14,11 +14,11 @@ This document owns executable-size constraints, the map workflow, current size s
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,048,064` bytes, below binary 1 MiB and above the stricter decimal `1,000,000` byte threshold.
+- Current measured `build\CaseDash.exe`: `1,028,608` bytes, below binary 1 MiB and above the stricter decimal `1,000,000` byte threshold.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `852.3 KiB`, `.rdata` about `68.0 KiB`, `.pdata` about `40.1 KiB`, `.rsrc$02` about `21.2 KiB`, and `.xdata` about `16.8 KiB`.
-- Current largest project objects: `dashboard_app.cpp.obj`, `board_lenovo_vantage.cpp.obj`, `diagnostics.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_resolver.cpp.obj`, `editors.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `pane.cpp.obj`, `layout_edit_tree.cpp.obj`, `CaseDash.rc.res`, `dashboard_shell_ui.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `render_thread.cpp.obj`, `collector_fake.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, and `layout_edit_hit_test.cpp.obj`.
-- Last validation: `format.cmd changed`, `lint.cmd`, `python -m unittest tools.tests.lint.lint_test`, `build.cmd`, `test.cmd`, production screenshot and layout-guide-sheet rejection smokes, `CaseDashHeadless.exe` combined export smoke, `web-build.cmd clean`, `build_maps.cmd`, and final size check.
+- Current largest sections: `.text$mn` about `835.9 KiB`, `.rdata` about `67.5 KiB`, `.pdata` about `40.0 KiB`, `.rsrc$02` about `19.7 KiB`, and `.xdata` about `16.6 KiB`.
+- Current largest project objects: `board_lenovo_vantage.cpp.obj`, `diagnostics.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_resolver.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `pane.cpp.obj`, `editors.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `CaseDash.rc.res`, `layout_edit_overlay_renderer.cpp.obj`, `render_thread.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `collector_fake.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, and `layout_edit_hit_test.cpp.obj`.
+- Last validation: `format.cmd changed`, `lint.cmd`, `lint.cmd includes changed`, `build.cmd`, `test.cmd`, production screenshot smoke, removed trace-prefix rejection smoke, `build_maps.cmd`, and final size check.
 
 ## Workflow
 
@@ -49,6 +49,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 - `RES_STR("...")` literals compile to collision-checked FNV-1a ids, not generated literal tables. Runtime lookup uses the loaded text atlas plus an open-addressed hash table so trace and diagnostics paths keep O(1) catalog access after their prefix gate passes.
 - User-visible UI copy belongs in `resources/localization.ini`. Direct `RES_STR` text is reserved for trace formats, compact localization keys, telemetry diagnostics payloads, and diagnostics-only errors.
 - Fixed trace helper vocabulary uses `ResourceStringId` and `RES_STR`; dynamic trace values stay in outer resource-string-aware format strings, including their quote marks, instead of shared trace quote or color wrapper helpers.
+- Past interactive debugging trace prefixes for dashboard tooltips, layout-edit hover, layout-edit tooltips, layout-edit dialog internals, layout-edit modal/menu scope, mouse tracking, and layout switching stay out of the shipped trace surface; `layout_edit_drag` remains as the compact summarized layout-edit profiling prefix.
 - The fallback `resources\app.ico` keeps only `16`, `32`, and `64` frames. Runtime themed icons provide live and generated arbitrary-size icon assets.
 - Panel icons stay in one fixed 64 x 64 vertical 8-bit grayscale PNG mask atlas and render through target-local alpha masks. Keep PNG and ICO resource optimization lossless, and strip nonessential PNG ancillary chunks only when visual validation remains healthy.
 - The shipped executable omits duplicate Win32 `VERSIONINFO` string resources; full user-visible version, build, and commit text lives in generated C++ constants for the `About CaseDash` dialog.

@@ -99,7 +99,6 @@ private:
     void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) override;
     void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const override;
     void RestackLayoutEditDialogAnchor(HWND dialogHwnd) override;
-    void TraceLayoutEditDialogEvent(ResourceStringId event, const std::string& details = {}) const override;
     void OnLayoutEditDialogCloseRequested() override;
     std::vector<std::string> AvailableBoardMetricSensorBindings(const LayoutMetricEditKey& key) const override;
     UINT ResolveDefaultCommand(MenuSource source, const LayoutEditController::TooltipTarget* layoutEditTarget) const;

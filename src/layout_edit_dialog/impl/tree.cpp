@@ -5,7 +5,6 @@
 
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/pane.h"
-#include "layout_edit_dialog/impl/trace.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "resource.h"
 #include "util/resource_strings.h"
@@ -118,59 +117,6 @@ std::string TreeNodeViewportLocation(LayoutEditDialogState* state, const LayoutE
     return node->locationText;
 }
 
-std::string BuildTreeItemTraceText(LayoutEditDialogState* state, HWND tree, HTREEITEM item) {
-    if (state == nullptr || tree == nullptr || item == nullptr) {
-        return ResourceStringText(RES_STR("location=\"none\""));
-    }
-    const LayoutEditTreeNode* node = TreeNodeFromItem(tree, item);
-    const std::string location = TreeNodeViewportLocation(state, node);
-    return FormatText(RES_STR("location=\"%.*s\" %s"),
-        static_cast<int>(location.size()),
-        location.data(),
-        BuildTraceNodeText(node).c_str());
-}
-
-std::string BuildTreeViewportTraceText(LayoutEditDialogState* state, HWND tree) {
-    if (state == nullptr || tree == nullptr) {
-        return ResourceStringText(RES_STR("tree=\"none\""));
-    }
-
-    const HTREEITEM firstVisible = TreeView_GetFirstVisible(tree);
-    const HTREEITEM selected = TreeView_GetSelection(tree);
-    const std::string firstVisibleText = BuildTreeItemTraceText(state, tree, firstVisible);
-    const std::string selectedText = BuildTreeItemTraceText(state, tree, selected);
-    return FormatText(RES_STR("visible_count=%u first_visible={%s} selected={%s}"),
-        TreeView_GetVisibleCount(tree),
-        firstVisibleText.c_str(),
-        selectedText.c_str());
-}
-
-void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, ResourceStringId event, std::string detail = {}) {
-    if (state == nullptr || state->dialog == nullptr) {
-        return;
-    }
-    std::string text = BuildTreeViewportTraceText(state, tree);
-    if (!detail.empty()) {
-        text.push_back(' ');
-        text += detail;
-    }
-    state->dialog->Host().TraceLayoutEditDialogEvent(event, text);
-}
-
-void TraceTreeViewport(LayoutEditDialogState* state, HWND tree, ResourceStringId event, ResourceStringId detail) {
-    TraceTreeViewport(state, tree, event, std::string(ResourceStringText(detail)));
-}
-
-std::string BuildTreeViewportSnapshotTraceText(const TreeViewportSnapshot& snapshot) {
-    return FormatText(
-        RES_STR("snapshot_first_visible=\"%.*s\" snapshot_selected=\"%.*s\" snapshot_selected_offset_rows=%d"),
-        static_cast<int>(snapshot.firstVisibleLocation.size()),
-        snapshot.firstVisibleLocation.data(),
-        static_cast<int>(snapshot.selectedLocation.size()),
-        snapshot.selectedLocation.data(),
-        snapshot.selectedOffsetRows);
-}
-
 TreeViewportSnapshot CaptureTreeViewportSnapshot(LayoutEditDialogState* state, HWND tree) {
     TreeViewportSnapshot snapshot;
     if (state == nullptr || tree == nullptr) {
@@ -224,16 +170,7 @@ bool RestoreTreeViewportFromSnapshot(
             restoredSelected == selectedItem) {
             if (HTREEITEM anchor = VisibleItemBefore(tree, selectedItem, snapshot.selectedOffsetRows);
                 anchor != nullptr) {
-                const std::string anchorText = BuildTreeItemTraceText(state, tree, anchor);
-                const std::string snapshotText = BuildTreeViewportSnapshotTraceText(snapshot);
-                TraceTreeViewport(state,
-                    tree,
-                    RES_STR("tree_viewport_restore_begin"),
-                    FormatText(
-                        RES_STR("mode=\"selected_offset\" anchor={%s} %s"), anchorText.c_str(), snapshotText.c_str()));
                 TreeView_SelectSetFirstVisible(tree, anchor);
-                TraceTreeViewport(
-                    state, tree, RES_STR("tree_viewport_restore_end"), RES_STR("mode=\"selected_offset\""));
                 return true;
             }
         }
@@ -242,21 +179,11 @@ bool RestoreTreeViewportFromSnapshot(
     if (!snapshot.firstVisibleLocation.empty()) {
         if (HTREEITEM firstVisibleItem = FindTreeItemByLocationText(state, snapshot.firstVisibleLocation);
             firstVisibleItem != nullptr) {
-            const std::string anchorText = BuildTreeItemTraceText(state, tree, firstVisibleItem);
-            const std::string snapshotText = BuildTreeViewportSnapshotTraceText(snapshot);
-            TraceTreeViewport(state,
-                tree,
-                RES_STR("tree_viewport_restore_begin"),
-                FormatText(RES_STR("mode=\"first_visible\" anchor={%s} %s"), anchorText.c_str(), snapshotText.c_str()));
             TreeView_SelectSetFirstVisible(tree, firstVisibleItem);
-            TraceTreeViewport(state, tree, RES_STR("tree_viewport_restore_end"), RES_STR("mode=\"first_visible\""));
             return true;
         }
     }
 
-    const std::string skipDetail =
-        FormatText(RES_STR("reason=\"no_matching_anchor\" %s"), BuildTreeViewportSnapshotTraceText(snapshot).c_str());
-    TraceTreeViewport(state, tree, RES_STR("tree_viewport_restore_skip"), skipDetail);
     return false;
 }
 
@@ -276,12 +203,6 @@ void RebuildLayoutEditTree(
         return;
     }
     const DialogDescendantRedrawScope redrawScope(hwnd);
-    state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("tree_rebuild_begin"),
-        FormatText(RES_STR("preferred_focus=\"%s\" filter=\"%.*s\""),
-            preferredFocus.has_value() ? "set" : "none",
-            static_cast<int>(state->currentFilter.size()),
-            state->currentFilter.data()));
-    TraceTreeViewport(state, tree, RES_STR("tree_rebuild_before"));
 
     std::string preferredLocation;
     if (preferredFocus.has_value()) {
@@ -294,28 +215,17 @@ void RebuildLayoutEditTree(
     }
     const TreeViewportSnapshot viewportSnapshot =
         preferredFocus.has_value() ? TreeViewportSnapshot{} : CaptureTreeViewportSnapshot(state, tree);
-    const std::string snapshotTrace = FormatText(RES_STR("preferred_location=\"%.*s\" %s"),
-        static_cast<int>(preferredLocation.size()),
-        preferredLocation.data(),
-        BuildTreeViewportSnapshotTraceText(viewportSnapshot).c_str());
-    state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("tree_rebuild_snapshot"), snapshotTrace);
 
     HTREEITEM selectedItem = nullptr;
     {
         const DialogRedrawScope redrawSuspension(tree, RDW_FRAME | RDW_INVALIDATE | RDW_UPDATENOW);
         LayoutEditTreeModel visibleTreeModel = FilterLayoutEditTreeModel(state->treeModel, state->currentFilter);
         state->treeItems.clear();
-        TraceTreeViewport(state, tree, RES_STR("tree_delete_all_before"));
         const bool wasSuppressingSelection = state->suppressTreeSelectionNotification;
         state->suppressTreeSelectionNotification = true;
         TreeView_DeleteAllItems(tree);
-        TraceTreeViewport(state, tree, RES_STR("tree_delete_all_after"));
         state->visibleTreeModel = std::move(visibleTreeModel);
         InsertLayoutEditTreeNodes(state, tree, state->visibleTreeModel.roots, TVI_ROOT);
-        TraceTreeViewport(state,
-            tree,
-            RES_STR("tree_insert_done"),
-            FormatText(RES_STR("roots=%zu items=%zu"), state->visibleTreeModel.roots.size(), state->treeItems.size()));
 
         if (preferredFocus.has_value()) {
             selectedItem = FindTreeItemByFocusKey(state, *preferredFocus);
@@ -332,34 +242,18 @@ void RebuildLayoutEditTree(
 
         if (selectedItem != nullptr) {
             ExpandTreeAncestors(tree, selectedItem);
-            const std::string selectedText = BuildTreeItemTraceText(state, tree, selectedItem);
-            TraceTreeViewport(state,
-                tree,
-                RES_STR("tree_select_item_before"),
-                FormatText(RES_STR("target={%s}"), selectedText.c_str()));
             TreeView_SelectItem(tree, selectedItem);
-            TraceTreeViewport(state, tree, RES_STR("tree_select_item_after"));
         }
         state->suppressTreeSelectionNotification = wasSuppressingSelection;
     }
 
     if (selectedItem != nullptr) {
         if (preferredFocus.has_value()) {
-            TraceTreeViewport(
-                state, tree, RES_STR("tree_ensure_visible_before"), RES_STR("reason=\"preferred_focus\""));
             TreeView_EnsureVisible(tree, selectedItem);
-            TraceTreeViewport(state, tree, RES_STR("tree_ensure_visible_after"), RES_STR("reason=\"preferred_focus\""));
         } else if (!RestoreTreeViewportFromSnapshot(state, tree, selectedItem, viewportSnapshot)) {
-            TraceTreeViewport(state, tree, RES_STR("tree_ensure_visible_before"), RES_STR("reason=\"restore_failed\""));
             TreeView_EnsureVisible(tree, selectedItem);
-            TraceTreeViewport(state, tree, RES_STR("tree_ensure_visible_after"), RES_STR("reason=\"restore_failed\""));
         }
         HandleLayoutEditTreeSelection(state, hwnd, selectedItem);
-        state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("tree_rebuild_done"),
-            FormatText(RES_STR("roots=%zu items=%zu selected=\"true\""),
-                state->visibleTreeModel.roots.size(),
-                state->treeItems.size()));
-        TraceTreeViewport(state, tree, RES_STR("tree_rebuild_after"));
         return;
     }
 
@@ -367,11 +261,6 @@ void RebuildLayoutEditTree(
     state->selectedLeaf = nullptr;
     state->dialog->UpdateSelectionHighlight(std::nullopt);
     PopulateLayoutEditSelection(state, hwnd);
-    state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("tree_rebuild_done"),
-        FormatText(RES_STR("roots=%zu items=%zu selected=\"false\""),
-            state->visibleTreeModel.roots.size(),
-            state->treeItems.size()));
-    TraceTreeViewport(state, tree, RES_STR("tree_rebuild_after"));
 }
 
 void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTREEITEM item) {
@@ -380,15 +269,12 @@ void HandleLayoutEditTreeSelection(LayoutEditDialogState* state, HWND hwnd, HTRE
     }
     const DialogDescendantRedrawScope redrawScope(hwnd);
     HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
-    TraceTreeViewport(state, tree, RES_STR("tree_selection_handle_begin"));
     const LayoutEditTreeNode* node = TreeNodeFromItem(tree, item);
     state->selectedNode = node;
     state->selectedLeaf = node != nullptr && node->leaf.has_value() ? &(*node->leaf) : nullptr;
     state->dialog->UpdateSelectionHighlight(SelectionHighlightForTreeNode(node));
-    state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("tree_select"), BuildTraceNodeText(node));
     PopulateLayoutEditSelection(state, hwnd);
     RefreshLayoutEditValidationState(state, hwnd);
-    TraceTreeViewport(state, tree, RES_STR("tree_selection_handle_end"));
 }
 
 void EnsureVisibleLayoutEditTreeSelection(HWND hwnd) {
@@ -402,11 +288,8 @@ void EnsureVisibleLayoutEditTreeSelection(HWND hwnd) {
     }
 
     if (HTREEITEM selectedItem = TreeView_GetSelection(tree); selectedItem != nullptr) {
-        auto* state = DialogStateFromWindow(hwnd);
-        TraceTreeViewport(state, tree, RES_STR("tree_ensure_selection_before"));
         ExpandTreeAncestors(tree, selectedItem);
         TreeView_EnsureVisible(tree, selectedItem);
-        TraceTreeViewport(state, tree, RES_STR("tree_ensure_selection_after"));
     }
 }
 
@@ -418,12 +301,6 @@ void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
         return;
     }
     HWND tree = GetDlgItem(hwnd, IDC_LAYOUT_EDIT_TREE);
-    TraceTreeViewport(state,
-        tree,
-        RES_STR("tree_refresh_controls"),
-        FormatText(RES_STR("rebuild_tree=\"%s\" preferred_focus=\"%s\""),
-            rebuildTree ? "true" : "false",
-            preferredFocus.has_value() ? "set" : "none"));
 
     if (rebuildTree) {
         RebuildLayoutEditTree(state, hwnd, preferredFocus);
@@ -434,21 +311,10 @@ void RefreshLayoutEditDialogControls(LayoutEditDialogState* state,
         if (tree != nullptr) {
             if (HTREEITEM item = FindTreeItemByFocusKey(state, *preferredFocus); item != nullptr) {
                 ExpandTreeAncestors(tree, item);
-                const std::string itemText = BuildTreeItemTraceText(state, tree, item);
-                TraceTreeViewport(state,
-                    tree,
-                    RES_STR("tree_select_item_before"),
-                    FormatText(RES_STR("target={%s} reason=\"refresh_controls\""), itemText.c_str()));
                 state->suppressTreeSelectionNotification = true;
                 TreeView_SelectItem(tree, item);
                 state->suppressTreeSelectionNotification = false;
-                TraceTreeViewport(
-                    state, tree, RES_STR("tree_select_item_after"), RES_STR("reason=\"refresh_controls\""));
-                TraceTreeViewport(
-                    state, tree, RES_STR("tree_ensure_visible_before"), RES_STR("reason=\"refresh_controls\""));
                 TreeView_EnsureVisible(tree, item);
-                TraceTreeViewport(
-                    state, tree, RES_STR("tree_ensure_visible_after"), RES_STR("reason=\"refresh_controls\""));
                 HandleLayoutEditTreeSelection(state, hwnd, item);
                 EnsureVisibleLayoutEditTreeSelection(hwnd);
                 return;

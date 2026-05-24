@@ -110,9 +110,9 @@ private:
     void SyncDashboardMoveOverlayState();
     bool CreateDashboardTooltip();
     void DestroyDashboardTooltip();
-    void HideLayoutEditTooltip(std::string_view reason = "layout_edit_inactive");
-    void HideTitlebarTooltip(std::string_view reason = "titlebar_inactive");
-    void HideTooltipForLayoutEditUpdate(std::string_view reason);
+    void HideLayoutEditTooltip();
+    void HideTitlebarTooltip();
+    void HideTooltipForLayoutEditUpdate();
     void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
@@ -122,10 +122,6 @@ private:
     void RedrawMoveFrame();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(TracePrefix prefix, ResourceStringId event, const std::string& details = {}) const;
-    void TraceLayoutEditUiEvent(TracePrefix prefix, ResourceStringId event, ResourceStringId details) const;
-    void TraceLayoutEditUiEventFmt(TracePrefix prefix, ResourceStringId event, ResourceStringId format, ...) const;
-    std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);

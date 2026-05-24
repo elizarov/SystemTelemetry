@@ -4,7 +4,6 @@
 #include <cmath>
 #include <commctrl.h>
 #include <commdlg.h>
-#include <cstdarg>
 #include <cstring>
 #include <vector>
 #include <windowsx.h>
@@ -1570,7 +1569,7 @@ void DashboardApp::UpdateNativeTitlebarControls() {
             SendMessageA(nativeTitlebarOpenComboHwnd_, CB_SHOWDROPDOWN, FALSE, 0);
             nativeTitlebarComboDropdownOpen_ = false;
             nativeTitlebarOpenComboHwnd_ = nullptr;
-            HideTitlebarTooltip("titlebar_combo_hidden");
+            HideTitlebarTooltip();
         } else {
             if (nativeTitlebarOpenComboHwnd_ == titlebarLayoutComboHwnd_) {
                 PositionNativeTitlebarCombo(titlebarThemeComboHwnd_, layout.themeComboRect);
@@ -2023,14 +2022,14 @@ void DashboardApp::UpdateNativeTitlebarButtonHover(POINT screenPoint) {
 
 void DashboardApp::UpdateNativeTitlebarTooltip(POINT screenPoint) {
     if (!nativeTitlebarVisible_ || titlebarHoverProbeHwnd_ == nullptr || nativeTitlebarComboDropdownOpen_) {
-        HideTitlebarTooltip(nativeTitlebarComboDropdownOpen_ ? "titlebar_combo_open" : "titlebar_unavailable");
+        HideTitlebarTooltip();
         return;
     }
 
     POINT probeClientPoint = screenPoint;
     ScreenToClient(titlebarHoverProbeHwnd_, &probeClientPoint);
     if (HitTestNativeTitlebarResizeHandle(probeClientPoint).has_value()) {
-        HideTitlebarTooltip("titlebar_resize_handle");
+        HideTitlebarTooltip();
         return;
     }
     const DashboardTitlebarControlLayout layout = NativeTitlebarControlLayout();
@@ -2042,13 +2041,13 @@ void DashboardApp::UpdateNativeTitlebarTooltip(POINT screenPoint) {
         layout.displayRect,
         layout.closeRect);
     if (target.control == DashboardTitlebarTooltipControl::None || target.localizationKey[0] == '\0') {
-        HideTitlebarTooltip("titlebar_no_target");
+        HideTitlebarTooltip();
         return;
     }
 
     const std::string text = FindLocalizedText(target.localizationKey);
     if (text.empty()) {
-        HideTitlebarTooltip("titlebar_empty_text");
+        HideTitlebarTooltip();
         return;
     }
 
@@ -2061,12 +2060,8 @@ void DashboardApp::UpdateNativeTitlebarTooltip(POINT screenPoint) {
 
     POINT tooltipScreenPoint{target.rect.left, target.rect.bottom + ScaleLogicalToPhysical(8, CurrentWindowDpi())};
     ClientToScreen(titlebarHoverProbeHwnd_, &tooltipScreenPoint);
-    dashboardTooltip_.ShowOrUpdate(tooltipRect,
-        tooltipScreenPoint,
-        text,
-        ScaleLogicalToPhysical(260, CurrentWindowDpi()),
-        "titlebar",
-        target.localizationKey);
+    dashboardTooltip_.ShowOrUpdate(
+        tooltipRect, tooltipScreenPoint, text, ScaleLogicalToPhysical(260, CurrentWindowDpi()));
     dashboardTooltipOwner_ = DashboardTooltipOwner::Titlebar;
     nativeTitlebarTooltipControl_ = target.control;
     nativeTitlebarTooltipRect_ = tooltipRect;
@@ -2122,7 +2117,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
         controller_.State().isMoving && placementInteractionMode_ == PlacementInteractionMode::Resize;
     const bool placementKeepsTitlebarVisible = controller_.State().isMoving && nativeTitlebarVisible_;
     if (autohideEligible_ || autohideAnimating_) {
-        HideTitlebarTooltip("autohide_active");
+        HideTitlebarTooltip();
         HideNativeTitlebar();
         StopNativeTitlebarHoverTimer();
         return;
@@ -2130,7 +2125,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     if (hwnd_ == nullptr || !IsWindowVisible(hwnd_) ||
         (controller_.State().isMoving && !resizeActive && !placementKeepsTitlebarVisible) ||
         layoutEditModalUiDepth_ > 0) {
-        HideTitlebarTooltip("titlebar_unavailable");
+        HideTitlebarTooltip();
         return;
     }
 
@@ -2152,13 +2147,13 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
     const bool cursorInTitlebarBand = geometry.canShow && PtInRect(&geometry.virtualHoverRect, cursor) != FALSE;
     const bool cursorInsideHoverArea = placementKeepsTitlebarVisible || cursorInClient || cursorInTitlebarBand;
     if (nativeTitlebarComboDropdownOpen_) {
-        HideTitlebarTooltip("titlebar_combo_open");
+        HideTitlebarTooltip();
         StartNativeTitlebarHoverTimer();
         return;
     }
     if (nativeTitlebarPressedButton_ != NativeTitlebarButton::None) {
         UpdateNativeTitlebarButtonHover(cursor);
-        HideTitlebarTooltip("titlebar_pressed");
+        HideTitlebarTooltip();
         StartNativeTitlebarHoverTimer();
         return;
     }
@@ -2187,7 +2182,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
             if (cursorInTitlebarBand) {
                 UpdateNativeTitlebarTooltip(cursor);
             } else if (!layoutEditCanOwnTooltip) {
-                HideTitlebarTooltip("titlebar_no_target");
+                HideTitlebarTooltip();
             }
             StartNativeTitlebarHoverTimer();
         }
@@ -2196,7 +2191,7 @@ void DashboardApp::UpdateNativeTitlebarHoverFromCursor() {
 
     if (nativeTitlebarHoverInside_ || nativeTitlebarVisible_) {
         nativeTitlebarHoverInside_ = false;
-        HideTitlebarTooltip("titlebar_hide_pending");
+        HideTitlebarTooltip();
         ResetNativeTitlebarButtonState();
         if (!nativeTitlebarHidePending_) {
             nativeTitlebarHidePending_ = true;
@@ -2337,7 +2332,7 @@ void DashboardApp::StartResizeModeAt(POINT cursorClientPoint, DisplayResizeCorne
         layoutEditController_.CancelInteraction();
     }
     HideLayoutEditTooltip();
-    HideTitlebarTooltip("resize_start");
+    HideTitlebarTooltip();
     ResetNativeTitlebarButtonState();
 
     POINT cursorScreenPoint = cursorClientPoint;
@@ -2719,7 +2714,6 @@ void DashboardApp::ShowError(std::string_view message) const {
 }
 
 bool DashboardApp::CreateDashboardTooltip() {
-    dashboardTooltip_.SetTrace(&trace_);
     return dashboardTooltip_.Create(hwnd_, instance_, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
 }
 
@@ -2731,108 +2725,32 @@ void DashboardApp::DestroyDashboardTooltip() {
     nativeTitlebarTooltipRectValid_ = false;
 }
 
-void DashboardApp::TraceLayoutEditUiEvent(
-    TracePrefix prefix, ResourceStringId event, const std::string& details) const {
-    const auto& state = controller_.State();
-    if (state.diagnostics == nullptr) {
-        return;
-    }
-
-    std::string text = ResourceStringText(event);
-    if (!details.empty()) {
-        text.push_back(' ');
-        text += details;
-    }
-    const std::string uiState = BuildLayoutEditUiTraceState();
-    if (!uiState.empty()) {
-        text.push_back(' ');
-        text += uiState;
-    }
-    state.diagnostics->WriteTraceMarker(prefix, text);
-}
-
-void DashboardApp::TraceLayoutEditUiEvent(TracePrefix prefix, ResourceStringId event, ResourceStringId details) const {
-    TraceLayoutEditUiEvent(prefix, event, std::string(ResourceStringText(details)));
-}
-
-void DashboardApp::TraceLayoutEditUiEventFmt(
-    TracePrefix prefix, ResourceStringId event, ResourceStringId format, ...) const {
-    va_list args;
-    va_start(args, format);
-    const std::string text = FormatTextV(format, args);
-    va_end(args);
-    TraceLayoutEditUiEvent(prefix, event, text);
-}
-
-std::string DashboardApp::BuildLayoutEditUiTraceState() const {
-    const auto& state = controller_.State();
-    const HWND capture = GetCapture();
-    const char* captureText = capture == nullptr ? "none" : (capture == hwnd_ ? "dashboard" : "other");
-    std::string trace =
-        FormatText(RES_STR("layout=\"%s\" editing=%s moving=%s modal_depth=%d tooltip_visible=%s "
-                           "tooltip_suppressed=%s tooltip_rect_valid=%s mouse_tracking=%s drag_active=%s "
-                           "capture=\"%s\""),
-            state.config.display.layout.c_str(),
-            Trace::BoolText(state.isEditingLayout),
-            Trace::BoolText(state.isMoving),
-            layoutEditModalUiDepth_,
-            Trace::BoolText(dashboardTooltipOwner_ == DashboardTooltipOwner::LayoutEdit && dashboardTooltip_.Visible()),
-            Trace::BoolText(layoutEditTooltipRefreshSuppressed_),
-            Trace::BoolText(
-                dashboardTooltipOwner_ == DashboardTooltipOwner::LayoutEdit && dashboardTooltip_.TargetRectValid()),
-            Trace::BoolText(layoutEditMouseTracking_),
-            Trace::BoolText(layoutEditController_.HasActiveDrag()),
-            captureText);
-
-    LayoutEditController::TooltipTarget target;
-    if (const_cast<LayoutEditController&>(layoutEditController_).CurrentTooltipTarget(target)) {
-        AppendFormat(trace,
-            RES_STR(" target=\"%s\" target_point=\"%d,%d\""),
-            LayoutEditTooltipPayloadTraceKind(target.payload),
-            target.clientPoint.x,
-            target.clientPoint.y);
-    } else {
-        AppendFormat(trace, RES_STR(" target=\"none\""));
-    }
-
-    POINT cursor{};
-    if (GetCursorPos(&cursor) != FALSE) {
-        AppendFormat(trace, RES_STR(" cursor_screen=\"%d,%d\""), cursor.x, cursor.y);
-        if (hwnd_ != nullptr) {
-            POINT clientPoint = cursor;
-            ScreenToClient(hwnd_, &clientPoint);
-            AppendFormat(trace, RES_STR(" cursor_client=\"%d,%d\""), clientPoint.x, clientPoint.y);
-        }
-    }
-    return trace;
-}
-
-void DashboardApp::HideLayoutEditTooltip(std::string_view reason) {
+void DashboardApp::HideLayoutEditTooltip() {
     if (dashboardTooltipOwner_ != DashboardTooltipOwner::LayoutEdit) {
         return;
     }
 
-    dashboardTooltip_.Hide(reason);
+    dashboardTooltip_.Hide();
     dashboardTooltipOwner_ = DashboardTooltipOwner::None;
 }
 
-void DashboardApp::HideTitlebarTooltip(std::string_view reason) {
+void DashboardApp::HideTitlebarTooltip() {
     if (dashboardTooltipOwner_ != DashboardTooltipOwner::Titlebar) {
         return;
     }
-    dashboardTooltip_.Hide(reason);
+    dashboardTooltip_.Hide();
     dashboardTooltipOwner_ = DashboardTooltipOwner::None;
     nativeTitlebarTooltipControl_ = DashboardTitlebarTooltipControl::None;
     nativeTitlebarTooltipRect_ = {};
     nativeTitlebarTooltipRectValid_ = false;
 }
 
-void DashboardApp::HideTooltipForLayoutEditUpdate(std::string_view reason) {
+void DashboardApp::HideTooltipForLayoutEditUpdate() {
     if (dashboardTooltipOwner_ == DashboardTooltipOwner::Titlebar) {
-        HideTitlebarTooltip(reason);
+        HideTitlebarTooltip();
         return;
     }
-    HideLayoutEditTooltip(reason);
+    HideLayoutEditTooltip();
 }
 
 void DashboardApp::SetLayoutEditTooltipRefreshSuppressed(bool suppressed) {
@@ -2840,9 +2758,6 @@ void DashboardApp::SetLayoutEditTooltipRefreshSuppressed(bool suppressed) {
         return;
     }
     layoutEditTooltipRefreshSuppressed_ = suppressed;
-    TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip,
-        RES_STR("suppression"),
-        suppressed ? RES_STR("value=\"true\"") : RES_STR("value=\"false\""));
     if (suppressed) {
         HideLayoutEditTooltip();
     }
@@ -2862,59 +2777,44 @@ bool DashboardApp::ShouldIgnoreCoveredLayoutEditPointer(POINT screenPoint, bool 
 void DashboardApp::SuspendCoveredLayoutEditHover() {
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
         shellUi_->IsLayoutEditModalUiActive() || layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, RES_STR("suspend"), RES_STR("reason=\"inactive_or_drag\""));
         HideLayoutEditTooltip();
         return;
     }
 
-    TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, RES_STR("suspend"), RES_STR("reason=\"covered_pointer\""));
     layoutEditController_.HandleMouseLeave();
     HideLayoutEditTooltip();
 }
 
 void DashboardApp::UpdateLayoutEditTooltip() {
     if (layoutEditTooltipRefreshSuppressed_) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, RES_STR("update_skip"), RES_STR("reason=\"suppressed\""));
-        HideLayoutEditTooltip("layout_edit_suppressed");
+        HideLayoutEditTooltip();
         return;
     }
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_->IsLayoutEditModalUiActive()) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, RES_STR("update_skip"), RES_STR("reason=\"inactive\""));
-        HideLayoutEditTooltip("layout_edit_inactive");
+        HideLayoutEditTooltip();
         return;
     }
     if (layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, RES_STR("update_skip"), RES_STR("reason=\"active_drag\""));
-        HideLayoutEditTooltip("layout_edit_active_drag");
+        HideLayoutEditTooltip();
         return;
     }
 
     POINT screenPoint{};
     if (GetCursorPos(&screenPoint) && ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditTooltip, RES_STR("update_skip"), RES_STR("reason=\"covered_pointer\""));
         SuspendCoveredLayoutEditHover();
         return;
     }
 
     LayoutEditController::TooltipTarget target;
     if (!layoutEditController_.CurrentTooltipTarget(target)) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditTooltip, RES_STR("update_skip"), RES_STR("reason=\"no_target\""));
-        HideTooltipForLayoutEditUpdate("layout_edit_no_target");
+        HideTooltipForLayoutEditUpdate();
         return;
     }
 
     const RenderPoint clientPoint = target.clientPoint;
-    std::string tooltipError;
     std::string tooltipText;
-    if (!BuildLayoutEditTooltipTextForPayload(controller_.State().config, target.payload, tooltipText, &tooltipError)) {
-        const char* reasonText = tooltipError.empty() ? "unsupported_target" : tooltipError.c_str();
-        TraceLayoutEditUiEventFmt(
-            TracePrefix::LayoutEditTooltip, RES_STR("update_abort"), RES_STR("reason=\"%s\""), reasonText);
-        HideTooltipForLayoutEditUpdate(reasonText);
+    if (!BuildLayoutEditTooltipTextForPayload(controller_.State().config, target.payload, tooltipText)) {
+        HideTooltipForLayoutEditUpdate();
         return;
     }
 
@@ -2924,40 +2824,28 @@ void DashboardApp::UpdateLayoutEditTooltip() {
     const RECT tooltipRect = RectFromPoint(clientPoint, tooltipRadius);
     POINT tooltipScreenPoint{clientPoint.x + tooltipOffsetX, clientPoint.y + tooltipOffsetY};
     ClientToScreen(hwnd_, &tooltipScreenPoint);
-    const char* targetKind = LayoutEditTooltipPayloadTraceKind(target.payload);
-    dashboardTooltip_.ShowOrUpdate(tooltipRect,
-        tooltipScreenPoint,
-        tooltipText,
-        ScaleLogicalToPhysical(360, CurrentWindowDpi()),
-        "layout_edit",
-        targetKind);
+    dashboardTooltip_.ShowOrUpdate(
+        tooltipRect, tooltipScreenPoint, tooltipText, ScaleLogicalToPhysical(360, CurrentWindowDpi()));
     dashboardTooltipOwner_ = DashboardTooltipOwner::LayoutEdit;
     dashboardTooltip_.RelayMouseMessage(WM_MOUSEMOVE, 0, MAKELPARAM(clientPoint.x, clientPoint.y));
 }
 
 void DashboardApp::RefreshLayoutEditHoverFromCursor() {
-    TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, RES_STR("refresh_begin"));
     if (layoutEditTooltipRefreshSuppressed_) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, RES_STR("refresh_skip"), RES_STR("reason=\"suppressed\""));
         HideLayoutEditTooltip();
         return;
     }
     if (!controller_.State().isEditingLayout || controller_.State().isMoving || shellUi_ == nullptr ||
         shellUi_->IsLayoutEditModalUiActive()) {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditHover, RES_STR("refresh_skip"), RES_STR("reason=\"inactive\""));
         HideLayoutEditTooltip();
         return;
     }
     if (layoutEditController_.HasActiveDrag()) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, RES_STR("refresh_skip"), RES_STR("reason=\"active_drag\""));
         return;
     }
 
     POINT screenPoint{};
     if (!GetCursorPos(&screenPoint) || ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, RES_STR("refresh_skip"), RES_STR("reason=\"covered_or_no_cursor\""));
         SuspendCoveredLayoutEditHover();
         return;
     }
@@ -2967,8 +2855,6 @@ void DashboardApp::RefreshLayoutEditHoverFromCursor() {
     RECT clientRect{};
     GetClientRect(hwnd_, &clientRect);
     if (!PtInRect(&clientRect, clientPointWin32)) {
-        TraceLayoutEditUiEvent(
-            TracePrefix::LayoutEditHover, RES_STR("refresh_skip"), RES_STR("reason=\"cursor_outside_client\""));
         layoutEditController_.HandleMouseLeave();
         HideLayoutEditTooltip();
         return;
@@ -2976,11 +2862,6 @@ void DashboardApp::RefreshLayoutEditHoverFromCursor() {
 
     UpdateLayoutEditMouseTracking();
     layoutEditController_.HandleMouseMove(RenderPoint{clientPointWin32.x, clientPointWin32.y});
-    TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditHover,
-        RES_STR("refresh_move"),
-        RES_STR("client_point=\"%d,%d\""),
-        clientPointWin32.x,
-        clientPointWin32.y);
     UpdateLayoutEditTooltip();
 }
 
@@ -3000,12 +2881,7 @@ void DashboardApp::UpdateLayoutEditMouseTracking() {
     trackMouseEvent.cbSize = sizeof(trackMouseEvent);
     trackMouseEvent.dwFlags = TME_LEAVE;
     trackMouseEvent.hwndTrack = hwnd_;
-    if (TrackMouseEvent(&trackMouseEvent) != FALSE) {
-        layoutEditMouseTracking_ = true;
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditMouseTracking, RES_STR("start"));
-    } else {
-        TraceLayoutEditUiEvent(TracePrefix::LayoutEditMouseTracking, RES_STR("start_failed"));
-    }
+    layoutEditMouseTracking_ = TrackMouseEvent(&trackMouseEvent) != FALSE;
 }
 
 void DashboardApp::RedrawMoveFrame() {
@@ -3297,10 +3173,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
         case WM_ACTIVATE:
             RefreshNativeTitlebarChrome();
             if (shellUi_ != nullptr) {
-                TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,
-                    RES_STR("wm_activate"),
-                    RES_STR("active_state=\"%d\""),
-                    static_cast<int>(LOWORD(wParam)));
                 RefreshLayoutEditHoverFromCursor();
             }
             break;
@@ -3461,7 +3333,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             UpdateNativeTitlebarHoverFromCursor();
             layoutEditMouseTracking_ = false;
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
-                TraceLayoutEditUiEvent(TracePrefix::LayoutEditUi, RES_STR("wm_mouseleave"));
                 POINT screenPoint{};
                 if (GetCursorPos(&screenPoint)) {
                     if (ShouldIgnoreCoveredLayoutEditPointer(screenPoint, true)) {
@@ -3473,9 +3344,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
                     RECT clientRect{};
                     GetClientRect(hwnd_, &clientRect);
                     if (PtInRect(&clientRect, clientPointWin32)) {
-                        TraceLayoutEditUiEvent(TracePrefix::LayoutEditUi,
-                            RES_STR("wm_mouseleave_ignore"),
-                            RES_STR("reason=\"cursor_still_in_client\""));
                         return 0;
                     }
                 }
@@ -3531,13 +3399,6 @@ LRESULT DashboardApp::HandleMessage(UINT message, WPARAM wParam, LPARAM lParam) 
             }
             if (state.isEditingLayout && !state.isMoving && !shellUi_->IsLayoutEditModalUiActive()) {
                 const bool handled = layoutEditController_.HandleCaptureChanged(hwnd_, reinterpret_cast<HWND>(lParam));
-                TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,
-                    RES_STR("wm_capturechanged"),
-                    RES_STR("new_owner=\"%s\" handled=\"%s\""),
-                    reinterpret_cast<HWND>(lParam) == nullptr
-                        ? "none"
-                        : (reinterpret_cast<HWND>(lParam) == hwnd_ ? "dashboard" : "other"),
-                    handled ? "true" : "false");
                 if (handled) {
                     UpdateLayoutEditTooltip();
                     return 0;

@@ -564,29 +564,13 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 
 bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
-    if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-            RES_STR("begin current_layout=\"%s\" requested_layout=\"%s\""),
-            state_.config.display.layout.c_str(),
-            layoutName.c_str());
-    }
     const std::string previousLayoutName = state_.config.display.layout;
     if (!SelectLayout(state_.config, layoutName)) {
-        if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarkerFmt(
-                TracePrefix::LayoutSwitch, RES_STR("select_failed requested_layout=\"%s\""), layoutName.c_str());
-        }
         return false;
     }
 
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
-        if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-                RES_STR("sync_failed requested_layout=\"%s\" renderer_error=\"%s\""),
-                layoutName.c_str(),
-                shell.Renderer().LastError().c_str());
-        }
         // The active config has already resolved a valid layout; rollback by name avoids a full config snapshot.
         SelectLayout(state_.config, previousLayoutName);
         SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
@@ -597,10 +581,6 @@ bool DashboardController::SwitchLayout(
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
     RefreshLayoutEditSessionDirtyFlag();
-    if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarkerFmt(
-            TracePrefix::LayoutSwitch, RES_STR("done active_layout=\"%s\""), state_.config.display.layout.c_str());
-    }
     return true;
 }
 
