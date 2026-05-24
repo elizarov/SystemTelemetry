@@ -142,6 +142,16 @@ void WriteTraceStringFragments(TraceLog& trace) {
     );
 }
 
+void ExpectJoinedHexEscapeFragment() {
+    EXPECT_THAT(
+        output,
+        testing::HasSubstr(
+            "gpu.temp = 100,\xC2\xB0"
+            "C,Core Temp\r\n"
+        )
+    );
+}
+
 void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
     trace.WriteFmt(
         TracePrefix::GpuVendor,

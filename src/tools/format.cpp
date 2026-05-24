@@ -3747,37 +3747,44 @@ private:
         size_t index,
         std::optional<size_t> maxLength
     ) const {
-        if (
-            !CanConcatenateStringLiteralText(trailingLiteral, currentLiteral) ||
-            HasUserDefinedLiteralSuffix(tokens, index)
-        ) {
+        if (HasUserDefinedLiteralSuffix(tokens, index)) {
+            return false;
+        }
+        std::optional<std::string> currentTail = ConcatenatedStringLiteralTail(trailingLiteral, currentLiteral);
+        if (!currentTail) {
             return false;
         }
         std::string candidate = result;
         candidate.pop_back();
-        candidate.append(currentLiteral.substr(1));
+        candidate.append(*currentTail);
         if (maxLength && candidate.size() > *maxLength) {
             return false;
         }
         result = std::move(candidate);
         trailingLiteral.pop_back();
-        trailingLiteral.append(currentLiteral.substr(1));
+        trailingLiteral.append(*currentTail);
         return true;
     }
 
-    bool CanConcatenateStringLiteralText(std::string_view previousLiteral, std::string_view currentLiteral) const {
+    std::optional<std::string> ConcatenatedStringLiteralTail(
+        std::string_view previousLiteral,
+        std::string_view currentLiteral
+    ) const {
         if (!IsOrdinaryStringLiteralText(previousLiteral) || !IsOrdinaryStringLiteralText(currentLiteral)) {
-            return false;
+            return std::nullopt;
         }
         const std::string_view previousContent = StringLiteralContent(previousLiteral);
         const std::string_view currentContent = StringLiteralContent(currentLiteral);
         if (StringLiteralContentEndsWithEscapedNewline(previousContent)) {
-            return false;
+            return std::nullopt;
         }
         if (currentContent.empty()) {
-            return true;
+            return std::string(currentLiteral.substr(1));
         }
-        return !HasTrailingExpandableEscape(previousContent, currentContent.front());
+        if (!HasTrailingExpandableEscape(previousContent, currentContent.front())) {
+            return std::string(currentLiteral.substr(1));
+        }
+        return std::nullopt;
     }
 
     static bool IsOrdinaryStringLiteralText(std::string_view literal) {
@@ -4497,6 +4504,9 @@ private:
         if (HasLineTerminatedStringLiteralSequence(tokens)) {
             return true;
         }
+        if (HasExpandableEscapeStringLiteralSequence(tokens)) {
+            return true;
+        }
         if (!HasLineComment(tokens)) {
             return false;
         }
@@ -4522,6 +4532,39 @@ private:
             previousStringLiteral = &token;
         }
         return false;
+    }
+
+    bool HasExpandableEscapeStringLiteralSequence(const std::vector<Token>& tokens) const {
+        const Token* previousStringLiteral = nullptr;
+        for (const Token& token : tokens) {
+            if (token.kind == TokenKind::Newline) {
+                continue;
+            }
+            if (token.kind != TokenKind::StringLiteral) {
+                previousStringLiteral = nullptr;
+                continue;
+            }
+            if (previousStringLiteral != nullptr && HasExpandableEscapeStringLiteralBoundary(
+                previousStringLiteral->text,
+                token.text
+            )) {
+                return true;
+            }
+            previousStringLiteral = &token;
+        }
+        return false;
+    }
+
+    bool HasExpandableEscapeStringLiteralBoundary(
+        std::string_view previousLiteral,
+        std::string_view currentLiteral
+    ) const {
+        if (!IsOrdinaryStringLiteralText(previousLiteral) || !IsOrdinaryStringLiteralText(currentLiteral)) {
+            return false;
+        }
+        const std::string_view currentContent = StringLiteralContent(currentLiteral);
+        return !currentContent.empty() &&
+            HasTrailingExpandableEscape(StringLiteralContent(previousLiteral), currentContent.front());
     }
 
     bool HasMultiStatementLambdaBody(const std::vector<Token>& tokens) const {
