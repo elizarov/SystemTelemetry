@@ -133,6 +133,11 @@ void FormatAlphaNibble(char* text, unsigned int alpha) {
     text[3] = kHex[alpha & 0x0Fu];
 }
 
+void IncrementSnapshotVersion(FrameState& frame) {
+    frame.versions.snapshotVersion = ++snapshotVersion_;
+    frame.versions.previousVersion = --snapshotVersion_;
+}
+
 void WriteTraceStringFragments(TraceLog& trace) {
     trace.WriteFmt(
         TracePrefix::Diagnostics,

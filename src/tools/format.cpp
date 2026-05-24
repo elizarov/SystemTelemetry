@@ -4033,6 +4033,13 @@ private:
         if ((current == "++" || current == "--") && prev == ")") {
             return true;
         }
+        if (
+            (current == "++" || current == "--") &&
+            IsUnaryPrefixOperator(tokens, index) &&
+            IsBinaryOperatorLike(prev)
+        ) {
+            return true;
+        }
         if (current == "[" && prev == "auto") {
             return true;
         }
