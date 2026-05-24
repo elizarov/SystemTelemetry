@@ -1610,9 +1610,8 @@ private:
             return;
         }
         std::vector<std::string> lines = FormatPendingLines({});
-        const bool fieldBreaksSiblingGroup = declarationKind == DeclarationKind::Field &&
-            lines.size() > 1 &&
-            FieldDeclarationBreaksSiblingGroup(pendingTokens_, lines);
+        const bool fieldBreaksSiblingGroup =
+            declarationKind == DeclarationKind::Field && lines.size() > 1 && FieldDeclarationBreaksSiblingGroup(lines);
         EmitBlankBeforeDeclarationKind(declarationKind, separateSameKind, fieldBreaksSiblingGroup);
         for (std::string& line : lines) {
             EmitLine(std::move(line));
@@ -1621,16 +1620,8 @@ private:
         NoteDeclarationKind(declarationKind, fieldBreaksSiblingGroup);
     }
 
-    bool FieldDeclarationBreaksSiblingGroup(
-        const std::vector<Token>& tokens,
-        const std::vector<std::string>& lines
-    ) const {
-        return IsTypeAliasFieldDeclaration(tokens) || FieldHasSameIndentDelimiterClose(lines);
-    }
-
-    bool IsTypeAliasFieldDeclaration(const std::vector<Token>& tokens) const {
-        const size_t first = NextSignificantIndex(tokens, 0);
-        return first < tokens.size() && (tokens[first].text == "using" || tokens[first].text == "typedef");
+    bool FieldDeclarationBreaksSiblingGroup(const std::vector<std::string>& lines) const {
+        return FieldHasSameIndentDelimiterClose(lines);
     }
 
     bool FieldHasSameIndentDelimiterClose(const std::vector<std::string>& lines) const {

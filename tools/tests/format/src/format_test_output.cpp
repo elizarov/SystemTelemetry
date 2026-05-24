@@ -266,13 +266,16 @@ void UseShortRequires(T& value) {
 }
 
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
+using RuntimeConfigDynamicItemVisitor = void (*)(void* context, std::string_view key, const void* item);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
+using RuntimeConfigFindDynamicItem = const void* (*)(const AppConfig& config, std::string_view key);
+using RuntimeConfigForEachDynamicItem =
+    void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 using ZesDriver = void*;
 using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 using LayoutEditParameter = ::LayoutEditParameter;
 using TextLayoutResult = ::TextLayoutResult;
-
 using LayoutEditActiveRegionPayload = std::variant<
     LayoutEditCardRegion,
     LayoutEditWidgetRegion,
@@ -327,9 +330,6 @@ struct LayoutEditAnchorBinding {
     std::optional<LayoutEditAnchorDragSpec> drag =
         LayoutEditAnchorDragSpec{AnchorDragAxis::Vertical, AnchorDragMode::AxisDelta, 1.0};
 };
-
-using RuntimeConfigForEachDynamicItem =
-    void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay = true, const ConfigParseContext& context = {});
 
