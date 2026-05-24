@@ -8,7 +8,7 @@
   "scan": {
     "roots": ["src", "tests", "resources"],
     "suffix_group": "lint_inputs",
-    "excluded_prefixes": ["src/vendor/"],
+    "excluded_prefixes": ["src/vendor/", "src/tools/vendor/"],
     "include_pattern": "^\\s*#include\\s+(?:\"([^\"]+)\"|<([^>]+)>)"
   },
   "architecture": {
