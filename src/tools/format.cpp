@@ -3623,13 +3623,7 @@ private:
         if (current == "[" && prev == "auto") {
             return true;
         }
-        if (
-            current == "::" &&
-            IsBinaryOperatorLike(prev) &&
-            !IsUnaryPrefixOperator(tokens, prevIndex) &&
-            !IsTemplateAngleCloseToken(tokens, prevIndex) &&
-            !(IsPointerOrReferenceDeclaratorToken(prev) && IsPointerOrReferenceDeclarator(tokens, prevIndex))
-        ) {
+        if (current == "::" && NeedsSpaceBeforeLeadingGlobalQualifier(tokens, prevIndex)) {
             return true;
         }
         if (current == "{" || IsNoSpaceBefore(current) || IsNoSpaceAfter(prev)) {
@@ -3662,6 +3656,42 @@ private:
             return true;
         }
         return IsWordLike(previous) && IsWordLike(token);
+    }
+
+    bool NeedsSpaceBeforeLeadingGlobalQualifier(const std::vector<Token>& tokens, size_t prevIndex) const {
+        const Token& previous = tokens[prevIndex];
+        if (previous.kind == TokenKind::Word) {
+            return IsGlobalQualifierPrefixWord(previous.text);
+        }
+        if (!IsBinaryOperatorLike(previous.text)) {
+            return false;
+        }
+        if (IsUnaryPrefixOperator(tokens, prevIndex) || IsTemplateAngleCloseToken(tokens, prevIndex)) {
+            return false;
+        }
+        if (IsPointerOrReferenceDeclaratorToken(previous.text) && IsPointerOrReferenceDeclarator(tokens, prevIndex)) {
+            return false;
+        }
+        return true;
+    }
+
+    bool IsGlobalQualifierPrefixWord(std::string_view text) const {
+        static constexpr std::string_view kWords[] = {
+            "alignas",
+            "case",
+            "co_return",
+            "consteval",
+            "constexpr",
+            "constinit",
+            "delete",
+            "extern",
+            "friend",
+            "inline",
+            "new",
+            "return",
+            "throw"
+        };
+        return IsTypeContextWord(text) || std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
     }
 
     bool IsOperatorFunctionNameToken(const std::vector<Token>& tokens, size_t index) const {

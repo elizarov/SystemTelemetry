@@ -82,6 +82,8 @@ public:
         std::string_view filter,
         std::string_view defaultExtension
     ) const = 0;
+    virtual ::Renderer& Renderer() = 0;
+    virtual const ::Renderer& Renderer() const = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
     virtual void Draw(::Renderer& renderer, const WidgetAnimationState& state) const = 0;
     virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
