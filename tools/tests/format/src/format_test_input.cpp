@@ -83,6 +83,10 @@ unsigned shortBits : 1;
 unsigned muchLongerBits : 2;
 };
 
+struct AlignedStorage{
+alignas(void*)unsigned char storage_[sizeof(void*)] {};
+};
+
 // Defaulted operator fixture.
 struct ColorMixExpression{
 std::string target;

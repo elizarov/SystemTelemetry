@@ -115,6 +115,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Do not put spaces just inside parentheses, brackets, template angle brackets, or one-line initializer braces: `(value)`, `items[index]`, `std::vector<int>`, and `{a, b}`.
 - Treat template and cast angle brackets as delimiter syntax, not comparison operators: `template <typename T>`, `std::vector<int>`, `std::vector<std::pair<std::string, std::string>>`, and `static_cast<int>(value)`.
 - Keep empty braces as `{}` with no inner space.
+- Keep `alignas` compact around its alignment argument and separate it from the declaration type with one space: `alignas(void*) unsigned char storage_[sizeof(void*)]{};`.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, `catch`, and `finally`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
 - Put a space between `auto` and the opening bracket of a structured binding: `auto [name, value] = pair;`.

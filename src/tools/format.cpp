@@ -3565,6 +3565,9 @@ private:
             return true;
         }
         const std::string& before = tokens[*beforeOpen].text;
+        if (before == "alignas") {
+            return false;
+        }
         return before != ")" && before != "]" && before != "}";
     }
 
@@ -4674,7 +4677,7 @@ private:
         ) {
             return false;
         }
-        return EndsWithMatchingParen(tokens) || ContainsTopLevelTokenOutsideTemplateArguments(tokens, ")");
+        return ContainsTopLevelFunctionParameterList(tokens);
     }
 
     BlockState PopBlockState() {
@@ -4690,18 +4693,11 @@ private:
         return FindTopLevelAssignment(tokens).has_value();
     }
 
-    bool EndsWithMatchingParen(const std::vector<Token>& tokens) const {
-        return !tokens.empty() && tokens.back().text == ")";
-    }
-
     bool ContainsTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
         return FindTopLevelToken(tokens, tokenText).has_value();
     }
 
-    bool ContainsTopLevelTokenOutsideTemplateArguments(
-        const std::vector<Token>& tokens,
-        std::string_view tokenText
-    ) const {
+    bool ContainsTopLevelFunctionParameterList(const std::vector<Token>& tokens) const {
         int depth = 0;
         for (size_t index = 0; index < tokens.size(); ++index) {
             if (depth == 0 && IsTemplateAngleOpen(tokens, index)) {
@@ -4710,12 +4706,53 @@ private:
                     continue;
                 }
             }
-            UpdateDepth(tokens[index], depth);
-            if (depth == 0 && tokens[index].text == tokenText) {
+            if (depth == 0 && tokens[index].text == "(" && IsFunctionParameterListOpen(tokens, index)) {
                 return true;
             }
+            UpdateDepth(tokens[index], depth);
         }
         return false;
+    }
+
+    bool IsFunctionParameterListOpen(const std::vector<Token>& tokens, size_t open) const {
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, open);
+        if (!previous) {
+            return false;
+        }
+        if (IsFunctionPointerDeclaratorGroupOpen(tokens, open)) {
+            return false;
+        }
+        const Token& token = tokens[*previous];
+        if (token.kind == TokenKind::Word) {
+            return !IsNonFunctionGroupOwnerWord(token.text);
+        }
+        return IsOperatorFunctionNameToken(tokens, *previous) || IsOperatorCallNameClose(tokens, *previous);
+    }
+
+    static bool IsNonFunctionGroupOwnerWord(std::string_view text) {
+        static constexpr std::string_view kWords[] = {
+            "__declspec",
+            "__uuidof",
+            "alignas",
+            "alignof",
+            "decltype",
+            "requires",
+            "sizeof",
+            "typeid"
+        };
+        return std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
+    }
+
+    bool IsOperatorCallNameClose(const std::vector<Token>& tokens, size_t close) const {
+        if (close >= tokens.size() || tokens[close].text != ")") {
+            return false;
+        }
+        const std::optional<size_t> open = FindMatchingOpen(tokens, close);
+        if (!open || *open == 0) {
+            return false;
+        }
+        const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
+        return beforeOpen && tokens[*beforeOpen].text == "operator";
     }
 
     std::optional<size_t> FindTopLevelToken(const std::vector<Token>& tokens, std::string_view tokenText) const {
