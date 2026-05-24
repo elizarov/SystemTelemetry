@@ -7,6 +7,8 @@
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "widget/layout_edit_types.h"
 
+struct AppConfig;
+
 std::string FormatLayoutEditTooltipValue(double value, configschema::ValueFormat format);
 std::string FormatLayoutEditTooltipValue(unsigned int value);
 std::string FormatLayoutEditTooltipValue(const UiFontConfig& value);
@@ -18,5 +20,6 @@ std::string BuildLayoutEditTooltipLine(const LayoutEditTooltipDescriptor& descri
 std::optional<std::string> BuildMetricListOrderTooltipLine(
     const AppConfig& config, const LayoutNodeFieldEditKey& key, int rowIndex);
 std::optional<std::string> BuildMetricListAddRowTooltipLine(const AppConfig& config, const LayoutNodeFieldEditKey& key);
+std::optional<std::string> BuildDateTimeFormatTooltipLine(const AppConfig& config, const LayoutNodeFieldEditKey& key);
 std::optional<std::string> BuildContainerChildOrderTooltipLine(
     const AppConfig& config, const LayoutContainerChildOrderEditKey& key);

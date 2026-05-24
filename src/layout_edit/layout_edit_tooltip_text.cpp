@@ -268,13 +268,19 @@ bool BuildLayoutEditTooltipTextForPayload(
             }
             return true;
         }
+        if (nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat) {
+            const auto firstLine = BuildDateTimeFormatTooltipLine(config, *nodeFieldKey);
+            if (!firstLine.has_value()) {
+                return AbortTooltipBuild(errorReason, "empty_date_time_format_text");
+            }
+            tooltipText = TooltipText(*firstLine, FindLocalizedText(nodeFieldDescriptor->descriptionResourceKey));
+            return true;
+        }
         const LayoutNodeConfig* node = FindLayoutNodeFieldNode(config, *nodeFieldKey);
         if (node == nullptr) {
             return AbortTooltipBuild(errorReason, "missing_node_field");
         }
-        const std::string valueLabel = nodeFieldDescriptor->editorKind == LayoutEditEditorKind::DateTimeFormat
-                                           ? FormatText("%s format", EnumToString(nodeFieldKey->widgetClass))
-                                           : std::string(EnumToString(nodeFieldKey->widgetClass));
+        const std::string valueLabel = std::string(EnumToString(nodeFieldKey->widgetClass));
         std::string text =
             FormatText("%s = %s", valueLabel.c_str(), ReadLayoutNodeFieldValue(*node, nodeFieldKey->field).c_str());
         AppendTooltipDescription(text, FindLocalizedText(nodeFieldDescriptor->descriptionResourceKey));

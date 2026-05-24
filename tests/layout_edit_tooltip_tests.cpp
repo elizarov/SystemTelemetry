@@ -185,6 +185,57 @@ TEST(LayoutEditTooltip, BuildsMetricListAddRowTooltipLineForCardLayout) {
     EXPECT_EQ(*line, "[card.cpu] layout = metric_list()");
 }
 
+TEST(LayoutEditTooltip, BuildsDateTimeFormatTooltipLineForCardLayout) {
+    AppConfig config;
+    LayoutCardConfig card;
+    card.id = "time";
+    card.layout.name = "rows";
+    card.layout.children.push_back(LayoutNodeConfig{.name = "clock_time", .parameter = "HH:MM"});
+    card.layout.children.push_back(LayoutNodeConfig{.name = "clock_date", .parameter = "YYYY-MM-DD"});
+    config.layout.cards.push_back(card);
+
+    const auto timeLine = BuildDateTimeFormatTooltipLine(
+        config, LayoutNodeFieldEditKey{"time", {0}, WidgetClass::ClockTime, LayoutNodeField::Parameter});
+    const auto dateLine = BuildDateTimeFormatTooltipLine(
+        config, LayoutNodeFieldEditKey{"time", {1}, WidgetClass::ClockDate, LayoutNodeField::Parameter});
+
+    ASSERT_TRUE(timeLine.has_value());
+    EXPECT_EQ(*timeLine, "[card.time] layout = clock_time(HH:MM)");
+    ASSERT_TRUE(dateLine.has_value());
+    EXPECT_EQ(*dateLine, "[card.time] layout = clock_date(YYYY-MM-DD)");
+}
+
+TEST(LayoutEditTooltip, BuildsDateTimeFormatTooltipLineForDashboardLayout) {
+    AppConfig config;
+    config.display.layout = "main";
+    config.layout.structure.cards.name = "clock_time";
+    config.layout.structure.cards.parameter = "hh:MM AM";
+
+    const auto line = BuildDateTimeFormatTooltipLine(
+        config, LayoutNodeFieldEditKey{"", {}, WidgetClass::ClockTime, LayoutNodeField::Parameter});
+
+    ASSERT_TRUE(line.has_value());
+    EXPECT_EQ(*line, "[layout.main] cards = clock_time(hh:MM AM)");
+}
+
+TEST(LayoutEditTooltip, BuildsDateTimeFormatTooltipTextFromEditableAnchorPayload) {
+    AppConfig config;
+    LayoutCardConfig card;
+    card.id = "time";
+    card.layout.name = "clock_date";
+    card.layout.parameter = "YYYY-MM-DD";
+    config.layout.cards.push_back(card);
+
+    LayoutEditAnchorRegion anchor;
+    anchor.key.widget = {"time", "time", {}};
+    anchor.key.subject = LayoutNodeFieldEditKey{"time", {}, WidgetClass::ClockDate, LayoutNodeField::Parameter};
+
+    std::string tooltip;
+
+    ASSERT_TRUE(BuildLayoutEditTooltipTextForPayload(config, anchor, tooltip, nullptr));
+    EXPECT_EQ(tooltip.substr(0, tooltip.find("\r\n")), "[card.time] layout = clock_date(YYYY-MM-DD)");
+}
+
 TEST(LayoutEditTooltip, BuildsContainerChildOrderTooltipLineForDashboardLayout) {
     AppConfig config;
     config.display.layout = "main";
