@@ -96,6 +96,7 @@ struct FormatterConfig {
     std::string mainIncludeRegex = "(Test)?$";
     bool mainIncludeQuote = true;
     std::vector<std::string> statementLikeMacroParameters;
+    std::vector<std::string> streamShiftConfigurationMethods;
     std::vector<IncludeGroup> includeGroups;
 };
 
@@ -3406,7 +3407,21 @@ private:
             segments.push_back(current);
         }
         std::vector<std::string> lines = FormatRange(receiver, indentLevel, std::move(prefix), {}, true);
-        for (size_t index = 0; index < segments.size(); ++index) {
+        for (size_t index = 0; index < segments.size();) {
+            std::vector<std::string> groupedLines;
+            size_t nextIndex = index + 1;
+            if (TryFormatStreamShiftConfigurationGroup(
+                segments,
+                index,
+                indentLevel + 1,
+                suffix,
+                groupedLines,
+                nextIndex
+            )) {
+                lines.insert(lines.end(), groupedLines.begin(), groupedLines.end());
+                index = nextIndex;
+                continue;
+            }
             std::string segmentSuffix;
             if (index + 1 == segments.size()) {
                 segmentSuffix = suffix;
@@ -3414,8 +3429,90 @@ private:
             std::vector<std::string> segmentLines =
                 FormatChainPart(segments[index], indentLevel + 1, {}, std::move(segmentSuffix));
             lines.insert(lines.end(), segmentLines.begin(), segmentLines.end());
+            ++index;
         }
         return lines;
+    }
+
+    bool TryFormatStreamShiftConfigurationGroup(
+        const std::vector<std::vector<Token>>& segments,
+        size_t index,
+        int indentLevel,
+        std::string_view suffix,
+        std::vector<std::string>& lines,
+        size_t& nextIndex
+    ) const {
+        if (!IsStreamShiftConfigurationSegment(segments[index])) {
+            return false;
+        }
+        std::vector<Token> combined = segments[index];
+        size_t valueIndex = index + 1;
+        while (valueIndex < segments.size() && IsStreamShiftConfigurationSegment(segments[valueIndex])) {
+            combined.insert(combined.end(), segments[valueIndex].begin(), segments[valueIndex].end());
+            ++valueIndex;
+        }
+        if (valueIndex >= segments.size()) {
+            return false;
+        }
+        combined.insert(combined.end(), segments[valueIndex].begin(), segments[valueIndex].end());
+        std::string groupSuffix;
+        if (valueIndex + 1 == segments.size()) {
+            groupSuffix = suffix;
+        }
+        std::string candidate = FormatInline(combined);
+        AppendSuffix(candidate, groupSuffix);
+        if (!Fits(indentLevel, candidate)) {
+            return false;
+        }
+        lines = FormatChainPart(combined, indentLevel, {}, std::move(groupSuffix));
+        nextIndex = valueIndex + 1;
+        return true;
+    }
+
+    bool IsStreamShiftConfigurationSegment(const std::vector<Token>& segment) const {
+        std::optional<std::string> methodName = StreamShiftConfigurationMethodName(segment);
+        return methodName && IsConfiguredStreamShiftConfigurationMethod(*methodName);
+    }
+
+    std::optional<std::string> StreamShiftConfigurationMethodName(const std::vector<Token>& segment) const {
+        size_t index = NextSignificantIndex(segment, 0);
+        if (index >= segment.size() || (segment[index].text != "<<" && segment[index].text != ">>")) {
+            return std::nullopt;
+        }
+        index = NextSignificantIndex(segment, index + 1);
+        if (index >= segment.size() || segment[index].kind != TokenKind::Word) {
+            return std::nullopt;
+        }
+        std::string name = segment[index].text;
+        index = NextSignificantIndex(segment, index + 1);
+        while (index < segment.size() && segment[index].text == "::") {
+            const size_t namePart = NextSignificantIndex(segment, index + 1);
+            if (namePart >= segment.size() || segment[namePart].kind != TokenKind::Word) {
+                return std::nullopt;
+            }
+            name += "::";
+            name += segment[namePart].text;
+            index = NextSignificantIndex(segment, namePart + 1);
+        }
+        if (index < segment.size() && segment[index].text == "(") {
+            const std::optional<size_t> close = FindMatchingClose(segment, index);
+            if (!close) {
+                return std::nullopt;
+            }
+            index = NextSignificantIndex(segment, *close + 1);
+        }
+        if (index != segment.size()) {
+            return std::nullopt;
+        }
+        return name;
+    }
+
+    bool IsConfiguredStreamShiftConfigurationMethod(std::string_view methodName) const {
+        return std::find(
+            config_.streamShiftConfigurationMethods.begin(),
+            config_.streamShiftConfigurationMethods.end(),
+            methodName
+        ) != config_.streamShiftConfigurationMethods.end();
     }
 
     bool TryAppendFinalChainPartToLastLine(
@@ -5780,6 +5877,13 @@ std::optional<FormatterConfig> LoadFormatterConfig(const std::string& root, std:
             if (const tools::lint::JsonValue* parameters = macroCategories->Find("statement_like_parameters")) {
                 for (const tools::lint::JsonValue& parameter : parameters->AsArray()) {
                     config.statementLikeMacroParameters.push_back(parameter.AsString());
+                }
+            }
+        }
+        if (const tools::lint::JsonValue* streamShift = configJson.Find("stream_shift")) {
+            if (const tools::lint::JsonValue* methods = streamShift->Find("configuration_methods")) {
+                for (const tools::lint::JsonValue& method : methods->AsArray()) {
+                    config.streamShiftConfigurationMethods.push_back(method.AsString());
                 }
             }
         }

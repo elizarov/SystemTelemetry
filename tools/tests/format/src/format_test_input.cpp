@@ -122,6 +122,7 @@ trace.WriteFmt(TracePrefix::GpuVendor,RES_STR("adapter_candidate index=%u vendor
 void ReportUnknownBenchmark(const std::string& firstArg,std::istream& input){
 std::cerr<<"unknown benchmark \""<<firstArg<<"\"; supported benchmarks: "<<SupportedBenchmarkNames()<<"\n";
 input>>firstBenchmarkName>>secondBenchmarkNameWithLongName>>thirdBenchmarkNameWithLongName>>fourthBenchmarkNameWithLongName;
+std::cout<<std::left<<std::setw(18)<<name<<" total_ms="<<std::fixed<<std::setprecision(2)<<result.total.count()<<" per_iter_ms="<<result.perIteration.count()<<"\n";
 }
 
 struct OklabColor{

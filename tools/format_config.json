@@ -14,6 +14,42 @@
       "X"
     ]
   },
+  "stream_shift": {
+    "configuration_methods": [
+      "std::boolalpha",
+      "std::noboolalpha",
+      "std::showbase",
+      "std::noshowbase",
+      "std::showpoint",
+      "std::noshowpoint",
+      "std::showpos",
+      "std::noshowpos",
+      "std::skipws",
+      "std::noskipws",
+      "std::uppercase",
+      "std::nouppercase",
+      "std::unitbuf",
+      "std::nounitbuf",
+      "std::internal",
+      "std::left",
+      "std::right",
+      "std::dec",
+      "std::hex",
+      "std::oct",
+      "std::fixed",
+      "std::scientific",
+      "std::hexfloat",
+      "std::defaultfloat",
+      "std::setbase",
+      "std::setfill",
+      "std::setprecision",
+      "std::setw",
+      "std::resetiosflags",
+      "std::setiosflags",
+      "std::emit_on_flush",
+      "std::noemit_on_flush"
+    ]
+  },
   "include_sorting": {
     "main_include": {
       "include_is_main_regex": "(Test)?$",
