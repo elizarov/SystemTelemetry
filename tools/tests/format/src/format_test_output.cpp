@@ -84,6 +84,8 @@ public:
     ) const = 0;
     virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
     virtual void Draw(::Renderer& renderer, const WidgetAnimationState& state) const = 0;
+    virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
+    virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
 };
 
 class DialogRedrawScope {

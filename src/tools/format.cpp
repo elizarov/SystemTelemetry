@@ -4891,10 +4891,11 @@ private:
         if (!tokens.empty() && tokens.front().text == "do") {
             return BlockKind::DoStatement;
         }
-        if (ContainsWord(tokens, "enum")) {
+        const std::optional<size_t> typeDeclarationKeyword = FindTypeDeclarationKeyword(tokens);
+        if (typeDeclarationKeyword && tokens[*typeDeclarationKeyword].text == "enum") {
             return BlockKind::EnumDeclaration;
         }
-        if (ContainsWord(tokens, "class") || ContainsWord(tokens, "struct") || ContainsWord(tokens, "enum")) {
+        if (typeDeclarationKeyword) {
             return BlockKind::TypeDeclaration;
         }
         if (IsFunctionDefinitionBlock(tokens)) {
@@ -4941,7 +4942,7 @@ private:
         if (first == "using" || first == "typedef" || first == "static_assert") {
             return DeclarationKind::Field;
         }
-        if (ContainsWord(tokens, "class") || ContainsWord(tokens, "struct") || ContainsWord(tokens, "enum")) {
+        if (FindTypeDeclarationKeyword(tokens)) {
             return DeclarationKind::TypeDeclaration;
         }
         if (
@@ -4963,6 +4964,31 @@ private:
             return false;
         }
         return tokens[marker].text == "default" || tokens[marker].text == "delete" || tokens[marker].text == "0";
+    }
+
+    std::optional<size_t> FindTypeDeclarationKeyword(const std::vector<Token>& tokens) const {
+        size_t first = NextSignificantIndex(tokens, 0);
+        if (first >= tokens.size()) {
+            return std::nullopt;
+        }
+        if (tokens[first].text == "template") {
+            const size_t groupOpen = NextSignificantIndex(tokens, first + 1);
+            if (groupOpen >= tokens.size() || tokens[groupOpen].text != "<") {
+                return std::nullopt;
+            }
+            const std::optional<size_t> groupClose = FindTemplateAngleClose(tokens, groupOpen);
+            if (!groupClose) {
+                return std::nullopt;
+            }
+            first = NextSignificantIndex(tokens, *groupClose + 1);
+            if (first >= tokens.size()) {
+                return std::nullopt;
+            }
+        }
+        if (tokens[first].text == "class" || tokens[first].text == "struct" || tokens[first].text == "enum") {
+            return first;
+        }
+        return std::nullopt;
     }
 
     bool IsDeclarationContext() const {
