@@ -438,15 +438,19 @@ When a wrapped lambda is assigned to a variable, keep the assignment prefix and 
 
 If the opener does not fit, first keep the capture list compact and split between `]` and `(` when both lines fit.
 
+When the lambda parameter list splits, keep the body `{` on the closing-parameter line.
+
 ```cpp
-const auto updateKey = [&lines, &ensureSection, shape]
-    (const std::string& sectionName, const std::string& key, const std::string& value)
-{
+const auto updateKey = [&](
+    const std::string& sectionName,
+    const std::string& key,
+    const std::string& value
+) {
     Update(sectionName, key, value);
 };
 ```
 
-If that does not fit, split a multi-parameter parameter list before splitting captures. Split captures last.
+Split a multi-parameter parameter list before splitting captures. Split captures last.
 
 ## Preprocessor And Macros
 

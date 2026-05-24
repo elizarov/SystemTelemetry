@@ -2424,7 +2424,7 @@ private:
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + firstLine);
         AppendLambdaParameterLines(lines, inner, *group, header, indentLevel);
-        lines.push_back(Indent(indentLevel) + "{");
+        AppendLambdaBodyOpen(lines);
         return lines;
     }
 
@@ -2457,8 +2457,7 @@ private:
             std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(*captureClose), header.end());
             const std::string restLine = FormatInline(rest);
             if (Fits(indentLevel, restLine)) {
-                lines.push_back(Indent(indentLevel) + restLine);
-                lines.push_back(Indent(indentLevel) + "{");
+                lines.push_back(Indent(indentLevel) + restLine + " {");
                 return lines;
             }
             std::vector<Token> inner(header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1),
@@ -2468,14 +2467,19 @@ private:
                     header.begin() + static_cast<std::ptrdiff_t>(parameterGroup->open + 1));
                 lines.push_back(Indent(indentLevel) + FormatInline(firstLineTokens));
                 AppendLambdaParameterLines(lines, inner, *parameterGroup, header, indentLevel);
-                lines.push_back(Indent(indentLevel) + "{");
+                AppendLambdaBodyOpen(lines);
                 return lines;
             }
         }
         std::vector<Token> rest(header.begin() + static_cast<std::ptrdiff_t>(*captureClose), header.end());
-        lines.push_back(Indent(indentLevel) + FormatInline(rest));
-        lines.push_back(Indent(indentLevel) + "{");
+        lines.push_back(Indent(indentLevel) + FormatInline(rest) + " {");
         return lines;
+    }
+
+    static void AppendLambdaBodyOpen(std::vector<std::string>& lines) {
+        if (!lines.empty()) {
+            lines.back() += " {";
+        }
     }
 
     void AppendLambdaParameterLines(std::vector<std::string>& lines,
