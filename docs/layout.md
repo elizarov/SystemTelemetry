@@ -57,6 +57,7 @@ The language is divided by responsibility:
 - Format: `metric.id = <scale>,<unit>,<label>`
 - `*` scale means the widget normalizes against telemetry-provided scale data.
 - Display style is metadata-owned for the metric id and is not a config field.
+- Memory metric units may use `<small>|<large>` so values with total capacity below `1 GB` use the small unit; the shipped `gpu.vram` definition uses `MB|GB`.
 - The runtime-only `nothing` placeholder keeps built-in metadata and `[metrics]` entries for it are ignored.
 - Throughput widgets and drive-usage rows read their displayed labels and units from this registry rather than from widget-local text.
 

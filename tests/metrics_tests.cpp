@@ -27,7 +27,7 @@ MetricsSectionConfig BuildMetricsConfig() {
     metrics.definitions.push_back(
         MetricDefinitionConfig{"cpu.ram", MetricDisplayStyle::Memory, true, 0.0, "GB", "RAM"});
     metrics.definitions.push_back(
-        MetricDefinitionConfig{"gpu.vram", MetricDisplayStyle::Memory, true, 0.0, "GB", "VRAM"});
+        MetricDefinitionConfig{"gpu.vram", MetricDisplayStyle::Memory, true, 0.0, "MB|GB", "VRAM"});
     metrics.definitions.push_back(
         MetricDefinitionConfig{"board.temp.cpu", MetricDisplayStyle::Scalar, false, 100.0, "C", "Temp"});
     metrics.definitions.push_back(
@@ -174,6 +174,7 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricValue& vram = source.ResolveMetric("gpu.vram");
     EXPECT_EQ(vram.label, "VRAM");
     EXPECT_EQ(vram.valueText, "8.4 / 16 GB");
+    EXPECT_EQ(vram.unit, "MB|GB");
     EXPECT_DOUBLE_EQ(vram.ratio, 8.4 / 16.0);
 
     const MetricValue& fps = source.ResolveMetric("gpu.fps");
@@ -194,6 +195,19 @@ TEST(Metrics, ResolvesUnifiedMetricsForGaugeAndMetricList) {
     const MetricValue* metricListFps = source.FindMetric("gpu.fps");
     ASSERT_NE(metricListFps, nullptr);
     EXPECT_EQ(metricListFps->label, "FPS");
+}
+
+TEST(Metrics, FormatsGpuVramBelowOneGbInMegabytes) {
+    const MetricsSectionConfig metrics = BuildMetricsConfig();
+    SystemSnapshot snapshot;
+    snapshot.gpu.vram = MemoryMetric{0.0625, 0.125};
+
+    MetricSource source(snapshot, metrics);
+
+    const MetricValue& vram = source.ResolveMetric("gpu.vram");
+    EXPECT_EQ(vram.label, "VRAM");
+    EXPECT_EQ(vram.valueText, "64 / 128 MB");
+    EXPECT_DOUBLE_EQ(vram.ratio, 0.5);
 }
 
 TEST(Metrics, ResolvesGpuFpsPermissionIssueAsAdminIndicator) {
