@@ -372,6 +372,12 @@ DashboardApp::DashboardApp(
     renderer_.SetLiveAnimationEnabled(true);
 }
 
+TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept :
+    collector_(std::exchange(other.collector_, nullptr)),
+    trace_(std::exchange(other.trace_, nullptr)),
+    operation_(std::exchange(other.operation_, nullptr)),
+    startedAt_(std::exchange(other.startedAt_, 0)) {}
+
 HANDLE OpenProbe(FilePath probePath) {
     HANDLE probe = CreateFileA(
         probePath.string().c_str(),

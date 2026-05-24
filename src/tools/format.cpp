@@ -4369,11 +4369,11 @@ private:
         if (HasTopLevelTokenBefore(tokens, index, "?")) {
             return false;
         }
-        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
-        if (!previous || tokens[*previous].text != ")") {
+        const std::optional<size_t> parametersClose = FindConstructorParameterListCloseBeforeColon(tokens, index);
+        if (!parametersClose) {
             return false;
         }
-        const std::optional<size_t> open = FindMatchingOpen(tokens, *previous);
+        const std::optional<size_t> open = FindMatchingOpen(tokens, *parametersClose);
         if (!open) {
             return false;
         }
@@ -4383,6 +4383,47 @@ private:
         }
         const size_t afterColon = NextSignificantIndex(tokens, index + 1);
         return afterColon < tokens.size();
+    }
+
+    std::optional<size_t> FindConstructorParameterListCloseBeforeColon(
+        const std::vector<Token>& tokens,
+        size_t colon
+    ) const {
+        size_t cursor = colon;
+        while (std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, cursor)) {
+            if (tokens[*previous].text == ")") {
+                const std::optional<size_t> open = FindMatchingOpen(tokens, *previous);
+                if (!open) {
+                    return std::nullopt;
+                }
+                const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
+                if (
+                    beforeOpen &&
+                    tokens[*beforeOpen].kind == TokenKind::Word &&
+                    IsConstructorTrailingQualifierGroup(tokens[*beforeOpen].text)
+                ) {
+                    cursor = *beforeOpen;
+                    continue;
+                }
+                return *previous;
+            }
+            if (
+                tokens[*previous].kind == TokenKind::Word && IsConstructorTrailingQualifierWord(tokens[*previous].text)
+            ) {
+                cursor = *previous;
+                continue;
+            }
+            break;
+        }
+        return std::nullopt;
+    }
+
+    static bool IsConstructorTrailingQualifierWord(std::string_view text) {
+        return text == "noexcept";
+    }
+
+    static bool IsConstructorTrailingQualifierGroup(std::string_view text) {
+        return text == "noexcept" || text == "requires";
     }
 
     bool HasTopLevelTokenBefore(const std::vector<Token>& tokens, size_t before, std::string_view text) const {

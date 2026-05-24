@@ -252,6 +252,8 @@ DashboardApp::DashboardApp(const DiagnosticsOptions& diagnosticsOptions,bool bri
 renderer_.SetLiveAnimationEnabled(true);
 }
 
+TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept : collector_(std::exchange(other.collector_, nullptr)), trace_(std::exchange(other.trace_, nullptr)), operation_(std::exchange(other.operation_, nullptr)), startedAt_(std::exchange(other.startedAt_, 0)) {}
+
 HANDLE OpenProbe(FilePath probePath){
 HANDLE probe=CreateFileA(probePath.string().c_str(),GENERIC_WRITE,FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,nullptr,CREATE_NEW,FILE_ATTRIBUTE_TEMPORARY | FILE_FLAG_DELETE_ON_CLOSE,nullptr);
 return probe;

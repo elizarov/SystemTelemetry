@@ -344,7 +344,7 @@ template <typename Callable>
 FunctionRef(Callable&& callable);
 ```
 
-Constructor initializer lists follow the same compact-or-fully-split rule. A short constructor initializer list stays with the declaration. A long constructor initializer list keeps `) :` on the header line, then emits each initializer on its own structural line indented one level deeper. For a non-empty body, the opening body brace is emitted on its own line after the initializer list. Empty bodies keep `{}` compact.
+Constructor initializer lists follow the same compact-or-fully-split rule. A short constructor initializer list stays with the declaration. A long constructor initializer list keeps `) :` on the header line, or `) noexcept :` when a trailing qualifier is present, then emits each initializer on its own structural line indented one level deeper. For a non-empty body, the opening body brace is emitted on its own line after the initializer list. Empty bodies keep `{}` compact.
 
 ```cpp
 Widget::Widget(int value) : value_(value) {}
@@ -361,6 +361,12 @@ DashboardApp::DashboardApp(
 {
     renderer_.SetLiveAnimationEnabled(true);
 }
+
+TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept :
+    collector_(std::exchange(other.collector_, nullptr)),
+    trace_(std::exchange(other.trace_, nullptr)),
+    operation_(std::exchange(other.operation_, nullptr)),
+    startedAt_(std::exchange(other.startedAt_, 0)) {}
 ```
 
 Control-statement headers use the same treatment. This applies to `if`, `while`, `for`, `switch`, `catch`, and similar parenthesized control constructs. A short header stays on one line. A long header puts the opening parenthesis at the end of the keyword line, formats the whole condition or header as structural contents, and puts the closing parenthesis on the line that opens the body.
