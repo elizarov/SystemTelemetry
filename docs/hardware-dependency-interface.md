@@ -1,6 +1,6 @@
-# Hardware Dependency Interface Proposal
+# Hardware Dependency Interface
 
-This document owns the active proposal for a hardware dependency interface, or HDI, in the telemetry package. The proposal is implementation guidance, not shipped runtime behavior. `docs/hardware.md` remains the source of truth for supported hardware providers and provider troubleshooting, and `docs/architecture/telemetry.md` remains the source of truth for current telemetry package boundaries.
+This document owns the hardware dependency interface, or HDI, in the telemetry package. It describes the implemented test boundary and the remaining migration target for hardware-provider dependencies. `docs/hardware.md` remains the source of truth for supported hardware providers and provider troubleshooting, and `docs/architecture/telemetry.md` remains the source of truth for current telemetry package boundaries.
 
 ## Goal
 
@@ -22,7 +22,7 @@ The target test surface covers GPU telemetry, board telemetry, and presented FPS
 
 HDI covers the machine-dependent boundaries needed to exercise hardware-provider behavior end to end:
 
-- GPU adapter discovery and matching inputs, including DXGI adapter enumeration, DXGI adapter descriptions and LUIDs, PCI identity lookup through D3DKMT, and adapter activity inputs used by presented-FPS process selection.
+- GPU adapter discovery and matching inputs, including DXGI adapter enumeration, DXGI adapter descriptions and LUIDs, PCI identity lookup through D3DKMT, GPU Engine and GPU Adapter Memory counters used by fallback GPU metrics, and adapter activity inputs used by presented-FPS process selection.
 - AMD ADLX calls used by the AMD GPU provider, including runtime initialization, GPU enumeration, GPU identity, supported metric checks, total VRAM, and metric sampling.
 - Intel Level Zero Sysman calls used by the Intel GPU provider, including loader availability, Sysman and core enumeration, device properties, engine, temperature, fan, frequency, memory components, and WDDM node clock fallback.
 - NVIDIA NVML and NVAPI calls used by the NVIDIA GPU provider, including dynamic library loading, entrypoint lookup, initialization, GPU enumeration, PCI identity, memory, temperature, fan RPM, and graphics clock sampling.
@@ -45,7 +45,7 @@ Each production HDI exposes only the operations CaseDash uses, not the full vend
 
 HDI headers avoid depending on large vendor SDK headers when practical. Prefer opaque handle aliases and small POD mirrors for the fields CaseDash consumes. If an existing vendored header is already required for a provider, keep that dependency contained to the provider-specific HDI header and do not leak it into shared telemetry headers.
 
-Factories create production HDIs from `Trace&` and provider options. `CreateTelemetryRuntime` accepts an optional `HardwareDependencyInjection` argument used by tests to install mock factories. Normal runs omit that argument and use production factories. Provider factories receive the dependencies they need instead of constructing hardware libraries internally.
+Factories create production HDIs from `Trace&` and provider options. `CreateTelemetryRuntime` accepts an optional `HardwareDependencyInjection` argument used by tests to install mock factories. The runtime borrows the injected `HdiFactory`; the factory and the mock state it returns must outlive the runtime. Normal runs omit that argument and use production factories. Provider factories receive the dependencies they need instead of constructing hardware libraries internally.
 
 Fixture-backed factories are test-only. Diagnostics commands do not install mock HDIs or run hardware replay workflows through production binaries.
 
@@ -78,8 +78,9 @@ Each hardware fixture includes:
 
 Mocks are strict. They validate which methods are called, how many times they are called, and which calls are intentionally absent for a hardware path. This catches accidental provider work, repeated runtime loads, and performance regressions that snapshot-only assertions can miss.
 
-Initial fixtures should mirror machines that already have performance records:
+Fixtures mirror machines that already have performance records:
 
+- `msi-z690-carbon-wifi-rtx3080` covers the implemented shared discovery, GPU fallback performance-counter, NVIDIA NVML/NVAPI, and MSI Center HDIs through `CreateTelemetryRuntime` and one collected snapshot.
 - `asus-gu603vi-intel-uhd-rtx4070` for hybrid Intel plus NVIDIA GPU selection, sleeping dGPU behavior, and ASUS board-backed fan fallback.
 - `gigabyte-x570i-amd-rx6800` for AMD ADLX GPU telemetry and Gigabyte SIV board telemetry.
 - `lenovo-lnvnb161216-intel-uhd-gtx1650ti` for Intel integrated GPU behavior, NVIDIA dGPU behavior, Lenovo service-backed board sampling, and permission-gated paths.
@@ -88,21 +89,19 @@ Tests assert through `CreateTelemetryRuntime` and the normal telemetry collectio
 
 HDI tests run provider behavior in synchronous mode. Asynchronous providers, such as Lenovo direct refresh or service-backed samples, expose deterministic synchronous test hooks through the injected dependencies instead of sleeping or waiting on background work.
 
-## Rollout
+## Rollout State
 
-Start with the smallest vertical slice that proves the seam:
+The implemented vertical slice proves the seam through the MSI Z690 plus RTX 3080 fixture:
 
-1. Add the HDI dependency factory and test mock infrastructure without changing behavior.
-2. Move GPU adapter discovery and board vendor discovery behind HDI so provider selection is testable independently of the current machine.
-3. Migrate one simple provider boundary, such as ASUS ATKACPI, and add one end-to-end test fixture.
-4. Migrate one dynamic native library provider, such as NVIDIA NVML or Intel Level Zero Sysman, and verify optional-entrypoint and missing-library behavior.
-5. Migrate presented FPS and Lenovo service-backed board sampling because those paths exercise service, permission, and asynchronous refresh behavior.
-6. Migrate managed bridge providers after the native mock and fixture shape is stable.
+- `HardwareDependencyInjection` and `HdiFactory` are package-private test seams reached from `CreateTelemetryRuntime`.
+- GPU adapter discovery, GPU fallback performance counters, and board vendor discovery are behind shared HDIs under `src/telemetry/impl/`.
+- NVIDIA NVML and NVAPI are behind provider-local HDIs under `src/telemetry/gpu/nvidia/impl/`.
+- MSI Center SDK discovery and managed bridge capture are behind a provider-local HDI under `src/telemetry/board/msi/impl/`.
+- `tests/hdi/msi_z690_rtx3080_hdi_tests.cpp` asserts runtime creation, hardware discovery, provider initialization, one telemetry snapshot, and strict mock call counts.
 
 Each migration removes raw external-call tracing from the provider module as the equivalent HDI tracing lands. The public hardware behavior and diagnostics contracts in `docs/hardware.md` should not change unless the implementation intentionally changes provider behavior.
 
-## Remaining Details
+## Remaining Work
 
-- Define the `HardwareDependencyInjection` contract and the exact ownership model for injected factories.
 - Decide how verbose fixture-capture tooling is built, invoked, and kept separate from production binaries.
-- Choose the first vertical-slice provider and fixture after the dependency injection API is sketched.
+- Migrate AMD ADLX, Intel Level Zero Sysman, ASUS ATKACPI, Gigabyte SIV, Lenovo diagnostics and service-backed board sampling, and presented FPS.

@@ -1,121 +1,29 @@
 #include "telemetry/impl/collector_gpu.h"
 
-#include <cstring>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 #include "config/metric_board_binding.h"
 #include "telemetry/fps/fps_service_client_provider.h"
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/impl/collector_state.h"
-#include "telemetry/impl/collector_support.h"
+#include "telemetry/impl/hdi.h"
+#include "telemetry/impl/hdi_gpu_performance.h"
 #include "util/numeric_safety.h"
 #include "util/resource_strings.h"
 
 namespace {
 
 constexpr char kPdhAllGpuAdaptersFilterLabel[] = "all";
-constexpr char kGpuEngine3dMarker[] = "engtype_3D";
-
-struct CounterArrayTotals {
-    double total = 0.0;
-    double total3d = 0.0;
-    DWORD matchedCount = 0;
-};
 
 std::optional<std::string> SelectedGpuPdhLuidToken(const RealTelemetryCollectorState& state) {
     return state.gpu_.selectedAdapter.has_value() ? GpuAdapterPdhLuidToken(*state.gpu_.selectedAdapter) : std::nullopt;
 }
 
-char LowerAscii(char ch) {
-    return ch >= 'A' && ch <= 'Z' ? static_cast<char>(ch - 'A' + 'a') : ch;
-}
-
-bool MatchesPdhInstanceFilter(const char* instance, std::string_view filter) {
-    if (filter.empty()) {
-        return true;
-    }
-    if (instance == nullptr) {
-        return false;
-    }
-
-    for (const char* cursor = instance; *cursor != '\0'; ++cursor) {
-        size_t matched = 0;
-        while (matched < filter.size() && cursor[matched] != '\0' &&
-               LowerAscii(cursor[matched]) == LowerAscii(filter[matched])) {
-            ++matched;
-        }
-        if (matched == filter.size()) {
-            return true;
-        }
-    }
-    return false;
-}
-
 std::string FormatOptionalFps(std::optional<double> value) {
     return value.has_value() ? Trace::FormatValueDouble("fps", *value, 1) : std::string("fps=N/A");
-}
-
-CounterArrayTotals ReadCounterArrayTotals(
-    RealTelemetryCollectorState& state, PDH_HCOUNTER counter, std::string_view instanceFilter, const char* filter) {
-    CounterArrayTotals totals;
-    if (counter == nullptr) {
-        return totals;
-    }
-    DWORD bufferSize = 0;
-    DWORD itemCount = 0;
-    PDH_STATUS status = PdhGetFormattedCounterArrayA(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, nullptr);
-    if (status != PDH_MORE_DATA) {
-        state.trace_.WriteFmt(
-            TracePrefix::Telemetry, RES_STR("pdh_array_prepare status=%ld"), static_cast<long>(status));
-        return totals;
-    }
-
-    state.gpu_.counterArrayBuffer.resize(bufferSize);
-    auto* items = reinterpret_cast<PDH_FMT_COUNTERVALUE_ITEM_A*>(state.gpu_.counterArrayBuffer.data());
-    status = PdhGetFormattedCounterArrayA(counter, PDH_FMT_DOUBLE, &bufferSize, &itemCount, items);
-    if (status != ERROR_SUCCESS) {
-        state.trace_.WriteFmt(TracePrefix::Telemetry,
-            RES_STR("pdh_array_fetch status=%ld count=%lu"),
-            static_cast<long>(status),
-            static_cast<unsigned long>(itemCount));
-        return totals;
-    }
-
-    for (DWORD i = 0; i < itemCount; ++i) {
-        const char* instance = items[i].szName;
-        if (!MatchesPdhInstanceFilter(instance, instanceFilter)) {
-            continue;
-        }
-        if (items[i].FmtValue.CStatus != ERROR_SUCCESS || !IsFiniteDouble(items[i].FmtValue.doubleValue)) {
-            continue;
-        }
-        ++totals.matchedCount;
-        totals.total += items[i].FmtValue.doubleValue;
-        if (instance != nullptr && std::strstr(instance, kGpuEngine3dMarker) != nullptr) {
-            totals.total3d += items[i].FmtValue.doubleValue;
-        }
-    }
-
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("pdh_array_done status=%ld count=%lu matched=%lu filter=\"%s\" total=value=%.2f total3d=value=%.2f"),
-        static_cast<long>(status),
-        static_cast<unsigned long>(itemCount),
-        static_cast<unsigned long>(totals.matchedCount),
-        filter,
-        totals.total,
-        totals.total3d);
-    totals.total = FiniteNonNegativeOr(totals.total);
-    totals.total3d = FiniteNonNegativeOr(totals.total3d);
-    return totals;
-}
-
-double SumCounterArray(
-    RealTelemetryCollectorState& state, PDH_HCOUNTER counter, std::string_view instanceFilter, const char* filter) {
-    return ReadCounterArrayTotals(state, counter, instanceFilter, filter).total;
 }
 
 void ApplyGpuVendorSample(RealTelemetryCollectorState& state, const GpuVendorTelemetrySample& sample) {
@@ -264,8 +172,8 @@ void ApplySelectedGpuAdapterInfo(RealTelemetryCollectorState& state) {
 }
 
 void ResolveGpuSelection(RealTelemetryCollectorState& state) {
-    GpuAdapterSelection selection =
-        ResolveGpuAdapterSelection(state.trace_, state.settings_.selection.preferredGpuAdapterName);
+    GpuAdapterSelection selection = ResolveGpuAdapterSelection(
+        state.trace_, state.settings_.selection.preferredGpuAdapterName, state.hardwareDependencyInjection_);
     state.gpu_.selectedAdapter = selection.selectedAdapter;
     state.gpu_.adapterCandidates = std::move(selection.candidates);
     state.resolvedSelections_.gpuAdapterName =
@@ -275,8 +183,10 @@ void ResolveGpuSelection(RealTelemetryCollectorState& state) {
 }
 
 void InitializeGpuVendorProvider(RealTelemetryCollectorState& state) {
-    state.gpu_.provider =
-        CreateGpuVendorTelemetryProvider(state.trace_, state.gpu_.selectedAdapter, state.settings_.collectPresentedFps);
+    state.gpu_.provider = CreateGpuVendorTelemetryProvider(state.trace_,
+        state.gpu_.selectedAdapter,
+        state.settings_.collectPresentedFps,
+        state.hardwareDependencyInjection_);
     if (state.gpu_.provider == nullptr) {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("gpu_provider_create result=null"));
         return;
@@ -357,31 +267,11 @@ void InitializeGpuCollector(RealTelemetryCollectorState& state) {
     ResetGpuProviderState(state);
     ResolveGpuSelection(state);
     InitializeGpuVendorProvider(state);
-
-    const PDH_STATUS queryStatus = PdhOpenQueryA(nullptr, 0, &state.gpu_.query);
-    state.trace_.WriteFmt(
-        TracePrefix::Telemetry, RES_STR("pdh_open gpu_query status=%ld"), static_cast<long>(queryStatus));
-    const PDH_STATUS loadStatus =
-        AddCounterCompat(state.gpu_.query, "\\GPU Engine(*)\\Utilization Percentage", &state.gpu_.loadCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("pdh_add gpu_load path=\"\\\\GPU Engine(*)\\\\Utilization Percentage\" status=%ld"),
-        static_cast<long>(loadStatus));
-    const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
-    state.trace_.WriteFmt(
-        TracePrefix::Telemetry, RES_STR("pdh_collect gpu_query status=%ld"), static_cast<long>(collectStatus));
-
-    const PDH_STATUS memoryQueryStatus = PdhOpenQueryA(nullptr, 0, &state.gpu_.memoryQuery);
-    state.trace_.WriteFmt(
-        TracePrefix::Telemetry, RES_STR("pdh_open gpu_memory_query status=%ld"), static_cast<long>(memoryQueryStatus));
-    const PDH_STATUS memoryCounterStatus = AddCounterCompat(
-        state.gpu_.memoryQuery, "\\GPU Adapter Memory(*)\\Dedicated Usage", &state.gpu_.dedicatedCounter);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("pdh_add gpu_memory path=\"\\\\GPU Adapter Memory(*)\\\\Dedicated Usage\" status=%ld"),
-        static_cast<long>(memoryCounterStatus));
-    const PDH_STATUS memoryCollectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
-    state.trace_.WriteFmt(TracePrefix::Telemetry,
-        RES_STR("pdh_collect gpu_memory_query status=%ld"),
-        static_cast<long>(memoryCollectStatus));
+    state.gpu_.performance =
+        ResolveHdiFactory(state.hardwareDependencyInjection_).CreateGpuPerformanceHdi(state.trace_);
+    if (state.gpu_.performance != nullptr) {
+        state.gpu_.performance->Initialize();
+    }
 }
 
 void ReconfigureGpuCollector(RealTelemetryCollectorState& state) {
@@ -389,9 +279,15 @@ void ReconfigureGpuCollector(RealTelemetryCollectorState& state) {
         TracePrefix::Telemetry, RES_STR("gpu_provider_shutdown provider=%s"), state.gpu_.providerName.c_str());
     state.gpu_.provider.reset();
     state.gpu_.fallbackFpsProvider.reset();
+    state.gpu_.performance.reset();
     ResetGpuProviderState(state);
     ResolveGpuSelection(state);
     InitializeGpuVendorProvider(state);
+    state.gpu_.performance =
+        ResolveHdiFactory(state.hardwareDependencyInjection_).CreateGpuPerformanceHdi(state.trace_);
+    if (state.gpu_.performance != nullptr) {
+        state.gpu_.performance->Initialize();
+    }
 }
 
 void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
@@ -414,16 +310,13 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     ApplyIntelCpuTemperatureFallback(state);
     ApplyFallbackFpsSample(state);
 
-    if (!hasVendorLoad && state.gpu_.query != nullptr) {
+    if (!hasVendorLoad && state.gpu_.performance != nullptr) {
         const std::optional<std::string> filterToken = SelectedGpuPdhLuidToken(state);
         const std::string filterLabel = filterToken.value_or(kPdhAllGpuAdaptersFilterLabel);
         const std::string_view instanceFilter =
             filterToken.has_value() ? std::string_view(*filterToken) : std::string_view();
-        const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.query);
-        state.trace_.WriteFmt(
-            TracePrefix::Telemetry, RES_STR("gpu_collect status=%ld"), static_cast<long>(collectStatus));
-        const CounterArrayTotals loadTotals =
-            ReadCounterArrayTotals(state, state.gpu_.loadCounter, instanceFilter, filterLabel.c_str());
+        const GpuPerformanceLoadSample loadTotals =
+            state.gpu_.performance->SampleLoad(instanceFilter, filterLabel.c_str());
         const double load3d = loadTotals.total3d;
         const double loadAll = loadTotals.total;
         state.snapshot_.gpu.loadPercent = ClampFinite(load3d > 0.0 ? load3d : loadAll, 0.0, 100.0);
@@ -439,15 +332,12 @@ void UpdateGpuMetrics(RealTelemetryCollectorState& state) {
     state.retainedHistoryStore_.PushSample(
         state.snapshot_, RetainedHistoryKey::GpuLoad, state.snapshot_.gpu.loadPercent);
 
-    if (!hasVendorVram && state.gpu_.memoryQuery != nullptr) {
+    if (!hasVendorVram && state.gpu_.performance != nullptr) {
         const std::optional<std::string> filterToken = SelectedGpuPdhLuidToken(state);
         const std::string filterLabel = filterToken.value_or(kPdhAllGpuAdaptersFilterLabel);
         const std::string_view instanceFilter =
             filterToken.has_value() ? std::string_view(*filterToken) : std::string_view();
-        const PDH_STATUS collectStatus = PdhCollectQueryData(state.gpu_.memoryQuery);
-        state.trace_.WriteFmt(
-            TracePrefix::Telemetry, RES_STR("gpu_memory_collect status=%ld"), static_cast<long>(collectStatus));
-        const double bytes = SumCounterArray(state, state.gpu_.dedicatedCounter, instanceFilter, filterLabel.c_str());
+        const double bytes = state.gpu_.performance->SampleDedicatedMemoryBytes(instanceFilter, filterLabel.c_str());
         state.snapshot_.gpu.vram.usedGb = FiniteNonNegativeOr(bytes / (1024.0 * 1024.0 * 1024.0));
         state.trace_.WriteFmt(TracePrefix::Telemetry,
             RES_STR("gpu_memory filter=\"%s\" bytes=value=%.0f used_gb=value=%.2f"),

@@ -1,7 +1,7 @@
 # Telemetry Package
 
 `src/telemetry/` owns live collection, fake collection, the telemetry runtime thread, telemetry snapshot contracts, snapshot dump-facing telemetry types, provider bridges, retained histories, the production metric catalog, FPS provider contracts, and the service IPC protocol.
-See also: [docs/hardware.md](../hardware.md) for supported provider behavior and [docs/hardware-dependency-interface.md](../hardware-dependency-interface.md) for the active hardware dependency interface (HDI) testing proposal.
+See also: [docs/hardware.md](../hardware.md) for supported provider behavior and [docs/hardware-dependency-interface.md](../hardware-dependency-interface.md) for the hardware dependency interface (HDI) testing boundary.
 
 ## Responsibilities
 
@@ -23,7 +23,7 @@ See also: [docs/hardware.md](../hardware.md) for supported provider behavior and
 - `telemetry/board/` contains board-provider extraction, pure vendor selection, supported provider bridges, and unsupported-board fallback behavior.
 - `telemetry/gpu/` contains GPU-provider extraction, pure vendor selection, supported provider bridges, and unsupported-GPU fallback behavior.
 - `telemetry/fps/` contains package-private Windows ETW presented-FPS and service-client provider implementations, with `telemetry/fps/impl/` for provider-local helpers such as the GPU raw-counter map.
-- `telemetry/impl/` contains collector submodules and system-info support.
+- `telemetry/impl/` contains collector submodules, system-info support, and shared HDIs for hardware discovery or collector-owned hardware counters.
 
 ## Boundaries
 
@@ -31,4 +31,4 @@ See also: [docs/hardware.md](../hardware.md) for supported provider behavior and
 - It publishes runtime contracts such as `TelemetryRuntime`, `SystemSnapshot`, provider samples, and metric resolution for higher packages.
 - It does not depend on renderer, widget, dashboard, diagnostics, display, layout-edit, or main.
 - Provider .NET assembly reflection stays in CLR-enabled bridge translation units; native provider state stays out of CLR metadata.
-- Native vendor providers keep provider-specific setup and method translation inside the provider module, including contracts such as ASUS ATKACPI `DSTS` device calls, Lenovo diagnostics-driver CPU temperature reads, Lenovo GameZone WMI fan calls, and vendor SDK bridges, then publish normal board-provider samples to the collector. Slow direct provider refresh paths own their own cadence and cached sample state so telemetry startup does not wait on vendor diagnostics scans.
+- Native vendor providers keep provider-specific interpretation, capability checks, fallback decisions, metric mapping, and user-facing diagnostics inside the provider module. Hardware-facing calls that have been migrated to HDI live in shared `telemetry/impl/` HDIs or provider-local `impl/` HDIs, then publish normal provider samples to the collector. Slow direct provider refresh paths own their own cadence and cached sample state so telemetry startup does not wait on vendor diagnostics scans.

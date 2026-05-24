@@ -1,6 +1,7 @@
 #include "telemetry/impl/collector_board.h"
 
 #include <algorithm>
+#include <utility>
 
 #include "telemetry/board/board_vendor.h"
 #include "telemetry/impl/collector_state.h"
@@ -126,7 +127,9 @@ void ClearBoardProviderState(RealTelemetryCollectorState& state, const char* dia
 void CreateBoardProvider(RealTelemetryCollectorState& state) {
     BoardVendorTelemetryProviderOptions providerOptions;
     providerOptions.synchronousSamples = state.synchronousProviderSamples_;
-    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_, providerOptions);
+    BoardVendorInfo info = ExtractBoardVendorInfo(state.hardwareDependencyInjection_);
+    state.board_.provider = CreateBoardVendorTelemetryProvider(
+        state.trace_, std::move(info), providerOptions, state.hardwareDependencyInjection_);
 }
 
 }  // namespace

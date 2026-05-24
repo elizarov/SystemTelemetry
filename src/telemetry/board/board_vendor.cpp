@@ -6,13 +6,13 @@
 #include "telemetry/board/gigabyte/board_gigabyte_siv.h"
 #include "telemetry/board/lenovo/board_lenovo_vantage.h"
 #include "telemetry/board/msi/board_msi_center.h"
+#include "telemetry/impl/hdi.h"
+#include "telemetry/impl/hdi_board_discovery.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/resource_strings.h"
 #include "util/trace.h"
 
 namespace {
-
-constexpr char kBiosKey[] = "HARDWARE\\DESCRIPTION\\System\\BIOS";
 
 class UnsupportedBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
@@ -47,13 +47,16 @@ private:
     BoardVendorTelemetrySample sample_;
 };
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
-    Trace& trace, BoardVendor vendor, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(Trace& trace,
+    BoardVendor vendor,
+    BoardVendorInfo info,
+    const BoardVendorTelemetryProviderOptions& options,
+    const HardwareDependencyInjection* injection) {
     if (vendor == BoardVendor::Asus) {
         return CreateAsusBoardTelemetryProvider(trace, std::move(info));
     }
     if (vendor == BoardVendor::Msi) {
-        return CreateMsiBoardTelemetryProvider(trace, std::move(info));
+        return CreateMsiBoardTelemetryProvider(trace, std::move(info), injection);
     }
     if (vendor == BoardVendor::Gigabyte) {
         return CreateGigabyteBoardTelemetryProvider(trace, std::move(info));
@@ -68,20 +71,38 @@ std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
 }  // namespace
 
 BoardVendorInfo ExtractBoardVendorInfo() {
-    return BoardVendorInfo{
-        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardManufacturer").value_or(""),
-        ReadRegistryString(HKEY_LOCAL_MACHINE, kBiosKey, "BaseBoardProduct").value_or(""),
-    };
+    return ExtractBoardVendorInfo(nullptr);
+}
+
+BoardVendorInfo ExtractBoardVendorInfo(const HardwareDependencyInjection* injection) {
+    std::unique_ptr<BoardDiscoveryHdi> discovery = ResolveHdiFactory(injection).CreateBoardDiscoveryHdi();
+    return discovery != nullptr ? discovery->ReadBoardVendorInfo() : BoardVendorInfo{};
 }
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
-    Trace& trace, const BoardVendorTelemetryProviderOptions& options) {
-    BoardVendorInfo info = ExtractBoardVendorInfo();
+    Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
+    return CreateBoardVendorTelemetryProvider(trace, std::move(info), options, nullptr);
+}
+
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace,
+    BoardVendorInfo info,
+    const BoardVendorTelemetryProviderOptions& options,
+    const HardwareDependencyInjection* injection) {
     const BoardVendor vendor = SelectBoardVendor(info);
     trace.WriteFmt(TracePrefix::BoardVendor,
         RES_STR("create vendor=%s manufacturer=\"%s\" product=\"%s\""),
         BoardVendorName(vendor),
         info.manufacturer.c_str(),
         info.product.c_str());
-    return CreateBoardProviderForVendor(trace, vendor, std::move(info), options);
+    return CreateBoardProviderForVendor(trace, vendor, std::move(info), options, injection);
+}
+
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, const BoardVendorTelemetryProviderOptions& options) {
+    return CreateBoardVendorTelemetryProvider(trace, options, nullptr);
+}
+
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, const BoardVendorTelemetryProviderOptions& options, const HardwareDependencyInjection* injection) {
+    return CreateBoardVendorTelemetryProvider(trace, ExtractBoardVendorInfo(injection), options, injection);
 }

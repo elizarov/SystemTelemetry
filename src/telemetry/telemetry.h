@@ -164,6 +164,8 @@ protected:
     ~TelemetryUpdateSink() = default;
 };
 
+struct HardwareDependencyInjection;
+
 class TelemetryRuntime {
 public:
     virtual ~TelemetryRuntime() = default;
@@ -212,4 +214,5 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     const TelemetrySettings& settings,
     Trace& trace,
     TelemetryUpdateSink* callback,
-    std::string* errorText = nullptr);
+    std::string* errorText = nullptr,
+    const HardwareDependencyInjection* hardwareDependencyInjection = nullptr);

@@ -32,6 +32,8 @@ struct DriveCounterState {
     PDH_HCOUNTER writeCounter = nullptr;
 };
 
+class GpuPerformanceHdi;
+
 struct RealTelemetryCollectorState {
     struct BoardState {
         std::unique_ptr<BoardVendorTelemetryProvider> provider;
@@ -61,11 +63,7 @@ struct RealTelemetryCollectorState {
         bool providerAvailable = false;
         std::optional<GpuAdapterInfo> selectedAdapter;
         std::vector<GpuAdapterCandidate> adapterCandidates;
-        PDH_HQUERY query = nullptr;
-        PDH_HCOUNTER loadCounter = nullptr;
-        PDH_HQUERY memoryQuery = nullptr;
-        PDH_HCOUNTER dedicatedCounter = nullptr;
-        std::vector<BYTE> counterArrayBuffer;
+        std::unique_ptr<GpuPerformanceHdi> performance;
     };
 
     struct StorageState {
@@ -87,7 +85,8 @@ struct RealTelemetryCollectorState {
         std::chrono::steady_clock::time_point previousTick{};
     };
 
-    RealTelemetryCollectorState(Trace& trace, bool synchronousProviderSamples);
+    RealTelemetryCollectorState(
+        Trace& trace, bool synchronousProviderSamples, const HardwareDependencyInjection* hardwareDependencyInjection);
     ~RealTelemetryCollectorState();
 
     TelemetrySettings settings_;
@@ -101,5 +100,6 @@ struct RealTelemetryCollectorState {
     NetworkState network_;
     RetainedHistoryStore retainedHistoryStore_;
     Trace& trace_;
+    const HardwareDependencyInjection* hardwareDependencyInjection_ = nullptr;
     bool synchronousProviderSamples_ = false;
 };

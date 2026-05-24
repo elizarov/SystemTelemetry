@@ -9,6 +9,8 @@
 #include "telemetry/metric_types.h"
 #include "util/trace.h"
 
+struct HardwareDependencyInjection;
+
 struct BoardVendorTelemetrySample {
     std::string boardManufacturer;
     std::string boardProduct;
@@ -36,5 +38,14 @@ struct BoardVendorTelemetryProviderOptions {
 };
 
 BoardVendorInfo ExtractBoardVendorInfo();
+BoardVendorInfo ExtractBoardVendorInfo(const HardwareDependencyInjection* injection);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace,
+    BoardVendorInfo info,
+    const BoardVendorTelemetryProviderOptions& options,
+    const HardwareDependencyInjection* injection);
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
     Trace& trace, const BoardVendorTelemetryProviderOptions& options);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
+    Trace& trace, const BoardVendorTelemetryProviderOptions& options, const HardwareDependencyInjection* injection);

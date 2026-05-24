@@ -33,5 +33,9 @@ protected:
     TelemetryCollector() = default;
 };
 
-std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(
-    const TelemetryCollectorOptions& options, const FilePath& workingDirectory, Trace& trace);
+struct HardwareDependencyInjection;
+
+std::unique_ptr<TelemetryCollector> CreateTelemetryCollector(const TelemetryCollectorOptions& options,
+    const FilePath& workingDirectory,
+    Trace& trace,
+    const HardwareDependencyInjection* hardwareDependencyInjection = nullptr);

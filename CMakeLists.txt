@@ -234,6 +234,14 @@ add_executable(CaseDash WIN32
     src/util/numeric_safety.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/hdi.cpp
+    src/telemetry/impl/hdi_default.cpp
+    src/telemetry/impl/hdi_gpu_discovery.cpp
+    src/telemetry/impl/hdi_gpu_performance.cpp
+    src/telemetry/impl/hdi_board_discovery.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvml.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvapi.cpp
+    src/telemetry/board/msi/impl/hdi_msi_center.cpp
     src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp
@@ -398,6 +406,14 @@ set(casedash_release_speed_sources
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/metrics.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/hdi.cpp
+    src/telemetry/impl/hdi_default.cpp
+    src/telemetry/impl/hdi_gpu_discovery.cpp
+    src/telemetry/impl/hdi_gpu_performance.cpp
+    src/telemetry/impl/hdi_board_discovery.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvml.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvapi.cpp
+    src/telemetry/board/msi/impl/hdi_msi_center.cpp
     src/widget/animation.cpp
     src/widget/animation_types.cpp
     src/widget/card_chrome_layout.cpp
@@ -613,6 +629,9 @@ set_target_properties(CaseDashTools PROPERTIES
     OUTPUT_NAME "CaseDashTools"
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
 )
+set_property(TARGET CaseDashTools APPEND PROPERTY
+    LINK_DEPENDS "${CMAKE_SOURCE_DIR}/CMakeLists.txt"
+)
 
 enable_testing()
 
@@ -667,6 +686,7 @@ add_executable(CaseDashTests
     tests/config_resolution_tests.cpp
     tests/config_writer_tests.cpp
     tests/hardware_vendor_selection_tests.cpp
+    tests/hdi/msi_z690_rtx3080_hdi_tests.cpp
     tests/system_info_support_tests.cpp
     tests/fps_service_protocol_tests.cpp
     tests/telemetry_retained_history_tests.cpp
@@ -721,13 +741,38 @@ add_executable(CaseDashTests
     src/layout_edit/impl/layout_snap_solver.cpp
     src/util/file_path.cpp
     src/util/numeric_safety.cpp
+    src/util/elevated_process.cpp
+    src/util/paths.cpp
     src/util/scale.cpp
     src/util/win32_format.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/gpu/gpu_vendor_selection.cpp
+    src/telemetry/gpu/gpu_vendor.cpp
+    src/telemetry/gpu/nvidia/gpu_nvidia_nvml.cpp
+    src/telemetry/gpu/amd/gpu_amd_adl.cpp
+    src/telemetry/gpu/intel/gpu_intel_level_zero.cpp
+    src/telemetry/board/board_vendor.cpp
+    src/telemetry/board/asus/board_asus_armoury_crate.cpp
+    src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
+    src/telemetry/board/msi/board_msi_center.cpp
+    src/telemetry/fps_provider.cpp
+    src/telemetry/fps/fps_etw_provider.cpp
+    src/telemetry/fps/impl/gpu_raw_counter_map.cpp
+    src/telemetry/fps/fps_service_client_provider.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/hdi.cpp
     src/telemetry/impl/collector.cpp
+    src/telemetry/impl/collector_state.cpp
+    src/telemetry/impl/collector_board.cpp
+    src/telemetry/impl/collector_cpu.cpp
+    src/telemetry/impl/collector_gpu.cpp
+    src/telemetry/impl/collector_support.cpp
+    src/telemetry/impl/collector_storage.cpp
+    src/telemetry/impl/collector_storage_selection.cpp
+    src/telemetry/impl/collector_network.cpp
+    src/telemetry/impl/collector_real.cpp
     src/telemetry/metrics.cpp
     src/widget/animation.cpp
     src/widget/animation_types.cpp
@@ -777,9 +822,13 @@ add_executable(CaseDashTests
     src/util/trace.cpp
     src/util/trace_timing.cpp
     src/telemetry/fps_service_protocol.cpp
+    src/vendor/adlx/SDK/ADLXHelper/Windows/Cpp/ADLXHelper.cpp
+    src/vendor/adlx/SDK/Platform/Windows/WinAPIs.cpp
+    $<TARGET_OBJECTS:CaseDashGigabyte>
   )
 target_include_directories(CaseDashTests PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
+    "${CMAKE_SOURCE_DIR}/src/vendor/adlx"
     "${CMAKE_SOURCE_DIR}/resources"
     "${CASEDASH_GENERATED_DIR}"
 )
@@ -815,9 +864,17 @@ target_link_libraries(CaseDashTests PRIVATE
     gdi32
     advapi32
     d3d11
+    dxgi
     d2d1
     dwrite
+    pdh
+    iphlpapi
+    ws2_32
     ole32
+    oleaut32
+    wbemuuid
+    wtsapi32
+    ${MSCOREE_LIB}
 )
 set_target_properties(CaseDashTests PROPERTIES
     VS_DEBUGGER_WORKING_DIRECTORY "${output_root}"
@@ -859,6 +916,14 @@ add_executable(CaseDashBenchmarks
     src/config/metric_board_binding.cpp
     src/telemetry/impl/system_info_support.cpp
     src/telemetry/telemetry.cpp
+    src/telemetry/impl/hdi.cpp
+    src/telemetry/impl/hdi_default.cpp
+    src/telemetry/impl/hdi_gpu_discovery.cpp
+    src/telemetry/impl/hdi_gpu_performance.cpp
+    src/telemetry/impl/hdi_board_discovery.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvml.cpp
+    src/telemetry/gpu/nvidia/impl/hdi_nvapi.cpp
+    src/telemetry/board/msi/impl/hdi_msi_center.cpp
     src/telemetry/impl/collector.cpp
     src/telemetry/impl/collector_state.cpp
     src/telemetry/impl/collector_board.cpp

@@ -1,9 +1,6 @@
 #include "telemetry/gpu/gpu_vendor.h"
 
-#include <windows.h>
-
 #include <cstdint>
-#include <dxgi.h>
 #include <memory>
 #include <optional>
 #include <string>
@@ -16,49 +13,18 @@
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "telemetry/gpu/intel/gpu_intel_level_zero.h"
 #include "telemetry/gpu/nvidia/gpu_nvidia_nvml.h"
+#include "telemetry/impl/hdi.h"
+#include "telemetry/impl/hdi_gpu_discovery.h"
 #include "util/resource_strings.h"
-#include "util/text_encoding.h"
 #include "util/text_format.h"
 #include "util/trace.h"
 
 namespace {
 
-using NtStatus = LONG;
-using D3DkmtHandle = UINT;
-
-constexpr int kD3DkmtQueryAdapterAddress = 6;
-constexpr char kGdi32LibraryName[] = "gdi32.dll";
-
-struct D3DkmtOpenAdapterFromLuid {
-    LUID adapterLuid;
-    D3DkmtHandle adapter = 0;
-};
-
-struct D3DkmtAdapterAddress {
-    UINT busNumber = 0;
-    UINT deviceNumber = 0;
-    UINT functionNumber = 0;
-};
-
-struct D3DkmtQueryAdapterInfo {
-    D3DkmtHandle adapter = 0;
-    int type = 0;
-    void* privateDriverData = nullptr;
-    UINT privateDriverDataSize = 0;
-};
-
-struct D3DkmtCloseAdapter {
-    D3DkmtHandle adapter = 0;
-};
-
 struct EnumeratedGpuAdapter {
     GpuAdapterInfo info;
     GpuVendor vendor = GpuVendor::Unknown;
 };
-
-using D3DkmtOpenAdapterFromLuidFn = NtStatus(WINAPI*)(D3DkmtOpenAdapterFromLuid*);
-using D3DkmtQueryAdapterInfoFn = NtStatus(WINAPI*)(const D3DkmtQueryAdapterInfo*);
-using D3DkmtCloseAdapterFn = NtStatus(WINAPI*)(const D3DkmtCloseAdapter*);
 
 class UnsupportedGpuTelemetryProvider final : public GpuVendorTelemetryProvider {
 public:
@@ -131,10 +97,13 @@ private:
     bool collectPresentedFps_ = false;
 };
 
-std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(
-    Trace& trace, GpuVendor vendor, std::optional<GpuAdapterInfo> adapter, bool collectPresentedFps) {
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorProviderForVendor(Trace& trace,
+    GpuVendor vendor,
+    std::optional<GpuAdapterInfo> adapter,
+    bool collectPresentedFps,
+    const HardwareDependencyInjection* injection) {
     if (vendor == GpuVendor::Nvidia) {
-        return CreateNvidiaGpuTelemetryProvider(trace, adapter, collectPresentedFps);
+        return CreateNvidiaGpuTelemetryProvider(trace, adapter, collectPresentedFps, injection);
     }
     if (vendor == GpuVendor::Amd) {
         return CreateAmdGpuTelemetryProvider(trace, adapter, collectPresentedFps);
@@ -169,138 +138,39 @@ GpuAdapterCandidate MakeGpuAdapterCandidate(const EnumeratedGpuAdapter& adapter,
     return candidate;
 }
 
-void PopulateAdapterPciAddress(GpuAdapterInfo& info, LUID adapterLuid) {
-    HMODULE gdi = GetModuleHandleA(kGdi32LibraryName);
-    if (gdi == nullptr) {
-        gdi = LoadLibraryA(kGdi32LibraryName);
-    }
-    if (gdi == nullptr) {
-        return;
-    }
-
-    const auto openAdapter =
-        reinterpret_cast<D3DkmtOpenAdapterFromLuidFn>(GetProcAddress(gdi, "D3DKMTOpenAdapterFromLuid"));
-    const auto queryAdapter = reinterpret_cast<D3DkmtQueryAdapterInfoFn>(GetProcAddress(gdi, "D3DKMTQueryAdapterInfo"));
-    const auto closeAdapter = reinterpret_cast<D3DkmtCloseAdapterFn>(GetProcAddress(gdi, "D3DKMTCloseAdapter"));
-    if (openAdapter == nullptr || queryAdapter == nullptr || closeAdapter == nullptr) {
-        return;
-    }
-
-    D3DkmtOpenAdapterFromLuid open{};
-    open.adapterLuid = adapterLuid;
-    if (openAdapter(&open) < 0) {
-        return;
-    }
-
-    D3DkmtAdapterAddress address{};
-    D3DkmtQueryAdapterInfo query{};
-    query.adapter = open.adapter;
-    query.type = kD3DkmtQueryAdapterAddress;
-    query.privateDriverData = &address;
-    query.privateDriverDataSize = sizeof(address);
-    if (queryAdapter(&query) >= 0) {
-        info.pciBus = address.busNumber;
-        info.pciDevice = address.deviceNumber;
-        info.pciFunction = address.functionNumber;
-        info.hasPciAddress = true;
-        info.hasPciAddress = HasUsableGpuPciAddress(info);
-    }
-
-    D3DkmtCloseAdapter close{};
-    close.adapter = open.adapter;
-    closeAdapter(&close);
-}
-
 }  // namespace
 
 GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view preferredAdapterName) {
+    return ResolveGpuAdapterSelection(trace, preferredAdapterName, nullptr);
+}
+
+GpuAdapterSelection ResolveGpuAdapterSelection(
+    Trace& trace, std::string_view preferredAdapterName, const HardwareDependencyInjection* injection) {
     GpuAdapterSelection selection;
     std::vector<EnumeratedGpuAdapter> adapters;
-    IDXGIFactory1* factory = nullptr;
-    const HRESULT factoryHr = CreateDXGIFactory1(__uuidof(IDXGIFactory1), reinterpret_cast<void**>(&factory));
-    if (FAILED(factoryHr) || factory == nullptr) {
-        trace.WriteFmt(
-            TracePrefix::GpuVendor, RES_STR("adapter_factory hr=0x%08X"), static_cast<unsigned int>(factoryHr));
+    std::unique_ptr<GpuDiscoveryHdi> discovery = ResolveHdiFactory(injection).CreateGpuDiscoveryHdi(trace);
+    if (discovery == nullptr) {
+        trace.Write(TracePrefix::GpuVendor, RES_STR("adapter_discovery result=null"));
         return selection;
     }
 
-    for (UINT adapterIndex = 0;; ++adapterIndex) {
-        IDXGIAdapter1* adapter = nullptr;
-        const HRESULT enumHr = factory->EnumAdapters1(adapterIndex, &adapter);
-        if (enumHr == DXGI_ERROR_NOT_FOUND) {
-            trace.Write(TracePrefix::GpuVendor, RES_STR("adapter_enum done"));
-            break;
-        }
-        if (FAILED(enumHr) || adapter == nullptr) {
+    for (GpuAdapterInfo info : discovery->EnumerateAdapters()) {
+        const GpuVendor vendor = SelectGpuVendor(info);
+        const std::optional<size_t> duplicateIndex = FindDuplicateGpuAdapterIndex(adapters, info);
+        if (duplicateIndex.has_value()) {
+            const bool replace =
+                !HasUsableGpuPciAddress(adapters[*duplicateIndex].info) && HasUsableGpuPciAddress(info);
             trace.WriteFmt(TracePrefix::GpuVendor,
-                RES_STR("adapter_enum index=%u hr=0x%08X"),
-                adapterIndex,
-                static_cast<unsigned int>(enumHr));
-            break;
-        }
-
-        DXGI_ADAPTER_DESC1 desc{};
-        const HRESULT descHr = adapter->GetDesc1(&desc);
-        const bool software = SUCCEEDED(descHr) && (desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) != 0;
-        const std::string adapterName = SUCCEEDED(descHr) ? TextFromWide(desc.Description) : std::string();
-        if (SUCCEEDED(descHr) && !software) {
-            GpuAdapterInfo info;
-            info.vendorId = desc.VendorId;
-            info.adapterName = adapterName;
-            info.adapterIndex = adapterIndex;
-            info.dedicatedVideoMemoryBytes = static_cast<std::uint64_t>(desc.DedicatedVideoMemory);
-            info.deviceId = desc.DeviceId;
-            info.subSysId = desc.SubSysId;
-            info.revision = desc.Revision;
-            info.hasAdapterLuid = true;
-            info.adapterLuidHighPart = static_cast<std::uint32_t>(desc.AdapterLuid.HighPart);
-            info.adapterLuidLowPart = static_cast<std::uint32_t>(desc.AdapterLuid.LowPart);
-            PopulateAdapterPciAddress(info, desc.AdapterLuid);
-            const GpuVendor vendor = SelectGpuVendor(info);
-            const std::optional<size_t> duplicateIndex = FindDuplicateGpuAdapterIndex(adapters, info);
-            if (duplicateIndex.has_value()) {
-                const bool replace =
-                    !HasUsableGpuPciAddress(adapters[*duplicateIndex].info) && HasUsableGpuPciAddress(info);
-                trace.WriteFmt(TracePrefix::GpuVendor,
-                    RES_STR("adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
-                            "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
-                            "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
-                    adapterIndex,
-                    adapters[*duplicateIndex].info.adapterIndex,
-                    Trace::BoolText(replace),
-                    desc.VendorId,
-                    desc.DeviceId,
-                    desc.SubSysId,
-                    desc.Revision,
-                    info.pciDomain,
-                    info.pciBus,
-                    info.pciDevice,
-                    info.pciFunction,
-                    GpuVendorName(vendor),
-                    GpuAdapterSelectionMatchRank(info, preferredAdapterName),
-                    DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
-                    adapterName.c_str());
-                if (replace) {
-                    adapters[*duplicateIndex] = EnumeratedGpuAdapter{info, vendor};
-                }
-                adapter->Release();
-                continue;
-            }
-
-            adapters.push_back(EnumeratedGpuAdapter{info, vendor});
-
-            trace.WriteFmt(TracePrefix::GpuVendor,
-                RES_STR(
-                    "adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
-                    "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
-                    "name=\"%s\""),
-                adapterIndex,
-                desc.VendorId,
-                desc.DeviceId,
-                desc.SubSysId,
-                desc.Revision,
-                static_cast<unsigned int>(info.adapterLuidHighPart),
-                static_cast<unsigned int>(info.adapterLuidLowPart),
+                RES_STR("adapter_duplicate index=%u duplicate_of=%u replace=%s vendor_id=0x%04X "
+                        "device_id=0x%04X subsystem_id=0x%08X revision=0x%02X pci=%04X:%02X:%02X.%u "
+                        "vendor=%s match_rank=%d dedicated_gb=%.2f name=\"%s\""),
+                info.adapterIndex,
+                adapters[*duplicateIndex].info.adapterIndex,
+                Trace::BoolText(replace),
+                info.vendorId,
+                info.deviceId,
+                info.subSysId,
+                info.revision,
                 info.pciDomain,
                 info.pciBus,
                 info.pciDevice,
@@ -308,21 +178,35 @@ GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view pr
                 GpuVendorName(vendor),
                 GpuAdapterSelectionMatchRank(info, preferredAdapterName),
                 DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
-                adapterName.c_str());
-            adapter->Release();
+                info.adapterName.c_str());
+            if (replace) {
+                adapters[*duplicateIndex] = EnumeratedGpuAdapter{info, vendor};
+            }
             continue;
         }
 
-        trace.WriteFmt(TracePrefix::GpuVendor,
-            RES_STR("adapter_skip index=%u hr=0x%08X software=%s name=\"%s\""),
-            adapterIndex,
-            static_cast<unsigned int>(descHr),
-            Trace::BoolText(software),
-            adapterName.c_str());
-        adapter->Release();
-    }
+        adapters.push_back(EnumeratedGpuAdapter{info, vendor});
 
-    factory->Release();
+        trace.WriteFmt(TracePrefix::GpuVendor,
+            RES_STR("adapter_candidate index=%u vendor_id=0x%04X device_id=0x%04X subsystem_id=0x%08X revision=0x%02X "
+                    "luid=0x%08x:0x%08x pci=%04X:%02X:%02X.%u vendor=%s match_rank=%d dedicated_gb=%.2f "
+                    "name=\"%s\""),
+            info.adapterIndex,
+            info.vendorId,
+            info.deviceId,
+            info.subSysId,
+            info.revision,
+            static_cast<unsigned int>(info.adapterLuidHighPart),
+            static_cast<unsigned int>(info.adapterLuidLowPart),
+            info.pciDomain,
+            info.pciBus,
+            info.pciDevice,
+            info.pciFunction,
+            GpuVendorName(vendor),
+            GpuAdapterSelectionMatchRank(info, preferredAdapterName),
+            DedicatedVideoMemoryGb(info.dedicatedVideoMemoryBytes),
+            info.adapterName.c_str());
+    }
     std::vector<GpuAdapterInfo> adapterInfos;
     adapterInfos.reserve(adapters.size());
     for (const EnumeratedGpuAdapter& adapter : adapters) {
@@ -382,11 +266,18 @@ std::optional<GpuAdapterInfo> ExtractPrimaryGpuAdapterInfo(Trace& trace) {
 
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
     Trace& trace, const std::optional<GpuAdapterInfo>& adapter, bool collectPresentedFps) {
+    return CreateGpuVendorTelemetryProvider(trace, adapter, collectPresentedFps, nullptr);
+}
+
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace,
+    const std::optional<GpuAdapterInfo>& adapter,
+    bool collectPresentedFps,
+    const HardwareDependencyInjection* injection) {
     const GpuVendor vendor = adapter.has_value() ? SelectGpuVendor(*adapter) : GpuVendor::Unknown;
     trace.WriteFmt(TracePrefix::GpuVendor,
         RES_STR("create vendor=%s adapter=\"%s\" collect_presented_fps=%s"),
         GpuVendorName(vendor),
         adapter.has_value() ? adapter->adapterName.c_str() : "",
         Trace::BoolText(collectPresentedFps));
-    return CreateGpuVendorProviderForVendor(trace, vendor, adapter, collectPresentedFps);
+    return CreateGpuVendorProviderForVendor(trace, vendor, adapter, collectPresentedFps, injection);
 }

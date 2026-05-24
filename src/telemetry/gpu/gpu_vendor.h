@@ -9,6 +9,8 @@
 #include "telemetry/gpu/gpu_vendor_selection.h"
 #include "util/trace.h"
 
+struct HardwareDependencyInjection;
+
 struct GpuVendorTelemetrySample {
     std::optional<std::string> name;
     std::optional<double> loadPercent;
@@ -38,6 +40,12 @@ struct GpuAdapterSelection {
 };
 
 GpuAdapterSelection ResolveGpuAdapterSelection(Trace& trace, std::string_view preferredAdapterName);
+GpuAdapterSelection ResolveGpuAdapterSelection(
+    Trace& trace, std::string_view preferredAdapterName, const HardwareDependencyInjection* injection);
 std::optional<GpuAdapterInfo> ExtractPrimaryGpuAdapterInfo(Trace& trace);
 std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(
     Trace& trace, const std::optional<GpuAdapterInfo>& adapter, bool collectPresentedFps);
+std::unique_ptr<GpuVendorTelemetryProvider> CreateGpuVendorTelemetryProvider(Trace& trace,
+    const std::optional<GpuAdapterInfo>& adapter,
+    bool collectPresentedFps,
+    const HardwareDependencyInjection* injection);

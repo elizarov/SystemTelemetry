@@ -231,11 +231,13 @@ std::unique_ptr<TelemetryRuntime> CreateTelemetryRuntime(const TelemetryCollecto
     const TelemetrySettings& settings,
     Trace& trace,
     TelemetryUpdateSink* callback,
-    std::string* errorText) {
+    std::string* errorText,
+    const HardwareDependencyInjection* hardwareDependencyInjection) {
     if (errorText != nullptr) {
         errorText->clear();
     }
-    std::unique_ptr<TelemetryCollector> collector = CreateTelemetryCollector(options, workingDirectory, trace);
+    std::unique_ptr<TelemetryCollector> collector =
+        CreateTelemetryCollector(options, workingDirectory, trace, hardwareDependencyInjection);
     if (collector == nullptr) {
         return nullptr;
     }

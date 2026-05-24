@@ -3,16 +3,9 @@
 
 #include "config/config_telemetry.h"
 #include "telemetry/impl/collector.h"
-#include "telemetry/impl/collector_real.h"
 #include "telemetry/telemetry.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
-
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace, bool synchronousProviderSamples) {
-    (void)trace;
-    (void)synchronousProviderSamples;
-    return nullptr;
-}
 
 namespace {
 

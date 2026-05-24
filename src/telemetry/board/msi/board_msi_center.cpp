@@ -1,16 +1,14 @@
 #include "telemetry/board/msi/board_msi_center.h"
 
-#include <windows.h>
-
 #include <memory>
 #include <optional>
 #include <string>
 #include <utility>
 #include <vector>
-#include <winreg.h>
 
 #include "telemetry/board/board_vendor.h"
-#include "telemetry/board/msi/board_msi_center_bridge.h"
+#include "telemetry/board/msi/impl/hdi_msi_center.h"
+#include "telemetry/impl/hdi.h"
 #include "telemetry/impl/system_info_support.h"
 #include "util/file_path.h"
 #include "util/resource_strings.h"
@@ -20,8 +18,6 @@
 #include "util/trace.h"
 
 namespace {
-
-constexpr char kMsiUninstallKey[] = "SOFTWARE\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall";
 
 std::string TextFromNullableWide(const wchar_t* text) {
     return text != nullptr ? TextFromWide(text) : std::string();
@@ -33,42 +29,6 @@ struct MsiCenterSnapshot {
     std::vector<BoardSensorReading> fans;
     std::vector<BoardSensorReading> temperatures;
 };
-
-std::optional<FilePath> FindInstalledMsiCenterDirectory() {
-    HKEY uninstallKey = nullptr;
-    if (RegOpenKeyExA(HKEY_LOCAL_MACHINE, kMsiUninstallKey, 0, KEY_READ, &uninstallKey) != ERROR_SUCCESS) {
-        return std::nullopt;
-    }
-
-    DWORD index = 0;
-    char childName[256];
-    DWORD childNameLength = ARRAYSIZE(childName);
-    while (RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
-           ERROR_SUCCESS) {
-        HKEY childKey = nullptr;
-        if (RegOpenKeyExA(uninstallKey, childName, 0, KEY_READ, &childKey) == ERROR_SUCCESS) {
-            const auto displayName = ReadRegistryString(childKey, nullptr, "DisplayName");
-            const bool isMsiCenterSdk = displayName.has_value() && ContainsInsensitive(*displayName, "MSI Center SDK");
-            if (isMsiCenterSdk) {
-                const auto installLocation = ReadRegistryString(childKey, nullptr, "InstallLocation");
-                if (installLocation.has_value() && !installLocation->empty()) {
-                    const DWORD attributes = GetFileAttributesA(installLocation->c_str());
-                    if (attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
-                        RegCloseKey(childKey);
-                        RegCloseKey(uninstallKey);
-                        return FilePath(*installLocation);
-                    }
-                }
-            }
-            RegCloseKey(childKey);
-        }
-        ++index;
-        childNameLength = ARRAYSIZE(childName);
-    }
-
-    RegCloseKey(uninstallKey);
-    return std::nullopt;
-}
 
 class MsiCenterCapture final : public MsiCenterCaptureSink {
 public:
@@ -132,7 +92,8 @@ private:
 
 class MsiCenterBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    MsiCenterBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) : trace_(trace), info_(std::move(info)) {}
+    MsiCenterBoardTelemetryProvider(Trace& trace, BoardVendorInfo info, const HardwareDependencyInjection* injection)
+        : trace_(trace), hdi_(ResolveHdiFactory(injection).CreateMsiCenterHdi(trace)), info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
         settings_ = settings;
@@ -150,7 +111,7 @@ public:
             return false;
         }
 
-        msiCenterDirectory_ = FindInstalledMsiCenterDirectory();
+        msiCenterDirectory_ = hdi_ != nullptr ? hdi_->FindInstalledDirectory() : std::nullopt;
         if (!msiCenterDirectory_.has_value()) {
             diagnostics_ = ResourceStringText(RES_STR("MSI Center SDK directory was not found in the registry."));
             return false;
@@ -208,7 +169,7 @@ public:
         }
 
         MsiCenterCapture capture(trace());
-        const bool captured = runtime_.Capture(msiCenterDirectory->string().c_str(), capture);
+        const bool captured = hdi_ != nullptr && hdi_->Capture(msiCenterDirectory->string().c_str(), capture);
         MsiCenterSnapshot snapshot = captured ? capture.FinishSuccess() : capture.FinishFailure();
         if (!captured) {
             diagnostics_ = snapshot.diagnostics;
@@ -248,9 +209,9 @@ private:
     }
 
     Trace& trace_;
+    std::unique_ptr<MsiCenterHdi> hdi_;
     BoardVendorInfo info_;
     BoardTelemetrySettings settings_{};
-    MsiCenterRuntime runtime_;
     std::optional<FilePath> msiCenterDirectory_;
     std::string boardManufacturer_;
     std::string boardProduct_;
@@ -269,5 +230,10 @@ private:
 }  // namespace
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateMsiBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) {
-    return std::make_unique<MsiCenterBoardTelemetryProvider>(trace, std::move(info));
+    return CreateMsiBoardTelemetryProvider(trace, std::move(info), nullptr);
+}
+
+std::unique_ptr<BoardVendorTelemetryProvider> CreateMsiBoardTelemetryProvider(
+    Trace& trace, BoardVendorInfo info, const HardwareDependencyInjection* injection) {
+    return std::make_unique<MsiCenterBoardTelemetryProvider>(trace, std::move(info), injection);
 }
