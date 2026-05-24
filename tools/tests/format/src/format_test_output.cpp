@@ -1063,6 +1063,20 @@ void PlaceEmptyLambdaCallout() {
     );
 }
 
+void SnapGaugeWidth() {
+    const bool snapped = layout_snap_solver::FindNearestSnapWeight(
+        kCurrentGaugeWeight,
+        kCombinedWeight,
+        kThreshold,
+        {layout_snap_solver::SnapCandidate{targetExtent, targetExtent - startExtent, 0}},
+        [](int firstWeight, int& extent) -> bool {
+            extent = ComputeCpuGaugeWidth(firstWeight);
+            return true;
+        },
+        snappedWeight
+    );
+}
+
 void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
     TraceLayoutEditUiEventFmt(
         TracePrefix::LayoutEditUi,

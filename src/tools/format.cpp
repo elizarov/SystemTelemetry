@@ -1039,9 +1039,13 @@ private:
                 }
             }
         }
-        return std::any_of(openGroups.begin(), openGroups.end(), [this](size_t index) {
-            return pendingTokens_[index].text == "{" && IsLambdaBodyOpenToken(pendingTokens_, index);
-        });
+        return std::any_of(
+            openGroups.begin(),
+            openGroups.end(),
+            [this](size_t index) {
+                return pendingTokens_[index].text == "{" && IsLambdaBodyOpenToken(pendingTokens_, index);
+            }
+        );
     }
 
     bool ShouldPreserveOriginalBlankSeparator(
@@ -1941,6 +1945,12 @@ private:
         }
         if (std::optional<size_t> initializerColon = FindConstructorInitializerColon(tokens)) {
             return SplitOwner{SplitOwnerKind::ConstructorInitializer, *initializerColon};
+        }
+        if (std::optional<size_t> lambdaBody = FindTopLevelLambdaBodyOpen(tokens)) {
+            return SplitOwner{SplitOwnerKind::Lambda, *lambdaBody};
+        }
+        if (std::optional<GroupPair> group = FindFirstWrappableGroupPairWithTopLevelSeparatorAndLambda(tokens, ',')) {
+            return SplitOwner{SplitOwnerKind::Group, 0, *group};
         }
         if (std::optional<size_t> lambdaBody = FindLambdaBodyOpen(tokens)) {
             return SplitOwner{SplitOwnerKind::Lambda, *lambdaBody};
@@ -4657,9 +4667,11 @@ private:
     }
 
     bool HasLineComment(const std::vector<Token>& tokens) const {
-        return std::any_of(tokens.begin(), tokens.end(), [](const Token& token) {
-            return token.kind == TokenKind::LineComment;
-        });
+        return std::any_of(
+            tokens.begin(),
+            tokens.end(),
+            [](const Token& token) { return token.kind == TokenKind::LineComment; }
+        );
     }
 
     bool LineCommentBeforeTopLevelStatementTerminator(const std::vector<Token>& tokens) const {
@@ -4751,6 +4763,34 @@ private:
                         !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
                     ) {
                         return GroupPair{index, *close};
+                    }
+                }
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return std::nullopt;
+    }
+
+    std::optional<GroupPair> FindFirstWrappableGroupPairWithTopLevelSeparatorAndLambda(
+        const std::vector<Token>& tokens,
+        char separator
+    ) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (IsGroupOpen(tokens[index].text) && depth == 0) {
+                if (std::optional<size_t> close = FindWrappableGroupClose(tokens, index)) {
+                    if (
+                        !IsEmptyGroupPair(tokens, index, *close) &&
+                        !IsNonWrappablePrefixGroup(tokens, index, *close) &&
+                        !IsFunctionPointerDeclaratorGroupOpen(tokens, index)
+                    ) {
+                        std::vector<Token> inner(
+                            tokens.begin() + static_cast<std::ptrdiff_t>(index + 1),
+                            tokens.begin() + static_cast<std::ptrdiff_t>(*close)
+                        );
+                        if (ContainsTopLevelSeparator(inner, separator) && FindTopLevelLambdaBodyOpen(inner)) {
+                            return GroupPair{index, *close};
+                        }
                     }
                 }
             }
@@ -5172,6 +5212,20 @@ private:
         return std::nullopt;
     }
 
+    std::optional<size_t> FindTopLevelLambdaBodyOpen(const std::vector<Token>& tokens) const {
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (depth == 0 && IsLambdaBodyOpenToken(tokens, index)) {
+                const std::optional<size_t> close = FindMatchingClose(tokens, index);
+                if (!close || !IsEmptyGroupPair(tokens, index, *close)) {
+                    return index;
+                }
+            }
+            UpdateDepth(tokens, index, depth);
+        }
+        return std::nullopt;
+    }
+
     bool IsPointerOrReferenceDeclarator(const std::vector<Token>& tokens, size_t index) const {
         if (index >= tokens.size() || !IsPointerOrReferenceDeclaratorToken(tokens[index].text)) {
             return false;
@@ -5441,9 +5495,13 @@ private:
     }
 
     bool IsDeclarationContext() const {
-        return std::none_of(blockStack_.begin(), blockStack_.end(), [](const BlockState& block) {
-            return block.kind == BlockKind::FunctionDefinition || block.kind == BlockKind::Other;
-        });
+        return std::none_of(
+            blockStack_.begin(),
+            blockStack_.end(),
+            [](const BlockState& block) {
+                return block.kind == BlockKind::FunctionDefinition || block.kind == BlockKind::Other;
+            }
+        );
     }
 
     bool IsFunctionDefinitionBlock(const std::vector<Token>& tokens) const {
@@ -5582,9 +5640,11 @@ private:
     }
 
     bool ContainsWord(const std::vector<Token>& tokens, std::string_view text) const {
-        return std::any_of(tokens.begin(), tokens.end(), [text](const Token& token) {
-            return token.kind == TokenKind::Word && token.text == text;
-        });
+        return std::any_of(
+            tokens.begin(),
+            tokens.end(),
+            [text](const Token& token) { return token.kind == TokenKind::Word && token.text == text; }
+        );
     }
 
     bool IsLabelColon() const {
@@ -6127,12 +6187,16 @@ std::vector<std::string> FormatIncludeRun(
     for (IncludeLine& include : includes) {
         include.group = IncludeGroupIndex(include, config, sourcePath);
     }
-    std::sort(includes.begin(), includes.end(), [](const IncludeLine& left, const IncludeLine& right) {
-        if (left.group != right.group) {
-            return left.group < right.group;
+    std::sort(
+        includes.begin(),
+        includes.end(),
+        [](const IncludeLine& left, const IncludeLine& right) {
+            if (left.group != right.group) {
+                return left.group < right.group;
+            }
+            return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
         }
-        return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
-    });
+    );
     std::vector<std::string> lines;
     int lastGroup = -1;
     for (const IncludeLine& include : includes) {
