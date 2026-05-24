@@ -328,6 +328,7 @@ TEST(ConfigWriter, FullExportWritesMetricsSectionAndOmitsMetricScales) {
         ReadConfigTemplateFromSourceTree(), config, nullptr, ConfigSaveShape::ExistingTemplateOnly);
 
     EXPECT_THAT(output, testing::HasSubstr("[metrics]\r\ncpu.load = *,%,Load\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("gpu.vram = *,MB|GB,VRAM\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("network.upload = *,MB/s,Up\r\n"));
     EXPECT_THAT(output, testing::HasSubstr("drive.free = *,GB|TB,Free\r\n"));
     EXPECT_THAT(output, testing::Not(testing::HasSubstr("nothing = 1,,Nothing\r\n")));

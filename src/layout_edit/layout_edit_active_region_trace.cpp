@@ -2,6 +2,7 @@
 
 #include <string>
 
+#include "layout_edit/layout_edit_tooltip.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
 #include "util/enum_string.h"
@@ -96,6 +97,9 @@ std::string FormatAnchorSubject(const AppConfig& config, const LayoutEditAnchorK
         return FormatText("card title %s", title->cardId.c_str());
     }
     if (const auto nodeField = LayoutEditAnchorNodeFieldKey(key); nodeField.has_value()) {
+        if (const auto line = BuildDateTimeFormatTooltipLine(config, *nodeField); line.has_value()) {
+            return *line;
+        }
         return FormatText("%s parameter %s",
             EnumToString(nodeField->widgetClass),
             FormatLayoutConfigPath(config, nodeField->editCardId, nodeField->nodePath).c_str());
