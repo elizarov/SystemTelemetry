@@ -239,11 +239,9 @@ p {
 }
 
 .first-use {
-  display: grid;
-  gap: 0.45rem;
   margin: 1.5rem 0 0;
-  padding-left: 1.25rem;
   color: var(--muted);
+  line-height: 1.55;
 }
 
 .hero-image,

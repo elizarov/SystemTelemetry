@@ -44,7 +44,7 @@ The section includes:
 - A short product description aligned with the README overview.
 - Primary links for the latest release download and the GitHub repository.
 - A dashboard screenshot for the active website theme.
-- A short first-use path: install the MSI, run CaseDash, right-click, choose layout and theme, configure display, and enable startup when ready.
+- A short first-use paragraph that tells visitors to install the MSI, run CaseDash, then use the hover titlebar or right-click menu for layout, theme, display fitting, and startup.
 
 The download copy stays practical and avoids marketing-only language. The screenshot is the dominant visual object.
 
@@ -59,10 +59,10 @@ The features section summarizes the product capabilities that matter to end user
 - Constraint-based layouts and live layout-edit mode.
 - Theme system derived from a small set of base colors.
 - Native executable under 1 MB.
-- Layouts for common small-panel formats.
-- Built-in display setup, placement restore, startup wallpaper, and Start with Windows support.
+- Layouts for common small-panel formats, including the shipped `1x4` portrait layout.
+- First-time configuration that keeps setup close through the hover titlebar and right-click menu, then leaves the fitted panel visually clean.
 
-Each feature item uses short copy and, where useful, a small cropped screenshot or visual treatment generated from actual app output. The section does not restate the full configuration language.
+Each feature item uses short benefit-oriented copy and, where useful, a small cropped screenshot or visual treatment generated from actual app output. The section does not restate the full configuration language or enumerate exact control lists.
 
 ## Hardware Section
 

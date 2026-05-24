@@ -16,6 +16,8 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | Prose feature name | layout guide sheet | Use this for the generated diagnostics image. |
 | Command-line and benchmark names | `/layout-guide-sheet`, `layout-guide-sheet` | Use the hyphenated form only where the switch, benchmark name, filename stem, trace field, or generated id requires it. |
 | Config and source identifiers | `[layout_guide_sheet]`, `layout_guide_sheet` | Use the underscore form only for config sections, package names, source paths, and symbols. |
+| Prose feature name | hover titlebar | Use `titlebar` as one word for the CaseDash hover feature and its controls. |
+| Prose drawer behavior | auto-hide drawer | Use hyphenated `auto-hide` in prose; use `autohide` only for config keys, source identifiers, and exact persisted values. |
 | Prose icon name | app icon | Use `/app-icon` for the diagnostics switch and `app_icon` for source identifiers. |
 | Prose dump name | snapshot dump | Use `dump` alone only after the snapshot dump has already been named in nearby text or when referring to the `/dump` switch. |
 | Synthetic telemetry source | built-in synthetic telemetry | Use `fake runtime`, `fake provider`, and `/fake` for switch, architecture, benchmark, or source-code contexts. Avoid `fake data` in docs. |
@@ -45,7 +47,9 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | placement | The dashboard window position relative to the target monitor. |
 | fullscreen display placement | A `Configure Display` choice that fits the layout to the whole selected display and commits CaseDash blank wallpaper ownership for that monitor. |
 | edge display placement | A `Configure Display` top, bottom, left, or right choice that fits the layout to one screen edge without owning a wallpaper. |
-| autohide display placement | An edge display placement whose saved `[display] autohide` edge matches the live dashboard client rectangle exactly, making the dashboard a topmost auto-hide drawer. |
+| auto-hide display placement | An edge display placement whose saved `[display] autohide` edge matches the live dashboard client rectangle exactly, making the dashboard a topmost auto-hide drawer. |
+| auto-hide drawer | The live dashboard behavior that hides on a configured monitor edge and reopens from the edge trigger band. |
+| hover titlebar | The hover-activated Windows titlebar strip that keeps first-time configuration controls reachable without persistent panel chrome. |
 | committed wallpaper ownership | The last successful runtime display commit whose non-empty `display.wallpaper` fills a resolved monitor at `(0,0)`; it drives later Windows wallpaper cleanup even if manual move or resize changes the live placement before the next commit. |
 | `Start with Windows` | The user-visible command that manages machine-wide logon startup and the `CashDashService` service. |
 | `Configure Display` | The command that chooses a fullscreen or edge display placement, computes explicit scale and position, and applies CaseDash wallpaper only for fullscreen placements. |
@@ -85,8 +89,8 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | Container kinds | `rows`, `columns` |
 | Widget names | `text`, `gauge`, `metric_list`, `throughput`, `network_footer`, `vertical_spacer`, `vertical_spring`, `drive_usage_list`, `clock_time`, `clock_date` |
 | Icon names | `cpu`, `gpu`, `network`, `storage`, `time` |
-| Shipped layout ids | `5x3`, `3x5`, `4x1` |
-| Shipped card ids | `cpu`, `gpu`, `network`, `storage`, `storage_throughput`, `storage_usage`, `time` |
+| Shipped layout ids | `5x3`, `3x5`, `4x1`, `1x4` |
+| Shipped card ids | `cpu`, `cpu_vertical`, `cpu_metrics`, `gpu`, `gpu_vertical`, `gpu_metrics`, `network`, `network_throughput_only`, `storage`, `storage_throughput`, `storage_throughput_only`, `storage_usage`, `time` |
 | Theme ids | `dark_cyan`, `dark_green`, `midnight_violet`, `amber_crt`, `volcanic`, `rose_gold`, `laser_grid`, `monochrome_lime`, `ultraviolet_black`, `copper_black`, `blueprint_light`, `paper_ink`, `mint_light`, `lavender_day`, `sunrise_light`, `slate_gold_light`, `sage_light`, `rose_light`, `cobalt_white`, `plum_white` |
 | Built-in metric ids | `cpu.load`, `cpu.clock`, `cpu.ram`, `gpu.load`, `gpu.temp`, `gpu.clock`, `gpu.fan`, `gpu.fps`, `gpu.vram`, `network.upload`, `network.download`, `storage.read`, `storage.write`, `drive.activity.read`, `drive.activity.write`, `drive.usage`, `drive.free` |
 | Logical board metric ids | `board.temp.cpu`, `board.fan.cpu`, `board.fan.gpu`, `board.fan.system` |

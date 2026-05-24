@@ -1,6 +1,6 @@
 # CaseDash
 
-CaseDash is a compact dashboard for dedicated PC telemetry screens: small USB/HDMI panels, case-mounted displays, or a secondary screen beside the main monitor. It presents CPU, GPU, FPS, memory, network, storage, board sensors, and time in a native interface built for always-on visibility.
+CaseDash is a compact dashboard for dedicated PC telemetry screens. Its natural home is a small USB/HDMI or case-mounted panel, and its edge auto-hide mode keeps it practical on a single monitor too. It turns system telemetry into an always-on native sensor panel.
 
 It is not a generic hardware-monitoring suite. CaseDash is a polished sensor panel you place, configure, and mostly leave alone. There are no keyboard shortcuts or extra controls beyond what is needed to make the panel look right and stay put.
 
@@ -20,8 +20,9 @@ It's me, [Roman Elizarov](https://github.com/elizarov) &mdash; ex-project Lead f
 - Theme system that derives a full palette from a small set of key colors.
 - Animated metric fills and throughput plots interpolate smoothly between telemetry snapshots.
 - Small native executable: an `.exe` under 1 MB, with vsync-paced animation that spends less than 1 ms per frame.
-- Layouts for small panels from 5-inch 800x480 screens up to wide 9-inch 1920x480 screens.
-- Built-in display setup that computes full-screen scale, remembers placement, and prepares a matching startup wallpaper.
+- A hover titlebar keeps first-time configuration controls reachable without cluttering the panel.
+- Ready-made layouts fit common compact landscape, portrait, and wide panel shapes.
+- Built-in display setup handles the fiddly work of fitting the panel and remembering where it belongs.
 - Machine-wide auto-start setup works for all users out of the box.
 
 ## Supported Hardware
@@ -31,9 +32,9 @@ CaseDash supports provider-backed GPU telemetry, board temperature and fan telem
 ## First Use
 
 1. Download and run `CaseDash.exe`.
-2. Right-click the dashboard or tray icon.
+2. Use the hover titlebar or right-click menu to open setup controls.
 3. Pick a layout and theme, then select storage and network devices if needed.
-4. Use `Configure Display` to choose the small screen.
+4. Use `Configure Display` to choose the small screen, or an edge placement on the main monitor.
 5. Enable `Start with Windows` when the panel is ready for daily use.
 
 Configuration is saved beside the executable as `config.ini`.
