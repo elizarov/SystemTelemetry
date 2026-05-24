@@ -3754,6 +3754,9 @@ private:
         }
         const std::string_view previousContent = StringLiteralContent(previousLiteral);
         const std::string_view currentContent = StringLiteralContent(currentLiteral);
+        if (StringLiteralContentEndsWithEscapedNewline(previousContent)) {
+            return false;
+        }
         if (currentContent.empty()) {
             return true;
         }
@@ -3766,6 +3769,29 @@ private:
 
     static std::string_view StringLiteralContent(std::string_view literal) {
         return literal.substr(1, literal.size() - 2);
+    }
+
+    static bool StringLiteralContentEndsWithEscapedNewline(std::string_view content) {
+        if (content.empty() || content.back() != 'n') {
+            return false;
+        }
+        size_t slashCount = 0;
+        for (size_t index = content.size() - 1; index > 0 && content[index - 1] == '\\'; --index) {
+            ++slashCount;
+        }
+        return slashCount % 2 == 1;
+    }
+
+    bool StringLiteralEndsWithEscapedNewline(std::string_view literal) const {
+        const size_t firstQuote = literal.find('"');
+        const size_t lastQuote = literal.rfind('"');
+        if (firstQuote == std::string_view::npos || lastQuote <= firstQuote) {
+            return false;
+        }
+        if (firstQuote > 0 && literal[firstQuote - 1] == 'R') {
+            return false;
+        }
+        return StringLiteralContentEndsWithEscapedNewline(literal.substr(firstQuote + 1, lastQuote - firstQuote - 1));
     }
 
     bool HasTrailingExpandableEscape(std::string_view content, char nextChar) const {
@@ -4451,6 +4477,9 @@ private:
         if (HasMultiStatementLambdaBody(tokens)) {
             return true;
         }
+        if (HasLineTerminatedStringLiteralSequence(tokens)) {
+            return true;
+        }
         if (!HasLineComment(tokens)) {
             return false;
         }
@@ -4458,6 +4487,24 @@ private:
             return false;
         }
         return FindFirstWrappableGroupPair(tokens).has_value() || CanSplitOperatorChain(tokens);
+    }
+
+    bool HasLineTerminatedStringLiteralSequence(const std::vector<Token>& tokens) const {
+        const Token* previousStringLiteral = nullptr;
+        for (const Token& token : tokens) {
+            if (token.kind == TokenKind::Newline) {
+                continue;
+            }
+            if (token.kind != TokenKind::StringLiteral) {
+                previousStringLiteral = nullptr;
+                continue;
+            }
+            if (previousStringLiteral != nullptr && StringLiteralEndsWithEscapedNewline(previousStringLiteral->text)) {
+                return true;
+            }
+            previousStringLiteral = &token;
+        }
+        return false;
     }
 
     bool HasMultiStatementLambdaBody(const std::vector<Token>& tokens) const {

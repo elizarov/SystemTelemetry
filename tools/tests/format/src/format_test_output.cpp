@@ -176,6 +176,14 @@ void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
         << "\n";
 }
 
+void WriteMetricConfig() {
+    const FilePath path = WriteTestConfig(
+        "[metrics]\n"
+        "nothing = 7,ignored,Overridden Placeholder\n"
+        "cpu.load = *,%,Processor Load\n"
+    );
+}
+
 struct OklabColor {
     double l;
     double a;

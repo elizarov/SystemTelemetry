@@ -125,6 +125,10 @@ input>>firstBenchmarkName>>secondBenchmarkNameWithLongName>>thirdBenchmarkNameWi
 std::cout<<std::left<<std::setw(18)<<name<<" total_ms="<<std::fixed<<std::setprecision(2)<<result.total.count()<<" per_iter_ms="<<result.perIteration.count()<<"\n";
 }
 
+void WriteMetricConfig(){
+const FilePath path=WriteTestConfig("[metrics]\n" "nothing = 7,ignored,Overridden Placeholder\n" "cpu.load = *,%,Processor Load\n");
+}
+
 struct OklabColor{
 double l;
 double a;
