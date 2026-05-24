@@ -303,7 +303,7 @@ int value =
 
 ## Declaration And Control Headers
 
-Template prefixes are always emitted on their own line before the declaration they introduce. Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
+Template prefixes are emitted before the declaration they introduce. A short `requires (...)` clause may stay on the same line as its `template <...>` prefix; otherwise the `requires` clause moves to its own subordinate line one indent deeper than the template prefix and wraps its condition structurally. Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
 
 ```cpp
 void func(int x) {
@@ -331,6 +331,16 @@ void SaveBoardSectionDifferences(
 ) {
     updateKey(board, compareBoard, sectionName);
 }
+
+template <typename T> requires (HasValue<T>)
+void UseShortRequires(T& value);
+
+template <typename Callable>
+    requires (
+        !std::is_same_v<std::remove_cvref_t<Callable>, FunctionRef> &&
+        std::is_invocable_r_v<Result, Callable&&, Args...>
+    )
+FunctionRef(Callable&& callable);
 ```
 
 Constructor initializer lists follow the same compact-or-fully-split rule. A short constructor initializer list stays with the declaration. A long constructor initializer list keeps `) :` on the header line, then emits each initializer on its own structural line indented one level deeper. For a non-empty body, the opening body brace is emitted on its own line after the initializer list. Empty bodies keep `{}` compact.

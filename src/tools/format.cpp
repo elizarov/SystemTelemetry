@@ -967,6 +967,11 @@ private:
         TypeDeclaration,
     };
 
+    struct RequiresClauseParts {
+        std::vector<Token> condition;
+        std::vector<Token> declaration;
+    };
+
     struct BlockState {
         BlockKind kind = BlockKind::Other;
         bool indentsBody = true;
@@ -1832,6 +1837,9 @@ private:
             }
             return {};
         }
+        if (IsRequiresClausePrefix(tokens)) {
+            return FormatRequiresClause(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
         const std::optional<SplitOwner> owner = SelectSplitOwner(tokens);
         if (owner && owner->kind == SplitOwnerKind::TemplateDeclaration) {
             return FormatTemplateDeclaration(tokens, indentLevel, std::move(prefix), std::move(suffix));
@@ -1994,7 +2002,89 @@ private:
             }
             return lines;
         }
-        std::vector<std::string> declarationLines = FormatRange(declaration, indentLevel, {}, std::move(suffix));
+        std::vector<std::string> declarationLines;
+        if (std::optional<RequiresClauseParts> requiresClause = SplitRequiresClause(declaration)) {
+            const std::string inlineRequiresClause = FormatInlineRequiresClause(requiresClause->condition);
+            if (lines.size() == 1 && Fits(indentLevel, templatePrefixText + " " + inlineRequiresClause)) {
+                lines.back() = Indent(indentLevel) + templatePrefixText + " " + inlineRequiresClause;
+                declarationLines = FormatRange(requiresClause->declaration, indentLevel, {}, std::move(suffix));
+            } else {
+                declarationLines =
+                    FormatRequiresClause(declaration, indentLevel + 1, {}, std::move(suffix), indentLevel);
+            }
+        } else {
+            declarationLines = FormatRange(declaration, indentLevel, {}, std::move(suffix));
+        }
+        lines.insert(lines.end(), declarationLines.begin(), declarationLines.end());
+        return lines;
+    }
+
+    bool IsRequiresClausePrefix(const std::vector<Token>& tokens) const {
+        return SplitRequiresClause(tokens).has_value();
+    }
+
+    std::optional<RequiresClauseParts> SplitRequiresClause(const std::vector<Token>& tokens) const {
+        const size_t first = NextSignificantIndex(tokens, 0);
+        if (first >= tokens.size() || tokens[first].text != "requires") {
+            return std::nullopt;
+        }
+        const size_t open = NextSignificantIndex(tokens, first + 1);
+        if (open >= tokens.size() || tokens[open].text != "(") {
+            return std::nullopt;
+        }
+        const std::optional<size_t> close = FindMatchingClose(tokens, open);
+        if (!close) {
+            return std::nullopt;
+        }
+        const size_t afterClose = NextSignificantIndex(tokens, *close + 1);
+        if (afterClose < tokens.size() && tokens[afterClose].text == "{") {
+            return std::nullopt;
+        }
+        return RequiresClauseParts{
+            std::vector<Token>(
+                tokens.begin() + static_cast<std::ptrdiff_t>(open + 1),
+                tokens.begin() + static_cast<std::ptrdiff_t>(*close)
+            ),
+            std::vector<Token>(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end())
+        };
+    }
+
+    std::string FormatInlineRequiresClause(const std::vector<Token>& condition) const {
+        return "requires (" + FormatInline(condition) + ")";
+    }
+
+    std::vector<std::string> FormatRequiresClause(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        std::optional<int> declarationIndentLevel = std::nullopt
+    ) const {
+        const std::optional<RequiresClauseParts> parts = SplitRequiresClause(tokens);
+        if (!parts) {
+            std::string inlineText = prefix + FormatInline(tokens);
+            AppendSuffix(inlineText, suffix);
+            return {Indent(indentLevel) + inlineText};
+        }
+        std::vector<std::string> lines;
+        std::string requiresLine = prefix + FormatInlineRequiresClause(parts->condition);
+        if (Fits(indentLevel, requiresLine)) {
+            lines.push_back(Indent(indentLevel) + std::move(requiresLine));
+        } else {
+            lines.push_back(Indent(indentLevel) + prefix + "requires (");
+            std::vector<std::string> conditionLines = FormatRange(parts->condition, indentLevel + 1, {}, {}, true);
+            lines.insert(lines.end(), conditionLines.begin(), conditionLines.end());
+            lines.push_back(Indent(indentLevel) + ")");
+        }
+        if (parts->declaration.empty()) {
+            if (!suffix.empty()) {
+                AppendSuffix(lines.back(), suffix);
+            }
+            return lines;
+        }
+        const int trailingDeclarationIndentLevel = declarationIndentLevel.value_or(indentLevel);
+        std::vector<std::string> declarationLines =
+            FormatRange(parts->declaration, trailingDeclarationIndentLevel, {}, std::move(suffix));
         lines.insert(lines.end(), declarationLines.begin(), declarationLines.end());
         return lines;
     }
@@ -3316,6 +3406,9 @@ private:
         if (current == "~" && previous.kind == TokenKind::Word && IsDestructorNameToken(tokens, index)) {
             return true;
         }
+        if (token.kind == TokenKind::Word && prev == "...") {
+            return true;
+        }
         if (current == ":" && IsLabelColonToken(tokens, index)) {
             return false;
         }
@@ -3331,11 +3424,13 @@ private:
         if (prev == "<" && IsTemplateAngleOpen(tokens, prevIndex)) {
             return false;
         }
-        if (
-            IsTemplateAngleCloseToken(tokens, prevIndex) &&
-            (current == "(" || IsPointerOrReferenceDeclaratorToken(current) || IsNoSpaceBefore(current))
-        ) {
-            return false;
+        if (IsTemplateAngleCloseToken(tokens, prevIndex)) {
+            if (current == "(" || IsNoSpaceBefore(current)) {
+                return false;
+            }
+            if (IsPointerOrReferenceDeclaratorToken(current) && IsPointerOrReferenceDeclarator(tokens, index)) {
+                return false;
+            }
         }
         if (current == "{" && IsAssignmentOperator(prev)) {
             return true;
@@ -3523,7 +3618,7 @@ private:
     bool IsLikelyTypeNameToken(const std::vector<Token>& tokens, size_t index) const {
         const Token& token = tokens[index];
         if (IsTemplateAngleCloseToken(tokens, index)) {
-            return true;
+            return IsLikelyTemplateTypeClose(tokens, index);
         }
         if (token.text == ")") {
             return IsDecltypeCloseBeforePointer(tokens, index);
@@ -3594,6 +3689,18 @@ private:
         }
         const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
         return beforeOpen && tokens[*beforeOpen].text == "decltype";
+    }
+
+    bool IsLikelyTemplateTypeClose(const std::vector<Token>& tokens, size_t closeIndex) const {
+        const std::optional<size_t> open = FindTemplateAngleOpen(tokens, closeIndex);
+        if (!open) {
+            return true;
+        }
+        const std::optional<size_t> beforeOpen = PreviousNonNewlineIndex(tokens, *open);
+        if (!beforeOpen || tokens[*beforeOpen].kind != TokenKind::Word) {
+            return true;
+        }
+        return !tools::lint::EndsWith(tokens[*beforeOpen].text, "_v");
     }
 
     bool IsLikelyDeclaratorContextBeforePointer(const std::vector<Token>& tokens, size_t index) const {
@@ -4805,6 +4912,8 @@ private:
                     return candidate;
                 }
                 --depth;
+            } else if (depth == 0 && IsTemplateArgumentReferenceToken(tokens, candidate)) {
+                continue;
             } else if (depth == 0 && IsTemplateScanBoundary(tokens[candidate].text)) {
                 return std::nullopt;
             }
@@ -4828,11 +4937,28 @@ private:
                     return index;
                 }
                 depth -= 2;
+            } else if (depth == 0 && IsTemplateArgumentReferenceToken(tokens, index)) {
+                continue;
             } else if (depth == 0 && IsTemplateScanBoundary(text)) {
                 return std::nullopt;
             }
         }
         return std::nullopt;
+    }
+
+    bool IsTemplateArgumentReferenceToken(const std::vector<Token>& tokens, size_t index) const {
+        if (tokens[index].text != "&&") {
+            return false;
+        }
+        const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
+        const size_t next = NextSignificantIndex(tokens, index + 1);
+        if (!previous || next >= tokens.size()) {
+            return false;
+        }
+        const std::string& before = tokens[*previous].text;
+        const std::string& after = tokens[next].text;
+        return (tokens[*previous].kind == TokenKind::Word || before == ">" || before == ">>") &&
+            (after == "," || after == ">" || after == ">>");
     }
 
     bool IsTemplateScanBoundary(std::string_view text) const {
