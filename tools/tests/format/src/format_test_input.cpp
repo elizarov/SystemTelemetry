@@ -129,6 +129,10 @@ void WriteMetricConfig(){
 const FilePath path=WriteTestConfig("[metrics]\n" "nothing = 7,ignored,Overridden Placeholder\n" "cpu.load = *,%,Processor Load\n");
 }
 
+void WriteInitialConfigText(){
+const std::string initialText="[display]\r\n" "monitor_name = TL160ADMP03-0\r\n" "position = 258,117\r\n" "scale = 2\r\n" "\r\n" "[network]\r\n" "adapter_name = Wi-Fi\r\n" "\r\n" "[storage]\r\n" "drives = C\r\n";
+}
+
 struct OklabColor{
 double l;
 double a;

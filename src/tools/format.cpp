@@ -3113,11 +3113,16 @@ private:
 
     bool IsStringLiteralSequence(const std::vector<Token>& tokens) const {
         int literalCount = 0;
+        bool sawTrailingSemicolon = false;
         for (const Token& token : tokens) {
             if (token.kind == TokenKind::Newline) {
                 continue;
             }
-            if (token.kind != TokenKind::StringLiteral) {
+            if (token.text == ";" && literalCount > 0 && !sawTrailingSemicolon) {
+                sawTrailingSemicolon = true;
+                continue;
+            }
+            if (token.kind != TokenKind::StringLiteral || sawTrailingSemicolon) {
                 return false;
             }
             ++literalCount;
@@ -3132,13 +3137,25 @@ private:
         std::string suffix
     ) const {
         std::vector<std::string> lines;
+        std::optional<size_t> lastStringLiteral;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (tokens[index].kind == TokenKind::StringLiteral) {
+                lastStringLiteral = index;
+            }
+        }
+        if (
+            std::optional<size_t> last = PreviousNonNewlineIndex(tokens, tokens.size());
+            last && tokens[*last].text == ";"
+        ) {
+            suffix = ";" + suffix;
+        }
         for (size_t index = 0; index < tokens.size(); ++index) {
             const Token& token = tokens[index];
             if (token.kind != TokenKind::StringLiteral) {
                 continue;
             }
             std::string line = lines.empty() ? prefix + token.text : token.text;
-            if (NextSignificantIndex(tokens, index + 1) >= tokens.size()) {
+            if (lastStringLiteral && index == *lastStringLiteral) {
                 AppendSuffix(line, suffix);
             }
             lines.push_back(Indent(indentLevel) + line);
