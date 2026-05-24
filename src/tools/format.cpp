@@ -4275,8 +4275,10 @@ private:
         bool hasEquality = false;
         bool hasRelational = false;
         bool hasShift = false;
-        bool hasAdditive = false;
-        bool hasMultiplicative = false;
+        bool hasPlus = false;
+        bool hasMinus = false;
+        bool hasStar = false;
+        bool hasDivisionOrModulo = false;
         for (size_t index = 0; index < tokens.size(); ++index) {
             UpdateDepth(tokens[index], depth);
             if (depth != 0 || IsTemplateAngleToken(tokens, index)) {
@@ -4299,12 +4301,16 @@ private:
                 hasShift = true;
             } else if ((text == "+" || text == "-") && IsUnaryPrefixOperator(tokens, index)) {
                 continue;
-            } else if (text == "+" || text == "-") {
-                hasAdditive = true;
+            } else if (text == "+") {
+                hasPlus = true;
+            } else if (text == "-") {
+                hasMinus = true;
             } else if ((text == "*" || text == "&") && IsPointerOrReferenceDeclarator(tokens, index)) {
                 continue;
-            } else if (text == "*" || text == "/" || text == "%") {
-                hasMultiplicative = true;
+            } else if (text == "*") {
+                hasStar = true;
+            } else if (text == "/" || text == "%") {
+                hasDivisionOrModulo = true;
             }
         }
         if (hasTernary) {
@@ -4325,10 +4331,10 @@ private:
         if (hasShift) {
             return ChainKind::Shift;
         }
-        if (hasAdditive) {
+        if (hasPlus && !hasMinus) {
             return ChainKind::Additive;
         }
-        if (hasMultiplicative) {
+        if (hasStar && !hasDivisionOrModulo) {
             return ChainKind::Multiplicative;
         }
         return ChainKind::None;
@@ -4359,9 +4365,9 @@ private:
             case ChainKind::Shift:
                 return text == "<<" || text == ">>";
             case ChainKind::Additive:
-                return text == "+" || text == "-";
+                return text == "+";
             case ChainKind::Multiplicative:
-                return text == "*" || text == "/" || text == "%";
+                return text == "*";
             case ChainKind::None:
                 return false;
         }

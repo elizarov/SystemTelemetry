@@ -809,6 +809,13 @@ double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double 
     return backgroundWeight;
 }
 
+double SampleSupersampledX(int x, int sx, int iconSize) {
+    const double sampleX = (
+        static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample
+    ) * 256.0 / static_cast<double>(iconSize);
+    return sampleX;
+}
+
 void BuildTrianglePoints(const RECT& rect, const Geometry& geometry) {
     POINT points[] = {
         {

@@ -471,6 +471,11 @@ const double backgroundWeight=((geometry.topY - geometry.bottomY)*(sampleX - geo
 return backgroundWeight;
 }
 
+double SampleSupersampledX(int x,int sx,int iconSize){
+const double sampleX=(static_cast<double>(x)+(static_cast<double>(sx)+0.5)/kSupersample)*256.0/static_cast<double>(iconSize);
+return sampleX;
+}
+
 void BuildTrianglePoints(const RECT& rect,const Geometry& geometry){
 POINT points[]={{rect.left + static_cast<LONG>(std::lround(geometry.leftX)),rect.top + static_cast<LONG>(std::lround(geometry.topY))},{rect.left + static_cast<LONG>(std::lround(geometry.rightX)),rect.top + static_cast<LONG>(std::lround(geometry.topY))},{rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
 Use(points);
