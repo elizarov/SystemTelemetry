@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "config/color_resolver.h"
+#include "config/config_file_io.h"
 #include "config/config_parser.h"
 #include "config/config_resolution.h"
 #include "config/config_telemetry.h"
@@ -235,9 +236,6 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
 
 std::unique_ptr<TelemetryCollector> CreateBenchmarkTelemetryCollector(const AppConfig& config, Trace& trace) {
     TelemetryCollectorOptions options;
-    // The update-telemetry benchmark intentionally uses the package-private synchronous collector. It measures provider
-    // collection CPU directly; the production TelemetryRuntime thread would hide that cost behind scheduling waits.
-    options.synchronousProviderSamples = true;
     std::unique_ptr<TelemetryCollector> telemetry = CreateTelemetryCollector(options, CurrentDirectoryPath(), trace);
     if (telemetry == nullptr) {
         return nullptr;
@@ -1164,7 +1162,6 @@ TelemetryInitBenchTotals RunTelemetryInitBenchmark(const TelemetrySettings& sett
     }
 
     TelemetryCollectorOptions options;
-    options.synchronousProviderSamples = true;
     const auto start = Clock::now();
     for (size_t iteration = 0; iteration < iterations; ++iteration) {
         const auto createStart = Clock::now();
@@ -1209,8 +1206,10 @@ void PrintTelemetryInitBenchResult(const TelemetryInitBenchTotals& totals) {
     PrintPhaseResult("collector_destroy", totals.collectorDestroy);
 }
 
-LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
-    DashboardRenderer& renderer, const SystemSnapshot& snapshot, size_t iterations) {
+LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(DashboardRenderer& renderer,
+    const SystemSnapshot& snapshot,
+    const LayoutGuideSheetConfig& guideSheet,
+    size_t iterations) {
     LayoutGuideSheetBenchTotals totals{};
     if (iterations == 0) {
         return totals;
@@ -1220,7 +1219,7 @@ LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
     for (size_t iteration = 0; iteration < iterations; ++iteration) {
         std::string errorText;
         LayoutGuideSheetPipelineStats pipelineStats;
-        if (!RenderLayoutGuideSheetOffscreen(renderer, snapshot, &errorText, &pipelineStats)) {
+        if (!RenderLayoutGuideSheetOffscreen(renderer, snapshot, guideSheet, &errorText, &pipelineStats)) {
             totals.succeeded = false;
             totals.errorText =
                 "layout guide offscreen render failed: " + (errorText.empty() ? renderer.LastError() : errorText);
@@ -1480,7 +1479,9 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
     }
 
     AppConfig runtimeConfig = BuildEffectiveRuntimeConfig(config, telemetry->ResolvedSelections());
-    ResolveLayoutGuideSheetColors(runtimeConfig);
+    LayoutGuideSheetConfig guideSheet;
+    LoadLayoutGuideSheetConfigText(ReadConfigFile(SourceConfigPath()), guideSheet);
+    ResolveLayoutGuideSheetColors(runtimeConfig, guideSheet);
     DashboardRenderer renderer(trace);
     renderer.SetRenderScale(renderScale);
     renderer.SetConfig(runtimeConfig);
@@ -1491,7 +1492,7 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
     }
 
     const LayoutGuideSheetBenchTotals totals =
-        RunLayoutGuideSheetGenerationBenchmark(renderer, telemetry->Snapshot(), iterations);
+        RunLayoutGuideSheetGenerationBenchmark(renderer, telemetry->Snapshot(), guideSheet, iterations);
     if (!totals.succeeded) {
         std::cerr << totals.errorText << "\n";
         return 1;

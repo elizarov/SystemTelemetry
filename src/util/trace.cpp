@@ -142,8 +142,6 @@ const char* Trace::PrefixName(TracePrefix prefix) {
             return "intel_level_zero";
         case TracePrefix::LenovoDiagnosticsDriver:
             return "lenovo_diagnostics_driver";
-        case TracePrefix::LayoutEditDrag:
-            return "layout_edit_drag";
         case TracePrefix::MsiCenter:
             return "msi_center";
         case TracePrefix::NvidiaNvml:

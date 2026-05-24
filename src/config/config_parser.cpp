@@ -332,7 +332,25 @@ bool ApplyMetricsSectionValue(MetricsSectionConfig& metrics,
     return true;
 }
 
+struct ApplyConfigTextContext {
+    AppConfig* config = nullptr;
+    const ConfigParseContext* parseContext = nullptr;
+};
+
+void ApplyConfigEntry(void* context, std::string_view section, std::string_view key, std::string_view value) {
+    auto& applyContext = *static_cast<ApplyConfigTextContext*>(context);
+    DispatchRuntimeConfigSection(
+        *applyContext.config, std::string(section), std::string(key), std::string(value), *applyContext.parseContext);
+}
+
 void ApplyConfigText(std::string_view text, AppConfig& config, const ConfigParseContext& context) {
+    ApplyConfigTextContext applyContext{&config, &context};
+    ForEachConfigEntry(text, &applyContext, &ApplyConfigEntry);
+}
+
+}  // namespace
+
+void ForEachConfigEntry(std::string_view text, void* context, ConfigEntryVisitor visitor) {
     std::string section;
 
     size_t lineStart = 0;
@@ -372,15 +390,13 @@ void ApplyConfigText(std::string_view text, AppConfig& config, const ConfigParse
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        DispatchRuntimeConfigSection(config, section, key, value, context);
+        visitor(context, section, key, value);
         if (lineEnd == text.size()) {
             break;
         }
         lineStart = lineEnd + 1;
     }
 }
-
-}  // namespace
 
 std::string LoadEmbeddedConfigTemplate() {
     return LoadTextResourceData(TextResourceId::ConfigTemplate);

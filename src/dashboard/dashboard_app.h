@@ -17,7 +17,6 @@
 #include "dashboard/dashboard_window_chrome.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_trace_session.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
 #include "util/scale.h"
@@ -315,5 +314,4 @@ private:
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;
-    LayoutEditTraceSession layoutEditTraceSession_{};
 };

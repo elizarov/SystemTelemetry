@@ -123,12 +123,6 @@ void ClearBoardProviderState(RealTelemetryCollectorState& state, const char* dia
     state.board_.availableTemperatureNames.clear();
 }
 
-void CreateBoardProvider(RealTelemetryCollectorState& state) {
-    BoardVendorTelemetryProviderOptions providerOptions;
-    providerOptions.synchronousSamples = state.synchronousProviderSamples_;
-    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_, providerOptions);
-}
-
 }  // namespace
 
 void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTelemetrySettings& settings) {
@@ -141,7 +135,7 @@ void InitializeBoardCollector(RealTelemetryCollectorState& state, const BoardTel
         return;
     }
 
-    CreateBoardProvider(state);
+    state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_);
     if (state.board_.provider != nullptr) {
         state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_initialize_begin"));
         if (state.board_.provider->Initialize(settings)) {
@@ -178,7 +172,7 @@ void ReconfigureBoardCollector(RealTelemetryCollectorState& state, const BoardTe
     }
 
     if (state.board_.provider == nullptr) {
-        CreateBoardProvider(state);
+        state.board_.provider = CreateBoardVendorTelemetryProvider(state.trace_);
         if (state.board_.provider == nullptr) {
             state.trace_.Write(TracePrefix::Telemetry, RES_STR("board_provider_create result=null"));
             return;

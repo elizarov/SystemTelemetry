@@ -11,7 +11,7 @@
 
 namespace {
 
-bool LoadHeadlessLayoutGuideSheetConfig(std::string* configText, std::string* errorText) {
+bool LoadHeadlessLayoutGuideSheetConfigText(std::string* configText, std::string* errorText) {
     if (configText != nullptr) {
         configText->clear();
     }
@@ -44,7 +44,8 @@ bool LoadHeadlessLayoutGuideSheetConfig(std::string* configText, std::string* er
     return true;
 }
 
-bool WriteHeadlessDiagnosticsExtraOutputs(const DiagnosticsOptions& options,
+bool WriteHeadlessDiagnosticsExtraOutputs(void* context,
+    const DiagnosticsOptions& options,
     const TelemetryDump& dump,
     const AppConfig& config,
     double scale,
@@ -57,7 +58,10 @@ bool WriteHeadlessDiagnosticsExtraOutputs(const DiagnosticsOptions& options,
     const FilePath imagePath = ResolveDiagnosticsOutputPath(
         GetWorkingDirectory(), options.layoutGuideSheetPath, kDefaultLayoutGuideSheetFileName);
     std::string saveError;
-    if (SaveLayoutGuideSheetPng(imagePath, dump.snapshot, config, scale, trace, &saveError)) {
+    auto& outputContext = *static_cast<HeadlessLayoutGuideSheetOutputContext*>(context);
+    LayoutGuideSheetConfig resolvedGuideSheet = *outputContext.guideSheet;
+    ResolveLayoutGuideSheetColors(config, resolvedGuideSheet);
+    if (SaveLayoutGuideSheetPng(imagePath, dump.snapshot, config, resolvedGuideSheet, scale, trace, &saveError)) {
         return true;
     }
 
@@ -72,10 +76,22 @@ bool WriteHeadlessDiagnosticsExtraOutputs(const DiagnosticsOptions& options,
 
 }  // namespace
 
-DiagnosticsOutputHandlers CreateHeadlessDiagnosticsOutputHandlers() {
+HeadlessLayoutGuideSheetOutputContext::HeadlessLayoutGuideSheetOutputContext()
+    : guideSheet(std::make_unique<LayoutGuideSheetConfig>()) {}
+
+HeadlessLayoutGuideSheetOutputContext::~HeadlessLayoutGuideSheetOutputContext() = default;
+
+bool InitializeHeadlessLayoutGuideSheetOutput(HeadlessLayoutGuideSheetOutputContext& context, std::string* errorText) {
+    std::string configText;
+    if (!LoadHeadlessLayoutGuideSheetConfigText(&configText, errorText)) {
+        return false;
+    }
+    return LoadLayoutGuideSheetConfigText(configText, *context.guideSheet);
+}
+
+DiagnosticsOutputHandlers CreateHeadlessDiagnosticsOutputHandlers(HeadlessLayoutGuideSheetOutputContext& context) {
     DiagnosticsOutputHandlers handlers;
+    handlers.context = &context;
     handlers.writeExtraOutputs = &WriteHeadlessDiagnosticsExtraOutputs;
-    handlers.loadExtraConfig = &LoadHeadlessLayoutGuideSheetConfig;
-    handlers.resolveExtraConfig = &ResolveLayoutGuideSheetColors;
     return handlers;
 }

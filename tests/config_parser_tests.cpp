@@ -175,51 +175,57 @@ TEST(ColorMath, ConvertsHsvAndRgbRoundTrip) {
 }
 
 TEST(ConfigParser, ResolvesLayoutGuideSheetColorsFromThemeAndColorsSection) {
-    const FilePath path = WriteTestConfig("[display]\n"
-                                          "theme = dark_cyan\n"
-                                          "\n"
-                                          "[theme.dark_cyan]\n"
-                                          "background = #000000FF\n"
-                                          "foreground = #FFFFFFFF\n"
-                                          "accent = #00BFFFFF\n"
-                                          "guide = #FF6A00FF\n"
-                                          "\n"
-                                          "[colors]\n"
-                                          "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
-                                          "muted_text_color = foreground(mix: 0.55 accent)\n"
-                                          "\n"
-                                          "[layout_guide_sheet]\n"
-                                          "callout_leader_color = foreground(mix: 0.59 guide, alpha: 0xE6)\n"
-                                          "callout_border_color = guide(rotate_hue: 53)\n"
-                                          "callout_description_color = muted_text_color\n");
+    const std::string text = "[display]\n"
+                             "theme = dark_cyan\n"
+                             "\n"
+                             "[theme.dark_cyan]\n"
+                             "background = #000000FF\n"
+                             "foreground = #FFFFFFFF\n"
+                             "accent = #00BFFFFF\n"
+                             "guide = #FF6A00FF\n"
+                             "\n"
+                             "[colors]\n"
+                             "active_edit_color = guide(rotate_hue: 46, mix: 0.22 foreground)\n"
+                             "muted_text_color = foreground(mix: 0.55 accent)\n"
+                             "\n"
+                             "[layout_guide_sheet]\n"
+                             "callout_leader_color = foreground(mix: 0.59 guide, alpha: 0xE6)\n"
+                             "callout_border_color = guide(rotate_hue: 53)\n"
+                             "callout_description_color = muted_text_color\n";
+    const FilePath path = WriteTestConfig(text);
 
     AppConfig config = LoadConfig(path, true, TestConfigParseContext());
-    ResolveLayoutGuideSheetColors(config);
+    LayoutGuideSheetConfig guideSheet;
+    ASSERT_TRUE(LoadLayoutGuideSheetConfigText(text, guideSheet));
+    ResolveLayoutGuideSheetColors(config, guideSheet);
 
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xFFAC84E6u);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xC19C00FFu);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutDescriptionColor.ToRgba(), 0x99DDFFFFu);
+    EXPECT_EQ(guideSheet.calloutLeaderColor.ToRgba(), 0xFFAC84E6u);
+    EXPECT_EQ(guideSheet.calloutBorderColor.ToRgba(), 0xC19C00FFu);
+    EXPECT_EQ(guideSheet.calloutDescriptionColor.ToRgba(), 0x99DDFFFFu);
 
     RemoveFileIfExists(path);
 }
 
 TEST(ConfigParser, ParsesLayoutGuideSheetSection) {
-    const FilePath path = WriteTestConfig("[layout_guide_sheet]\n"
-                                          "callout_leader_color = #FFE45CE6\n"
-                                          "callout_border_color = #B88A22FF\n"
-                                          "sheet_margin = 41\n"
-                                          "callout_gap = 42\n"
-                                          "leader_stroke_width = 3\n"
-                                          "leader_endpoint_diameter = 7\n");
+    const std::string text = "[layout_guide_sheet]\n"
+                             "callout_leader_color = #FFE45CE6\n"
+                             "callout_border_color = #B88A22FF\n"
+                             "sheet_margin = 41\n"
+                             "callout_gap = 42\n"
+                             "leader_stroke_width = 3\n"
+                             "leader_endpoint_diameter = 7\n";
+    const FilePath path = WriteTestConfig(text);
 
-    const AppConfig config = LoadConfig(path, true, TestConfigParseContext());
+    LoadConfig(path, true, TestConfigParseContext());
+    LayoutGuideSheetConfig guideSheet;
+    ASSERT_TRUE(LoadLayoutGuideSheetConfigText(text, guideSheet));
 
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutLeaderColor.ToRgba(), 0xFFE45CE6u);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutBorderColor.ToRgba(), 0xB88A22FFu);
-    EXPECT_EQ(config.layout.layoutGuideSheet.sheetMargin, 41);
-    EXPECT_EQ(config.layout.layoutGuideSheet.calloutGap, 42);
-    EXPECT_EQ(config.layout.layoutGuideSheet.leaderStrokeWidth, 3);
-    EXPECT_EQ(config.layout.layoutGuideSheet.leaderEndpointDiameter, 7);
+    EXPECT_EQ(guideSheet.calloutLeaderColor.ToRgba(), 0xFFE45CE6u);
+    EXPECT_EQ(guideSheet.calloutBorderColor.ToRgba(), 0xB88A22FFu);
+    EXPECT_EQ(guideSheet.sheetMargin, 41);
+    EXPECT_EQ(guideSheet.calloutGap, 42);
+    EXPECT_EQ(guideSheet.leaderStrokeWidth, 3);
+    EXPECT_EQ(guideSheet.leaderEndpointDiameter, 7);
 
     RemoveFileIfExists(path);
 }

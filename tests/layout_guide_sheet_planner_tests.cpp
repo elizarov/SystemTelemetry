@@ -14,6 +14,7 @@
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
+#include "layout_guide_sheet/layout_guide_sheet.h"
 #include "telemetry/impl/collector_fake.h"
 #include "util/file_path.h"
 #include "util/localization_catalog.h"
@@ -38,8 +39,16 @@ void LoadTestLocalizationCatalog() {
     ReplaceLocalizationCatalogForTesting(ParseLocalizationCatalog(buffer.str()));
 }
 
+std::string ReadSourceConfigText() {
+    std::ifstream input(SourceConfigPath().string(), std::ios::binary);
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
+
 struct BuiltInLayoutGuideSheetContext {
     AppConfig config;
+    LayoutGuideSheetConfig guideSheet;
     LayoutEditActiveRegions regions;
     LayoutEditActiveRegions overviewRegions;
     std::vector<LayoutGuideSheetCardSummary> cards;
@@ -48,6 +57,9 @@ struct BuiltInLayoutGuideSheetContext {
 BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* layoutName = "5x3") {
     LoadTestLocalizationCatalog();
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    LayoutGuideSheetConfig guideSheet;
+    EXPECT_TRUE(LoadLayoutGuideSheetConfigText(ReadSourceConfigText(), guideSheet));
+    ResolveLayoutGuideSheetColors(config, guideSheet);
     EXPECT_TRUE(SelectLayout(config, layoutName));
 
     Trace trace;
@@ -65,9 +77,10 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
     overlayState.showLayoutEditGuides = true;
     overlayState.forceLayoutEditAffordances = true;
     EXPECT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
-    LayoutGuideSheetRenderer sheetRenderer(renderer);
+    LayoutGuideSheetRenderer sheetRenderer(renderer, guideSheet);
 
     return BuiltInLayoutGuideSheetContext{config,
+        guideSheet,
         renderer.CollectLayoutEditActiveRegions(overlayState),
         sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
         CollectLayoutGuideSheetCardSummaries(renderer)};

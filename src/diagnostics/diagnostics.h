@@ -16,7 +16,8 @@
 
 struct AppConfig;
 
-using WriteDiagnosticsExtraOutputsFn = bool (*)(const DiagnosticsOptions& options,
+using WriteDiagnosticsExtraOutputsFn = bool (*)(void* context,
+    const DiagnosticsOptions& options,
     const TelemetryDump& dump,
     const AppConfig& config,
     double scale,
@@ -26,6 +27,7 @@ using LoadDiagnosticsExtraConfigFn = bool (*)(std::string* configText, std::stri
 using ResolveDiagnosticsExtraConfigFn = void (*)(AppConfig& config);
 
 struct DiagnosticsOutputHandlers {
+    void* context = nullptr;
     WriteDiagnosticsExtraOutputsFn writeExtraOutputs = nullptr;
     LoadDiagnosticsExtraConfigFn loadExtraConfig = nullptr;
     ResolveDiagnosticsExtraConfigFn resolveExtraConfig = nullptr;

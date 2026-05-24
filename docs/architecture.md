@@ -11,7 +11,7 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 - [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app icon export, and native crash reports.
 - [display](architecture/display.md) - monitor enumeration, display targeting, placement, scale, and wallpaper/configure-display helpers.
 - [headless](architecture/headless.md) - non-shipped diagnostics executable entry point and layout guide sheet output adapter for build, validation, and website asset generation.
-- [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, tooltip text, and active-region trace output.
+- [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, and tooltip text.
 - [layout_edit_dialog](architecture/layout_edit_dialog.md) - modeless configuration editor window, editor controls, preview/revert flow, and theme preview drawing.
 - [layout_guide_sheet](architecture/layout_guide_sheet.md) - diagnostics layout guide sheet planning, representative-card selection, callout layout, leader routing, and sheet rendering.
 - [layout_model](architecture/layout_model.md) - renderer-safe layout-edit contracts, edit-target identity, active-region behavior, hit priority, and overlay state.

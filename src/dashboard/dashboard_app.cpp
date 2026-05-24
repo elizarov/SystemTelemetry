@@ -3560,14 +3560,14 @@ void DashboardApp::Paint() {
 }
 
 void DashboardApp::BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) {
-    layoutEditTraceSession_.Begin(trace_, kind, detail);
+    (void)kind;
+    (void)detail;
 }
 
 void DashboardApp::RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) {
     trace_.Timings().Record(trace_, TraceTimingOperationName(phase), elapsed);
-    layoutEditTraceSession_.Record(phase, elapsed);
 }
 
 void DashboardApp::EndLayoutEditTraceSession(ResourceStringId reason) {
-    layoutEditTraceSession_.End(trace_, reason);
+    (void)reason;
 }

@@ -14,11 +14,11 @@ This document owns executable-size constraints, the map workflow, current size s
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `1,028,608` bytes, below binary 1 MiB and above the stricter decimal `1,000,000` byte threshold.
+- Current measured `build\CaseDash.exe`: `998,400` bytes, below the stricter decimal `1,000,000` byte threshold.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `835.9 KiB`, `.rdata` about `67.5 KiB`, `.pdata` about `40.0 KiB`, `.rsrc$02` about `19.7 KiB`, and `.xdata` about `16.6 KiB`.
-- Current largest project objects: `board_lenovo_vantage.cpp.obj`, `diagnostics.cpp.obj`, `dashboard_app.cpp.obj`, `dashboard_controller.cpp.obj`, `layout_resolver.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `pane.cpp.obj`, `editors.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `CaseDash.rc.res`, `layout_edit_overlay_renderer.cpp.obj`, `render_thread.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `collector_fake.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, and `layout_edit_hit_test.cpp.obj`.
-- Last validation: `format.cmd changed`, `lint.cmd`, `lint.cmd includes changed`, `build.cmd`, `test.cmd`, production screenshot smoke, removed trace-prefix rejection smoke, `build_maps.cmd`, and final size check.
+- Current largest sections: `.text$mn` about `812.7 KiB`, `.rdata` about `65.8 KiB`, `.pdata` about `38.9 KiB`, `.rsrc$02` about `19.6 KiB`, and `.xdata` about `16.3 KiB`.
+- Current largest project objects: `diagnostics.cpp.obj`, `dashboard_app.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `pane.cpp.obj`, `editors.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `CaseDash.rc.res`, `board_lenovo_vantage.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `render_thread.cpp.obj`, `collector_fake.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, and `layout_edit_hit_test.cpp.obj`.
+- Last validation: `format.cmd changed`, `build.cmd`, `lint.cmd`, `lint.cmd includes changed`, `test.cmd`, production screenshot smoke, production layout-guide rejection smoke, headless export smoke, headless validation/runtime error smokes, `build_maps.cmd`, and final size check.
 
 ## Workflow
 
@@ -49,7 +49,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 - `RES_STR("...")` literals compile to collision-checked FNV-1a ids, not generated literal tables. Runtime lookup uses the loaded text atlas plus an open-addressed hash table so trace and diagnostics paths keep O(1) catalog access after their prefix gate passes.
 - User-visible UI copy belongs in `resources/localization.ini`. Direct `RES_STR` text is reserved for trace formats, compact localization keys, telemetry diagnostics payloads, and diagnostics-only errors.
 - Fixed trace helper vocabulary uses `ResourceStringId` and `RES_STR`; dynamic trace values stay in outer resource-string-aware format strings, including their quote marks, instead of shared trace quote or color wrapper helpers.
-- Past interactive debugging trace prefixes for dashboard tooltips, layout-edit hover, layout-edit tooltips, layout-edit dialog internals, layout-edit modal/menu scope, mouse tracking, and layout switching stay out of the shipped trace surface; `layout_edit_drag` remains as the compact summarized layout-edit profiling prefix.
+- Past interactive debugging trace prefixes for dashboard tooltips, layout-edit hover, layout-edit tooltips, layout-edit dialog internals, layout-edit modal/menu scope, mouse tracking, layout switching, active-region screenshot dumps, and layout-edit drag-session summaries stay out of the shipped trace surface. Profile timing summaries keep the retained layout-edit phase measurements without per-drag trace records.
 - The fallback `resources\app.ico` keeps only `16`, `32`, and `64` frames. Runtime themed icons provide live and generated arbitrary-size icon assets.
 - Panel icons stay in one fixed 64 x 64 vertical 8-bit grayscale PNG mask atlas and render through target-local alpha masks. Keep PNG and ICO resource optimization lossless, and strip nonessential PNG ancillary chunks only when visual validation remains healthy.
 - The shipped executable omits duplicate Win32 `VERSIONINFO` string resources; full user-visible version, build, and commit text lives in generated C++ constants for the `About CaseDash` dialog.
@@ -87,7 +87,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 ### Runtime And Providers
 
 - Telemetry runtime, FPS ETW processing, render-thread handoff, trace locking, and app telemetry handoff use direct Win32 thread/event handles plus `LightweightMutex` instead of STL threading wrappers.
-- Provider boundaries keep broad STL or managed metadata out of the app where practical: Gigabyte SIV logic stays native with narrow `/clr` bridge signatures, Intel Level Zero, Lenovo diagnostics-driver, and NVML dynamic entry-point loads stay concrete at call sites, and process/provider names convert at the OS boundary.
+- Provider boundaries keep broad STL or managed metadata out of the app where practical: Gigabyte SIV logic stays native with narrow `/clr` bridge signatures, Intel Level Zero, Lenovo diagnostics-driver, and NVML dynamic entry-point loads stay concrete at call sites, and process/provider names convert at the OS boundary. Lenovo diagnostics-driver and `CashDashService` board samples run synchronously; do not reintroduce `std::future`, `std::async`, or background provider refresh plumbing without a fresh measured size and UX case.
 - Network selection streams visible candidates directly into retained telemetry state, with the selected candidate tracked in place.
 - Synthetic telemetry history generation keeps spec records static and moves generated history vectors into retained-history entries.
 

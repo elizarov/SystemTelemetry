@@ -167,6 +167,7 @@ bool SameEditableAnchorIdentity(const LayoutEditAnchorRegion& lhs, const LayoutE
 
 void AddPackedDashboardGuides(PackedOverview& overview,
     DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     const std::vector<RenderRect>& childRects,
@@ -176,7 +177,7 @@ void AddPackedDashboardGuides(PackedOverview& overview,
         return;
     }
     const bool horizontal = node.name == "columns";
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     const int hitInset = ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1);
     const int reorderWidth = ScaleAtLeast(renderer, horizontal ? 12 : 8, 1);
     const int reorderHeight = ScaleAtLeast(renderer, horizontal ? 8 : 12, 1);
@@ -269,6 +270,7 @@ void AddPackedDashboardGuides(PackedOverview& overview,
 
 void AppendPackedCards(const LayoutNodeConfig& node,
     DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const RenderRect& rect,
     const std::vector<size_t>& nodePath,
     PackedOverview& overview) {
@@ -326,21 +328,21 @@ void AppendPackedCards(const LayoutNodeConfig& node,
         }
         childRects.push_back(childRect);
         childPath.push_back(i);
-        AppendPackedCards(node.children[i], renderer, childRect, childPath, overview);
+        AppendPackedCards(node.children[i], renderer, guideSheet, childRect, childPath, overview);
         childPath.pop_back();
         cursor += extent + gap;
         remainingExtra -= extra;
         remainingWeight -= weight;
     }
-    AddPackedDashboardGuides(overview, renderer, node, rect, childRects, gap, nodePath);
+    AddPackedDashboardGuides(overview, renderer, guideSheet, node, rect, childRects, gap, nodePath);
 }
 
-PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
+PackedOverview BuildPackedOverview(DashboardRenderer& renderer, const LayoutGuideSheetConfig& guideSheet) {
     PackedNode root = MeasurePackedNode(renderer.Config().layout.structure.cards, renderer);
     const int outerMargin = renderer.ScaleLogical(renderer.Config().layout.dashboard.outerMargin);
     PackedOverview overview;
     overview.rect = RenderRect{0, 0, root.width + outerMargin * 2, root.height + outerMargin * 2};
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     LayoutEditGapAnchor outerMarginAnchor;
     outerMarginAnchor.axis = LayoutGuideAxis::Horizontal;
     outerMarginAnchor.key.widget =
@@ -358,6 +360,7 @@ PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
     overview.gapAnchors.push_back(std::move(outerMarginAnchor));
     AppendPackedCards(renderer.Config().layout.structure.cards,
         renderer,
+        guideSheet,
         RenderRect{outerMargin, outerMargin, outerMargin + root.width, outerMargin + root.height},
         {},
         overview);
@@ -416,11 +419,12 @@ LayoutEditActiveRegions CollectActiveRegionsFromPackedOverview(const PackedOverv
     return regions;
 }
 
-void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect) {
+void DrawDottedOverviewRect(
+    DashboardRenderer& renderer, const LayoutGuideSheetConfig& guideSheet, const RenderRect& rect) {
     if (rect.IsEmpty()) {
         return;
     }
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     const int padding = ScaleAtLeast(renderer, sheetStyle.overviewDottedPadding, 0);
     const RenderRect drawRect = rect.Inflate(padding, padding);
     const int strokeWidth = ScaleAtLeast(renderer, sheetStyle.overviewDottedStrokeWidth, 1);
@@ -445,6 +449,7 @@ void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect)
 }
 
 void DrawOverviewArtifact(DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const LayoutGuideSheetPlacementCallout& callout,
     const RenderRect& sourceRect,
     const RenderRect& destRect) {
@@ -452,7 +457,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         callout.hoverArtifactTargetRect.has_value() ? *callout.hoverArtifactTargetRect : callout.targetRect,
         sourceRect,
         destRect);
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     RenderRect anchor;
     const bool hasAnchor = callout.hoverAnchorRect.has_value();
     if (hasAnchor) {
@@ -509,7 +514,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
     }
     if (callout.hoverAnchorKey.has_value()) {
         if (callout.hoverAnchorDrawTargetOutline) {
-            DrawDottedOverviewRect(renderer, target);
+            DrawDottedOverviewRect(renderer, guideSheet, target);
         }
         const int size = std::max(1,
             std::min(std::max(target.Width(), target.Height()),
@@ -535,11 +540,12 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
 
 }  // namespace
 
-LayoutGuideSheetRenderer::LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer)
-    : dashboardRenderer_(dashboardRenderer) {}
+LayoutGuideSheetRenderer::LayoutGuideSheetRenderer(
+    DashboardRenderer& dashboardRenderer, const LayoutGuideSheetConfig& guideSheet)
+    : dashboardRenderer_(dashboardRenderer), guideSheet_(guideSheet) {}
 
 LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(const SystemSnapshot& snapshot) {
-    PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
+    PackedOverview overview = BuildPackedOverview(dashboardRenderer_, guideSheet_);
     const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
     for (PackedOverviewCard& card : overview.cards) {
         card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
@@ -609,8 +615,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     if (errorText != nullptr) {
         errorText->clear();
     }
-    ApplyLayoutGuideSheetRendererPalette(
-        dashboardRenderer_.Renderer(), dashboardRenderer_.Config().layout.layoutGuideSheet);
+    ApplyLayoutGuideSheetRendererPalette(dashboardRenderer_.Renderer(), guideSheet_);
 
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
@@ -630,7 +635,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     std::vector<CardPlacement> cardPlacements;
     cardPlacements.reserve(selectedCardIds.size() + 1);
     const std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(dashboardRenderer_);
-    PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
+    PackedOverview overview = BuildPackedOverview(dashboardRenderer_, guideSheet_);
     for (PackedOverviewCard& card : overview.cards) {
         card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
             dashboardRenderer_, card.id, card.rect, nullptr, card.suppressTitle);
@@ -658,7 +663,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     }
     StableSortCalloutsByPriority(callouts);
 
-    const LayoutGuideSheetConfig& sheetStyle = dashboardRenderer_.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet_;
     const int sheetMargin = ScaleNonNegative(dashboardRenderer_, sheetStyle.sheetMargin);
     const int calloutGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutGap);
     const int bubblePaddingX = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutPaddingX);
@@ -904,7 +909,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                     if (callout.hoverColorParameter.has_value()) {
                         continue;
                     }
-                    DrawOverviewArtifact(dashboardRenderer_, callout, placement.sourceRect, placement.destRect);
+                    DrawOverviewArtifact(
+                        dashboardRenderer_, guideSheet_, callout, placement.sourceRect, placement.destRect);
                 }
                 continue;
             }

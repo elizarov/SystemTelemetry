@@ -17,8 +17,7 @@ namespace {
 
 class RealTelemetryCollector : public TelemetryCollector {
 public:
-    RealTelemetryCollector(Trace& trace, bool synchronousProviderSamples)
-        : state_(std::make_unique<RealTelemetryCollectorState>(trace, synchronousProviderSamples)) {}
+    explicit RealTelemetryCollector(Trace& trace) : state_(std::make_unique<RealTelemetryCollectorState>(trace)) {}
 
     bool Initialize(const TelemetrySettings& settings, std::string* errorText) override {
         if (errorText != nullptr) {
@@ -171,6 +170,6 @@ private:
 
 }  // namespace
 
-std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace, bool synchronousProviderSamples) {
-    return std::make_unique<RealTelemetryCollector>(trace, synchronousProviderSamples);
+std::unique_ptr<TelemetryCollector> CreateRealTelemetryCollector(Trace& trace) {
+    return std::make_unique<RealTelemetryCollector>(trace);
 }

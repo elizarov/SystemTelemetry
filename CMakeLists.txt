@@ -264,9 +264,7 @@ add_executable(CaseDash WIN32
     src/layout_edit_dialog/impl/util.cpp
     src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_hit_test.cpp
-    src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_controller.cpp
-    src/layout_edit/layout_edit_trace_session.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp
@@ -404,7 +402,6 @@ set(casedash_release_speed_sources
     src/dashboard_renderer/impl/render_thread.cpp
     src/dashboard_renderer/impl/layout_resolver.cpp
     src/layout_edit/impl/layout_snap_solver.cpp
-    src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_controller.cpp
     src/layout_edit/layout_edit_hit_test.cpp
     src/layout_edit/layout_edit_parameter_edit.cpp
@@ -413,7 +410,6 @@ set(casedash_release_speed_sources
     src/layout_edit/layout_edit_tooltip.cpp
     src/layout_edit/layout_edit_tooltip_payload.cpp
     src/layout_edit/layout_edit_tooltip_text.cpp
-    src/layout_edit/layout_edit_trace_session.cpp
     src/layout_edit/layout_edit_tree.cpp
     src/layout_edit_dialog/theme_preview.cpp
     src/layout_guide_sheet/layout_guide_sheet.cpp
@@ -669,9 +665,7 @@ add_executable(CaseDashHeadless
     src/util/win32_format.cpp
     src/config/metric_board_binding.cpp
     src/layout_edit/layout_edit_hit_test.cpp
-    src/layout_edit/layout_edit_active_region_trace.cpp
     src/layout_edit/layout_edit_controller.cpp
-    src/layout_edit/layout_edit_trace_session.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
     src/layout_model/layout_edit_hit_priority.cpp

@@ -860,6 +860,12 @@ def generate_cpp(
             "    return kRuntimeConfigSections;",
             "}",
             "",
+            f"#if {LAYOUT_GUIDE_SHEET_FEATURE_GUARD}",
+            "std::span<const RuntimeConfigFieldDescriptor> LayoutGuideSheetRuntimeConfigFields() {",
+            "    return kLayoutGuideSheetConfigFields;",
+            "}",
+            "#endif",
+            "",
         ]
     )
     return "\n".join(lines)

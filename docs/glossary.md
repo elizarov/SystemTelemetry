@@ -22,7 +22,7 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | Prose dump name | snapshot dump | Use `dump` alone only after the snapshot dump has already been named in nearby text or when referring to the `/dump` switch. |
 | Synthetic telemetry source | built-in synthetic telemetry | Use `fake runtime`, `fake provider`, and `/fake` for switch, architecture, benchmark, or source-code contexts. Avoid `fake data` in docs. |
 | FPS metric | presented FPS | Use `presented-FPS` only as a compound adjective, such as `presented-FPS collection`. |
-| Active area term | active region | Use `active-region` only as a compound adjective, such as `active-region trace`. |
+| Active area term | active region | Use `active-region` only as a compound adjective, such as `active-region hit testing`. |
 | Edit target term | edit target | Use `editable target` only when describing whether a visible item can be edited. |
 | Service concept | CaseDash service | The installed Windows service and pipe are named `CashDashService`; preserve that exact spelling for service-name and source-symbol references. |
 
@@ -237,7 +237,6 @@ See also: [docs/project.md](project.md) for documentation ownership, [docs/layou
 | blank rendering mode | The `/blank` mode that keeps dashboard chrome and static labels while omitting dynamic values and fills. |
 | default-config behavior | `/default-config` suppressing the executable-side config overlay for the current process. |
 | hover diagnostics | `/hover:<x>,<y>` resolving the layout-edit target and tooltip text for a screenshot export. |
-| active-region trace | `diagnostics:active_region` lines emitted for mouse-reactive regions in traced screenshot exports. |
 | crash report | The best-effort text report written after an unhandled native process crash. |
 | minidump | The `.dmp` crash dump written with a crash report. |
 

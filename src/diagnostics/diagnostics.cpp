@@ -23,7 +23,6 @@
 #include "diagnostics/app_icon_export.h"
 #include "diagnostics/constants.h"
 #include "diagnostics/snapshot_dump.h"
-#include "layout_edit/layout_edit_active_region_trace.h"
 #include "layout_edit/layout_edit_controller.h"
 #include "layout_edit/layout_edit_tooltip_text.h"
 #include "telemetry/metrics.h"
@@ -842,7 +841,8 @@ bool DiagnosticsSession::WriteOutputs(const TelemetryDump& dump, const AppConfig
 
     if (handlers_.writeExtraOutputs != nullptr) {
         std::string extraOutputError;
-        if (!handlers_.writeExtraOutputs(options_, dump, config, savedScreenshotScale, trace_, &extraOutputError)) {
+        if (!handlers_.writeExtraOutputs(
+                handlers_.context, options_, dump, config, savedScreenshotScale, trace_, &extraOutputError)) {
             lastError_ = extraOutputError;
             return false;
         }
@@ -1094,10 +1094,6 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
             *errorText = error;
         }
         WriteRendererErrorTrace(trace, RES_STR("screenshot_save"), error);
-    }
-    if (saved) {
-        WriteLayoutEditActiveRegionTrace(
-            trace, config, renderer.CollectLayoutEditActiveRegions(overlayState), overlayState);
     }
     return saved;
 }

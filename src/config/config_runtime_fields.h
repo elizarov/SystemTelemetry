@@ -79,6 +79,7 @@ std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, 
 bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const void* owner, const void* compareOwner);
 // Implemented by generated file build/cmake/generated/config/config_meta.generated.cpp.
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
+std::span<const RuntimeConfigFieldDescriptor> LayoutGuideSheetRuntimeConfigFields();
 std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFields(const RuntimeConfigSectionDescriptor& section);
 const RuntimeConfigSectionDescriptor* FindRuntimeConfigSection(std::string_view sectionName);
 const RuntimeConfigSectionDescriptor* FindRuntimeConfigDynamicSection(std::string_view sectionName);

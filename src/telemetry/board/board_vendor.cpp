@@ -48,7 +48,7 @@ private:
 };
 
 std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
-    Trace& trace, BoardVendor vendor, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
+    Trace& trace, BoardVendor vendor, BoardVendorInfo info) {
     if (vendor == BoardVendor::Asus) {
         return CreateAsusBoardTelemetryProvider(trace, std::move(info));
     }
@@ -59,7 +59,7 @@ std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardProviderForVendor(
         return CreateGigabyteBoardTelemetryProvider(trace, std::move(info));
     }
     if (vendor == BoardVendor::Lenovo) {
-        return CreateLenovoBoardTelemetryProvider(trace, std::move(info), options);
+        return CreateLenovoBoardTelemetryProvider(trace, std::move(info));
     }
 
     return std::make_unique<UnsupportedBoardTelemetryProvider>(trace, std::move(info));
@@ -74,8 +74,7 @@ BoardVendorInfo ExtractBoardVendorInfo() {
     };
 }
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(
-    Trace& trace, const BoardVendorTelemetryProviderOptions& options) {
+std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider(Trace& trace) {
     BoardVendorInfo info = ExtractBoardVendorInfo();
     const BoardVendor vendor = SelectBoardVendor(info);
     trace.WriteFmt(TracePrefix::BoardVendor,
@@ -83,5 +82,5 @@ std::unique_ptr<BoardVendorTelemetryProvider> CreateBoardVendorTelemetryProvider
         BoardVendorName(vendor),
         info.manufacturer.c_str(),
         info.product.c_str());
-    return CreateBoardProviderForVendor(trace, vendor, std::move(info), options);
+    return CreateBoardProviderForVendor(trace, vendor, std::move(info));
 }

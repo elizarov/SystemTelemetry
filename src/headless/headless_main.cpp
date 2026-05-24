@@ -1,6 +1,7 @@
 #include <windows.h>
 
 #include <cstdio>
+#include <string>
 #include <string_view>
 
 #include "diagnostics/crash_report.h"
@@ -26,7 +27,13 @@ int main() {
 
     InstallCrashReportHandler(diagnosticsOptions);
 
-    const DiagnosticsOutputHandlers handlers = CreateHeadlessDiagnosticsOutputHandlers();
+    HeadlessLayoutGuideSheetOutputContext outputContext;
+    std::string outputError;
+    if (!InitializeHeadlessLayoutGuideSheetOutput(outputContext, &outputError)) {
+        ReportDiagnosticsError(diagnosticsOptions, outputError);
+        return 1;
+    }
+    const DiagnosticsOutputHandlers handlers = CreateHeadlessDiagnosticsOutputHandlers(outputContext);
     const DiagnosticsValidationResult validation = ValidateDiagnosticsOptions(diagnosticsOptions, handlers);
     if (!validation.ok) {
         ReportDiagnosticsError(diagnosticsOptions, validation.message);
