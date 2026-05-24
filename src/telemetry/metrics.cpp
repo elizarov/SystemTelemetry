@@ -125,9 +125,33 @@ std::string FormatPercentValue(std::optional<double> value, std::string_view uni
     return FormatText("%.*f %.*s", precision, *value, static_cast<int>(unit.size()), unit.data());
 }
 
+std::pair<std::string_view, std::string_view> SplitSizeUnits(std::string_view units) {
+    const size_t separator = units.find('|');
+    if (separator == std::string_view::npos) {
+        return {units, units};
+    }
+    return {units.substr(0, separator), units.substr(separator + 1)};
+}
+
 std::string FormatMemoryValue(double usedGb, double totalGb, std::string_view unit) {
     if (!IsFiniteDouble(usedGb) || !IsFiniteDouble(totalGb) || totalGb <= 0.0) {
         return "N/A";
+    }
+    if (unit.find('|') != std::string_view::npos) {
+        const auto [smallUnit, largeUnit] = SplitSizeUnits(unit);
+        if (totalGb < 1.0) {
+            const double usedMb = usedGb * 1024.0;
+            const double totalMb = totalGb * 1024.0;
+            if (smallUnit.empty()) {
+                return FormatText("%.0f / %.0f", usedMb, totalMb);
+            }
+            return FormatText(
+                "%.0f / %.0f %.*s", usedMb, totalMb, static_cast<int>(smallUnit.size()), smallUnit.data());
+        }
+        if (largeUnit.empty()) {
+            return FormatText("%.1f / %.0f", usedGb, totalGb);
+        }
+        return FormatText("%.1f / %.0f %.*s", usedGb, totalGb, static_cast<int>(largeUnit.size()), largeUnit.data());
     }
     if (unit.empty()) {
         return FormatText("%.1f / %.0f", usedGb, totalGb);
@@ -144,14 +168,6 @@ std::string FormatThroughputValue(double valueMbps, std::string_view unit) {
     }
     return FormatText(
         valueMbps >= 100.0 ? "%.0f %.*s" : "%.1f %.*s", valueMbps, static_cast<int>(unit.size()), unit.data());
-}
-
-std::pair<std::string_view, std::string_view> SplitSizeUnits(std::string_view units) {
-    const size_t separator = units.find('|');
-    if (separator == std::string_view::npos) {
-        return {units, units};
-    }
-    return {units.substr(0, separator), units.substr(separator + 1)};
 }
 
 std::string FormatSizeAutoValue(double valueGb, std::string_view units) {

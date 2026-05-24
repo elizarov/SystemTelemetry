@@ -134,6 +134,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The dashboard redraws after receiving a new telemetry snapshot instead of driving collection from the UI message loop.
 - Retained histories feed throughput plots plus recent-peak or recent-max overlays for supported widgets.
 - Dashboard formatting uses the configured metric display definitions, while snapshot dump serialization keeps its own stable machine-facing unit contract.
+- Memory metric definitions with paired units such as `MB|GB` display the small unit when total capacity is below `1 GB` and otherwise display the large unit. The shipped `gpu.vram` metric uses this form so integrated GPUs with small dedicated memory show MB values.
 - The dashboard runs as a single-instance application. Starting a new UI instance closes the existing one and continues startup in the replacement instance.
 - Starting with `/bring-to-front` uses the normal UI startup path and raises the dashboard after creating the tray icon. Elevated UI relaunches include this switch and briefly retry the foreground raise after startup.
 - Headless diagnostics `/exit` runs are outside that normal single-instance replacement path; diagnostics-specific behavior is defined in [docs/diagnostics.md](diagnostics.md).
