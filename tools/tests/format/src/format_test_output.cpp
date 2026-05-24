@@ -379,6 +379,10 @@ TraceTimingScope::TraceTimingScope(TraceTimingScope&& other) noexcept :
     operation_(std::exchange(other.operation_, nullptr)),
     startedAt_(std::exchange(other.startedAt_, 0)) {}
 
+int CardChromeWidget::PreferredHeight(const WidgetHost&) const {
+    return 0;
+}
+
 HANDLE OpenProbe(FilePath probePath) {
     HANDLE probe = CreateFileA(
         probePath.string().c_str(),

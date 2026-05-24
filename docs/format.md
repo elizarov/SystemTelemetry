@@ -118,6 +118,7 @@ Spacing follows the native formatter policy with the project's explicit no-align
 - Keep `alignas` compact around its alignment argument and separate it from the declaration type with one space: `alignas(void*) unsigned char storage_[sizeof(void*)]{};`.
 - Put one space before a code-block opening brace after function declarations, class declarations, namespace declarations, control statements, lambdas, `try`, `else`, `catch`, and `finally`.
 - Put spaces around lambda trailing-return arrows: `[](int value) -> int { return value; }`.
+- Put one space before trailing function qualifiers after the parameter list: `int Method() const`, `int Method() noexcept`, and `int Method() const = 0;`.
 - Put a space between `auto` and the opening bracket of a structured binding: `auto [name, value] = pair;`.
 - Do not put a space between a string or character literal prefix and its literal: `L"text"`, `u8"text"`, and `L'x'`.
 - Put one space between `return` and the returned expression: `return value;`, `return !ready;`, and `return {};`. Bare returns keep no space before the statement semicolon: `return;`.

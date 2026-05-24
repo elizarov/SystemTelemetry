@@ -3568,7 +3568,23 @@ private:
         if (before == "alignas") {
             return false;
         }
-        return before != ")" && before != "]" && before != "}";
+        return IsCStyleCastContextBeforeOpen(tokens, *beforeOpen);
+    }
+
+    bool IsCStyleCastContextBeforeOpen(const std::vector<Token>& tokens, size_t beforeOpen) const {
+        const std::string& before = tokens[beforeOpen].text;
+        if (tokens[beforeOpen].kind == TokenKind::Word) {
+            return before == "return" || before == "co_return" || before == "throw";
+        }
+        return before == "(" ||
+            before == "[" ||
+            before == "{" ||
+            before == "," ||
+            before == ";" ||
+            before == "=" ||
+            before == "?" ||
+            before == ":" ||
+            IsBinaryOperatorLike(before);
     }
 
     bool IsLikelyCStyleCastType(const std::vector<Token>& tokens, size_t open, size_t close) const {
