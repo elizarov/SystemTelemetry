@@ -74,6 +74,54 @@ private:
     HWND hwnd_ = nullptr;
 };
 
+bool gSuppressPopupMenuAltKeyUp = false;
+
+bool IsAltKeyMessage(UINT message, WPARAM key) {
+    return (message == WM_KEYUP || message == WM_SYSKEYUP) && (key == VK_MENU || key == VK_LMENU || key == VK_RMENU);
+}
+
+LRESULT CALLBACK PopupMenuAltReleaseHook(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == MSGF_MENU && gSuppressPopupMenuAltKeyUp) {
+        const auto* message = reinterpret_cast<const MSG*>(lParam);
+        if (message != nullptr && IsAltKeyMessage(message->message, message->wParam)) {
+            gSuppressPopupMenuAltKeyUp = false;
+            return 1;
+        }
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
+
+class ScopedPopupMenuAltReleaseFilter {
+public:
+    explicit ScopedPopupMenuAltReleaseFilter(bool enabled) {
+        if (!enabled) {
+            return;
+        }
+        gSuppressPopupMenuAltKeyUp = true;
+        hook_ = SetWindowsHookExA(WH_MSGFILTER, PopupMenuAltReleaseHook, nullptr, GetCurrentThreadId());
+        if (hook_ == nullptr) {
+            gSuppressPopupMenuAltKeyUp = false;
+        }
+    }
+
+    ~ScopedPopupMenuAltReleaseFilter() {
+        if (hook_ != nullptr) {
+            UnhookWindowsHookEx(hook_);
+        }
+        gSuppressPopupMenuAltKeyUp = false;
+    }
+
+    ScopedPopupMenuAltReleaseFilter(const ScopedPopupMenuAltReleaseFilter&) = delete;
+    ScopedPopupMenuAltReleaseFilter& operator=(const ScopedPopupMenuAltReleaseFilter&) = delete;
+
+private:
+    HHOOK hook_ = nullptr;
+};
+
+bool IsPopupMenuAltModifierDown() {
+    return (::GetKeyState(VK_MENU) & 0x8000) != 0 || (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
+}
+
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
 constexpr size_t kConfigureDisplayMenuCapacity = kCommandConfigureDisplayMax - kCommandConfigureDisplayBase + 1;
@@ -1214,7 +1262,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU displayMenu = CreatePopupMenu();
     HMENU devicesMenu = CreatePopupMenu();
     HMENU editLayoutMenu = CreatePopupMenu();
-    const bool showAdvancedMenu = (::GetKeyState(VK_MENU) & 0x8000) != 0;
+    const bool showAdvancedMenu = IsPopupMenuAltModifierDown();
     HMENU advancedMenu = showAdvancedMenu ? CreatePopupMenu() : nullptr;
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     if (state.config.layout.layouts.empty()) {
@@ -1381,6 +1429,8 @@ void DashboardShellUi::ShowContextMenu(
     const UINT defaultCommand = ResolveDefaultCommand(source, layoutEditTarget);
     SetMenuDefaultItem(menu, defaultCommand, FALSE);
     SetForegroundWindow(app_.hwnd_);
+    // Alt reveals the advanced submenu; its release should not cancel the popup it just requested.
+    ScopedPopupMenuAltReleaseFilter altReleaseFilter(showAdvancedMenu);
     const UINT selected = TrackPopupMenu(menu,
         TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
         screenPoint.x,
