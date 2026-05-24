@@ -3424,6 +3424,10 @@ private:
             segments.push_back(current);
         }
         std::vector<std::string> lines = FormatRange(receiver, indentLevel, std::move(prefix), {}, true);
+        if (std::optional<std::string> compactTail = CompactShiftOperatorTail(segments, indentLevel + 1, suffix)) {
+            lines.push_back(Indent(indentLevel + 1) + *compactTail);
+            return lines;
+        }
         for (size_t index = 0; index < segments.size();) {
             std::vector<std::string> groupedLines;
             size_t nextIndex = index + 1;
@@ -3449,6 +3453,26 @@ private:
             ++index;
         }
         return lines;
+    }
+
+    std::optional<std::string> CompactShiftOperatorTail(
+        const std::vector<std::vector<Token>>& segments,
+        int indentLevel,
+        std::string_view suffix
+    ) const {
+        std::vector<Token> combined;
+        for (const std::vector<Token>& segment : segments) {
+            combined.insert(combined.end(), segment.begin(), segment.end());
+        }
+        if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
+            return std::nullopt;
+        }
+        std::string candidate = FormatInline(combined);
+        AppendSuffix(candidate, suffix);
+        if (!Fits(indentLevel, candidate)) {
+            return std::nullopt;
+        }
+        return candidate;
     }
 
     bool TryFormatStreamShiftConfigurationGroup(

@@ -167,11 +167,7 @@ void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
 
 void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
     std::cerr
-        << "unknown benchmark \""
-        << firstArg
-        << "\"; supported benchmarks: "
-        << SupportedBenchmarkNames()
-        << "\n";
+        << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames() << "\n";
     input
         >> firstBenchmarkName
         >> secondBenchmarkNameWithLongName
@@ -184,6 +180,15 @@ void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
         << " per_iter_ms="
         << result.perIteration.count()
         << "\n";
+}
+
+void ExpectRectNoOverlap(RECT* rects) {
+    if (check) {
+        if (ready) {
+            EXPECT_FALSE(IntersectRect(&intersection, &rects[i], &rects[j]))
+                << "rect " << i << " overlapped rect " << j;
+        }
+    }
 }
 
 void WriteMetricConfig() {

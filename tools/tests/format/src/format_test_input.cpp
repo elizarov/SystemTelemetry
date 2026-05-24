@@ -129,6 +129,14 @@ input>>firstBenchmarkName>>secondBenchmarkNameWithLongName>>thirdBenchmarkNameWi
 std::cout<<std::left<<std::setw(18)<<name<<" total_ms="<<std::fixed<<std::setprecision(2)<<result.total.count()<<" per_iter_ms="<<result.perIteration.count()<<"\n";
 }
 
+void ExpectRectNoOverlap(RECT* rects){
+if(check){
+if(ready){
+EXPECT_FALSE(IntersectRect(&intersection,&rects[i],&rects[j]))<<"rect "<<i<<" overlapped rect "<<j;
+}
+}
+}
+
 void WriteMetricConfig(){
 const FilePath path=WriteTestConfig("[metrics]\n" "nothing = 7,ignored,Overridden Placeholder\n" "cpu.load = *,%,Processor Load\n");
 }
