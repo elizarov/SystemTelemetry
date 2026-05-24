@@ -268,6 +268,8 @@ using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_
 using ZesDriver = void*;
 using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
+using LayoutEditParameter = ::LayoutEditParameter;
+using TextLayoutResult = ::TextLayoutResult;
 
 using LayoutEditActiveRegionPayload = std::variant<
     LayoutEditCardRegion,

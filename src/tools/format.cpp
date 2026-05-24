@@ -3623,6 +3623,15 @@ private:
         if (current == "[" && prev == "auto") {
             return true;
         }
+        if (
+            current == "::" &&
+            IsBinaryOperatorLike(prev) &&
+            !IsUnaryPrefixOperator(tokens, prevIndex) &&
+            !IsTemplateAngleCloseToken(tokens, prevIndex) &&
+            !(IsPointerOrReferenceDeclaratorToken(prev) && IsPointerOrReferenceDeclarator(tokens, prevIndex))
+        ) {
+            return true;
+        }
         if (current == "{" || IsNoSpaceBefore(current) || IsNoSpaceAfter(prev)) {
             return false;
         }
