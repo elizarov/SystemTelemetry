@@ -578,7 +578,7 @@ private:
         dirty_ = true;
     }
 
-    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override {
+    void BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) override {
         phaseTotals_ = {};
         traceSession_.Begin(trace_, kind, detail);
     }
@@ -588,7 +588,7 @@ private:
         RecordPhase(static_cast<BenchPhase>(PhaseIndex(phase)), elapsed);
     }
 
-    void EndLayoutEditTraceSession(const char* reason) override {
+    void EndLayoutEditTraceSession(ResourceStringId reason) override {
         traceSession_.End(trace_, reason);
     }
 

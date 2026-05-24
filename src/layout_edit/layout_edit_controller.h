@@ -3,6 +3,7 @@
 #include <windows.h>
 
 #include <chrono>
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -14,6 +15,7 @@
 #include "widget/layout_edit_types.h"
 
 struct AppConfig;
+enum class ResourceStringId : std::uint32_t;
 
 class LayoutEditHost {
 public:
@@ -45,9 +47,9 @@ public:
         LayoutGuideAxis axis) = 0;
     virtual bool ApplyLayoutEditValue(LayoutEditParameter parameter, double value) = 0;
     virtual void InvalidateLayoutEdit() = 0;
-    virtual void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) = 0;
+    virtual void BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) = 0;
     virtual void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) = 0;
-    virtual void EndLayoutEditTraceSession(const char* reason) = 0;
+    virtual void EndLayoutEditTraceSession(ResourceStringId reason) = 0;
 };
 
 class LayoutEditController {

@@ -2,6 +2,7 @@
 
 #include <windows.h>
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -12,6 +13,7 @@
 #include "widget/layout_edit_types.h"
 
 struct LayoutEditDialogState;
+enum class ResourceStringId : std::uint32_t;
 
 class LayoutEditDialogHost {
 public:
@@ -47,7 +49,7 @@ public:
     virtual void UpdateLayoutEditSelectionHighlight(const std::optional<LayoutEditSelectionHighlight>& highlight) = 0;
     virtual void ApplyLayoutEditDialogIcons(HWND dialogHwnd) const = 0;
     virtual void RestackLayoutEditDialogAnchor(HWND dialogHwnd) = 0;
-    virtual void TraceLayoutEditDialogEvent(const char* event, const std::string& details = {}) const = 0;
+    virtual void TraceLayoutEditDialogEvent(ResourceStringId event, const std::string& details = {}) const = 0;
     virtual void OnLayoutEditDialogCloseRequested() = 0;
 };
 

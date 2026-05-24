@@ -14,10 +14,10 @@ This document owns executable-size constraints, the map workflow, current size s
 
 ## Current State
 
-- Current measured `build\CaseDash.exe`: `956,928` bytes.
+- Current measured `build\CaseDash.exe`: `1,104,896` bytes.
 - Current app map summary: `build\CaseDash.map.summary.txt`.
-- Current largest sections: `.text$mn` about `772.1 KiB`, `.rdata` about `69.8 KiB`, `.pdata` about `38.2 KiB`, `.rsrc$02` about `17.9 KiB`, and `.xdata` about `15.6 KiB`.
-- Current largest project objects: `diagnostics.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_renderer.cpp.obj`, `dashboard_controller.cpp.obj`, `editors.cpp.obj`, `d2d_renderer.cpp.obj`, `layout_edit_controller.cpp.obj`, `pane.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `dashboard_app.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `dashboard_shell_ui.cpp.obj`, `CaseDash.rc.res`, `layout_guide_sheet_placement.cpp.obj`, `collector_fake.cpp.obj`, `render_thread.cpp.obj`, `config_parser.cpp.obj`, and `metrics.cpp.obj`.
+- Current largest sections: `.text$mn` about `904.2 KiB`, `.rdata` about `69.8 KiB`, `.pdata` about `41.4 KiB`, `.rsrc$02` about `21.6 KiB`, and `.xdata` about `16.9 KiB`.
+- Current largest project objects: `dashboard_app.cpp.obj`, `diagnostics.cpp.obj`, `board_lenovo_vantage.cpp.obj`, `layout_resolver.cpp.obj`, `dashboard_controller.cpp.obj`, `dashboard_renderer.cpp.obj`, `d2d_renderer.cpp.obj`, `editors.cpp.obj`, `layout_edit_controller.cpp.obj`, `layout_guide_sheet_renderer.cpp.obj`, `layout_edit_tree.cpp.obj`, `pane.cpp.obj`, `CaseDash.rc.res`, `dashboard_shell_ui.cpp.obj`, `layout_edit_overlay_renderer.cpp.obj`, `layout_guide_sheet_placement.cpp.obj`, `render_thread.cpp.obj`, `layout_guide_sheet_planner.cpp.obj`, `gpu_intel_level_zero.cpp.obj`, `collector_fake.cpp.obj`, `snapshot_dump.cpp.obj`, `metrics.cpp.obj`, `fps_etw_provider.cpp.obj`, `drive_usage_list.cpp.obj`, and `config_meta.generated.cpp.obj`.
 - Last validation: `format.cmd changed`, `build.cmd`, `build_maps.cmd`, `lint.cmd includes changed`, `test.cmd`, `git diff --check`, and `build\CaseDash.exe /default-config /fake /exit /trace:build\size_optimization_validation_trace.txt /dump:build\size_optimization_validation_dump.txt /screenshot:build\size_optimization_validation_screenshot.png /layout-guide-sheet:build\size_optimization_validation_sheet.png /app-icon:build\size_optimization_validation_app_icon.png /app-icon-size:64 /save-full-config:build\size_optimization_validation_full_config.ini`.
 
 ## Workflow
@@ -48,6 +48,7 @@ Hard size lessons and source-shape rules live in [docs/source_policy_guardrails.
 - The embedded default config, localization catalog, and generated resource-string catalog share one CDLZ text atlas. The atlas keeps config, localization, and first-source-use resource strings in deterministic order, with extended 12-bit-offset LZSS token parsing.
 - `RES_STR("...")` literals compile to collision-checked FNV-1a ids, not generated literal tables. Runtime lookup uses the loaded text atlas plus an open-addressed hash table so trace and diagnostics paths keep O(1) catalog access after their prefix gate passes.
 - User-visible UI copy belongs in `resources/localization.ini`. Direct `RES_STR` text is reserved for trace formats, compact localization keys, telemetry diagnostics payloads, and diagnostics-only errors.
+- Fixed trace helper vocabulary uses `ResourceStringId` and `RES_STR`; dynamic trace values stay in outer resource-string-aware format strings, including their quote marks, instead of shared trace quote or color wrapper helpers.
 - The fallback `resources\app.ico` keeps only `16`, `32`, and `64` frames. Runtime themed icons provide live and generated arbitrary-size icon assets.
 - Panel icons stay in one fixed 64 x 64 vertical 8-bit grayscale PNG mask atlas and render through target-local alpha masks. Keep PNG and ICO resource optimization lossless, and strip nonessential PNG ancillary chunks only when visual validation remains healthy.
 - The shipped executable omits duplicate Win32 `VERSIONINFO` string resources; full user-visible version, build, and commit text lives in generated C++ constants for the `About CaseDash` dialog.

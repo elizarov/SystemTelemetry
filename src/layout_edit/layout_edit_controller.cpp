@@ -8,6 +8,7 @@
 #include "layout_edit/layout_edit_service.h"
 #include "layout_model/layout_edit_helpers.h"
 #include "layout_model/layout_edit_parameter_metadata.h"
+#include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_format.h"
 
@@ -236,7 +237,7 @@ void LayoutEditController::StopSession(bool showLayoutEditGuidesAfterStop) {
     SyncRendererInteractionState();
     ReleaseCapture();
     SetCursor(LoadCursorA(nullptr, IDC_ARROW));
-    host_.EndLayoutEditTraceSession("session_stop");
+    host_.EndLayoutEditTraceSession(RES_STR("session_stop"));
     host_.InvalidateLayoutEdit();
 }
 
@@ -382,7 +383,8 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 ContainerChildReorderDragState& activeDrag = *activeContainerChildReorderDrag_;
                 activeDrag.stableChildRects = activeDrag.childRects;
                 host_.SetLayoutEditInteractiveDragTraceActive(true);
-                host_.BeginLayoutEditTraceSession("container_child_reorder", DescribeEditableAnchor(region->key));
+                host_.BeginLayoutEditTraceSession(
+                    RES_STR("container_child_reorder"), DescribeEditableAnchor(region->key));
                 SyncRendererInteractionState();
                 host_.InvalidateLayoutEdit();
                 SetCapture(hwnd);
@@ -413,7 +415,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                     clientPoint.y};
                 hoveredEditableWidget_ = region->key.widget;
                 host_.SetLayoutEditInteractiveDragTraceActive(true);
-                host_.BeginLayoutEditTraceSession("metric_list_reorder", DescribeEditableAnchor(region->key));
+                host_.BeginLayoutEditTraceSession(RES_STR("metric_list_reorder"), DescribeEditableAnchor(region->key));
                 SyncRendererInteractionState();
                 host_.InvalidateLayoutEdit();
                 SetCapture(hwnd);
@@ -436,7 +438,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
                 hoveredEditableWidget_ = region->key.widget;
             }
             host_.SetLayoutEditInteractiveDragTraceActive(true);
-            host_.BeginLayoutEditTraceSession("anchor", DescribeEditableAnchor(region->key));
+            host_.BeginLayoutEditTraceSession(RES_STR("anchor"), DescribeEditableAnchor(region->key));
             SyncRendererInteractionState();
             SetCapture(hwnd);
             return true;
@@ -467,7 +469,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
             };
             hoveredGapEditAnchorRegion_ = *anchor;
             host_.SetLayoutEditInteractiveDragTraceActive(true);
-            host_.BeginLayoutEditTraceSession("gap_anchor", DescribeGapEditAnchor(*anchor));
+            host_.BeginLayoutEditTraceSession(RES_STR("gap_anchor"), DescribeGapEditAnchor(*anchor));
             SyncRendererInteractionState();
             SetCapture(hwnd);
             return true;
@@ -489,7 +491,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
         }
         hoveredWidgetEditGuide_ = widgetGuide;
         host_.SetLayoutEditInteractiveDragTraceActive(true);
-        host_.BeginLayoutEditTraceSession("widget_guide", DescribeWidgetGuide(widgetGuide));
+        host_.BeginLayoutEditTraceSession(RES_STR("widget_guide"), DescribeWidgetGuide(widgetGuide));
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
@@ -509,7 +511,7 @@ bool LayoutEditController::HandleLButtonDown(HWND hwnd, RenderPoint clientPoint)
         host_.SetLayoutGuideDragActive(true);
         host_.SetLayoutEditInteractiveDragTraceActive(true);
         hoveredLayoutGuide_ = guide;
-        host_.BeginLayoutEditTraceSession("layout_guide", DescribeLayoutGuide(guide));
+        host_.BeginLayoutEditTraceSession(RES_STR("layout_guide"), DescribeLayoutGuide(guide));
         SyncRendererInteractionState();
         SetCapture(hwnd);
         return true;
@@ -614,7 +616,7 @@ bool LayoutEditController::HandleLButtonUp(RenderPoint clientPoint) {
     SyncRendererInteractionState();
     ReleaseCapture();
     RefreshHover(clientPoint);
-    host_.EndLayoutEditTraceSession("mouse_up");
+    host_.EndLayoutEditTraceSession(RES_STR("mouse_up"));
     return true;
 }
 
@@ -644,7 +646,7 @@ bool LayoutEditController::HandleCaptureChanged(HWND hwnd, HWND newCaptureOwner)
     host_.SetLayoutEditInteractiveDragTraceActive(false);
     SyncRendererInteractionState();
     host_.InvalidateLayoutEdit();
-    host_.EndLayoutEditTraceSession("capture_changed");
+    host_.EndLayoutEditTraceSession(RES_STR("capture_changed"));
     return true;
 }
 
@@ -717,7 +719,7 @@ void LayoutEditController::CancelInteraction() {
     SyncRendererInteractionState();
     ReleaseCapture();
     SetCursor(LoadCursorA(nullptr, IDC_ARROW));
-    host_.EndLayoutEditTraceSession("modal_ui");
+    host_.EndLayoutEditTraceSession(RES_STR("modal_ui"));
     host_.InvalidateLayoutEdit();
 }
 

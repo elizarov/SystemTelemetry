@@ -228,7 +228,7 @@ public:
 
     void InvalidateLayoutEdit() override {}
 
-    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override {
+    void BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) override {
         (void)kind;
         (void)detail;
     }
@@ -238,7 +238,7 @@ public:
         (void)elapsed;
     }
 
-    void EndLayoutEditTraceSession(const char* reason) override {
+    void EndLayoutEditTraceSession(ResourceStringId reason) override {
         (void)reason;
     }
 

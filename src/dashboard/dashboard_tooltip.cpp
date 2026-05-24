@@ -2,6 +2,7 @@
 
 #include <commctrl.h>
 
+#include "util/resource_strings.h"
 #include "util/text_format.h"
 
 namespace {
@@ -119,7 +120,7 @@ void DashboardTooltip::Hide(std::string_view reason) {
     visible_ = false;
     targetRectValid_ = false;
     screenPointValid_ = false;
-    TraceLifecycle("hide", reason, wasVisible, false, false, false, false, false, false);
+    TraceLifecycle(RES_STR("hide"), reason, wasVisible, false, false, false, false, false, false);
     surface_.clear();
     target_.clear();
 }
@@ -197,18 +198,12 @@ void DashboardTooltip::ShowOrUpdate(const RECT& targetRect,
         ShowWindow(hwnd_, SW_SHOWNOACTIVATE);
     }
     visible_ = true;
-    TraceLifecycle(wasVisible && !textChanged && !rectChanged && !pointChanged && !maxWidthChanged && !surfaceChanged &&
-                           !targetChanged
-                       ? "update_noop"
-                       : (wasVisible ? "update" : "show"),
-        {},
-        wasVisible,
-        textChanged,
-        surfaceChanged,
-        targetChanged,
-        rectChanged,
-        pointChanged,
-        maxWidthChanged);
+    const ResourceStringId event = wasVisible && !textChanged && !rectChanged && !pointChanged && !maxWidthChanged &&
+                                           !surfaceChanged && !targetChanged
+                                       ? RES_STR("update_noop")
+                                       : (wasVisible ? RES_STR("update") : RES_STR("show"));
+    TraceLifecycle(
+        event, {}, wasVisible, textChanged, surfaceChanged, targetChanged, rectChanged, pointChanged, maxWidthChanged);
 }
 
 void DashboardTooltip::RelayMouseMessage(UINT message, WPARAM wParam, LPARAM lParam) const {
@@ -249,7 +244,7 @@ TOOLINFOA DashboardTooltip::ToolInfo() const {
     return toolInfo;
 }
 
-void DashboardTooltip::TraceLifecycle(std::string_view event,
+void DashboardTooltip::TraceLifecycle(ResourceStringId event,
     std::string_view reason,
     bool wasVisible,
     bool textChanged,
@@ -267,12 +262,10 @@ void DashboardTooltip::TraceLifecycle(std::string_view event,
     const std::string escapedSurface = TraceQuotedValue(surface_);
     const std::string escapedTarget = TraceQuotedValue(target_);
     trace_->WriteFmt(tracePrefix_,
-        "event=\"%.*s\" surface=\"%s\" target=\"%s\" reason=\"%s\" visible_before=%s visible_after=%s "
-        "text_changed=%s surface_changed=%s target_changed=%s rect_changed=%s point_changed=%s "
-        "max_width_changed=%s rect=(%ld,%ld,%ld,%ld) "
-        "screen=(%ld,%ld) max_width=%d text=\"%s\"",
-        static_cast<int>(event.size()),
-        event.data(),
+        RES_STR("event=\"%s\" surface=\"%s\" target=\"%s\" reason=\"%s\" visible_before=%s visible_after=%s "
+                "text_changed=%s surface_changed=%s target_changed=%s rect_changed=%s point_changed=%s "
+                "max_width_changed=%s rect=(%ld,%ld,%ld,%ld) screen=(%ld,%ld) max_width=%d text=\"%s\""),
+        ResourceStringText(event),
         escapedSurface.c_str(),
         escapedTarget.c_str(),
         escapedReason.c_str(),

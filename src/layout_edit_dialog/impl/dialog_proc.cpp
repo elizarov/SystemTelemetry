@@ -4,12 +4,14 @@
 #include <commctrl.h>
 #include <commdlg.h>
 
+#include "config/color_format.h"
 #include "layout_edit_dialog/impl/editors.h"
 #include "layout_edit_dialog/impl/pane.h"
 #include "layout_edit_dialog/impl/trace.h"
 #include "layout_edit_dialog/impl/tree.h"
 #include "layout_edit_dialog/impl/util.h"
 #include "resource.h"
+#include "util/resource_strings.h"
 
 namespace {
 
@@ -415,23 +417,24 @@ bool HandleLayoutEditDialogProcMessage(HWND hwnd, UINT message, WPARAM wParam, L
                         RGB((currentColor >> 24) & 0xFFu, (currentColor >> 16) & 0xFFu, (currentColor >> 8) & 0xFFu);
                     chooseColor.lpCustColors = state->customColors;
                     chooseColor.Flags = CC_FULLOPEN | CC_RGBINIT;
-                    state->dialog->Host().TraceLayoutEditDialogEvent("picker_open",
-                        BuildTraceNodeDetail(state->selectedNode,
-                            " current=%s",
-                            QuoteTraceText(FormatTraceColorHex(currentColor)).c_str()));
+                    const std::string currentColorText = FormatRgbaColorText(currentColor);
+                    state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("picker_open"),
+                        BuildTraceNodeDetail(
+                            state->selectedNode, RES_STR(" current=\"%s\""), currentColorText.c_str()));
                     if (ChooseColorA(&chooseColor) == TRUE) {
                         const unsigned int currentAlpha = ReadColorDialogValue(hwnd).value_or(currentColor) & 0xFFu;
                         const unsigned int nextColor = (GetRValue(chooseColor.rgbResult) << 24) |
                                                        (GetGValue(chooseColor.rgbResult) << 16) |
                                                        (GetBValue(chooseColor.rgbResult) << 8) | currentAlpha;
-                        state->dialog->Host().TraceLayoutEditDialogEvent("picker_return",
+                        const std::string nextColorText = FormatRgbaColorText(nextColor);
+                        state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("picker_return"),
                             BuildTraceNodeDetail(state->selectedNode,
-                                " accepted=\"true\" chosen=%s",
-                                QuoteTraceText(FormatTraceColorHex(nextColor)).c_str()));
+                                RES_STR(" accepted=\"true\" chosen=\"%s\""),
+                                nextColorText.c_str()));
                         SetSelectedDialogColor(state, hwnd, nextColor);
                     } else {
-                        state->dialog->Host().TraceLayoutEditDialogEvent(
-                            "picker_return", BuildTraceNodeDetail(state->selectedNode, " accepted=\"false\""));
+                        state->dialog->Host().TraceLayoutEditDialogEvent(RES_STR("picker_return"),
+                            BuildTraceNodeDetail(state->selectedNode, RES_STR(" accepted=\"false\"")));
                     }
                     RefreshLayoutEditValidationState(state, hwnd);
                     return handled(TRUE);

@@ -30,7 +30,7 @@ public:
 
 private:
     TOOLINFOA ToolInfo() const;
-    void TraceLifecycle(std::string_view event,
+    void TraceLifecycle(ResourceStringId event,
         std::string_view reason,
         bool wasVisible,
         bool textChanged,

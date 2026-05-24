@@ -418,13 +418,13 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
     if (layoutEditDialog_ != nullptr) {
         app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditDialog,
-            "refresh_begin",
-            "preferred_focus=\"%s\"",
+            RES_STR("refresh_begin"),
+            RES_STR("preferred_focus=\"%s\""),
             preferredFocus.has_value() ? "set" : "none");
         layoutEditDialog_->Refresh(preferredFocus);
         layoutEditDialog_->SetSelectionHighlightVisible(true);
         layoutEditDialog_->RestackAnchor();
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditDialog, "refresh_done");
+        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditDialog, RES_STR("refresh_done"));
     }
 }
 
@@ -654,7 +654,7 @@ void DashboardShellUi::HandleExitRequest() {
     DestroyWindow(app_.hwnd_);
 }
 
-void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::string& details) const {
+void DashboardShellUi::TraceLayoutEditDialogEvent(ResourceStringId event, const std::string& details) const {
     const auto& state = app_.controller_.State();
     if (state.diagnostics == nullptr) {
         return;
@@ -663,8 +663,8 @@ void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::
     if (details.empty()) {
         state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, event);
     } else {
-        std::string text = FormatText("%s %s", event, details.c_str());
-        state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, text);
+        state.diagnostics->WriteTraceMarkerFmt(
+            TracePrefix::LayoutEditDialog, RES_STR("%s %s"), ResourceStringText(event), details.c_str());
     }
 }
 
@@ -684,8 +684,10 @@ void DashboardShellUi::ShowAboutDialog() const {
 }
 
 void DashboardShellUi::BeginLayoutEditModalUi() {
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "begin_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
+    app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditModal,
+        RES_STR("begin_request"),
+        RES_STR("depth_before=\"%d\""),
+        app_.layoutEditModalUiDepth_);
     ++app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 1 && app_.controller_.State().isEditingLayout) {
         app_.layoutEditController_.CancelInteraction();
@@ -694,8 +696,10 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     app_.layoutEditMouseTracking_ = false;
     app_.UpdateNativeTitlebarProbe();
     SetCursor(LoadCursorA(nullptr, IDC_ARROW));
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
+    app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditModal,
+        RES_STR("begin_done"),
+        RES_STR("depth_after=\"%d\""),
+        app_.layoutEditModalUiDepth_);
 }
 
 void DashboardShellUi::EndLayoutEditModalUi() {
@@ -703,18 +707,20 @@ void DashboardShellUi::EndLayoutEditModalUi() {
         app_.layoutEditModalUiDepth_ = 0;
         return;
     }
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "end_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
+    app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditModal,
+        RES_STR("end_request"),
+        RES_STR("depth_before=\"%d\""),
+        app_.layoutEditModalUiDepth_);
     --app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 0) {
         ReleaseCapture();
         app_.layoutEditMouseTracking_ = false;
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal, "end_released_capture");
+        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal, RES_STR("end_released_capture"));
         app_.RefreshLayoutEditHoverFromCursor();
         app_.UpdateNativeTitlebarHoverFromCursor();
     }
     app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "end_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
+        TracePrefix::LayoutEditModal, RES_STR("end_done"), RES_STR("depth_after=\"%d\""), app_.layoutEditModalUiDepth_);
 }
 
 HINSTANCE DashboardShellUi::DialogInstance() const {
@@ -1094,22 +1100,26 @@ void DashboardShellUi::ExecuteCommand(
                 const size_t index = selected - kCommandLayoutBase;
                 if (index < state.config.layout.layouts.size()) {
                     const std::string& layoutName = state.config.layout.layouts[index].name;
-                    app_.TraceLayoutEditUiEventFmt(
-                        TracePrefix::LayoutSwitch, "menu_command", "selected_layout=\"%s\"", layoutName.c_str());
+                    app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutSwitch,
+                        RES_STR("menu_command"),
+                        RES_STR("selected_layout=\"%s\""),
+                        layoutName.c_str());
                     const bool suppressTooltipRefresh = app_.controller_.State().isEditingLayout;
                     if (suppressTooltipRefresh) {
                         app_.SetLayoutEditTooltipRefreshSuppressed(true);
                         app_.layoutEditController_.HandleMouseLeave();
                         app_.HideLayoutEditTooltip();
                         app_.TraceLayoutEditUiEvent(
-                            TracePrefix::LayoutSwitch, "menu_prepare", "tooltip_suppressed=\"true\"");
+                            TracePrefix::LayoutSwitch, RES_STR("menu_prepare"), RES_STR("tooltip_suppressed=\"true\""));
                     }
                     if (!app_.controller_.SwitchLayout(app_, layoutName, app_.diagnosticsOptions_.editLayout)) {
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEventFmt(
-                            TracePrefix::LayoutSwitch, "menu_failed", "selected_layout=\"%s\"", layoutName.c_str());
+                        app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutSwitch,
+                            RES_STR("menu_failed"),
+                            RES_STR("selected_layout=\"%s\""),
+                            layoutName.c_str());
                         ShowAppMessageBox(app_.hwnd_,
                             FindLocalizedText(RES_STR("dashboard.message.switch_layout_failed")),
                             MB_ICONERROR);
@@ -1118,8 +1128,10 @@ void DashboardShellUi::ExecuteCommand(
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEventFmt(
-                            TracePrefix::LayoutSwitch, "menu_done", "selected_layout=\"%s\"", layoutName.c_str());
+                        app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutSwitch,
+                            RES_STR("menu_done"),
+                            RES_STR("selected_layout=\"%s\""),
+                            layoutName.c_str());
                     }
                 }
                 break;

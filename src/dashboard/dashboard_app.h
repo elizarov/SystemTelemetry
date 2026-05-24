@@ -122,8 +122,9 @@ private:
     void RedrawMoveFrame();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(TracePrefix prefix, const char* event, const std::string& details = {}) const;
-    void TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* event, const char* format, ...) const;
+    void TraceLayoutEditUiEvent(TracePrefix prefix, ResourceStringId event, const std::string& details = {}) const;
+    void TraceLayoutEditUiEvent(TracePrefix prefix, ResourceStringId event, ResourceStringId details) const;
+    void TraceLayoutEditUiEventFmt(TracePrefix prefix, ResourceStringId event, ResourceStringId format, ...) const;
     std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
@@ -218,9 +219,9 @@ private:
     std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
     std::optional<DisplayResizeCorner> HitTestNativeTitlebarResizeHandle(POINT clientPoint) const;
 
-    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
+    void BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
-    void EndLayoutEditTraceSession(const char* reason) override;
+    void EndLayoutEditTraceSession(ResourceStringId reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
