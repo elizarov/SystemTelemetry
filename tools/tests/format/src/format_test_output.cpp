@@ -187,7 +187,15 @@ enum class ValueFormat : std::uint8_t {
     Integer,
     FloatingPoint,
     ColorHex,
-    FontSpec,
+    FontSpec,  // text values
+    FontSmall,
+    FontFooter,
+    FontClockTime,
+    FontClockDate,
+
+    // Card style anchors
+    CardRadius,
+    CardBorder,
 };
 
 enum RuntimeMode {

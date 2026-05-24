@@ -44,7 +44,7 @@ The tool writes `case_dash_macro_config.js` from `tools\format_config.json`, run
 - Enforce the configured hard 120-column line width for generated code whenever the formatter can safely break the syntax.
 - Do not break string literals, character literals, numeric constants, or comments only to satisfy the line width.
 - Preserve comments in place. The formatter may change spaces and line breaks around comments, and may trim trailing whitespace from comment lines, but it does not move comments across code tokens or reflow comment text.
-- Keep a `//` comment that starts on the line after a declaration as a standalone comment line. Only a `//` comment that is physically on the same source line as a statement or declaration may become that line's trailing comment.
+- Keep a `//` comment that starts on the line after a declaration, statement, or list item as a standalone comment line. Only a `//` comment that is physically on the same source line as a statement, declaration, or list item may become that line's trailing comment. In comma lists, a standalone comment before the next item belongs to that next item as a separator, not to the previous item.
 - Remove trailing commas from comma-separated lists in both single-line and multi-line layouts, except enum bodies.
 - Insert one empty line between top-level logical groups such as classes, free functions, namespace-level declarations, and method implementations.
 - Insert one empty line between neighboring `class`, `struct`, and `enum class` declarations and their sibling declarations. Non-empty function definitions are also separated from neighboring declarations by one empty line.

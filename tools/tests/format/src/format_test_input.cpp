@@ -140,7 +140,15 @@ std::clamp(*hueOverrideWithLongName,0.0,360.0),
 enum class RuntimeConfigFieldValueKind{HexColor,Integer};
 
 enum class ValueFormat : std::uint8_t {
-    String, Integer, FloatingPoint, ColorHex, FontSpec,
+    String, Integer, FloatingPoint, ColorHex, FontSpec, // text values
+    FontSmall,
+    FontFooter,
+    FontClockTime,
+    FontClockDate,
+
+    // Card style anchors
+    CardRadius,
+    CardBorder,
 };
 
 enum RuntimeMode{Default};

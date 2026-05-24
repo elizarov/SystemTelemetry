@@ -996,6 +996,13 @@ private:
             pendingTokens_.push_back({TokenKind::Newline, "\n"});
             return;
         }
+        if (ShouldForwardStandaloneLineCommentToPending(tokens, index, newlineCount)) {
+            pendingTokens_.push_back({TokenKind::Newline, "\n"});
+            if (newlineCount > 1) {
+                pendingTokens_.push_back({TokenKind::Newline, "\n"});
+            }
+            return;
+        }
         if (ShouldPreserveOriginalBlankSeparator(tokens, index, newlineCount)) {
             EmitOriginalBlankSeparator();
         }
@@ -1006,6 +1013,17 @@ private:
             return false;
         }
         return IsInsidePendingLambdaBody();
+    }
+
+    bool ShouldForwardStandaloneLineCommentToPending(
+        const std::vector<Token>& tokens,
+        size_t newlineIndex,
+        size_t newlineCount
+    ) const {
+        if (newlineCount == 0 || pendingTokens_.empty()) {
+            return false;
+        }
+        return newlineIndex + 1 < tokens.size() && tokens[newlineIndex + 1].kind == TokenKind::LineComment;
     }
 
     bool IsInsidePendingLambdaBody() const {
@@ -1633,13 +1651,17 @@ private:
             EmitFormatted(tokens, ",");
             return;
         }
+        bool emittedElement = false;
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            std::vector<std::string> elementLines =
+                FormatDelimitedElement(elements[index], indentLevel_, ",", false, true, false, emittedElement);
+            if (elementLines.empty()) {
                 continue;
             }
-            for (std::string& line : FormatRange(elements[index], indentLevel_, {}, ",")) {
+            for (std::string& line : elementLines) {
                 EmitLine(std::move(line));
             }
+            emittedElement = true;
         }
     }
 
@@ -2378,18 +2400,23 @@ private:
         }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs) + " {");
+        bool emittedElement = false;
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            std::vector<std::string> elementLines = FormatDelimitedElement(
+                elements[index],
+                indentLevel + 1,
+                index + 1 < elements.size() ? "," : "",
+                true,
+                true,
+                false,
+                emittedElement
+            );
+            if (elementLines.empty()) {
                 continue;
             }
-            std::string elementSuffix;
-            if (index + 1 < elements.size()) {
-                elementSuffix = ",";
-            }
-            std::vector<std::string> elementLines =
-                FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
             AppendSplitElementLines(lines, elementLines, true);
+            emittedElement = true;
         }
         std::string closeLine = "}" + FormatInline(after);
         AppendSuffix(closeLine, suffix);
@@ -2423,18 +2450,23 @@ private:
         );
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + firstLine);
+        bool emittedElement = false;
         std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            std::vector<std::string> elementLines = FormatDelimitedElement(
+                elements[index],
+                indentLevel + 1,
+                index + 1 < elements.size() ? "," : "",
+                true,
+                true,
+                false,
+                emittedElement
+            );
+            if (elementLines.empty()) {
                 continue;
             }
-            std::string elementSuffix;
-            if (index + 1 < elements.size()) {
-                elementSuffix = ",";
-            }
-            std::vector<std::string> elementLines =
-                FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
             AppendSplitElementLines(lines, elementLines, true);
+            emittedElement = true;
         }
         std::string closeLine = "}}" + FormatInline(after);
         AppendSuffix(closeLine, suffix);
@@ -2661,28 +2693,27 @@ private:
             std::vector<std::string> childLines = FormatRange(inner, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
         } else {
+            bool emittedElement = false;
             for (size_t index = 0; index < elements.size(); ++index) {
-                if (elements[index].empty()) {
-                    continue;
-                }
                 std::string elementSuffix;
                 if (index + 1 < elements.size()) {
                     elementSuffix = std::string(1, separator);
                 }
-                std::vector<std::string> elementLines;
-                if (tokens[group.open].text == "{" && separator == ',') {
-                    elementLines = FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
-                } else {
-                    elementLines = FormatRange(
-                        elements[index],
-                        indentLevel + 1,
-                        {},
-                        elementSuffix,
-                        indentElementChains,
-                        startsWithControlFor
-                    );
+                const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
+                std::vector<std::string> elementLines = FormatDelimitedElement(
+                    elements[index],
+                    indentLevel + 1,
+                    elementSuffix,
+                    isInitializerElement,
+                    indentElementChains,
+                    startsWithControlFor,
+                    emittedElement
+                );
+                if (elementLines.empty()) {
+                    continue;
                 }
                 AppendSplitElementLines(lines, elementLines, tokens[group.open].text == "{" && separator == ',');
+                emittedElement = true;
             }
         }
         std::string closeLine = FormatInline(suffixTokens);
@@ -2720,21 +2751,27 @@ private:
             std::vector<std::string> childLines = FormatRange(nestedInner, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), childLines.begin(), childLines.end());
         } else {
+            bool emittedElement = false;
             for (size_t index = 0; index < elements.size(); ++index) {
-                if (elements[index].empty()) {
-                    continue;
-                }
                 std::string elementSuffix;
                 if (index + 1 < elements.size()) {
                     elementSuffix = ",";
                 }
-                std::vector<std::string> elementLines;
-                if (inner[nested.open].text == "{") {
-                    elementLines = FormatInitializerElement(elements[index], indentLevel + 1, elementSuffix);
-                } else {
-                    elementLines = FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                const bool isInitializerElement = inner[nested.open].text == "{";
+                std::vector<std::string> elementLines = FormatDelimitedElement(
+                    elements[index],
+                    indentLevel + 1,
+                    elementSuffix,
+                    isInitializerElement,
+                    true,
+                    false,
+                    emittedElement
+                );
+                if (elementLines.empty()) {
+                    continue;
                 }
                 AppendSplitElementLines(lines, elementLines, inner[nested.open].text == "{");
+                emittedElement = true;
             }
         }
         std::vector<Token> closeTokens;
@@ -3935,12 +3972,61 @@ private:
         }
     }
 
-    std::vector<std::string> FormatInitializerElement(
+    std::vector<std::string> FormatDelimitedElement(
         const std::vector<Token>& tokens,
         int indentLevel,
-        std::string_view suffix
+        std::string_view suffix,
+        bool isInitializerElement,
+        bool indentSplitChains,
+        bool indentLogicalSplitChains,
+        bool preserveLeadingBlankSeparator
     ) const {
-        return FormatRange(tokens, indentLevel, {}, std::string(suffix), true);
+        std::vector<std::string> lines;
+        size_t begin = 0;
+        bool preserveBlankSeparator = preserveLeadingBlankSeparator;
+        while (begin < tokens.size()) {
+            size_t newlineCount = 0;
+            while (begin < tokens.size() && tokens[begin].kind == TokenKind::Newline) {
+                ++newlineCount;
+                ++begin;
+            }
+            if (begin >= tokens.size()) {
+                return lines;
+            }
+            const bool hasBlankSeparator = newlineCount > 1;
+            if (tokens[begin].kind == TokenKind::LineComment) {
+                if (hasBlankSeparator && preserveBlankSeparator) {
+                    lines.push_back({});
+                }
+                lines.push_back(Indent(indentLevel) + TrimRight(TrimLeft(tokens[begin].text)));
+                ++begin;
+                preserveBlankSeparator = true;
+                continue;
+            }
+            if (hasBlankSeparator && preserveBlankSeparator) {
+                lines.push_back({});
+            }
+            break;
+        }
+        std::vector<Token> remaining(tokens.begin() + static_cast<std::ptrdiff_t>(begin), tokens.end());
+        if (remaining.empty() || ContainsOnlyNewlines(remaining, 0, remaining.size())) {
+            return lines;
+        }
+        std::vector<std::string> remainingLines;
+        if (isInitializerElement) {
+            remainingLines = FormatRange(remaining, indentLevel, {}, std::string(suffix), true);
+        } else {
+            remainingLines = FormatRange(
+                remaining,
+                indentLevel,
+                {},
+                std::string(suffix),
+                indentSplitChains,
+                indentLogicalSplitChains
+            );
+        }
+        lines.insert(lines.end(), remainingLines.begin(), remainingLines.end());
+        return lines;
     }
 
     void AppendSplitElementLines(
