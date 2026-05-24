@@ -572,6 +572,11 @@ void AssignCompactBracedConstructor(LayoutEditGapAnchor& outerMarginAnchor){
 outerMarginAnchor.key.widget=LayoutEditWidgetIdentity{"","",{},LayoutEditWidgetIdentity::Kind::DashboardChrome};
 }
 
+void PlaceEmptyLambdaCallout(){
+const LayoutGuideSheetPlacementResult result=PlaceLayoutGuideSheetCallouts(cardPlacements,callouts,LayoutGuideSheetPlacementStyle{10,12,4,20,0,1},[](LayoutGuideSheetPlacementCallout&,int){
+},nullptr);
+}
+
 void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
 TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }

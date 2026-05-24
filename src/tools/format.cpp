@@ -3959,7 +3959,7 @@ private:
         if (current == "{" && IsLambdaBodyOpenToken(tokens, index)) {
             return true;
         }
-        if (prev == "{" && IsLambdaBodyOpenToken(tokens, prevIndex)) {
+        if (prev == "{" && current != "}" && IsLambdaBodyOpenToken(tokens, prevIndex)) {
             return true;
         }
         if ((prev == "," || prev == ";") && current != ")" && current != "]" && current != ";") {
@@ -5158,6 +5158,13 @@ private:
 
     std::optional<size_t> FindLambdaBodyOpen(const std::vector<Token>& tokens) const {
         for (size_t index = 0; index < tokens.size(); ++index) {
+            if (!IsLambdaBodyOpenToken(tokens, index)) {
+                continue;
+            }
+            const std::optional<size_t> close = FindMatchingClose(tokens, index);
+            if (close && IsEmptyGroupPair(tokens, index, *close)) {
+                continue;
+            }
             if (IsLambdaBodyOpenToken(tokens, index)) {
                 return index;
             }
