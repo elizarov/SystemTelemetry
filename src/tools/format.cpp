@@ -1895,11 +1895,11 @@ private:
         ) {
             return SplitOwner{SplitOwnerKind::Assignment, *assignment};
         }
-        if (std::optional<size_t> lambdaBody = FindLambdaBodyOpen(tokens)) {
-            return SplitOwner{SplitOwnerKind::Lambda, *lambdaBody};
-        }
         if (std::optional<size_t> initializerColon = FindConstructorInitializerColon(tokens)) {
             return SplitOwner{SplitOwnerKind::ConstructorInitializer, *initializerColon};
+        }
+        if (std::optional<size_t> lambdaBody = FindLambdaBodyOpen(tokens)) {
+            return SplitOwner{SplitOwnerKind::Lambda, *lambdaBody};
         }
         if (CanSplitOperatorChain(tokens)) {
             return SplitOwner{SplitOwnerKind::OperatorChain};
@@ -2050,7 +2050,7 @@ private:
     }
 
     std::string FormatInlineRequiresClause(const std::vector<Token>& condition) const {
-        return "requires (" + FormatInline(condition) + ")";
+        return "requires(" + FormatInline(condition) + ")";
     }
 
     std::vector<std::string> FormatRequiresClause(
@@ -2071,7 +2071,7 @@ private:
         if (Fits(indentLevel, requiresLine)) {
             lines.push_back(Indent(indentLevel) + std::move(requiresLine));
         } else {
-            lines.push_back(Indent(indentLevel) + prefix + "requires (");
+            lines.push_back(Indent(indentLevel) + prefix + "requires(");
             std::vector<std::string> conditionLines = FormatRange(parts->condition, indentLevel + 1, {}, {}, true);
             lines.insert(lines.end(), conditionLines.begin(), conditionLines.end());
             lines.push_back(Indent(indentLevel) + ")");
@@ -4452,20 +4452,25 @@ private:
             if (tokens[inner].kind == TokenKind::Newline) {
                 continue;
             }
-            if (!sawSignificant) {
-                if (!IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
-                    return false;
-                }
-                sawSignificant = true;
+            sawSignificant = true;
+            if (
+                tokens[inner].kind != TokenKind::Word &&
+                tokens[inner].text != "::" &&
+                !IsPointerOrReferenceDeclaratorToken(tokens[inner].text)
+            ) {
+                return false;
             }
             if (IsPointerOrReferenceDeclaratorToken(tokens[inner].text)) {
                 sawPointer = true;
             }
         }
-        return sawPointer;
+        return sawSignificant && sawPointer;
     }
 
     bool IsFunctionPointerDeclaratorContextBeforeGroup(const std::vector<Token>& tokens, size_t index) const {
+        if (FunctionPointerDeclaratorGroupStartsWithCallingConvention(tokens, index)) {
+            return false;
+        }
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, index);
         if (!previous) {
             return false;
@@ -4477,6 +4482,19 @@ private:
             return true;
         }
         return IsLikelyTypeBeforePointer(tokens, index) && IsLikelyDeclaratorContextBeforePointer(tokens, index);
+    }
+
+    bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(
+        const std::vector<Token>& tokens,
+        size_t index
+    ) const {
+        if (index >= tokens.size() || tokens[index].text != "(") {
+            return false;
+        }
+        const size_t first = NextSignificantIndex(tokens, index + 1);
+        return first < tokens.size() &&
+            tokens[first].kind == TokenKind::Word &&
+            IsCallingConventionToken(tokens[first].text);
     }
 
     bool IsCodeBlockOpen() const {

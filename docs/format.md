@@ -303,7 +303,7 @@ int value =
 
 ## Declaration And Control Headers
 
-Template prefixes are emitted before the declaration they introduce. A short `requires (...)` clause may stay on the same line as its `template <...>` prefix; otherwise the `requires` clause moves to its own subordinate line one indent deeper than the template prefix and wraps its condition structurally. Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
+Template prefixes are emitted before the declaration they introduce. A short `requires(...)` clause may stay on the same line as its `template <...>` prefix; otherwise the `requires` clause moves to its own subordinate line one indent deeper than the template prefix and wraps its condition structurally. Function and method declarations or definitions use the same compact-or-fully-split shape as function calls. When the parameter list wraps, the opening parenthesis ends the first line, each parameter occupies its own line, and the closing parenthesis starts the line that continues the declaration or opens the body.
 
 ```cpp
 void func(int x) {
@@ -332,11 +332,11 @@ void SaveBoardSectionDifferences(
     updateKey(board, compareBoard, sectionName);
 }
 
-template <typename T> requires (HasValue<T>)
+template <typename T> requires(HasValue<T>)
 void UseShortRequires(T& value);
 
 template <typename Callable>
-    requires (
+    requires(
         !std::is_same_v<std::remove_cvref_t<Callable>, FunctionRef> &&
         std::is_invocable_r_v<Result, Callable&&, Args...>
     )
