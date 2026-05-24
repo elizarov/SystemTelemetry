@@ -99,11 +99,19 @@ function(casedash_configure_version_metadata)
 
     set(CASEDASH_GENERATED_DIR "${CMAKE_BINARY_DIR}/generated")
     file(MAKE_DIRECTORY "${CASEDASH_GENERATED_DIR}")
-    set(CASEDASH_MANIFEST_PATH "${CASEDASH_GENERATED_DIR}/CaseDash.manifest")
+    set(casedash_manifest_path "${CASEDASH_GENERATED_DIR}/CaseDash.manifest")
+    set(casedash_headless_manifest_path "${CASEDASH_GENERATED_DIR}/CaseDashHeadless.manifest")
 
+    set(CASEDASH_MANIFEST_NAME "CaseDash")
     configure_file(
         "${CMAKE_SOURCE_DIR}/resources/CaseDash.manifest.in"
-        "${CASEDASH_MANIFEST_PATH}"
+        "${casedash_manifest_path}"
+        @ONLY
+    )
+    set(CASEDASH_MANIFEST_NAME "CaseDashHeadless")
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/resources/CaseDash.manifest.in"
+        "${casedash_headless_manifest_path}"
         @ONLY
     )
     configure_file(
@@ -114,14 +122,25 @@ function(casedash_configure_version_metadata)
 
     set(CASEDASH_FILE_DESCRIPTION "CaseDash")
     set(CASEDASH_ORIGINAL_FILENAME "CaseDash.exe")
+    set(CASEDASH_MANIFEST_PATH "${casedash_manifest_path}")
     configure_file(
         "${CMAKE_SOURCE_DIR}/resources/CaseDashVersion.rc.in"
         "${CASEDASH_GENERATED_DIR}/CaseDashVersion.rc"
         @ONLY
     )
 
+    set(CASEDASH_FILE_DESCRIPTION "CaseDash Headless")
+    set(CASEDASH_ORIGINAL_FILENAME "CaseDashHeadless.exe")
+    set(CASEDASH_MANIFEST_PATH "${casedash_headless_manifest_path}")
+    configure_file(
+        "${CMAKE_SOURCE_DIR}/resources/CaseDashVersion.rc.in"
+        "${CASEDASH_GENERATED_DIR}/CaseDashHeadlessVersion.rc"
+        @ONLY
+    )
+
     set(CASEDASH_FILE_DESCRIPTION "CaseDash Benchmarks")
     set(CASEDASH_ORIGINAL_FILENAME "CaseDashBenchmarks.exe")
+    set(CASEDASH_MANIFEST_PATH "${casedash_manifest_path}")
     configure_file(
         "${CMAKE_SOURCE_DIR}/resources/CaseDashVersion.rc.in"
         "${CASEDASH_GENERATED_DIR}/CaseDashBenchmarksVersion.rc"
@@ -130,8 +149,10 @@ function(casedash_configure_version_metadata)
 
     set(CASEDASH_GENERATED_DIR "${CASEDASH_GENERATED_DIR}" PARENT_SCOPE)
     set(CASEDASH_VERSION_RC "${CMAKE_BINARY_DIR}/generated/CaseDashVersion.rc" PARENT_SCOPE)
+    set(CASEDASH_HEADLESS_VERSION_RC "${CMAKE_BINARY_DIR}/generated/CaseDashHeadlessVersion.rc" PARENT_SCOPE)
     set(CASEDASH_BENCHMARKS_VERSION_RC "${CMAKE_BINARY_DIR}/generated/CaseDashBenchmarksVersion.rc" PARENT_SCOPE)
-    set(CASEDASH_MANIFEST_PATH "${CASEDASH_MANIFEST_PATH}" PARENT_SCOPE)
+    set(CASEDASH_MANIFEST_PATH "${casedash_manifest_path}" PARENT_SCOPE)
+    set(CASEDASH_HEADLESS_MANIFEST_PATH "${casedash_headless_manifest_path}" PARENT_SCOPE)
     set(CASEDASH_VERSION "${CASEDASH_VERSION}" PARENT_SCOPE)
     set(CASEDASH_OFFICIAL_RELEASE "${CASEDASH_OFFICIAL_RELEASE}" PARENT_SCOPE)
 endfunction()

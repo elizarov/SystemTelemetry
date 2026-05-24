@@ -380,6 +380,67 @@ DiagnosticsValidationResult DiagnosticsValidationFailure(
     return result;
 }
 
+std::string FormatTraceDetailText(std::string_view detail) {
+    std::string text;
+    text.reserve(detail.size());
+    for (const char ch : detail) {
+        switch (ch) {
+            case '\\':
+                text += "\\\\";
+                break;
+            case '"':
+                text += "\\\"";
+                break;
+            case '\r':
+                text += "\\r";
+                break;
+            case '\n':
+                text += "\\n";
+                break;
+            default:
+                text += ch;
+                break;
+        }
+    }
+    return text;
+}
+
+void WriteStandaloneDiagnosticsFailureTrace(
+    const DiagnosticsOptions& options, ResourceStringId event, std::string_view detail) {
+    if (!options.trace) {
+        return;
+    }
+
+    const FilePath tracePath =
+        ResolveDiagnosticsOutputPath(GetWorkingDirectory(), options.tracePath, kDefaultTraceFileName);
+    std::FILE* traceFile = nullptr;
+    if (fopen_s(&traceFile, tracePath.string().c_str(), kAppendBinaryMode) != 0 || traceFile == nullptr) {
+        return;
+    }
+
+    Trace trace(traceFile);
+    if (detail.empty()) {
+        trace.Write(TracePrefix::Diagnostics, event);
+    } else {
+        const std::string detailText = FormatTraceDetailText(detail);
+        trace.WriteFmt(TracePrefix::Diagnostics,
+            RES_STR("%s detail=\"%.*s\""),
+            ResourceStringText(event),
+            static_cast<int>(detailText.size()),
+            detailText.data());
+    }
+    fclose(traceFile);
+}
+
+std::string FormatDiagnosticsFailureMessage(std::string_view action, std::string_view detail) {
+    std::string message;
+    AssignFormat(message, "Failed to %.*s.", static_cast<int>(action.size()), action.data());
+    if (!detail.empty()) {
+        AppendFormat(message, "\n\n%.*s", static_cast<int>(detail.size()), detail.data());
+    }
+    return message;
+}
+
 struct DiagnosticsPlainSwitch {
     const char* name;
     bool DiagnosticsOptions::* enabled;
@@ -527,6 +588,12 @@ DiagnosticsValidationResult ValidateDiagnosticsOptions(
             options, "app_icon_size", "/app-icon-size must be between 16 and 1024 pixels.");
     }
     return {};
+}
+
+void ReportDiagnosticsError(const DiagnosticsOptions& options, std::string_view message) {
+    if (options.reportError != nullptr && !message.empty()) {
+        options.reportError(options, message);
+    }
 }
 
 bool ApplyDiagnosticsLayoutOverride(
@@ -688,11 +755,12 @@ void DiagnosticsSession::WriteTraceMarkerWithDetail(
         WriteTraceMarker(prefix, text);
         return;
     }
+    const std::string detailText = FormatTraceDetailText(detail);
     WriteTraceMarkerFmt(prefix,
         RES_STR("%s detail=\"%.*s\""),
         ResourceStringText(text),
-        static_cast<int>(detail.size()),
-        detail.data());
+        static_cast<int>(detailText.size()),
+        detailText.data());
 }
 
 void DiagnosticsSession::WriteTraceMarkerFmt(TracePrefix prefix, const char* format, ...) {
@@ -1041,7 +1109,13 @@ bool SaveRenderedAppIcon(const FilePath& imagePath, const AppConfig& config, int
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, DiagnosticsOutputHandlers handlers) {
     std::string extraConfigTemplate;
     if (handlers.loadExtraConfig != nullptr) {
-        if (!handlers.loadExtraConfig(&extraConfigTemplate, nullptr)) {
+        std::string extraConfigError;
+        if (!handlers.loadExtraConfig(&extraConfigTemplate, &extraConfigError)) {
+            const std::string message =
+                FormatDiagnosticsFailureMessage("load diagnostics config extension", extraConfigError);
+            WriteStandaloneDiagnosticsFailureTrace(
+                diagnosticsOptions, RES_STR("headless_extra_config_load_failed"), message);
+            ReportDiagnosticsError(diagnosticsOptions, message);
             return 1;
         }
     }
@@ -1054,13 +1128,21 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, Dia
     Trace trace;
     DiagnosticsSession diagnostics(diagnosticsOptions, trace, handlers);
     if (!diagnostics.Initialize()) {
+        ReportDiagnosticsError(diagnosticsOptions, diagnostics.LastError());
         return 1;
     }
-    if (!ApplyDiagnosticsLayoutOverride(config, diagnosticsOptions, &diagnostics)) {
+    std::string overrideError;
+    if (!ApplyDiagnosticsLayoutOverride(config, diagnosticsOptions, &diagnostics, &overrideError)) {
+        diagnostics.WriteTraceMarkerWithDetail(
+            TracePrefix::Diagnostics, RES_STR("headless_layout_override_failed"), overrideError);
+        ReportDiagnosticsError(diagnosticsOptions, overrideError);
         return 1;
     }
     if (!ApplyDiagnosticsThemeOverride(
-            config, diagnosticsOptions, &diagnostics, nullptr, handlers.resolveExtraConfig)) {
+            config, diagnosticsOptions, &diagnostics, &overrideError, handlers.resolveExtraConfig)) {
+        diagnostics.WriteTraceMarkerWithDetail(
+            TracePrefix::Diagnostics, RES_STR("headless_theme_override_failed"), overrideError);
+        ReportDiagnosticsError(diagnosticsOptions, overrideError);
         return 1;
     }
 
@@ -1075,6 +1157,7 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, Dia
     if (telemetry == nullptr) {
         diagnostics.WriteTraceMarkerWithDetail(
             TracePrefix::Diagnostics, RES_STR("telemetry_initialize_failed"), telemetryError);
+        ReportDiagnosticsError(diagnosticsOptions, FormatTelemetryInitializeError(telemetryError));
         return 1;
     }
 
@@ -1095,6 +1178,10 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, Dia
                 &reloadError,
                 extraConfigTemplate,
                 handlers.resolveExtraConfig)) {
+            const std::string message = FormatDiagnosticsFailureMessage("reload config", reloadError);
+            diagnostics.WriteTraceMarkerWithDetail(
+                TracePrefix::Diagnostics, RES_STR("headless_reload_config_failed"), message);
+            ReportDiagnosticsError(diagnosticsOptions, message);
             return 1;
         }
         telemetryUpdate = telemetry->Latest();
@@ -1102,7 +1189,9 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, Dia
     ApplyResolvedTelemetrySelections(config, telemetryUpdate.resolvedSelections);
     diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_begin"));
     if (!diagnostics.WriteOutputs(telemetryUpdate.dump, config)) {
-        diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_failed"));
+        diagnostics.WriteTraceMarkerWithDetail(
+            TracePrefix::Diagnostics, RES_STR("write_outputs_failed"), diagnostics.LastError());
+        ReportDiagnosticsError(diagnosticsOptions, diagnostics.LastError());
         return 1;
     }
     diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_done"));

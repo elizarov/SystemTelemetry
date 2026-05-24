@@ -68,6 +68,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, app icon, and config outputs refresh once per second from the latest runtime state.
 - With `/exit`, `CaseDash.exe` loads config, performs the first update, optionally exports the requested non-layout-guide outputs once, and exits without entering the normal GUI lifetime.
 - `CaseDashHeadless.exe` always runs the one-shot diagnostics path, as if `/exit` were supplied, and additionally supports `/layout-guide-sheet`.
+- `CaseDashHeadless.exe` is a console diagnostics tool. Validation and runtime diagnostics failures write human-readable errors to `stderr`; when `/trace` is active, the same failure path also writes diagnostics failure records to trace.
 - With `/elevate`, trace, snapshot dump, screenshot, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
@@ -94,6 +95,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - Unhandled native process crashes append a `crash:unhandled_exception` trace line when `/trace` is active and the trace file can be reopened. The line includes the exception code, exception address, crash report path, and minidump path.
 - When `/trace` is enabled, diagnostics failures prefer trace logging plus a failure exit code over blocking modal behavior.
+- Headless diagnostics failures always report to `stderr`; `/trace` adds the structured trace record without replacing the console error.
 - Required fake-file load failures follow that same rule so `/fake:<path> /exit` returns promptly under trace.
 - Telemetry runtime creation reports initialization failure detail to its caller; diagnostics and dashboard callers own trace or dialog reporting.
 - Layout-edit drag profiling writes one start marker and one end marker per drag with summarized timing instead of high-volume per-frame renderer trace spam.

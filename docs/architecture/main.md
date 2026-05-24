@@ -11,6 +11,7 @@
 - Relay `/elevate` runs to an elevated child process while preserving diagnostics arguments and current working directory.
 - Choose either the normal UI path or the production one-shot diagnostics path.
 - Reject `/layout-guide-sheet` with a clear validation error because that output belongs to `CaseDashHeadless.exe`.
+- Provide the diagnostics error handler for `CaseDash.exe`, showing modal errors for non-traced diagnostics failures and preserving trace-only failure reporting when `/trace` is active.
 - Start config load from embedded `resources/config.ini`, apply the executable-side overlay unless suppressed, and resolve active layout plus runtime selections before telemetry and rendering start.
 - Keep the executable manifest declaring UTF-8 as the active code page and disabling file virtualization so config reads and writes target the executable-side location.
 

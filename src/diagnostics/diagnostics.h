@@ -55,6 +55,7 @@ bool SaveRenderedAppIcon(
 DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine);
 DiagnosticsValidationResult ValidateDiagnosticsOptions(
     const DiagnosticsOptions& options, DiagnosticsOutputHandlers handlers = {});
+void ReportDiagnosticsError(const DiagnosticsOptions& options, std::string_view message);
 DashboardRenderer::RenderMode GetDiagnosticsRenderMode(const DiagnosticsOptions& options);
 LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOptions& options);
 int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, DiagnosticsOutputHandlers handlers = {});

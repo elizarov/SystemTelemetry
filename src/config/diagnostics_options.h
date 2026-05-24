@@ -3,10 +3,14 @@
 #include <cstdint>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "util/file_path.h"
 
 struct AppConfig;
+struct DiagnosticsOptions;
+
+using DiagnosticsErrorHandlerFn = void (*)(const DiagnosticsOptions& options, std::string_view message);
 
 enum class DiagnosticsLayoutSimilarityMode {
     None,
@@ -54,6 +58,7 @@ struct DiagnosticsOptions {
     FilePath saveConfigPath;
     FilePath saveFullConfigPath;
     FilePath fakePath;
+    DiagnosticsErrorHandlerFn reportError = nullptr;
 
     bool HasAnyOutput() const;
 };

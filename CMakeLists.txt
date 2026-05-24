@@ -380,6 +380,9 @@ set_source_files_properties(resources/CaseDash.rc PROPERTIES
 set_source_files_properties(${CASEDASH_VERSION_RC} ${CASEDASH_BENCHMARKS_VERSION_RC} PROPERTIES
     OBJECT_DEPENDS "${CASEDASH_MANIFEST_PATH}"
 )
+set_source_files_properties(${CASEDASH_HEADLESS_VERSION_RC} PROPERTIES
+    OBJECT_DEPENDS "${CASEDASH_HEADLESS_MANIFEST_PATH}"
+)
 
 set(casedash_release_speed_sources
     src/config/config_telemetry.cpp
@@ -644,7 +647,7 @@ add_executable(CaseDashHeadless
     ${CASEDASH_HEADLESS_LAYOUT_GUIDE_SHEET_CONFIG_RC}
     ${CASEDASH_CONFIG_META_CPP}
     ${CASEDASH_LAYOUT_EDIT_META_CPP}
-    ${CASEDASH_VERSION_RC}
+    ${CASEDASH_HEADLESS_VERSION_RC}
     src/headless/headless_main.cpp
     src/headless/layout_guide_sheet_output.cpp
     src/diagnostics/diagnostics.cpp
@@ -824,6 +827,7 @@ target_link_options(CaseDashHeadless PRIVATE
     $<$<CONFIG:Release>:/INCREMENTAL:NO>
     $<$<CONFIG:RelWithDebInfo>:/DEBUG>
     $<$<CONFIG:RelWithDebInfo>:/INCREMENTAL>
+    /SUBSYSTEM:CONSOLE
     /MANIFEST:NO
 )
 target_link_libraries(CaseDashHeadless PRIVATE
