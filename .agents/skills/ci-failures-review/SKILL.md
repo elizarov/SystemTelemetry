@@ -51,6 +51,7 @@ Use this skill to investigate a failed workflow from the pull request or failing
 - PowerShell 7 treats negative `-split` max-substring counts as right-to-left splitting. Release tooling that needs normal line splitting should use max count `0` or omit the max count so CI `pwsh` sees the same chunks as Windows PowerShell.
 - CaseDash validates feature-branch changes through pull requests. A failed PR `Validation` check is the canonical signal to investigate; a same-commit branch-push run is not expected for ordinary feature work.
 - When built-in card content is factored into referenced helper cards, layout-edit diagnostics distinguish the rendered placement card id from the edited helper card id. Tests that locate visible content should filter by render `cardId`, while expected config lines should name the helper `[card.<id>]` section that owns the edited layout.
+- When a built-in layout change adds or removes a `!title` card-reference parameter, split assertions for shipped layout expectations from explicit `!title` behavior fixtures so config changes do not silently drop suppression coverage.
 
 ## Local Validation
 

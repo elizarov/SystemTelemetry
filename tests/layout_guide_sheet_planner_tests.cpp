@@ -142,6 +142,26 @@ TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPla
     EXPECT_FALSE(timeCard->chromeLayout.hasHeader);
 }
 
+TEST(LayoutGuideSheetPlanner, TitlelessCardReferenceOmitsHeaderForThatPlacement) {
+    AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    ASSERT_TRUE(SelectLayout(config, "5x3"));
+    config.layout.structure.cards = LayoutNodeConfig{};
+    config.layout.structure.cards.name = "time";
+    config.layout.structure.cards.parameter = "!title";
+    config.layout.structure.cards.cardReference = true;
+
+    Trace trace;
+    DashboardRenderer renderer(trace);
+    renderer.SetConfig(config);
+    ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
+    std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(renderer);
+    const auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
+    ASSERT_NE(timeCard, cards.end());
+    EXPECT_TRUE(timeCard->title.empty());
+    EXPECT_TRUE(timeCard->iconName.empty());
+    EXPECT_FALSE(timeCard->chromeLayout.hasHeader);
+}
+
 TEST(LayoutGuideSheetPlanner, CalloutSelectionUsesOnlySelectedCardsAndGroupsMetricDefinitions) {
     const BuiltInLayoutGuideSheetContext context = BuildBuiltInLayoutGuideSheetContext();
 
