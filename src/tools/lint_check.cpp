@@ -34,6 +34,17 @@ bool IsNewerThan(std::string_view source, std::uint64_t targetTime) {
     return sourceTime.has_value() && *sourceTime > targetTime;
 }
 
+bool IsCMakeBuildGraphStale(const std::string& repoRoot) {
+    const std::optional<std::uint64_t> cmakeListsTime = LastWriteTime(JoinPath(repoRoot, "CMakeLists.txt"));
+    if (!cmakeListsTime.has_value()) {
+        return false;
+    }
+
+    // A CMake edit can refresh build.ninja without relinking CaseDashTools when the tool target is unchanged.
+    const std::optional<std::uint64_t> buildGraphTime = LastWriteTime(JoinPath(repoRoot, "build/cmake/build.ninja"));
+    return !buildGraphTime.has_value() || *cmakeListsTime > *buildGraphTime;
+}
+
 bool IsToolStale() {
     const std::string exePath = ExecutablePath();
     const std::optional<std::uint64_t> exeTime = LastWriteTime(exePath);
@@ -41,7 +52,7 @@ bool IsToolStale() {
         return false;
     }
     const std::string repoRoot = ParentPath(ParentPath(exePath));
-    if (IsNewerThan(JoinPath(repoRoot, "CMakeLists.txt"), *exeTime)) {
+    if (IsCMakeBuildGraphStale(repoRoot)) {
         return true;
     }
     for (const std::string& path : RecursiveFiles(JoinPath(repoRoot, "src/tools"))) {
@@ -398,7 +409,7 @@ int RunLintCheck(int argc, char** argv) {
 
     const auto started = std::chrono::steady_clock::now();
     if (IsToolStale()) {
-        std::fprintf(stderr, "CaseDashTools.exe is older than its source; rebuilding.\n");
+        std::fprintf(stderr, "CaseDashTools build inputs changed; rebuilding.\n");
         return kToolStaleExitCode;
     }
 
