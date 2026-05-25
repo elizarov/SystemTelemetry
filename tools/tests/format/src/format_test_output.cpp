@@ -222,8 +222,7 @@ void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
             layoutResolver_->layoutEditGuides_.size() +
             containerChildTargetCount +
             layoutResolver_->gapEditAnchors_.size() +
-            layoutResolver_->widgetEditGuides_.size() +
-            (
+            layoutResolver_->widgetEditGuides_.size() + (
                 layoutResolver_->staticEditableAnchorRegions_.size() +
                 layoutResolver_->dynamicEditableAnchorRegions_.size()
             ) * 2 +
@@ -942,6 +941,44 @@ bool HasMissingReflectionMembers(const ReflectionContext* context) {
     return false;
 }
 
+void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState, const LayoutEditAnchorRegion& region) {
+    const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
+    if (
+        MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) || (
+            special != nullptr &&
+            *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
+            LayoutEditAnchorParameter(region.key).has_value() &&
+            IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
+        )
+    ) {
+        appendHighlight(region, true);
+    }
+}
+
+void PreferOperatorChainOpenerEconomy() {
+    const int metricValue = firstValue + builder.WithSource(sourceValue).BuildMetricValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    );
+    const bool found = currentKey == layoutLookupTable[ComputeLayoutKeyIndex(
+        firstKeyPartWithLongName,
+        secondKeyPartWithLongName,
+        thirdKeyPartWithLongName,
+        fourthKeyPartWithLongName,
+        fifthKeyPartWithLongName
+    )];
+    const RenderRect bounds = baseBounds | RenderRect{
+        leftValueWithLongName,
+        topValueWithLongName,
+        rightValueWithLongName,
+        bottomValueWithLongName,
+        extraValueWithLongName,
+        finalValueWithLongName
+    };
+}
+
 void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {
     if (parameter == nullptr) {
         return;
@@ -1015,12 +1052,11 @@ RenderRect BuildGuideSheetTargetRect(
     double dx,
     double dy
 ) {
-    const RenderRect targetRect = cardPlacements[planned.cardIndex].overview ?
-        TransformRect(
-            planned.target,
-            cardPlacements[planned.cardIndex].sourceRect,
-            cardPlacements[planned.cardIndex].destRect
-        ) : OffsetRenderRect(planned.target, dx, dy);
+    const RenderRect targetRect = cardPlacements[planned.cardIndex].overview ? TransformRect(
+        planned.target,
+        cardPlacements[planned.cardIndex].sourceRect,
+        cardPlacements[planned.cardIndex].destRect
+    ) : OffsetRenderRect(planned.target, dx, dy);
     return targetRect;
 }
 

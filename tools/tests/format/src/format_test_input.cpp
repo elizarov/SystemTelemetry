@@ -545,6 +545,17 @@ if(context->initializeMethod==nullptr||context->getCurrentMethod==nullptr||conte
 return false;
 }
 
+void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState,const LayoutEditAnchorRegion& region){
+const auto* special=std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
+if(MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight,region.key)||(special!=nullptr&&*special==LayoutEditSelectionHighlightSpecial::AllTexts&&LayoutEditAnchorParameter(region.key).has_value()&&IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))){appendHighlight(region,true);}
+}
+
+void PreferOperatorChainOpenerEconomy(){
+const int metricValue=firstValue+builder.WithSource(sourceValue).BuildMetricValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
+const bool found=currentKey==layoutLookupTable[ComputeLayoutKeyIndex(firstKeyPartWithLongName,secondKeyPartWithLongName,thirdKeyPartWithLongName,fourthKeyPartWithLongName,fifthKeyPartWithLongName)];
+const RenderRect bounds=baseBounds|RenderRect{leftValueWithLongName,topValueWithLongName,rightValueWithLongName,bottomValueWithLongName,extraValueWithLongName,finalValueWithLongName};
+}
+
 void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
 if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
 }

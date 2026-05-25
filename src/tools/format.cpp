@@ -415,15 +415,14 @@ void AppendTokenRange(const std::vector<Token>& tokens, size_t begin, size_t end
 }
 
 bool IsBraceRequiredControlToken(const Token& token) {
-    return token.kind == TokenKind::Word &&
-        (
-            token.text == "if" ||
-            token.text == "else" ||
-            token.text == "for" ||
-            token.text == "while" ||
-            token.text == "do" ||
-            token.text == "switch"
-        );
+    return token.kind == TokenKind::Word && (
+        token.text == "if" ||
+        token.text == "else" ||
+        token.text == "for" ||
+        token.text == "while" ||
+        token.text == "do" ||
+        token.text == "switch"
+    );
 }
 
 std::optional<size_t> FindControlHeaderEnd(const std::vector<Token>& tokens, size_t controlIndex, size_t end) {
@@ -1208,8 +1207,7 @@ private:
         }
         if (
             next < tokens.size() &&
-            tokens[next].kind == TokenKind::Word &&
-            (
+            tokens[next].kind == TokenKind::Word && (
                 tokens[next].text == "else" ||
                 tokens[next].text == "catch" ||
                 tokens[next].text == "finally" ||
@@ -1426,13 +1424,12 @@ private:
     }
 
     bool IsStructuredMacroReplacement(const std::vector<Token>& replacementTokens) const {
-        return ContainsTopLevelToken(replacementTokens, ";") &&
-            (
-                ContainsWord(replacementTokens, "class") ||
-                ContainsWord(replacementTokens, "enum") ||
-                ContainsWord(replacementTokens, "struct") ||
-                ContainsWord(replacementTokens, "template")
-            );
+        return ContainsTopLevelToken(replacementTokens, ";") && (
+            ContainsWord(replacementTokens, "class") ||
+            ContainsWord(replacementTokens, "enum") ||
+            ContainsWord(replacementTokens, "struct") ||
+            ContainsWord(replacementTokens, "template")
+        );
     }
 
     std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
@@ -2406,6 +2403,60 @@ private:
             return std::nullopt;
         }
         return fragment;
+    }
+
+    std::optional<GroupPair> FindOpenerEconomyGroup(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix
+    ) const {
+        if (tokens.empty() || HasOriginalBlankSeparator(tokens) || HasLineComment(tokens)) {
+            return std::nullopt;
+        }
+        if (
+            std::optional<GroupPair> callChainGroup = FindPreferredCallChainArgumentGroup(tokens, indentLevel, prefix)
+        ) {
+            return callChainGroup;
+        }
+        return FindFirstWrappableGroupPair(tokens);
+    }
+
+    std::optional<std::vector<std::string>> TryFormatOpenerEconomySplit(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        std::string inlineText = FormatInline(tokens);
+        AppendSuffix(inlineText, suffix);
+        if (Fits(indentLevel, inlineText)) {
+            return std::nullopt;
+        }
+        const std::optional<GroupPair> group = FindOpenerEconomyGroup(tokens, indentLevel, prefix);
+        if (!group || !Fits(indentLevel, std::string(prefix) + FormatGroupOpeningLine(tokens, *group))) {
+            return std::nullopt;
+        }
+        return FormatSplitGroup(tokens, *group, indentLevel, std::string(prefix), std::string(suffix));
+    }
+
+    bool TryAppendOpenerEconomySplitToLastLine(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        std::string_view suffix,
+        int indentLevel
+    ) const {
+        if (lines.empty()) {
+            return false;
+        }
+        std::string prefix = tools::lint::Trim(lines.back()) + " ";
+        std::optional<std::vector<std::string>> replacement =
+            TryFormatOpenerEconomySplit(tokens, indentLevel, prefix, suffix);
+        if (!replacement) {
+            return false;
+        }
+        lines.pop_back();
+        lines.insert(lines.end(), replacement->begin(), replacement->end());
+        return true;
     }
 
     std::vector<Token> FirstOperatorChainPart(const std::vector<Token>& tokens, ChainKind chainKind) const {
@@ -3428,6 +3479,21 @@ private:
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             std::vector<std::string> partLines =
                 FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
+            if (index + 1 < parts.size()) {
+                const std::string nextPartSuffix = index + 2 == parts.size() ? suffix : std::string{};
+                if (TryAppendOperatorChainPartOpeningToLastLine(
+                    partLines,
+                    parts[index],
+                    parts[index + 1],
+                    nextPartSuffix,
+                    partIndent,
+                    chainKind
+                )) {
+                    lines.insert(lines.end(), partLines.begin(), partLines.end());
+                    ++index;
+                    continue;
+                }
+            }
             if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
                 partLines,
                 parts[index + 1],
@@ -3439,6 +3505,24 @@ private:
             lines.insert(lines.end(), partLines.begin(), partLines.end());
         }
         return lines;
+    }
+
+    bool TryAppendOperatorChainPartOpeningToLastLine(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& previousPart,
+        const std::vector<Token>& part,
+        std::string_view suffix,
+        int indentLevel,
+        ChainKind chainKind
+    ) const {
+        if (lines.empty() || HasLineComment(previousPart)) {
+            return false;
+        }
+        const std::optional<size_t> previousLast = PreviousNonNewlineIndex(previousPart, previousPart.size());
+        if (!previousLast || !IsChainBreakOperator(previousPart, *previousLast, chainKind)) {
+            return false;
+        }
+        return TryAppendOpenerEconomySplitToLastLine(lines, part, suffix, indentLevel);
     }
 
     std::vector<std::string> FormatShiftOperatorChain(
@@ -3632,7 +3716,7 @@ private:
         return true;
     }
 
-    bool TryAppendFinalChainPartOpeningToLastLine(
+    bool TryAppendTernaryChainPartOpeningToLastLine(
         std::vector<std::string>& lines,
         const std::vector<Token>& finalPart,
         std::string_view suffix,
@@ -3645,26 +3729,7 @@ private:
         if (!EndsWithColon(trimmedLastLine)) {
             return false;
         }
-        const std::optional<GroupPair> group = FindFirstWrappableGroupPair(finalPart);
-        if (!group) {
-            return false;
-        }
-        std::vector<Token> inner(
-            finalPart.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-            finalPart.begin() + static_cast<std::ptrdiff_t>(group->close)
-        );
-        if (!ContainsTopLevelSeparator(inner, ',')) {
-            return false;
-        }
-        std::string prefix = trimmedLastLine + " ";
-        if (!Fits(indentLevel, prefix + FormatGroupOpeningLine(finalPart, *group))) {
-            return false;
-        }
-        std::vector<std::string> replacement =
-            FormatSplitGroup(finalPart, *group, indentLevel, std::move(prefix), std::string(suffix));
-        lines.pop_back();
-        lines.insert(lines.end(), replacement.begin(), replacement.end());
-        return true;
+        return TryAppendOpenerEconomySplitToLastLine(lines, finalPart, suffix, indentLevel);
     }
 
     std::vector<std::string> FormatTernaryPart(
@@ -3694,20 +3759,13 @@ private:
             return lines;
         }
         std::vector<Token> value(tokens.begin() + static_cast<std::ptrdiff_t>(*question + 1), tokens.end());
-        const size_t valueStart = NextSignificantIndex(value, 0);
-        if (valueStart < value.size() && IsGroupOpen(value[valueStart].text)) {
-            if (std::optional<size_t> valueClose = FindMatchingClose(value, valueStart)) {
-                std::string attachedGroupPrefix = conditionLine + " ";
-                if (Fits(indentLevel, attachedGroupPrefix + value[valueStart].text)) {
-                    return FormatSplitGroup(
-                        value,
-                        GroupPair{valueStart, *valueClose},
-                        indentLevel,
-                        std::move(attachedGroupPrefix),
-                        std::move(suffix)
-                    );
-                }
-            }
+        if (std::optional<std::vector<std::string>> valueLines = TryFormatOpenerEconomySplit(
+            value,
+            indentLevel,
+            conditionLine + " ",
+            suffix
+        )) {
+            return *valueLines;
         }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + conditionLine);
@@ -3759,10 +3817,20 @@ private:
                 std::move(partPrefix),
                 std::move(partSuffix)
             );
-            if (index + 2 == parts.size() && (
-                partLines.size() > 1 &&
-                TryAppendFinalChainPartToLastLine(partLines, parts[index + 1], suffix) ||
-                TryAppendFinalChainPartOpeningToLastLine(partLines, parts[index + 1], suffix, partIndent)
+            if (index + 1 < parts.size()) {
+                const std::string nextPartSuffix = index + 2 == parts.size() ? suffix : std::string{};
+                if (
+                    TryAppendTernaryChainPartOpeningToLastLine(partLines, parts[index + 1], nextPartSuffix, partIndent)
+                ) {
+                    lines.insert(lines.end(), partLines.begin(), partLines.end());
+                    ++index;
+                    continue;
+                }
+            }
+            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
+                partLines,
+                parts[index + 1],
+                suffix
             )) {
                 lines.insert(lines.end(), partLines.begin(), partLines.end());
                 break;

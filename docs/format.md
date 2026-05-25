@@ -217,6 +217,20 @@ render(
 );
 ```
 
+When a split operator-chain part is followed by an expression that also must split, keep the next expression's opener on the operator line when that opener fits. This opener economy applies uniformly to parenthesized groups, calls and member-call chains, subscripts, and braced constructions.
+
+```cpp
+selected = Matches(region) || (
+    special != nullptr &&
+    IsActive(*special)
+);
+
+value = first + BuildValue(
+    left,
+    right
+);
+```
+
 Assignment-like expressions split after the assignment when the right-hand side fits at continuation indentation. If the right-hand side must split and its first split line fits after the assignment prefix, attach that first split line to the assignment.
 
 ```cpp
