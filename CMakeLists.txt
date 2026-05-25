@@ -855,6 +855,8 @@ target_compile_options(CaseDashTreeSitterCppGrammar PRIVATE
 add_executable(CaseDashTools
     src/tools/tools_main.cpp
     src/tools/format.cpp
+    src/tools/format_args.cpp
+    src/tools/format_config.cpp
     src/tools/lint_check.cpp
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp

@@ -12,6 +12,9 @@ if errorlevel 1 exit /b %errorlevel%
 ctest --test-dir "%REPO_ROOT%\build\cmake" -C Release --verbose --output-on-failure
 set "RESULT=%errorlevel%"
 
+python "%REPO_ROOT%\tools\tests\format\format_test.py"
+if errorlevel 1 if "%RESULT%"=="0" set "RESULT=%errorlevel%"
+
 python "%REPO_ROOT%\tools\tests\lint\lint_test.py"
 if errorlevel 1 if "%RESULT%"=="0" set "RESULT=%errorlevel%"
 

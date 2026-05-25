@@ -6,7 +6,6 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
-import json
 import os
 import re
 import shutil
@@ -26,6 +25,9 @@ TREE_SITTER_CLI_SHA512 = (
     "627AFC4B0BCDEFD4E40C8A36"
 )
 REQUIRED_MACRO_CATEGORIES = ("calling_convention",)
+FORMAT_CATEGORY_KEYS = {
+    "calling_convention": "CallingConvention",
+}
 MACRO_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
@@ -34,26 +36,72 @@ def fail(message: str) -> None:
     raise SystemExit(1)
 
 
+def strip_yaml_comment(line: str) -> str:
+    in_single_quote = False
+    in_double_quote = False
+    result: list[str] = []
+    for char in line:
+        if char == "'" and not in_double_quote:
+            in_single_quote = not in_single_quote
+        elif char == '"' and not in_single_quote:
+            in_double_quote = not in_double_quote
+        elif char == "#" and not in_single_quote and not in_double_quote:
+            break
+        result.append(char)
+    return "".join(result).strip()
+
+
+def unquote_scalar(value: str) -> str:
+    value = value.strip()
+    if len(value) >= 2 and value[0] == "'" and value[-1] == "'":
+        return value[1:-1].replace("''", "'")
+    if len(value) >= 2 and value[0] == '"' and value[-1] == '"':
+        return value[1:-1]
+    return value
+
+
+def load_macro_category_section(config_path: Path) -> dict[str, list[str]]:
+    lines = config_path.read_text(encoding="utf-8").splitlines()
+    macro_categories: dict[str, list[str]] = {}
+    in_macro_section = False
+    current_key: str | None = None
+    for raw_line in lines:
+        line = strip_yaml_comment(raw_line)
+        if not line or line in {"---", "..."}:
+            continue
+        indent = len(raw_line) - len(raw_line.lstrip(" "))
+        if indent == 0:
+            in_macro_section = line == "MacroCategories:"
+            current_key = None
+            continue
+        if not in_macro_section:
+            continue
+        if indent == 2 and line.endswith(":"):
+            current_key = line[:-1].strip()
+            macro_categories.setdefault(current_key, [])
+        elif indent >= 4 and current_key is not None and line.startswith("- "):
+            macro_categories[current_key].append(unquote_scalar(line[2:]))
+    return macro_categories
+
+
 def load_macro_categories(config_path: Path) -> dict[str, list[str]]:
-    config = json.loads(config_path.read_text(encoding="utf-8"))
-    if config.get("schema_version") != 1:
-        fail("tools/format_config.json schema_version must be 1")
-    macro_categories = config.get("macro_categories")
-    if not isinstance(macro_categories, dict):
-        fail("tools/format_config.json macro_categories must be an object")
+    macro_categories = load_macro_category_section(config_path)
+    if not macro_categories:
+        fail(".cpp-format MacroCategories must be present")
 
     categories: dict[str, list[str]] = {}
     for category in REQUIRED_MACRO_CATEGORIES:
-        names = macro_categories.get(category)
-        if not isinstance(names, list) or not names:
-            fail(f"tools/format_config.json macro_categories.{category} must be a non-empty array")
+        config_key = FORMAT_CATEGORY_KEYS[category]
+        names = macro_categories.get(config_key)
+        if not names:
+            fail(f".cpp-format MacroCategories.{config_key} must be a non-empty array")
         seen = set()
         clean_names: list[str] = []
         for name in names:
-            if not isinstance(name, str) or not MACRO_NAME_PATTERN.match(name):
-                fail(f"tools/format_config.json macro {category} entry is not a C/C++ macro name: {name!r}")
+            if not MACRO_NAME_PATTERN.match(name):
+                fail(f".cpp-format macro {config_key} entry is not a C/C++ macro name: {name!r}")
             if name in seen:
-                fail(f"tools/format_config.json macro {category} entry is duplicated: {name}")
+                fail(f".cpp-format macro {config_key} entry is duplicated: {name}")
             seen.add(name)
             clean_names.append(name)
         categories[category] = clean_names
@@ -62,7 +110,7 @@ def load_macro_categories(config_path: Path) -> dict[str, list[str]]:
 
 def write_case_dash_macro_config(output_path: Path, categories: dict[str, list[str]]) -> None:
     lines = [
-        "// Generated from tools/format_config.json by tools/regenerate_tree_sitter_grammar.py.",
+        "// Generated from .cpp-format by tools/regenerate_tree_sitter_grammar.py.",
         "module.exports = {",
         "  macro_categories: {",
     ]
@@ -133,7 +181,7 @@ def main() -> int:
     vendor_root = repo_root / "src" / "tools" / "vendor" / "tree-sitter"
     cpp_grammar_dir = vendor_root / "tree-sitter-cpp"
     c_grammar_dir = vendor_root / "tree-sitter-c"
-    config_path = repo_root / "tools" / "format_config.json"
+    config_path = repo_root / ".cpp-format"
     macro_config_path = cpp_grammar_dir / "case_dash_macro_config.js"
 
     for required_path in (cpp_grammar_dir / "grammar.js", c_grammar_dir / "grammar.js", config_path):

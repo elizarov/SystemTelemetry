@@ -162,7 +162,7 @@ std::cout
     << "name=" << name << " value=" << value << "\n";
 ```
 
-Stream configuration methods listed in `tools\format_config.json` stay on the same continuation line as the following streamed value when the combined line fits.
+Stream configuration methods listed in `.cpp-format` stay on the same continuation line as the following streamed value when the combined line fits.
 
 Adjacent string literals are an implicit concatenation chain. When the sequence stays split, the first literal uses expression indentation and later fragments use one additional indent.
 
@@ -462,7 +462,7 @@ Macro continuation backslashes, spaces before continuation backslashes, and cont
 
 Macro replacement lists that form declaration fragments are recursively formatted before continuation backslashes are added.
 
-Function-like macro parameters listed in `macro_categories.statement_like_parameters` in `tools\format_config.json` are emitted one invocation per continuation line.
+Function-like macro parameters listed in `.cpp-format` `MacroCategories.StatementLikeParameters` are emitted one invocation per continuation line.
 
 ```cpp
 #define CASEDASH_METRIC_DISPLAY_STYLE_ITEMS(X) \
@@ -477,7 +477,7 @@ Include sorting may move `#include` lines within sortable include blocks. It doe
 
 Comments inside an include area bound the sortable include run around them.
 
-Include blocks are regrouped, sorted case-insensitively inside each group, and separated by one empty line between groups. Group definitions live in `tools\format_config.json`. Group order:
+Include blocks are regrouped, sorted case-insensitively inside each group, and separated by one empty line between groups. Group definitions live in `.cpp-format`. Group order:
 
 - main quoted include for the current source file
 - Windows socket headers
@@ -517,10 +517,11 @@ Outside the listed changes, the formatter changes only spaces and line breaks.
 
 ## Tooling Ownership
 
-- `format.cmd` delegates to `CaseDashTools.exe format`.
-- `CaseDashTools.exe format` owns source discovery, parsing, checking, fixing, and stdout rendering.
-- `src\tools\format.cpp` owns formatting logic.
-- `tools\format_config.json` owns line width, indent width, tab width, grammar macro names, statement-like macro parameters, stream-shift configuration method names, and include-sorting groups.
+- `format.cmd` owns repository source discovery for all, changed, and staged formatting runs, then delegates explicit file lists to `CaseDashTools.exe format`.
+- `CaseDashTools.exe format` owns clang-format-like stdin, file-list, `-i`, `--dry-run`, `--style=file`, `--style=<path>`, and `--style=file:<path>` handling, parsing, checking, fixing, ignore-file filtering, and stdout rendering.
+- `src\tools\format.cpp` owns fixed formatting logic.
+- `.cpp-format` owns only the formatter inputs that are intentionally configurable: `ColumnLimit`, `IndentWidth`, `TabWidth`, `IncludeCategories`, `MainIncludeChar`, `IncludeIsMainRegex`, `MacroCategories`, and `StreamShift`.
+- `.cpp-format-ignore` owns simple literal formatter exclusions. Entries are directory names, file names, or slash-separated relative paths. Glob patterns and negation are not supported.
 - `src\tools\vendor\tree-sitter\` owns vendored tree-sitter grammar inputs and generated parser sources.
 - `tools\regenerate_tree_sitter_grammar.py` owns parser regeneration.
 
@@ -532,6 +533,6 @@ Regenerate parser outputs only after editing vendored grammar source or parser m
 python tools\regenerate_tree_sitter_grammar.py
 ```
 
-The regeneration tool writes `case_dash_macro_config.js` from `tools\format_config.json`, runs the pinned tree-sitter CLI, and updates generated files under `src\tools\vendor\tree-sitter\tree-sitter-cpp\src\`. Pass `--tree-sitter-cli <path>` to use an existing CLI. Otherwise it downloads the pinned Windows CLI under `build\`.
+The regeneration tool writes `case_dash_macro_config.js` from `.cpp-format`, runs the pinned tree-sitter CLI, and updates generated files under `src\tools\vendor\tree-sitter\tree-sitter-cpp\src\`. Pass `--tree-sitter-cli <path>` to use an existing CLI. Otherwise it downloads the pinned Windows CLI under `build\`.
 
-Configuration does not expose style options. Brace behavior, wrapping behavior, spacing, and alignment behavior are fixed in formatter source.
+Configuration is intentionally narrow and does not expose style policy knobs. Brace behavior, wrapping behavior, spacing, alignment behavior, and other layout ideology are fixed in formatter source.

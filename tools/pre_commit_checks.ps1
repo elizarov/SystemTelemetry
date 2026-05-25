@@ -61,7 +61,7 @@ try {
     $hookStatus = 0
 
     if ($hasStagedCppFiles) {
-        & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repoRoot 'tools\run_clang_format.ps1') -Root $repoRoot -Mode fix -Scope staged -Restage
+        & cmd.exe /c "`"$repoRoot\format.cmd`" fix staged --restage"
         $formatStatus = $LASTEXITCODE
         if ($formatStatus -ne 0) {
             $hookStatus = $formatStatus

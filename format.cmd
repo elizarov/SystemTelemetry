@@ -8,9 +8,8 @@ pushd "%script_root%" >nul || exit /b 1
 
 set "mode=check"
 set "scope=all"
-set "target_file="
-set "target_path="
-set "stdout=0"
+set "restage=0"
+set "verbose=0"
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -24,29 +23,28 @@ if /I "%~1"=="changed" (
     shift
     goto parse_args
 )
-if /I "%~1"=="--root" (
-    if "%~2"=="" goto :usage
-    set "root_arg=%~2"
-    shift
+if /I "%~1"=="change" (
+    set "scope=changed"
     shift
     goto parse_args
 )
-if /I "%~1"=="--file" (
-    if "%~2"=="" goto :usage
-    set "target_file=%~2"
-    shift
+if /I "%~1"=="staged" (
+    set "scope=staged"
     shift
     goto parse_args
 )
-if /I "%~1"=="--path" (
-    if "%~2"=="" goto :usage
-    set "target_path=%~2"
-    shift
+if /I "%~1"=="--restage" (
+    set "restage=1"
     shift
     goto parse_args
 )
-if /I "%~1"=="--stdout" (
-    set "stdout=1"
+if /I "%~1"=="-v" (
+    set "verbose=1"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--verbose" (
+    set "verbose=1"
     shift
     goto parse_args
 )
@@ -54,12 +52,8 @@ goto :usage
 
 :args_done
 
-if "!stdout!"=="1" if not defined target_file goto :usage
-if defined target_file if /I "!scope!"=="changed" goto :usage
-if defined target_path if /I "!scope!"=="changed" goto :usage
-if defined target_file if defined target_path goto :usage
-if "!stdout!"=="1" if /I "!mode!"=="fix" goto :usage
-if "!stdout!"=="1" if defined target_path goto :usage
+if "!restage!"=="1" if /I not "!mode!"=="fix" goto :usage
+if "!restage!"=="1" if /I not "!scope!"=="staged" goto :usage
 
 call :ensure_format_tool
 set "ensure_format_tool_result=!errorlevel!"
@@ -68,25 +62,122 @@ if not "!ensure_format_tool_result!"=="0" (
     exit /b !ensure_format_tool_result!
 )
 
-set "mode_arg="
-set "scope_arg="
-if /I "!mode!"=="fix" set "mode_arg=fix"
-if /I "!scope!"=="changed" set "scope_arg=changed"
+if not exist "%script_root%build" mkdir "%script_root%build"
+set "candidate_list=%script_root%build\format_candidates_%RANDOM%_%RANDOM%.txt"
+set "file_list=%script_root%build\format_files_%RANDOM%_%RANDOM%.txt"
+if exist "!candidate_list!" del /q "!candidate_list!" >nul 2>nul
+if exist "!file_list!" del /q "!file_list!" >nul 2>nul
 
-if defined target_file (
-    if "!stdout!"=="1" (
-        "%script_root%build\CaseDashTools.exe" format !mode_arg! --root "%root_arg%" --file "%target_file%" --stdout
-    ) else (
-        "%script_root%build\CaseDashTools.exe" format !mode_arg! --root "%root_arg%" --file "%target_file%"
-    )
-) else if defined target_path (
-    "%script_root%build\CaseDashTools.exe" format !mode_arg! --root "%root_arg%" --path "%target_path%"
-) else (
-    "%script_root%build\CaseDashTools.exe" format !mode_arg! !scope_arg! --root "%root_arg%"
+call :collect_files
+set "collect_result=!errorlevel!"
+if not "!collect_result!"=="0" (
+    del /q "!candidate_list!" "!file_list!" >nul 2>nul
+    popd >nul
+    exit /b !collect_result!
 )
-set "result=%errorlevel%"
+
+for %%I in ("!file_list!") do set "file_list_size=%%~zI"
+if "!file_list_size!"=="0" (
+    if /I "!scope!"=="all" (
+        echo No maintained C++ source files were found.
+        set "empty_result=1"
+    ) else (
+        echo No eligible !scope! C++ source files were found.
+        set "empty_result=0"
+    )
+    del /q "!candidate_list!" "!file_list!" >nul 2>nul
+    popd >nul
+    exit /b !empty_result!
+)
+
+set "native_options=--style=file"
+if /I "!mode!"=="fix" (
+    set "native_options=!native_options! -i"
+) else (
+    set "native_options=!native_options! --dry-run"
+)
+if "!verbose!"=="1" set "native_options=!native_options! --verbose"
+
+set "format_failed=0"
+set "chunk_args="
+set "chunk_count=0"
+for /f "usebackq delims=" %%F in ("!file_list!") do (
+    call :append_format_file "%%F"
+)
+call :run_format_chunk
+
+if "!format_failed!"=="0" if "!restage!"=="1" (
+    set "chunk_args="
+    set "chunk_count=0"
+    for /f "usebackq delims=" %%F in ("!file_list!") do (
+        call :append_git_file "%%F"
+    )
+    call :run_git_add_chunk
+)
+
+del /q "!candidate_list!" "!file_list!" >nul 2>nul
 popd >nul
-exit /b %result%
+exit /b !format_failed!
+
+:collect_files
+if /I "!scope!"=="all" (
+    git -C "%root_arg%" -c core.quotepath=off -c core.safecrlf=false ls-files --cached --others --exclude-standard -- src tests > "!candidate_list!"
+) else if /I "!scope!"=="changed" (
+    git -C "%root_arg%" rev-parse --verify HEAD >nul 2>nul
+    if errorlevel 1 (
+        git -C "%root_arg%" -c core.quotepath=off -c core.safecrlf=false diff --name-only --diff-filter=ACMR --cached -- src tests > "!candidate_list!"
+    ) else (
+        git -C "%root_arg%" -c core.quotepath=off -c core.safecrlf=false diff --name-only --diff-filter=ACMR HEAD -- src tests > "!candidate_list!"
+    )
+    git -C "%root_arg%" -c core.quotepath=off -c core.safecrlf=false ls-files --others --exclude-standard -- src tests >> "!candidate_list!"
+) else if /I "!scope!"=="staged" (
+    git -C "%root_arg%" -c core.quotepath=off -c core.safecrlf=false diff --cached --name-only --diff-filter=ACMR -- src tests > "!candidate_list!"
+) else (
+    exit /b 2
+)
+if errorlevel 1 exit /b !errorlevel!
+
+set "last_file="
+> "!file_list!" (
+    for /f "usebackq delims=" %%F in (`sort "!candidate_list!"`) do (
+        if /I not "%%F"=="!last_file!" (
+            set "last_file=%%F"
+            if /I "%%~xF"==".cpp" if exist "%root_arg%\%%F" echo %%F
+            if /I "%%~xF"==".h" if exist "%root_arg%\%%F" echo %%F
+        )
+    )
+)
+exit /b 0
+
+:append_format_file
+set arg="%~1"
+set "chunk_args=!chunk_args! !arg!"
+set /a chunk_count+=1
+if !chunk_count! GEQ 80 call :run_format_chunk
+exit /b 0
+
+:run_format_chunk
+if "!chunk_count!"=="0" exit /b 0
+"%script_root%build\CaseDashTools.exe" format !native_options! !chunk_args!
+if errorlevel 1 set "format_failed=1"
+set "chunk_args="
+set "chunk_count=0"
+exit /b 0
+
+:append_git_file
+set arg="%~1"
+set "chunk_args=!chunk_args! !arg!"
+set /a chunk_count+=1
+if !chunk_count! GEQ 80 call :run_git_add_chunk
+exit /b 0
+
+:run_git_add_chunk
+if "!chunk_count!"=="0" exit /b 0
+git -C "%root_arg%" -c core.safecrlf=false add -- !chunk_args!
+if errorlevel 1 set "format_failed=1"
+set "chunk_args="
+set "chunk_count=0"
+exit /b 0
 
 :ensure_format_tool
 if exist "%script_root%build\CaseDashTools.exe" exit /b 0
@@ -99,7 +190,6 @@ echo   format
 echo   format fix
 echo   format changed
 echo   format fix changed
-echo   format [fix] --path file-or-directory
-echo   format [--root path] --file path [--stdout]
+echo   format fix staged --restage
 popd >nul
 exit /b 2
