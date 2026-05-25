@@ -34,9 +34,9 @@ TEST(LocalizationCatalog, KeepsFlatKeyLinesOutsideSections) {
 
 TEST(LocalizationCatalog, LooksUpResourceStringKeys) {
     ReplaceLocalizationCatalogForTesting(
-        ParseLocalizationCatalog("[dashboard.message]\nreload_config_failed = Failed to reload config.ini.\n"));
+        ParseLocalizationCatalog("[dashboard.message]\nrun_as_administrator_failed = Failed to restart.\n"));
 
-    EXPECT_STREQ(FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), "Failed to reload config.ini.");
+    EXPECT_STREQ(FindLocalizedText(RES_STR("dashboard.message.run_as_administrator_failed")), "Failed to restart.");
 }
 
 TEST(LocalizationCatalog, DefinesTextForTitlebarTooltipKeys) {

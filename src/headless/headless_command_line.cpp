@@ -77,7 +77,6 @@ void PrintHeadlessCommandLineHelp(std::FILE* stream, std::string_view message) {
                "  /save-full-config[:path]      Write the full config export.\n"
                "\n"
                "Source and config switches:\n"
-               "  /reload                       Reload config before exports.\n"
                "  /fake[:path]                  Use built-in synthetic telemetry or a snapshot dump file.\n"
                "  /layout:<name>                Select a named layout.\n"
                "  /theme:<name>                 Select a named theme.\n"

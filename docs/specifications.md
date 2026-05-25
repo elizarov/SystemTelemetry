@@ -16,7 +16,6 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The embedded template remains the shipped default source, while [resources/config.ini](../resources/config.ini) remains the maintained example and spelling authority for config entries.
 - The runtime treats window size, placement, and UI geometry as logical units and converts them to device pixels through either the current monitor DPI scale or the active explicit scale override. Resolved display scales are rounded to three decimal places before window sizing.
 - When the configured target monitor is temporarily unavailable, the runtime keeps watching for it and restores the saved placement there once the monitor becomes enumerable.
-- `Reload Config` reapplies live configuration immediately without restarting.
 - `Save Config` writes only the live values that differ from the loaded executable-side config state, preserving unchanged explicit overrides and unknown lines.
 - For color values, `Save Config` compares the persisted color expression or literal text, so switching themes does not write derived color roles whose expressions are unchanged.
 - Saved config text has no leading empty lines; retained comments and sections are separated by a single empty line when a new section is inserted after them.
@@ -40,7 +39,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The active named layout selects one static dashboard composition at a time.
 - The active named theme selects the base color tokens used by derived dashboard colors.
 - The live window, tray, and owned dialog icons are rendered programmatically from the active resolved theme colors, with the icon background matching the dashboard card fill composited over the app background; the embedded `resources/app.ico` carries only `16`, `32`, and `64` pixel fallback frames for Windows shell use before runtime theme application and by executable metadata.
-- The renderer resolves card and widget rectangles after config load or reload and keeps rendering in those resolved coordinates until the next reload.
+- The renderer resolves card and widget rectangles after config load and live layout, theme, or scale changes.
 - The dashboard content comes from cards named in the active layout, and each card may show an optional title, optional icon, and a configured widget composition. A layout card reference can suppress the title for one placement while reusing the same card content elsewhere with its configured title.
 - Cards with no title and no icon reserve no header area.
 - Layout references may reuse another card's inner layout without duplicating its definition.
@@ -68,7 +67,7 @@ The dashboard uses only Windows-native telemetry plus supported hardware-provide
 - The `Display` submenu contains `Configure Display` and `Scale`; `Configure Display` lists enabled display placement entries separated by display section, and `Scale` offers the default DPI-derived scale, maintained preset scales, and a custom numeric scale dialog. Scale entries show the scale percentage and resulting dashboard window size as `<percent>% - <width>x<height>`.
 - The `Devices` submenu contains `GPU`, `Network`, and `Storage Drives`.
 - The `Edit Layout` submenu contains the checked `Edit Layout` mode toggle, `Layout Editor...`, and `Save Config`.
-- Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Run as administrator`, `Reload Config`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, and `Save Screenshot...`.
+- Holding Alt while opening the dashboard or tray popup menu adds an `Advanced` submenu with `Run as administrator`, `Save Config`, `Export Full Config...`, `Export Snapshot Dump...`, and `Save Screenshot...`.
 - `Run as administrator` restarts the dashboard through the Windows elevation prompt, preserves the current command-line diagnostics switches, and closes the current instance only after the elevated relaunch starts. The item is checked and disabled when the current dashboard is already elevated.
 - The tray icon exposes the same action set as the dashboard menu.
 - `About CaseDash` shows the current themed app icon in a square slot, compiled version, build kind, and commit when available.

@@ -454,7 +454,6 @@ void ApplyDiagnosticsPlainSwitches(
         {"/exit", &DiagnosticsOptions::exit},
         {"/blank", &DiagnosticsOptions::blank},
         {"/edit-layout", &DiagnosticsOptions::editLayout},
-        {"/reload", &DiagnosticsOptions::reload},
         {"/default-config", &DiagnosticsOptions::defaultConfig},
     };
 
@@ -970,70 +969,6 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppCo
         errorText);
 }
 
-bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
-    AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry,
-    const DiagnosticsOptions& diagnosticsOptions,
-    Trace& trace,
-    DiagnosticsSession* diagnostics,
-    TelemetryUpdateSink* callback,
-    std::string* errorText,
-    std::string_view extraTemplate,
-    ResolveDiagnosticsExtraConfigFn resolveExtraConfig) {
-    if (errorText != nullptr) {
-        errorText->clear();
-    }
-    const AppConfig reloadedConfig = LoadConfigWithExtraTemplate(
-        configPath, !diagnosticsOptions.defaultConfig, ConfigParseContext{TelemetryMetricCatalog()}, extraTemplate);
-    AppConfig effectiveReloadedConfig = reloadedConfig;
-    if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_begin"));
-    }
-    if (!ApplyDiagnosticsLayoutOverride(effectiveReloadedConfig, diagnosticsOptions, diagnostics, errorText)) {
-        if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
-        }
-        return false;
-    }
-    if (!ApplyDiagnosticsThemeOverride(
-            effectiveReloadedConfig, diagnosticsOptions, diagnostics, errorText, resolveExtraConfig)) {
-        if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
-        }
-        return false;
-    }
-    ApplyDiagnosticsScaleOverride(effectiveReloadedConfig, diagnosticsOptions);
-    if (resolveExtraConfig != nullptr) {
-        resolveExtraConfig(effectiveReloadedConfig);
-    }
-
-    telemetry.reset();
-    std::string reloadError;
-    std::unique_ptr<TelemetryRuntime> reloadedTelemetry =
-        InitializeTelemetryRuntimeInstance(effectiveReloadedConfig, diagnosticsOptions, trace, callback, &reloadError);
-    if (reloadedTelemetry == nullptr) {
-        telemetry = InitializeTelemetryRuntimeInstance(activeConfig, diagnosticsOptions, trace, callback);
-        if (errorText != nullptr) {
-            *errorText = reloadError;
-        }
-        if (diagnostics != nullptr) {
-            diagnostics->WriteTraceMarkerWithDetail(
-                TracePrefix::Diagnostics, RES_STR("reload_config_failed"), reloadError);
-        }
-        return false;
-    }
-
-    telemetry = std::move(reloadedTelemetry);
-    const TelemetryUpdate reloadedUpdate = telemetry->Latest();
-    activeConfig = std::move(effectiveReloadedConfig);
-    ApplyResolvedTelemetrySelections(activeConfig, reloadedUpdate.resolvedSelections);
-    if (diagnostics != nullptr) {
-        diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_done"));
-        WriteResolvedColorTrace(*diagnostics, activeConfig);
-    }
-    return true;
-}
-
 bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
@@ -1192,26 +1127,6 @@ int RunDiagnosticsHeadlessMode(const DiagnosticsOptions& diagnosticsOptions, Dia
     diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("update_snapshot_begin"));
     TelemetryUpdate telemetryUpdate = telemetry->Latest();
     diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("update_snapshot_done"));
-    if (diagnosticsOptions.reload) {
-        std::string reloadError;
-        if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
-                config,
-                telemetry,
-                diagnosticsOptions,
-                trace,
-                &diagnostics,
-                nullptr,
-                &reloadError,
-                extraConfigTemplate,
-                handlers.resolveExtraConfig)) {
-            const std::string message = FormatDiagnosticsFailureMessage("reload config", reloadError);
-            diagnostics.WriteTraceMarkerWithDetail(
-                TracePrefix::Diagnostics, RES_STR("headless_reload_config_failed"), message);
-            ReportDiagnosticsError(diagnosticsOptions, message);
-            return 1;
-        }
-        telemetryUpdate = telemetry->Latest();
-    }
     ApplyResolvedTelemetrySelections(config, telemetryUpdate.resolvedSelections);
     diagnostics.WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("write_outputs_begin"));
     if (!diagnostics.WriteOutputs(telemetryUpdate.dump, config)) {

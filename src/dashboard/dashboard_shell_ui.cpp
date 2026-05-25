@@ -465,10 +465,6 @@ std::optional<DashboardShellUi::UnsavedLayoutEditAction> DashboardShellUi::Promp
             state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_title"));
             state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_exit_prompt_content"));
             break;
-        case UnsavedLayoutEditPrompt::ReloadConfig:
-            state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_title"));
-            state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_reload_prompt_content"));
-            break;
         case UnsavedLayoutEditPrompt::RunAsAdministrator:
             state.mainInstruction = FindLocalizedText(RES_STR("dashboard.message.layout_edit_elevate_prompt_title"));
             state.content = FindLocalizedText(RES_STR("dashboard.message.layout_edit_elevate_prompt_content"));
@@ -564,27 +560,6 @@ bool DashboardShellUi::OpenLayoutEditDialog() {
             app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.layout_edit_dialog_open_failed")), MB_ICONERROR);
         return false;
     }
-    return true;
-}
-
-bool DashboardShellUi::HandleReloadConfig() {
-    if (app_.controller_.State().isEditingLayout && app_.controller_.HasUnsavedLayoutEditChanges()) {
-        const auto action = PromptForUnsavedLayoutEditChanges(UnsavedLayoutEditPrompt::ReloadConfig);
-        if (!action.has_value() || *action == UnsavedLayoutEditAction::Cancel) {
-            return false;
-        }
-        if (*action == UnsavedLayoutEditAction::Save && !app_.controller_.SaveCurrentConfig(app_)) {
-            return false;
-        }
-    }
-
-    if (!app_.controller_.ReloadConfigFromDisk(app_, app_.diagnosticsOptions_)) {
-        ShowAppMessageBox(
-            app_.hwnd_, FindLocalizedText(RES_STR("dashboard.message.reload_config_failed")), MB_ICONERROR);
-        return false;
-    }
-    RefreshLayoutEditDialog();
-    app_.InvalidateNativeTitlebar();
     return true;
 }
 
@@ -1037,9 +1012,6 @@ void DashboardShellUi::ExecuteCommand(
         case kCommandRunAsAdministrator:
             HandleRunAsAdministrator();
             break;
-        case kCommandReloadConfig:
-            HandleReloadConfig();
-            break;
         case kCommandSaveConfig:
             if (app_.controller_.SaveCurrentConfig(app_)) {
                 if (state.isEditingLayout) {
@@ -1289,7 +1261,6 @@ void DashboardShellUi::ShowContextMenu(
             MF_STRING | (IsCurrentProcessElevated() ? (MF_CHECKED | MF_GRAYED) : MF_UNCHECKED);
         AppendMenuText(advancedMenu, runAsAdministratorFlags, kCommandRunAsAdministrator, "Run as administrator");
         AppendMenuA(advancedMenu, MF_SEPARATOR, 0, nullptr);
-        AppendMenuText(advancedMenu, MF_STRING, kCommandReloadConfig, "Reload Config");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveConfig, "Save Config");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveDumpAs, "Export Snapshot Dump...");

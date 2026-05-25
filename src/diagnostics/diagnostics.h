@@ -135,13 +135,3 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppCo
     Trace& trace,
     TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);
-bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
-    AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry,
-    const DiagnosticsOptions& diagnosticsOptions,
-    Trace& trace,
-    DiagnosticsSession* diagnostics,
-    TelemetryUpdateSink* callback,
-    std::string* errorText = nullptr,
-    std::string_view extraTemplate = {},
-    ResolveDiagnosticsExtraConfigFn resolveExtraConfig = nullptr);

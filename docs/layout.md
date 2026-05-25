@@ -5,7 +5,7 @@ See also: [resources/config.ini](../resources/config.ini) for the maintained shi
 
 ## Purpose And Scope
 
-`config.ini` uses a compact INI-based language that selects runtime targets, defines metric presentation, and describes the static dashboard layout. The runtime loads one active named layout at a time and resolves card and widget coordinates from config during load or reload rather than from live telemetry values.
+`config.ini` uses a compact INI-based language that selects runtime targets, defines metric presentation, and describes the static dashboard layout. The runtime loads one active named layout at a time and resolves card and widget coordinates from config during config load rather than from live telemetry values.
 
 ## Compact Rules
 

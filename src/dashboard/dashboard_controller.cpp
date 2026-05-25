@@ -410,48 +410,6 @@ bool DashboardController::WriteDiagnosticsOutputs(DashboardShellHost& shell) {
     return ok;
 }
 
-bool DashboardController::ReloadConfigFromDisk(
-    DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
-    std::string telemetryError;
-    const DisplayConfig previousDisplay = state_.config.display;
-    if (!ReloadTelemetryCollectorFromDisk(GetRuntimeConfigPath(),
-            state_.config,
-            state_.telemetry,
-            diagnosticsOptions,
-            shell.TraceLog(),
-            state_.diagnostics.get(),
-            &shell,
-            &telemetryError)) {
-        if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
-            shell.ShowError(FormatTelemetryInitializeError(telemetryError));
-        } else if (state_.diagnostics != nullptr && !state_.diagnostics->LastError().empty() &&
-                   state_.diagnostics->ShouldShowDialogs()) {
-            shell.ShowError(state_.diagnostics->LastError());
-        }
-        shell.ReleaseFonts();
-        shell.InitializeFonts();
-        return false;
-    }
-    TraceDisplayPositionUpdate(shell.TraceLog(), RES_STR("reload_config"), previousDisplay, state_.config.display);
-    SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
-    if (!shell.Renderer().LastError().empty()) {
-        if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarker(TracePrefix::Diagnostics, RES_STR("reload_config_failed"));
-        }
-        return false;
-    }
-    if (!CommitDisplayWallpaperTransition(state_.config, shell.TraceLog(), true)) {
-        return false;
-    }
-    state_.placementWatchActive = true;
-    shell.ApplyConfigPlacement();
-    shell.RedrawShellNow();
-    if (state_.isEditingLayout) {
-        MarkLayoutEditSessionSaved();
-    }
-    return true;
-}
-
 void DashboardController::SaveDumpAs(DashboardShellHost& shell) {
     if (state_.telemetry == nullptr) {
         return;
