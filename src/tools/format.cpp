@@ -3632,6 +3632,41 @@ private:
         return true;
     }
 
+    bool TryAppendFinalChainPartOpeningToLastLine(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& finalPart,
+        std::string_view suffix,
+        int indentLevel
+    ) const {
+        if (lines.empty() || finalPart.empty() || HasOriginalBlankSeparator(finalPart) || ShouldForceSplit(finalPart)) {
+            return false;
+        }
+        const std::string trimmedLastLine = tools::lint::Trim(lines.back());
+        if (!EndsWithColon(trimmedLastLine)) {
+            return false;
+        }
+        const std::optional<GroupPair> group = FindFirstWrappableGroupPair(finalPart);
+        if (!group) {
+            return false;
+        }
+        std::vector<Token> inner(
+            finalPart.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+            finalPart.begin() + static_cast<std::ptrdiff_t>(group->close)
+        );
+        if (!ContainsTopLevelSeparator(inner, ',')) {
+            return false;
+        }
+        std::string prefix = trimmedLastLine + " ";
+        if (!Fits(indentLevel, prefix + FormatGroupOpeningLine(finalPart, *group))) {
+            return false;
+        }
+        std::vector<std::string> replacement =
+            FormatSplitGroup(finalPart, *group, indentLevel, std::move(prefix), std::string(suffix));
+        lines.pop_back();
+        lines.insert(lines.end(), replacement.begin(), replacement.end());
+        return true;
+    }
+
     std::vector<std::string> FormatTernaryPart(
         const std::vector<Token>& tokens,
         int indentLevel,
@@ -3724,10 +3759,10 @@ private:
                 std::move(partPrefix),
                 std::move(partSuffix)
             );
-            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
-                partLines,
-                parts[index + 1],
-                suffix
+            if (index + 2 == parts.size() && (
+                partLines.size() > 1 &&
+                TryAppendFinalChainPartToLastLine(partLines, parts[index + 1], suffix) ||
+                TryAppendFinalChainPartOpeningToLastLine(partLines, parts[index + 1], suffix, partIndent)
             )) {
                 lines.insert(lines.end(), partLines.begin(), partLines.end());
                 break;

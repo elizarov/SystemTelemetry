@@ -826,14 +826,13 @@ int ShortNonEmpty() {
 void EmptyFunction() {}
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
-    return description.empty() ? std::string(name) :
-        FormatText(
-            "%.*s - %.*s",
-            static_cast<int>(name.size()),
-            name.data(),
-            static_cast<int>(description.size()),
-            description.data()
-        );
+    return description.empty() ? std::string(name) : FormatText(
+        "%.*s - %.*s",
+        static_cast<int>(name.size()),
+        name.data(),
+        static_cast<int>(description.size()),
+        description.data()
+    );
 }
 
 const char* SelectRevertLabel(bool isFontsSection, bool isThemeSection, bool isLayoutSection, bool isMetricsSection) {
