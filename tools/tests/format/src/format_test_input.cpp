@@ -475,6 +475,20 @@ std::string FormatNamedMenuLabel(std::string_view name,std::string_view descript
 return description.empty()?std::string(name):FormatText("%.*s - %.*s",static_cast<int>(name.size()),name.data(),static_cast<int>(description.size()),description.data());
 }
 
+void PreferOuterCallBreakForSingleArgument(){
+UseAVeryLongCallNameThatPushesPastLimit(DecorateValueWithLongName(firstValueWithLongName&&SingleArgumentCallWithLongName(secondValueWithLongName)));
+}
+
+void BuildLayoutEditTargetMenuLabel(const LayoutEditTarget* layoutEditTarget){
+if(layoutEditTarget!=nullptr){
+if(layoutEditTarget->payload.kind==TooltipPayloadKind::LayoutEdit){
+std::string label;
+const auto focusKey=TooltipPayloadFocusKey(layoutEditTarget->payload);
+if(label.empty()&&focusKey.has_value()&&std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)){label=BuildLayoutEditMenuLabel("card title");}
+else if(label.empty()&&focusKey.has_value()&&std::get_if<LayoutNodeFieldEditKey>(&*focusKey)!=nullptr){label=BuildLayoutEditMenuLabel("node field");}
+else if(label.empty()&&focusKey.has_value()&&std::holds_alternative<LayoutContainerEditKey>(*focusKey)){label=BuildLayoutEditMenuLabel("layout container");}
+}}}
+
 
 
 const char* SelectRevertLabel(bool isFontsSection,bool isThemeSection,bool isLayoutSection,bool isMetricsSection){

@@ -229,7 +229,7 @@ target = RenderPoint{
 };
 ```
 
-A wrapped non-control parenthesized group with one argument keeps the compact argument on one continuation line when it fits.
+A wrapped parenthesized group with one expression keeps the compact expression on one continuation line when it fits. This includes control conditions, so the outer condition or call break wins before a nested single-argument call.
 
 ```cpp
 metrics.definitions.push_back(

@@ -2950,13 +2950,13 @@ private:
             tokens.begin(),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
         );
-        if (StartsWithControlHeader(firstLineTokens)) {
-            return std::nullopt;
-        }
         std::vector<Token> inner(
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
             tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
         );
+        if (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';')) {
+            return std::nullopt;
+        }
         if (
             inner.empty() ||
             ContainsOnlyNewlines(inner, 0, inner.size()) ||
