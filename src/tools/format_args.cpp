@@ -32,6 +32,27 @@ std::optional<std::string> ParseStyleValue(std::string_view value, std::string& 
     return tools::lint::AbsolutePath(value);
 }
 
+bool AppendFilesFromList(std::string_view path, FormatOptions& options, std::string& error) {
+    if (path.empty()) {
+        error = "--files requires a path";
+        return false;
+    }
+    const std::string absolute = tools::lint::AbsolutePath(path);
+    std::optional<std::string> text = tools::lint::ReadFileText(absolute);
+    if (!text) {
+        error = "failed to read --files list " + std::string(path);
+        return false;
+    }
+    options.fileListProvided = true;
+    for (std::string line : tools::lint::SplitLines(*text)) {
+        line = tools::lint::Trim(line);
+        if (!line.empty()) {
+            options.files.push_back(line);
+        }
+    }
+    return true;
+}
+
 }  // namespace
 
 std::optional<FormatOptions> ParseFormatArgs(int argc, char** argv, std::string& error) {
@@ -54,6 +75,22 @@ std::optional<FormatOptions> ParseFormatArgs(int argc, char** argv, std::string&
             options.mode = FormatMode::DryRun;
         } else if (arg == "-v" || arg == "--verbose") {
             options.verbose = true;
+        } else if (arg == "--files") {
+            if (index + 1 >= argc) {
+                error = "--files requires a path";
+                return std::nullopt;
+            }
+            if (!AppendFilesFromList(argv[++index], options, error)) {
+                return std::nullopt;
+            }
+        } else if (StartsWith(arg, "--files=")) {
+            if (!AppendFilesFromList(std::string_view(arg).substr(8), options, error)) {
+                return std::nullopt;
+            }
+        } else if (StartsWith(arg, "-files=")) {
+            if (!AppendFilesFromList(std::string_view(arg).substr(7), options, error)) {
+                return std::nullopt;
+            }
         } else if (arg == "--style") {
             if (index + 1 >= argc) {
                 error = "--style requires a value";
@@ -83,7 +120,7 @@ std::optional<FormatOptions> ParseFormatArgs(int argc, char** argv, std::string&
             options.files.push_back(arg);
         }
     }
-    if (options.mode == FormatMode::InPlace && options.files.empty()) {
+    if (options.mode == FormatMode::InPlace && options.files.empty() && !options.fileListProvided) {
         error = "-i requires at least one file";
         return std::nullopt;
     }
@@ -98,7 +135,8 @@ void PrintFormatUsage(FILE* output) {
     );
     std::fprintf(
         output,
-        "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-i|-n|--dry-run] file...\n"
+        "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-i|-n|--dry-run] "
+            "[--files <path>|--files=<path>] [file...]\n"
     );
 }
 

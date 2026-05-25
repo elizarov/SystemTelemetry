@@ -99,12 +99,8 @@ if /I "!mode!"=="fix" (
 if "!verbose!"=="1" set "native_options=!native_options! --verbose"
 
 set "format_failed=0"
-set "chunk_args="
-set "chunk_count=0"
-for /f "usebackq delims=" %%F in ("!file_list!") do (
-    call :append_format_file "%%F"
-)
-call :run_format_chunk
+"%script_root%build\CaseDashTools.exe" format !native_options! --files "!file_list!"
+set "format_failed=!errorlevel!"
 
 if "!format_failed!"=="0" if "!restage!"=="1" (
     set "chunk_args="
@@ -147,21 +143,6 @@ set "last_file="
         )
     )
 )
-exit /b 0
-
-:append_format_file
-set arg="%~1"
-set "chunk_args=!chunk_args! !arg!"
-set /a chunk_count+=1
-if !chunk_count! GEQ 80 call :run_format_chunk
-exit /b 0
-
-:run_format_chunk
-if "!chunk_count!"=="0" exit /b 0
-"%script_root%build\CaseDashTools.exe" format !native_options! !chunk_args!
-if errorlevel 1 set "format_failed=1"
-set "chunk_args="
-set "chunk_count=0"
 exit /b 0
 
 :append_git_file

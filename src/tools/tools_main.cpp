@@ -13,7 +13,7 @@ void PrintUsage() {
     std::fprintf(
         stderr,
         "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-i|-n|--dry-run] "
-            "[-v|--verbose] [file...]\n"
+            "[-v|--verbose] [--files <path>|--files=<path>] [file...]\n"
     );
     std::fprintf(
         stderr,

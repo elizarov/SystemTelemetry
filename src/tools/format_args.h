@@ -17,6 +17,7 @@ struct FormatOptions {
     FormatMode mode = FormatMode::Stdout;
     bool verbose = false;
     bool help = false;
+    bool fileListProvided = false;
     std::optional<std::string> explicitStylePath;
     std::vector<std::string> files;
 };

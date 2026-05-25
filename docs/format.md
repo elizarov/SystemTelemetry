@@ -517,8 +517,8 @@ Outside the listed changes, the formatter changes only spaces and line breaks.
 
 ## Tooling Ownership
 
-- `format.cmd` owns repository source discovery for all, changed, and staged formatting runs, then delegates explicit file lists to `CaseDashTools.exe format`.
-- `CaseDashTools.exe format` owns clang-format-like stdin, file-list, `-i`, `--dry-run`, `--style=file`, `--style=<path>`, and `--style=file:<path>` handling, parsing, checking, fixing, ignore-file filtering, and stdout rendering.
+- `format.cmd` owns repository source discovery for all, changed, and staged formatting runs, then delegates the discovered newline-separated file list to `CaseDashTools.exe format --files`.
+- `CaseDashTools.exe format` owns clang-format-like stdin, direct file arguments, newline file lists passed with `--files <path>` or `--files=<path>`, `-i`, `--dry-run`, `--style=file`, `--style=<path>`, and `--style=file:<path>` handling, parsing, checking, fixing, ignore-file filtering, and stdout rendering.
 - `src\tools\format.cpp` owns fixed formatting logic.
 - `.cpp-format` owns only the formatter inputs that are intentionally configurable: `ColumnLimit`, `IndentWidth`, `TabWidth`, `IncludeCategories`, `MainIncludeChar`, `IncludeIsMainRegex`, `MacroCategories`, and `StreamShift`.
 - `.cpp-format-ignore` owns simple literal formatter exclusions. Entries are directory names, file names, or slash-separated relative paths. Glob patterns and negation are not supported.

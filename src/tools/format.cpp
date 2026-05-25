@@ -6329,7 +6329,7 @@ void PrintFormatSummary(
 ) {
     std::fprintf(
         output,
-        "%s %d file%s with native tree-sitter formatter in %s.",
+        "%s %d file%s in %s.",
         verb,
         processedCount,
         processedCount == 1 ? "" : "s",
@@ -6375,7 +6375,7 @@ int RunFormat(int argc, char** argv) {
     const std::string currentDirectory = tools::lint::CurrentDirectoryAbsolute();
     FILE* summary = SummaryStream(options);
 
-    if (options.files.empty()) {
+    if (options.files.empty() && !options.fileListProvided) {
         std::string error;
         const FormatterConfig* config = styleCache.ConfigForPath(currentDirectory, error);
         if (config == nullptr) {
@@ -6393,7 +6393,7 @@ int RunFormat(int argc, char** argv) {
         if (options.mode == FormatMode::DryRun && result.changed) {
             std::fprintf(
                 summary,
-                "Native formatting is required for stdin. Checked stdin in %s.\n",
+                "Formatting is required for stdin. Checked stdin in %s.\n",
                 FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
             );
             return 1;
@@ -6403,7 +6403,7 @@ int RunFormat(int argc, char** argv) {
         }
         std::fprintf(
             summary,
-            "%s stdin with native tree-sitter formatter in %s.\n",
+            "%s stdin in %s.\n",
             options.mode == FormatMode::DryRun ? "Checked" : "Formatted",
             FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
         );
@@ -6491,14 +6491,9 @@ int RunFormat(int argc, char** argv) {
     }
     if (failed) {
         if (options.mode == FormatMode::InPlace) {
-            std::fprintf(summary, "Native formatting failed");
+            std::fprintf(summary, "Formatting failed");
         } else {
-            std::fprintf(
-                summary,
-                "Native formatting is required for %d file%s",
-                changedCount,
-                changedCount == 1 ? "" : "s"
-            );
+            std::fprintf(summary, "Formatting is required for %d file%s", changedCount, changedCount == 1 ? "" : "s");
         }
         if (parseErrorCount > 0) {
             std::fprintf(
@@ -6509,7 +6504,7 @@ int RunFormat(int argc, char** argv) {
             );
         }
         if (ignoredCount > 0) {
-            std::fprintf(summary, " Skipped %d ignored file%s.", ignoredCount, ignoredCount == 1 ? "" : "s");
+            std::fprintf(summary, ". Skipped %d ignored file%s", ignoredCount, ignoredCount == 1 ? "" : "s");
         }
         std::fprintf(
             summary,

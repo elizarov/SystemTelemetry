@@ -49,7 +49,7 @@ class FormatCommandTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertEqual(read_fixture(OUTPUT_FIXTURE), result.stdout)
-        self.assertRegex(result.stderr, r"Formatted stdin with native tree-sitter formatter in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
+        self.assertRegex(result.stderr, r"Formatted stdin in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
 
     def test_file_argument_formats_to_stdout(self) -> None:
         result = native_format("--style=file", str(TEST_ROOT / OUTPUT_FIXTURE))
@@ -58,7 +58,7 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(read_fixture(OUTPUT_FIXTURE), result.stdout)
         self.assertRegex(
             result.stderr,
-            r"Formatted 1 file with native tree-sitter formatter in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
+            r"Formatted 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
         )
 
     def test_dry_run_accepts_idempotent_file_and_rejects_unformatted_file(self) -> None:
@@ -67,13 +67,27 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(0, ok_result.returncode, msg=f"stdout:\n{ok_result.stdout}\n\nstderr:\n{ok_result.stderr}")
         self.assertRegex(
             ok_result.stdout,
-            r"Checked 1 file with native tree-sitter formatter in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
+            r"Checked 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
         )
 
         bad_result = native_format("--style=file", "--dry-run", str(TEST_ROOT / INPUT_FIXTURE))
 
         self.assertEqual(1, bad_result.returncode, msg=f"stdout:\n{bad_result.stdout}\n\nstderr:\n{bad_result.stderr}")
-        self.assertIn("Native formatting is required for 1 file", bad_result.stdout)
+        self.assertIn("Formatting is required for 1 file", bad_result.stdout)
+
+    def test_files_option_reads_newline_file_list(self) -> None:
+        build_dir = REPO_ROOT / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="format_files_", dir=build_dir) as temp_dir:
+            root = Path(temp_dir)
+            file_list = root / "files.txt"
+            file_list.write_text(f"{TEST_ROOT / OUTPUT_FIXTURE}\n\n", encoding="utf-8")
+
+            result = native_format("--style=file", "--dry-run", "--files", str(file_list))
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+            self.assertRegex(result.stdout, r"Checked 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
 
     def test_in_place_formats_file(self) -> None:
         build_dir = REPO_ROOT / "build"
@@ -107,9 +121,9 @@ class FormatCommandTests(unittest.TestCase):
             explicit = native_format(f"--style={root / '.cpp-format'}", "--dry-run", str(source), cwd=nested)
 
             self.assertEqual(1, discovered.returncode, msg=f"stdout:\n{discovered.stdout}\n\nstderr:\n{discovered.stderr}")
-            self.assertIn("Native formatting is required", discovered.stdout)
+            self.assertIn("Formatting is required", discovered.stdout)
             self.assertEqual(1, explicit.returncode, msg=f"stdout:\n{explicit.stdout}\n\nstderr:\n{explicit.stderr}")
-            self.assertIn("Native formatting is required", explicit.stdout)
+            self.assertIn("Formatting is required", explicit.stdout)
 
     def test_ignore_file_skips_simple_directory_entries(self) -> None:
         build_dir = REPO_ROOT / "build"
@@ -140,6 +154,8 @@ class FormatCommandTests(unittest.TestCase):
             ("-i",),
             ("-i", "--dry-run", str(TEST_ROOT / OUTPUT_FIXTURE)),
             ("--style",),
+            ("--files",),
+            ("--files=",),
             ("--unknown",),
         ]
 
