@@ -1,13 +1,11 @@
 #include "config/color_resolver.h"
 
 #include <optional>
-#include <string_view>
 
 #include "config/color_expression.h"
 #include "config/color_format.h"
 #include "config/color_math.h"
 #include "config/config_runtime_fields.h"
-#include "util/function_ref.h"
 #include "util/strings.h"
 
 namespace {
@@ -82,8 +80,6 @@ std::optional<ColorConfig> FindThemeToken(const ThemeConfig& theme, std::string_
     return std::nullopt;
 }
 
-using ColorLookup = FunctionRef<std::optional<ColorConfig>(std::string_view)>;
-
 ColorConfig& MutableColorField(void* owner, const RuntimeConfigFieldDescriptor& field) {
     return *reinterpret_cast<ColorConfig*>(static_cast<char*>(owner) + field.offset);
 }
@@ -92,18 +88,7 @@ const ColorConfig& ColorField(const void* owner, const RuntimeConfigFieldDescrip
     return *reinterpret_cast<const ColorConfig*>(static_cast<const char*>(owner) + field.offset);
 }
 
-std::optional<ColorConfig> FindColorFieldByKey(
-    std::span<const RuntimeConfigFieldDescriptor> fields, const void* owner, std::string_view name) {
-    for (const RuntimeConfigFieldDescriptor& field : fields) {
-        if (field.kind == RuntimeConfigFieldValueKind::HexColor &&
-            std::string_view(field.key, field.keyLength) == name) {
-            return ColorField(owner, field);
-        }
-    }
-    return std::nullopt;
-}
-
-std::optional<ColorConfig> ResolveColorExpression(const ColorConfig& color, const ColorLookup& lookup) {
+std::optional<ColorConfig> ResolveColorExpression(const ColorConfig& color, const ConfigColorLookup& lookup) {
     const std::string expression = color.expression.empty() ? FormatHexColor(color) : color.expression;
     ColorConfig literal = ParseHexColorOrDefault(expression, color);
     if (!expression.empty() && expression.front() == '#') {
@@ -145,7 +130,7 @@ std::optional<ColorConfig> ResolveColorExpression(const ColorConfig& color, cons
     return FromColorBytes(bytes, expression);
 }
 
-void ResolveColorInPlace(ColorConfig& color, const ColorLookup& lookup) {
+void ResolveColorInPlace(ColorConfig& color, const ConfigColorLookup& lookup) {
     if (std::optional<ColorConfig> resolved = ResolveColorExpression(color, lookup); resolved.has_value()) {
         color = *resolved;
     } else {
@@ -165,7 +150,35 @@ void ResolveThemeColors(LayoutConfig& layout) {
     }
 }
 
-void ResolveColorFieldsInPlace(std::span<const RuntimeConfigFieldDescriptor> fields, void* owner, ColorLookup lookup) {
+}  // namespace
+
+const ThemeConfig* ResolveConfiguredTheme(LayoutConfig& layout, std::string& themeName) {
+    ResolveThemeColors(layout);
+    const ThemeConfig* activeTheme = FindTheme(layout, themeName);
+    if (activeTheme == nullptr && !layout.themes.empty()) {
+        activeTheme = &layout.themes.front();
+        themeName = activeTheme->name;
+    }
+    return activeTheme;
+}
+
+std::optional<ColorConfig> FindThemeColorToken(const ThemeConfig& theme, std::string_view name) {
+    return FindThemeToken(theme, name);
+}
+
+std::optional<ColorConfig> FindConfigColorFieldByKey(
+    std::span<const RuntimeConfigFieldDescriptor> fields, const void* owner, std::string_view name) {
+    for (const RuntimeConfigFieldDescriptor& field : fields) {
+        if (field.kind == RuntimeConfigFieldValueKind::HexColor &&
+            std::string_view(field.key, field.keyLength) == name) {
+            return ColorField(owner, field);
+        }
+    }
+    return std::nullopt;
+}
+
+void ResolveConfigColorFieldsInPlace(
+    std::span<const RuntimeConfigFieldDescriptor> fields, void* owner, ConfigColorLookup lookup) {
     for (const RuntimeConfigFieldDescriptor& field : fields) {
         if (field.kind == RuntimeConfigFieldValueKind::HexColor) {
             ResolveColorInPlace(MutableColorField(owner, field), lookup);
@@ -173,31 +186,13 @@ void ResolveColorFieldsInPlace(std::span<const RuntimeConfigFieldDescriptor> fie
     }
 }
 
-}  // namespace
-
 void ResolveConfiguredColors(AppConfig& config) {
-    ResolveThemeColors(config.layout);
-    const ThemeConfig* activeTheme = FindTheme(config.layout, config.display.theme);
-    if (activeTheme == nullptr && !config.layout.themes.empty()) {
-        activeTheme = &config.layout.themes.front();
-        config.display.theme = activeTheme->name;
-    }
+    const ThemeConfig* activeTheme = ResolveConfiguredTheme(config.layout, config.display.theme);
     if (activeTheme == nullptr) {
         return;
     }
 
     const auto themeLookup = [activeTheme](std::string_view name) { return FindThemeToken(*activeTheme, name); };
     const RuntimeConfigSectionDescriptor& colorsSection = RequiredSection("colors");
-    ResolveColorFieldsInPlace(RuntimeConfigFields(colorsSection), &config.layout.colors, themeLookup);
-
-    const auto guideSheetLookup = [&config, activeTheme, &colorsSection](
-                                      std::string_view name) -> std::optional<ColorConfig> {
-        if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
-            return themeColor;
-        }
-        return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
-    };
-
-    ResolveColorFieldsInPlace(
-        RuntimeConfigFields(RequiredSection("layout_guide_sheet")), &config.layout.layoutGuideSheet, guideSheetLookup);
+    ResolveConfigColorFieldsInPlace(RuntimeConfigFields(colorsSection), &config.layout.colors, themeLookup);
 }

@@ -32,7 +32,6 @@
 #include "util/paths.h"
 #include "util/scale.h"
 #include "util/text_format.h"
-#include "util/trace.h"
 
 namespace {
 
@@ -73,6 +72,21 @@ public:
 private:
     HWND hwnd_ = nullptr;
 };
+
+LRESULT CALLBACK PopupMenuAltMessageHook(int code, WPARAM wParam, LPARAM lParam) {
+    if (code == MSGF_MENU) {
+        const auto* message = reinterpret_cast<const MSG*>(lParam);
+        const bool isAltKey = message != nullptr && (message->wParam == VK_MENU || message->wParam == VK_LMENU ||
+                                                        message->wParam == VK_RMENU);
+        if (isAltKey) {
+            if (message->message == WM_KEYDOWN || message->message == WM_SYSKEYDOWN || message->message == WM_KEYUP ||
+                message->message == WM_SYSKEYUP) {
+                return 1;
+            }
+        }
+    }
+    return CallNextHookEx(nullptr, code, wParam, lParam);
+}
 
 constexpr double kPredefinedDisplayScales[] = {1.0, 1.5, 2.0, 2.5, 3.0};
 constexpr double kScaleEpsilon = 0.0001;
@@ -417,14 +431,9 @@ bool DashboardShellUi::EnsureLayoutEditDialog(const std::optional<LayoutEditFocu
 
 void DashboardShellUi::RefreshLayoutEditDialog(const std::optional<LayoutEditFocusKey>& preferredFocus) {
     if (layoutEditDialog_ != nullptr) {
-        app_.TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditDialog,
-            "refresh_begin",
-            "preferred_focus=\"%s\"",
-            preferredFocus.has_value() ? "set" : "none");
         layoutEditDialog_->Refresh(preferredFocus);
         layoutEditDialog_->SetSelectionHighlightVisible(true);
         layoutEditDialog_->RestackAnchor();
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditDialog, "refresh_done");
     }
 }
 
@@ -654,20 +663,6 @@ void DashboardShellUi::HandleExitRequest() {
     DestroyWindow(app_.hwnd_);
 }
 
-void DashboardShellUi::TraceLayoutEditDialogEvent(const char* event, const std::string& details) const {
-    const auto& state = app_.controller_.State();
-    if (state.diagnostics == nullptr) {
-        return;
-    }
-
-    if (details.empty()) {
-        state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, event);
-    } else {
-        std::string text = FormatText("%s %s", event, details.c_str());
-        state.diagnostics->WriteTraceMarker(TracePrefix::LayoutEditDialog, text);
-    }
-}
-
 bool DashboardShellUi::IsLayoutEditModalUiActive() const {
     return app_.layoutEditModalUiDepth_ > 0;
 }
@@ -684,8 +679,6 @@ void DashboardShellUi::ShowAboutDialog() const {
 }
 
 void DashboardShellUi::BeginLayoutEditModalUi() {
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "begin_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
     ++app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 1 && app_.controller_.State().isEditingLayout) {
         app_.layoutEditController_.CancelInteraction();
@@ -694,8 +687,6 @@ void DashboardShellUi::BeginLayoutEditModalUi() {
     app_.layoutEditMouseTracking_ = false;
     app_.UpdateNativeTitlebarProbe();
     SetCursor(LoadCursorA(nullptr, IDC_ARROW));
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "begin_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }
 
 void DashboardShellUi::EndLayoutEditModalUi() {
@@ -703,18 +694,13 @@ void DashboardShellUi::EndLayoutEditModalUi() {
         app_.layoutEditModalUiDepth_ = 0;
         return;
     }
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "end_request", "depth_before=\"%d\"", app_.layoutEditModalUiDepth_);
     --app_.layoutEditModalUiDepth_;
     if (app_.layoutEditModalUiDepth_ == 0) {
         ReleaseCapture();
         app_.layoutEditMouseTracking_ = false;
-        app_.TraceLayoutEditUiEvent(TracePrefix::LayoutEditModal, "end_released_capture");
         app_.RefreshLayoutEditHoverFromCursor();
         app_.UpdateNativeTitlebarHoverFromCursor();
     }
-    app_.TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditModal, "end_done", "depth_after=\"%d\"", app_.layoutEditModalUiDepth_);
 }
 
 HINSTANCE DashboardShellUi::DialogInstance() const {
@@ -1072,9 +1058,6 @@ void DashboardShellUi::ExecuteCommand(
         case kCommandSaveScreenshotAs:
             app_.controller_.SaveScreenshotAs(app_, app_.diagnosticsOptions_);
             break;
-        case kCommandSaveLayoutGuideSheetAs:
-            app_.controller_.SaveLayoutGuideSheetAs(app_);
-            break;
         case kCommandSaveFullConfigAs:
             app_.controller_.SaveFullConfigAs(app_);
             break;
@@ -1094,22 +1077,16 @@ void DashboardShellUi::ExecuteCommand(
                 const size_t index = selected - kCommandLayoutBase;
                 if (index < state.config.layout.layouts.size()) {
                     const std::string& layoutName = state.config.layout.layouts[index].name;
-                    app_.TraceLayoutEditUiEventFmt(
-                        TracePrefix::LayoutSwitch, "menu_command", "selected_layout=\"%s\"", layoutName.c_str());
                     const bool suppressTooltipRefresh = app_.controller_.State().isEditingLayout;
                     if (suppressTooltipRefresh) {
                         app_.SetLayoutEditTooltipRefreshSuppressed(true);
                         app_.layoutEditController_.HandleMouseLeave();
                         app_.HideLayoutEditTooltip();
-                        app_.TraceLayoutEditUiEvent(
-                            TracePrefix::LayoutSwitch, "menu_prepare", "tooltip_suppressed=\"true\"");
                     }
                     if (!app_.controller_.SwitchLayout(app_, layoutName, app_.diagnosticsOptions_.editLayout)) {
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEventFmt(
-                            TracePrefix::LayoutSwitch, "menu_failed", "selected_layout=\"%s\"", layoutName.c_str());
                         ShowAppMessageBox(app_.hwnd_,
                             FindLocalizedText(RES_STR("dashboard.message.switch_layout_failed")),
                             MB_ICONERROR);
@@ -1118,8 +1095,6 @@ void DashboardShellUi::ExecuteCommand(
                         if (suppressTooltipRefresh) {
                             app_.SetLayoutEditTooltipRefreshSuppressed(false);
                         }
-                        app_.TraceLayoutEditUiEventFmt(
-                            TracePrefix::LayoutSwitch, "menu_done", "selected_layout=\"%s\"", layoutName.c_str());
                     }
                 }
                 break;
@@ -1205,7 +1180,7 @@ void DashboardShellUi::ShowContextMenu(
     HMENU displayMenu = CreatePopupMenu();
     HMENU devicesMenu = CreatePopupMenu();
     HMENU editLayoutMenu = CreatePopupMenu();
-    const bool showAdvancedMenu = (::GetKeyState(VK_MENU) & 0x8000) != 0;
+    const bool showAdvancedMenu = (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0;
     HMENU advancedMenu = showAdvancedMenu ? CreatePopupMenu() : nullptr;
     const UINT autoStartFlags = MF_STRING | (app_.controller_.IsAutoStartEnabled() ? MF_CHECKED : MF_UNCHECKED);
     if (state.config.layout.layouts.empty()) {
@@ -1319,7 +1294,6 @@ void DashboardShellUi::ShowContextMenu(
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveFullConfigAs, "Export Full Config...");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveDumpAs, "Export Snapshot Dump...");
         AppendMenuText(advancedMenu, MF_STRING, kCommandSaveScreenshotAs, "Save Screenshot...");
-        AppendMenuText(advancedMenu, MF_STRING, kCommandSaveLayoutGuideSheetAs, "Save Layout Guide Sheet...");
     }
     if (layoutEditTarget != nullptr) {
         std::string label;
@@ -1373,6 +1347,14 @@ void DashboardShellUi::ShowContextMenu(
     const UINT defaultCommand = ResolveDefaultCommand(source, layoutEditTarget);
     SetMenuDefaultItem(menu, defaultCommand, FALSE);
     SetForegroundWindow(app_.hwnd_);
+    // Alt reveals the advanced submenu; enter popup menu tracking after its release.
+    HHOOK altMessageHook = nullptr;
+    if (showAdvancedMenu) {
+        altMessageHook = SetWindowsHookExA(WH_MSGFILTER, PopupMenuAltMessageHook, nullptr, GetCurrentThreadId());
+        for (int attempts = 0; attempts < 150 && (::GetAsyncKeyState(VK_MENU) & 0x8000) != 0; ++attempts) {
+            Sleep(10);
+        }
+    }
     const UINT selected = TrackPopupMenu(menu,
         TPM_RETURNCMD | TPM_RIGHTBUTTON | TPM_LEFTALIGN | TPM_TOPALIGN,
         screenPoint.x,
@@ -1380,6 +1362,9 @@ void DashboardShellUi::ShowContextMenu(
         0,
         app_.hwnd_,
         nullptr);
+    if (altMessageHook != nullptr) {
+        UnhookWindowsHookEx(altMessageHook);
+    }
     DestroyMenu(menu);
     ClearConfigureDisplayMenuBitmaps();
     if (selected != 0) {

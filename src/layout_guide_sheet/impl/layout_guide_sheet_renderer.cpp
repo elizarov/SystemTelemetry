@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/layout_guide_sheet_support.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_model/layout_edit_anchor_shape.h"
 #include "layout_model/layout_edit_helpers.h"
+#include "renderer/layout_guide_sheet_palette.h"
 #include "util/text_format.h"
 
 namespace {
@@ -165,6 +167,7 @@ bool SameEditableAnchorIdentity(const LayoutEditAnchorRegion& lhs, const LayoutE
 
 void AddPackedDashboardGuides(PackedOverview& overview,
     DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const LayoutNodeConfig& node,
     const RenderRect& rect,
     const std::vector<RenderRect>& childRects,
@@ -174,7 +177,7 @@ void AddPackedDashboardGuides(PackedOverview& overview,
         return;
     }
     const bool horizontal = node.name == "columns";
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     const int hitInset = ScaleAtLeast(renderer, sheetStyle.overviewGuideHitInset, 1);
     const int reorderWidth = ScaleAtLeast(renderer, horizontal ? 12 : 8, 1);
     const int reorderHeight = ScaleAtLeast(renderer, horizontal ? 8 : 12, 1);
@@ -267,6 +270,7 @@ void AddPackedDashboardGuides(PackedOverview& overview,
 
 void AppendPackedCards(const LayoutNodeConfig& node,
     DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const RenderRect& rect,
     const std::vector<size_t>& nodePath,
     PackedOverview& overview) {
@@ -324,21 +328,21 @@ void AppendPackedCards(const LayoutNodeConfig& node,
         }
         childRects.push_back(childRect);
         childPath.push_back(i);
-        AppendPackedCards(node.children[i], renderer, childRect, childPath, overview);
+        AppendPackedCards(node.children[i], renderer, guideSheet, childRect, childPath, overview);
         childPath.pop_back();
         cursor += extent + gap;
         remainingExtra -= extra;
         remainingWeight -= weight;
     }
-    AddPackedDashboardGuides(overview, renderer, node, rect, childRects, gap, nodePath);
+    AddPackedDashboardGuides(overview, renderer, guideSheet, node, rect, childRects, gap, nodePath);
 }
 
-PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
+PackedOverview BuildPackedOverview(DashboardRenderer& renderer, const LayoutGuideSheetConfig& guideSheet) {
     PackedNode root = MeasurePackedNode(renderer.Config().layout.structure.cards, renderer);
     const int outerMargin = renderer.ScaleLogical(renderer.Config().layout.dashboard.outerMargin);
     PackedOverview overview;
     overview.rect = RenderRect{0, 0, root.width + outerMargin * 2, root.height + outerMargin * 2};
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     LayoutEditGapAnchor outerMarginAnchor;
     outerMarginAnchor.axis = LayoutGuideAxis::Horizontal;
     outerMarginAnchor.key.widget =
@@ -356,6 +360,7 @@ PackedOverview BuildPackedOverview(DashboardRenderer& renderer) {
     overview.gapAnchors.push_back(std::move(outerMarginAnchor));
     AppendPackedCards(renderer.Config().layout.structure.cards,
         renderer,
+        guideSheet,
         RenderRect{outerMargin, outerMargin, outerMargin + root.width, outerMargin + root.height},
         {},
         overview);
@@ -414,11 +419,12 @@ LayoutEditActiveRegions CollectActiveRegionsFromPackedOverview(const PackedOverv
     return regions;
 }
 
-void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect) {
+void DrawDottedOverviewRect(
+    DashboardRenderer& renderer, const LayoutGuideSheetConfig& guideSheet, const RenderRect& rect) {
     if (rect.IsEmpty()) {
         return;
     }
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     const int padding = ScaleAtLeast(renderer, sheetStyle.overviewDottedPadding, 0);
     const RenderRect drawRect = rect.Inflate(padding, padding);
     const int strokeWidth = ScaleAtLeast(renderer, sheetStyle.overviewDottedStrokeWidth, 1);
@@ -443,6 +449,7 @@ void DrawDottedOverviewRect(DashboardRenderer& renderer, const RenderRect& rect)
 }
 
 void DrawOverviewArtifact(DashboardRenderer& renderer,
+    const LayoutGuideSheetConfig& guideSheet,
     const LayoutGuideSheetPlacementCallout& callout,
     const RenderRect& sourceRect,
     const RenderRect& destRect) {
@@ -450,7 +457,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
         callout.hoverArtifactTargetRect.has_value() ? *callout.hoverArtifactTargetRect : callout.targetRect,
         sourceRect,
         destRect);
-    const LayoutGuideSheetConfig& sheetStyle = renderer.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet;
     RenderRect anchor;
     const bool hasAnchor = callout.hoverAnchorRect.has_value();
     if (hasAnchor) {
@@ -507,7 +514,7 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
     }
     if (callout.hoverAnchorKey.has_value()) {
         if (callout.hoverAnchorDrawTargetOutline) {
-            DrawDottedOverviewRect(renderer, target);
+            DrawDottedOverviewRect(renderer, guideSheet, target);
         }
         const int size = std::max(1,
             std::min(std::max(target.Width(), target.Height()),
@@ -533,15 +540,16 @@ void DrawOverviewArtifact(DashboardRenderer& renderer,
 
 }  // namespace
 
-LayoutGuideSheetRenderer::LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer)
-    : dashboardRenderer_(dashboardRenderer) {}
+LayoutGuideSheetRenderer::LayoutGuideSheetRenderer(
+    DashboardRenderer& dashboardRenderer, const LayoutGuideSheetConfig& guideSheet)
+    : dashboardRenderer_(dashboardRenderer), guideSheet_(guideSheet) {}
 
 LayoutEditActiveRegions LayoutGuideSheetRenderer::CollectOverviewActiveRegions(const SystemSnapshot& snapshot) {
-    PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
+    PackedOverview overview = BuildPackedOverview(dashboardRenderer_, guideSheet_);
     const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-            card.id, card.rect, &metrics, card.suppressTitle);
+        card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
+            dashboardRenderer_, card.id, card.rect, &metrics, card.suppressTitle);
     }
     return CollectActiveRegionsFromPackedOverview(overview);
 }
@@ -558,7 +566,7 @@ bool LayoutGuideSheetRenderer::SavePng(const FilePath& imagePath,
         callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.SaveLayoutGuideSheetSurfacePng(imagePath, width, height, draw);
+            return SaveLayoutGuideSheetSurfacePng(dashboardRenderer_, imagePath, width, height, draw);
         },
         traceDetails,
         errorText,
@@ -576,7 +584,7 @@ bool LayoutGuideSheetRenderer::RenderOffscreen(const SystemSnapshot& snapshot,
         callouts,
         selectedCardIds,
         [&](int width, int height, SurfaceDrawCallback draw) {
-            return dashboardRenderer_.RenderLayoutGuideSheetSurfaceOffscreen(width, height, draw);
+            return RenderLayoutGuideSheetSurfaceOffscreen(dashboardRenderer_, width, height, draw);
         },
         traceDetails,
         errorText,
@@ -607,6 +615,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     if (errorText != nullptr) {
         errorText->clear();
     }
+    ApplyLayoutGuideSheetRendererPalette(dashboardRenderer_.Renderer(), guideSheet_);
 
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
@@ -625,11 +634,11 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     using CardPlacement = LayoutGuideSheetCardPlacement;
     std::vector<CardPlacement> cardPlacements;
     cardPlacements.reserve(selectedCardIds.size() + 1);
-    const std::vector<LayoutGuideSheetCardSummary> cards = dashboardRenderer_.CollectLayoutGuideSheetCardSummaries();
-    PackedOverview overview = BuildPackedOverview(dashboardRenderer_);
+    const std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(dashboardRenderer_);
+    PackedOverview overview = BuildPackedOverview(dashboardRenderer_, guideSheet_);
     for (PackedOverviewCard& card : overview.cards) {
-        card.chromeArtifacts = dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-            card.id, card.rect, nullptr, card.suppressTitle);
+        card.chromeArtifacts = BuildLayoutGuideSheetCardChromeArtifacts(
+            dashboardRenderer_, card.id, card.rect, nullptr, card.suppressTitle);
     }
     for (const std::string& selectedCardId : selectedCardIds) {
         const auto cardIt =
@@ -654,7 +663,7 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
     }
     StableSortCalloutsByPriority(callouts);
 
-    const LayoutGuideSheetConfig& sheetStyle = dashboardRenderer_.Config().layout.layoutGuideSheet;
+    const LayoutGuideSheetConfig& sheetStyle = guideSheet_;
     const int sheetMargin = ScaleNonNegative(dashboardRenderer_, sheetStyle.sheetMargin);
     const int calloutGap = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutGap);
     const int bubblePaddingX = ScaleNonNegative(dashboardRenderer_, sheetStyle.calloutPaddingX);
@@ -863,21 +872,10 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
 
     const auto drawStart = std::chrono::steady_clock::now();
 
-    struct RenderModeScope {
-        DashboardRenderer& renderer;
-        RenderMode previous;
-
-        ~RenderModeScope() {
-            renderer.renderMode_ = previous;
-        }
-    };
-
-    const RenderModeScope renderModeScope{dashboardRenderer_, dashboardRenderer_.renderMode_};
-    dashboardRenderer_.renderMode_ = RenderMode::LayoutGuideSheet;
     const bool saved = renderSurface(sheetWidth, sheetHeight, [&] {
         dashboardRenderer_.Renderer().FillSolidRect(
             RenderRect{0, 0, sheetWidth, sheetHeight}, RenderColorId::Background);
-        dashboardRenderer_.BeginLayoutGuideSheetDynamicArtifacts(overlayState);
+        BeginLayoutGuideSheetDynamicArtifacts(dashboardRenderer_, overlayState);
         const MetricSource& metrics = dashboardRenderer_.ResolveMetrics(snapshot);
         for (const CardPlacement& placement : cardPlacements) {
             if (placement.overview) {
@@ -887,15 +885,15 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                         static_cast<float>(ScaleAtLeast(dashboardRenderer_, sheetStyle.overviewBorderWidth, 1))));
                 for (const PackedOverviewCard& card : overview.cards) {
                     const RenderRect cardRect = TransformRect(card.rect, placement.sourceRect, placement.destRect);
-                    dashboardRenderer_.BuildLayoutGuideSheetCardChromeArtifacts(
-                        card.id, cardRect, &metrics, card.suppressTitle);
+                    BuildLayoutGuideSheetCardChromeArtifacts(
+                        dashboardRenderer_, card.id, cardRect, &metrics, card.suppressTitle);
                 }
                 continue;
             }
-            dashboardRenderer_.DrawLayoutGuideSheetCard(
-                placement.id, placement.sourceRect, placement.destRect, metrics);
+            DrawLayoutGuideSheetCard(
+                dashboardRenderer_, placement.id, placement.sourceRect, placement.destRect, metrics);
         }
-        dashboardRenderer_.ResolveLayoutGuideSheetDynamicArtifactCollisions();
+        ResolveLayoutGuideSheetDynamicArtifactCollisions(dashboardRenderer_);
         DashboardOverlayState drawOverlayState;
         drawOverlayState.showLayoutEditGuides = true;
         drawOverlayState.forceLayoutEditAffordances = true;
@@ -911,7 +909,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                     if (callout.hoverColorParameter.has_value()) {
                         continue;
                     }
-                    DrawOverviewArtifact(dashboardRenderer_, callout, placement.sourceRect, placement.destRect);
+                    DrawOverviewArtifact(
+                        dashboardRenderer_, guideSheet_, callout, placement.sourceRect, placement.destRect);
                 }
                 continue;
             }
@@ -919,8 +918,8 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
             drawOverlayState.hoveredEditableWidget.reset();
             drawOverlayState.hoveredLayoutEditGuide.reset();
             drawOverlayState.hoveredGapEditAnchor.reset();
-            dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                drawOverlayState, placement.sourceRect, placement.destRect, metrics);
+            DrawLayoutGuideSheetOverlay(
+                dashboardRenderer_, drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             for (const Callout& callout : callouts) {
                 if (callout.sourceCardId != placement.id) {
                     continue;
@@ -936,11 +935,11 @@ bool LayoutGuideSheetRenderer::Render(const SystemSnapshot& snapshot,
                 }
                 drawOverlayState.hoveredLayoutEditGuide = callout.hoverLayoutGuide;
                 drawOverlayState.hoveredGapEditAnchor = callout.hoverGapAnchorKey;
-                dashboardRenderer_.DrawLayoutGuideSheetOverlay(
-                    drawOverlayState, placement.sourceRect, placement.destRect, metrics);
+                DrawLayoutGuideSheetOverlay(
+                    dashboardRenderer_, drawOverlayState, placement.sourceRect, placement.destRect, metrics);
             }
         }
-        dashboardRenderer_.EndLayoutGuideSheetDynamicArtifacts();
+        EndLayoutGuideSheetDynamicArtifacts(dashboardRenderer_);
         for (const Callout& callout : callouts) {
             dashboardRenderer_.Renderer().DrawSolidLine(callout.targetAttachment,
                 callout.bubbleAttachment,

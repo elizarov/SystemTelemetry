@@ -2,14 +2,19 @@
 
 #include <chrono>
 #include <string>
+#include <string_view>
 #include <vector>
 
+#include "config/config.h"
 #include "util/file_path.h"
 
 class DashboardRenderer;
 class Trace;
 struct AppConfig;
 struct SystemSnapshot;
+
+bool LoadLayoutGuideSheetConfigText(std::string_view configText, LayoutGuideSheetConfig& guideSheet);
+void ResolveLayoutGuideSheetColors(const AppConfig& config, LayoutGuideSheetConfig& guideSheet);
 
 struct LayoutGuideSheetPipelineStats {
     std::chrono::nanoseconds activeRegions{};
@@ -25,6 +30,7 @@ struct LayoutGuideSheetPipelineStats {
 bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
+    const LayoutGuideSheetConfig& guideSheet,
     double scale,
     Trace& trace,
     std::string* errorText,
@@ -32,5 +38,6 @@ bool SaveLayoutGuideSheetPng(const FilePath& imagePath,
 
 bool RenderLayoutGuideSheetOffscreen(DashboardRenderer& renderer,
     const SystemSnapshot& snapshot,
+    const LayoutGuideSheetConfig& guideSheet,
     std::string* errorText = nullptr,
     LayoutGuideSheetPipelineStats* stats = nullptr);

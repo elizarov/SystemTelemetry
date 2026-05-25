@@ -587,6 +587,8 @@ def root_offset_expr(paths: dict[str, list[str]], root_name: str, owner_type: st
 
 
 ROOT_CONTEXT_BY_NAME: dict[str, StructDesc] = {}
+LAYOUT_GUIDE_SHEET_CONFIG_STRUCT = "LayoutGuideSheetConfig"
+LAYOUT_GUIDE_SHEET_FEATURE_GUARD = "CASEDASH_ENABLE_LAYOUT_GUIDE_SHEET_OUTPUT"
 
 
 def cpp_string(value: str) -> str:
@@ -608,6 +610,9 @@ def generate_runtime_field_array(struct: StructDesc) -> str:
             "},"
         )
     lines.append("};")
+    if struct.name == LAYOUT_GUIDE_SHEET_CONFIG_STRUCT:
+        lines.insert(0, f"#if {LAYOUT_GUIDE_SHEET_FEATURE_GUARD}")
+        lines.append("#endif")
     return "\n".join(lines)
 
 
@@ -715,7 +720,19 @@ def generate_dynamic_callbacks(structs: list[StructDesc], root_name: str, struct
     )
 
 
-def generate_runtime_section_table(structs: list[StructDesc]) -> str:
+def default_section_order(resource_sections: dict[str, list[str]], struct: StructDesc) -> int:
+    section_names = list(resource_sections)
+    if struct.kind == "dynamic":
+        prefix = struct.prefix or ""
+        for index, section_name in enumerate(section_names):
+            if section_name.startswith(prefix):
+                return index
+        return len(section_names)
+    section = struct.section or ""
+    return section_names.index(section) if section in resource_sections else len(section_names)
+
+
+def generate_runtime_section_table(structs: list[StructDesc], resource_sections: dict[str, list[str]]) -> str:
     root = next(item for item in structs if item.kind == "root")
     section_items = flattened_sections(structs)
     lines: list[str] = []
@@ -756,12 +773,13 @@ def generate_runtime_section_table(structs: list[StructDesc]) -> str:
                 kind = "Static"
             item_size = "0"
             key_offset = "0"
-        lines.append(
+        section_lines = [
             "    {"
             f"{cpp_string(section_name)}, "
             f"static_cast<std::uint32_t>({offset}), "
             f"{key_offset}, "
             f"{item_size}, "
+            f"static_cast<std::uint16_t>({default_section_order(resource_sections, struct)}), "
             f"static_cast<std::uint8_t>({len(section_name)}), "
             f"RuntimeConfigSectionKind::{kind}, "
             f"RuntimeConfigSectionCodec::{runtime_section_codec(struct)}, "
@@ -769,7 +787,13 @@ def generate_runtime_section_table(structs: list[StructDesc]) -> str:
             f"{field_count}, "
             f"{callbacks}"
             "},"
-        )
+        ]
+        if struct.name == LAYOUT_GUIDE_SHEET_CONFIG_STRUCT:
+            lines.append(f"#if {LAYOUT_GUIDE_SHEET_FEATURE_GUARD}")
+            lines.extend(section_lines)
+            lines.append("#endif")
+        else:
+            lines.extend(section_lines)
     lines.append("};")
     return "\n".join(lines)
 
@@ -807,7 +831,9 @@ def generate_layout_edit_table(
     return "\n".join(lines)
 
 
-def generate_cpp(structs: list[StructDesc], paths: dict[str, list[str]]) -> str:
+def generate_cpp(
+    structs: list[StructDesc], paths: dict[str, list[str]], resource_sections: dict[str, list[str]]
+) -> str:
     field_structs = [item for item in structs if item.kind in {"static", "dynamic"}]
     lines = [
         '#include "config/config_runtime_fields.h"',
@@ -815,13 +841,17 @@ def generate_cpp(structs: list[StructDesc], paths: dict[str, list[str]]) -> str:
         "#include <cstddef>",
         "#include <span>",
         "",
+        f"#ifndef {LAYOUT_GUIDE_SHEET_FEATURE_GUARD}",
+        f"#define {LAYOUT_GUIDE_SHEET_FEATURE_GUARD} 0",
+        "#endif",
+        "",
         "namespace {",
         "",
     ]
     for struct in field_structs:
         lines.append(generate_runtime_field_array(struct))
         lines.append("")
-    lines.append(generate_runtime_section_table(structs))
+    lines.append(generate_runtime_section_table(structs, resource_sections))
     lines.append("")
     lines.extend(["}  // namespace", ""])
     lines.extend(
@@ -829,6 +859,12 @@ def generate_cpp(structs: list[StructDesc], paths: dict[str, list[str]]) -> str:
             "std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors() {",
             "    return kRuntimeConfigSections;",
             "}",
+            "",
+            f"#if {LAYOUT_GUIDE_SHEET_FEATURE_GUARD}",
+            "std::span<const RuntimeConfigFieldDescriptor> LayoutGuideSheetRuntimeConfigFields() {",
+            "    return kLayoutGuideSheetConfigFields;",
+            "}",
+            "#endif",
             "",
         ]
     )
@@ -959,7 +995,7 @@ def main() -> int:
         ROOT_CONTEXT_BY_NAME = {item.name: item for item in structs}
         paths = build_owner_paths(structs)
         layout_edit_parameters = resolve_layout_edit_parameters(args.layout_edit_parameters, structs)
-        cpp = generate_cpp(structs, paths)
+        cpp = generate_cpp(structs, paths, resources)
         layout_edit_cpp = generate_layout_edit_cpp(structs, paths, layout_edit_parameters)
         manifest = json.dumps(build_manifest(structs, paths, layout_edit_parameters), indent=2) + "\n"
         write_if_changed(args.output_cpp, cpp)

@@ -232,7 +232,6 @@ struct LayoutCardConfig {
 // config_meta: container
 struct LayoutConfig {
     ColorsConfig colors{};
-    LayoutGuideSheetConfig layoutGuideSheet{};
     std::vector<ThemeConfig> themes{};
     DashboardSectionConfig dashboard{};
     CardStyleConfig cardStyle{};

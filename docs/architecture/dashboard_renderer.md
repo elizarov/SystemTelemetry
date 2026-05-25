@@ -19,7 +19,7 @@
 - Keep widget animation sample types, transition details, and render geometry payloads out of the dashboard-renderer boundary; those details stay package-private under `widget`.
 - Render selected and hovered layout-edit highlights, layout and widget guides, gap anchors, size-similarity indicators, dotted outlines, and dragged container-child replay.
 - Produce copied `LayoutEditActiveRegions` snapshots for live layout-edit mode and diagnostics screenshot validation.
-- Supply resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by the `layout_guide_sheet` package.
+- Supply resolved-card summaries, card-chrome artifact hooks, and rendering hooks needed by the `layout_guide_sheet` package from `layout_guide_sheet_support.cpp`, which is linked only into headless, tests, and benchmarks.
 
 ## Boundaries
 

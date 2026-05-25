@@ -4,10 +4,8 @@
 
 #include <algorithm>
 #include <array>
-#include <chrono>
 #include <cstdint>
 #include <cstring>
-#include <future>
 #include <intrin.h>
 #include <iterator>
 #include <memory>
@@ -21,7 +19,6 @@
 #include "telemetry/impl/system_info_support.h"
 #include "util/elevated_process.h"
 #include "util/file_path.h"
-#include "util/lightweight_mutex.h"
 #include "util/resource_strings.h"
 #include "util/strings.h"
 #include "util/text_encoding.h"
@@ -40,7 +37,6 @@ constexpr DWORD kPipeConnectTimeoutMs = 100;
 constexpr DWORD kPipeReadChunkBytes = 4096;
 constexpr DWORD kMaximumPipeResponseBytes = 16 * 1024;
 constexpr int kSensorRetrySampleInterval = 10;
-constexpr std::chrono::seconds kDirectSnapshotRefreshInterval{5};
 constexpr DWORD kWmiQueryTimeoutMs = 1500;
 constexpr char kLenovoDiagnosticsDriverServiceName[] = "LenovoDiagnosticsDriver";
 constexpr wchar_t kLenovoGameZoneNamespace[] = L"ROOT\\WMI";         // WMI COM BSTR boundary has no A API.
@@ -61,15 +57,6 @@ struct LenovoSensorSnapshot {
 
 struct LenovoGameZoneFanValue {
     std::uint32_t rpm = 0;
-};
-
-struct LenovoServiceSnapshotState {
-    LightweightMutex mutex;
-    bool running = false;
-    bool done = false;
-    bool hasResponse = false;
-    std::string diagnostics;
-    LenovoSensorSnapshot snapshot;
 };
 
 class Handle {
@@ -998,66 +985,6 @@ LenovoSensorSnapshot SnapshotFromServiceSample(const BoardVendorTelemetrySample&
     return snapshot;
 }
 
-struct LenovoServiceSnapshotThreadContext {
-    std::shared_ptr<LenovoServiceSnapshotState> state;
-};
-
-DWORD WINAPI LenovoServiceSnapshotThread(void* contextPtr) {
-    std::unique_ptr<LenovoServiceSnapshotThreadContext> context(
-        static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr));
-    if (context == nullptr || context->state == nullptr) {
-        return 1;
-    }
-
-    std::string diagnostics;
-    std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(diagnostics);
-    LenovoSensorSnapshot snapshot;
-    const bool hasResponse = serviceSample.has_value();
-    if (hasResponse) {
-        snapshot = SnapshotFromServiceSample(*serviceSample);
-        diagnostics = snapshot.diagnostics;
-    }
-
-    const LightweightMutexLock lock(context->state->mutex);
-    context->state->snapshot = std::move(snapshot);
-    context->state->diagnostics = std::move(diagnostics);
-    context->state->hasResponse = hasResponse;
-    context->state->done = true;
-    context->state->running = false;
-    return 0;
-}
-
-void StartLenovoServiceSnapshot(std::shared_ptr<LenovoServiceSnapshotState> state) {
-    {
-        const LightweightMutexLock lock(state->mutex);
-        if (state->running) {
-            return;
-        }
-        state->running = true;
-        state->done = false;
-        state->hasResponse = false;
-        state->diagnostics.clear();
-        state->snapshot = {};
-    }
-
-    auto context = std::make_unique<LenovoServiceSnapshotThreadContext>();
-    context->state = std::move(state);
-    HANDLE thread = CreateThread(nullptr, 0, LenovoServiceSnapshotThread, context.get(), 0, nullptr);
-    if (thread != nullptr) {
-        context.release();
-        CloseHandle(thread);
-        return;
-    }
-
-    const DWORD error = GetLastError();
-    const LightweightMutexLock lock(context->state->mutex);
-    context->state->diagnostics = FormatText(
-        RES_STR("Failed to start CashDash service Lenovo direct-driver refresh: %s"), FormatWin32Error(error).c_str());
-    context->state->hasResponse = false;
-    context->state->done = true;
-    context->state->running = false;
-}
-
 BoardVendorTelemetrySample CreateRawLenovoSampleFromSnapshot(
     const BoardVendorInfo& info, const LenovoSensorSnapshot& snapshot) {
     BoardVendorTelemetrySample sample;
@@ -1076,19 +1003,10 @@ BoardVendorTelemetrySample CreateRawLenovoSampleFromSnapshot(
 
 class LenovoDiagnosticsDriverBoardTelemetryProvider final : public BoardVendorTelemetryProvider {
 public:
-    LenovoDiagnosticsDriverBoardTelemetryProvider(
-        Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options)
-        : trace_(trace), info_(std::move(info)), synchronousSamples_(options.synchronousSamples) {}
-
-    ~LenovoDiagnosticsDriverBoardTelemetryProvider() override {
-        if (pendingDirectSnapshot_.valid()) {
-            pendingDirectSnapshot_.wait();
-        }
-    }
+    LenovoDiagnosticsDriverBoardTelemetryProvider(Trace& trace, BoardVendorInfo info)
+        : trace_(trace), info_(std::move(info)) {}
 
     bool Initialize(const BoardTelemetrySettings& settings) override {
-        CompleteReadyDirectSnapshotDuringInitialize();
-
         settings_ = settings;
         wantsDriverTemperature_ = !settings_.requestedTemperatureNames.empty();
         wantsGameZoneFans_ = !settings_.requestedFanNames.empty();
@@ -1151,9 +1069,6 @@ public:
         if (!initialized_ || !diagnosticsDriverDirectory_.has_value()) {
             return sample;
         }
-        if (synchronousSamples_) {
-            return SampleSynchronously();
-        }
         if (!processElevated_ && wantsDriverTemperature_) {
             return SampleThroughService(sample);
         }
@@ -1161,26 +1076,52 @@ public:
     }
 
 private:
-    void CompleteReadyDirectSnapshotDuringInitialize() {
-        if (!pendingDirectSnapshot_.valid()) {
-            return;
-        }
-        if (pendingDirectSnapshot_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_pending_during_initialize"));
-            return;
+    BoardVendorTelemetrySample SampleThroughService(BoardVendorTelemetrySample sample) {
+        std::string serviceDiagnostics;
+        if (!serviceUsable_) {
+            ++serviceRetrySample_;
+            if (serviceRetrySample_ < kSensorRetrySampleInterval) {
+                serviceDiagnostics =
+                    ResourceStringText(RES_STR("CashDash service Lenovo direct-driver path is waiting for retry."));
+                ApplyDriverPermissionRequiredSample(sample, serviceDiagnostics);
+                return sample;
+            }
+            serviceRetrySample_ = 0;
         }
 
-        cachedDirectSnapshot_ = pendingDirectSnapshot_.get();
-        hasCachedDirectSnapshot_ = cachedDirectSnapshot_.success;
+        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("service_sample_refresh_started"));
+        std::optional<BoardVendorTelemetrySample> serviceSample = QueryServiceBoardSample(serviceDiagnostics);
+        if (!serviceSample.has_value()) {
+            serviceUsable_ = false;
+            serviceRetrySample_ = 0;
+            trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
+                RES_STR("service_sample_failed diagnostics=\"%s\""),
+                serviceDiagnostics.c_str());
+            ApplyDriverPermissionRequiredSample(sample, serviceDiagnostics);
+            return sample;
+        }
+
+        serviceUsable_ = true;
+        serviceRetrySample_ = kSensorRetrySampleInterval;
+        LenovoSensorSnapshot snapshot = SnapshotFromServiceSample(*serviceSample);
         trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
-            RES_STR("direct_snapshot_ready_during_initialize available=%d"),
-            cachedDirectSnapshot_.success ? 1 : 0);
+            RES_STR("service_sample_done available=%d diagnostics=\"%s\""),
+            snapshot.success ? 1 : 0,
+            snapshot.diagnostics.c_str());
+        if (snapshot.success) {
+            ApplySnapshotToSample(snapshot, sample);
+            return sample;
+        }
+
+        ApplyFanOnlySample(sample);
+        diagnostics_ = snapshot.diagnostics.empty() ? serviceDiagnostics : snapshot.diagnostics;
+        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
+        return sample;
     }
 
-    BoardVendorTelemetrySample SampleSynchronously() {
-        BoardVendorTelemetrySample sample = CreateBaseSample();
-        LenovoSensorSnapshot snapshot;
+    BoardVendorTelemetrySample SampleDirectly(BoardVendorTelemetrySample sample) {
         std::string directDiagnostics;
+        LenovoSensorSnapshot snapshot;
         if (wantsDriverTemperature_) {
             trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_refresh_started"));
             snapshot = CaptureLenovoDriverCpuTemperatureSensors(trace_, *diagnosticsDriverDirectory_);
@@ -1198,64 +1139,6 @@ private:
 
         diagnostics_ =
             FormatText(RES_STR("Lenovo Diagnostics Driver unavailable. direct=\"%s\""), directDiagnostics.c_str());
-        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
-        return sample;
-    }
-
-    BoardVendorTelemetrySample SampleThroughService(BoardVendorTelemetrySample sample) {
-        std::string serviceDiagnostics;
-        CompletePendingServiceSnapshot(serviceDiagnostics);
-        if (hasCachedServiceSnapshot_) {
-            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
-            if (IsServiceSnapshotRunning()) {
-                sample.diagnostics = FormatText(RES_STR("%s refresh=running service=\"%s\""),
-                    sample.diagnostics.c_str(),
-                    serviceDiagnostics.c_str());
-            }
-            return sample;
-        }
-
-        MaybeStartServiceSnapshot(serviceDiagnostics);
-        const bool serviceSnapshotRunning = IsServiceSnapshotRunning();
-        if (hasCachedServiceSnapshot_) {
-            ApplySnapshotToSample(cachedServiceSnapshot_, sample);
-            return sample;
-        }
-
-        if (!serviceUsable_) {
-            ApplyDriverPermissionRequiredSample(sample, serviceDiagnostics, serviceSnapshotRunning);
-            return sample;
-        }
-
-        ApplyFanOnlySample(sample);
-        diagnostics_ = serviceDiagnostics.empty()
-                           ? ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is waiting."))
-                           : serviceDiagnostics;
-        sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
-        return sample;
-    }
-
-    BoardVendorTelemetrySample SampleDirectly(BoardVendorTelemetrySample sample) {
-        std::string directDiagnostics;
-        CompletePendingDirectSnapshot(directDiagnostics);
-        if (hasCachedDirectSnapshot_) {
-            ApplySnapshotToSample(cachedDirectSnapshot_, sample);
-            if (pendingDirectSnapshot_.valid()) {
-                sample.diagnostics = FormatText(RES_STR("%s refresh=running"), sample.diagnostics.c_str());
-            }
-            return sample;
-        }
-
-        MaybeStartDirectSnapshot(directDiagnostics);
-        if (hasCachedDirectSnapshot_) {
-            ApplySnapshotToSample(cachedDirectSnapshot_, sample);
-            return sample;
-        }
-
-        ApplyFanOnlySample(sample);
-        diagnostics_ = directDiagnostics.empty()
-                           ? ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is waiting."))
-                           : directDiagnostics;
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
         return sample;
     }
@@ -1320,14 +1203,11 @@ private:
     }
 
     void ApplyDriverPermissionRequiredSample(
-        BoardVendorTelemetrySample& sample, const std::string& serviceDiagnostics, bool serviceSnapshotRunning) {
+        BoardVendorTelemetrySample& sample, const std::string& serviceDiagnostics) {
         diagnostics_ = FormatText(
             RES_STR(
                 "Lenovo Diagnostics Driver requires administrator privileges without CashDashService. service=\"%s\""),
             serviceDiagnostics.c_str());
-        if (serviceSnapshotRunning) {
-            AppendDiagnosticsSuffix(diagnostics_, "service_refresh", "running");
-        }
 
         sample.temperatures = temperatureMetricTemplate_;
         sample.fans = fanMetricTemplate_;
@@ -1338,147 +1218,6 @@ private:
         MarkMissingMetricsPermissionRequired(sample.fans);
         sample.available = HasAvailableMetricValue(sample.temperatures) || HasAvailableMetricValue(sample.fans);
         sample.diagnostics = FormatText(RES_STR("%s%s"), diagnostics_.c_str(), requestedDiagnosticsSuffix_.c_str());
-    }
-
-    bool IsServiceSnapshotRunning() {
-        const LightweightMutexLock lock(serviceSnapshotState_->mutex);
-        return serviceSnapshotState_->running;
-    }
-
-    void CompletePendingServiceSnapshot(std::string& diagnostics) {
-        LenovoSensorSnapshot snapshot;
-        bool done = false;
-        bool hasResponse = false;
-        {
-            const LightweightMutexLock lock(serviceSnapshotState_->mutex);
-            if (serviceSnapshotState_->running && diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is running."));
-            }
-            if (!serviceSnapshotState_->done) {
-                return;
-            }
-
-            snapshot = std::move(serviceSnapshotState_->snapshot);
-            diagnostics = std::move(serviceSnapshotState_->diagnostics);
-            hasResponse = serviceSnapshotState_->hasResponse;
-            serviceSnapshotState_->done = false;
-            serviceSnapshotState_->hasResponse = false;
-            done = true;
-        }
-
-        if (!done) {
-            return;
-        }
-
-        lastServiceSnapshotStart_ = std::chrono::steady_clock::now();
-        if (!hasResponse) {
-            serviceUsable_ = false;
-            serviceRetrySample_ = 0;
-            cachedServiceSnapshot_ = {};
-            hasCachedServiceSnapshot_ = false;
-            trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
-                RES_STR("service_sample_failed diagnostics=\"%s\""),
-                diagnostics.c_str());
-            return;
-        }
-
-        serviceUsable_ = true;
-        serviceRetrySample_ = kSensorRetrySampleInterval;
-        trace_.WriteFmt(TracePrefix::LenovoDiagnosticsDriver,
-            RES_STR("service_sample_done available=%d diagnostics=\"%s\""),
-            snapshot.success ? 1 : 0,
-            snapshot.diagnostics.c_str());
-        if (snapshot.success) {
-            cachedServiceSnapshot_ = std::move(snapshot);
-            hasCachedServiceSnapshot_ = true;
-        }
-    }
-
-    void MaybeStartServiceSnapshot(std::string& diagnostics) {
-        {
-            const LightweightMutexLock lock(serviceSnapshotState_->mutex);
-            if (serviceSnapshotState_->running) {
-                if (diagnostics.empty()) {
-                    diagnostics =
-                        ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is running."));
-                }
-                return;
-            }
-        }
-
-        if (!serviceUsable_) {
-            ++serviceRetrySample_;
-            if (serviceRetrySample_ < kSensorRetrySampleInterval) {
-                if (diagnostics.empty()) {
-                    diagnostics =
-                        ResourceStringText(RES_STR("CashDash service Lenovo direct-driver path is waiting for retry."));
-                }
-                return;
-            }
-            serviceRetrySample_ = 0;
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        if (lastServiceSnapshotStart_.has_value() &&
-            now - *lastServiceSnapshotStart_ < kDirectSnapshotRefreshInterval) {
-            if (diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh is waiting."));
-            }
-            return;
-        }
-
-        lastServiceSnapshotStart_ = now;
-        diagnostics = ResourceStringText(RES_STR("CashDash service Lenovo direct-driver refresh started."));
-        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("service_sample_refresh_started"));
-        StartLenovoServiceSnapshot(serviceSnapshotState_);
-    }
-
-    void CompletePendingDirectSnapshot(std::string& diagnostics) {
-        if (!pendingDirectSnapshot_.valid()) {
-            return;
-        }
-        if (pendingDirectSnapshot_.wait_for(std::chrono::seconds(0)) != std::future_status::ready) {
-            diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is running."));
-            return;
-        }
-
-        LenovoSensorSnapshot snapshot = pendingDirectSnapshot_.get();
-        diagnostics = snapshot.diagnostics;
-        if (snapshot.success) {
-            cachedDirectSnapshot_ = std::move(snapshot);
-            hasCachedDirectSnapshot_ = true;
-        } else if (!hasCachedDirectSnapshot_) {
-            diagnostics_ = snapshot.diagnostics;
-        }
-    }
-
-    void MaybeStartDirectSnapshot(std::string& diagnostics) {
-        if (pendingDirectSnapshot_.valid() || !diagnosticsDriverDirectory_.has_value()) {
-            return;
-        }
-        if (!wantsDriverTemperature_) {
-            diagnostics =
-                ResourceStringText(RES_STR("No Lenovo Diagnostics Driver temperature values were requested."));
-            return;
-        }
-
-        const auto now = std::chrono::steady_clock::now();
-        if (lastDirectSnapshotStart_.has_value() && now - *lastDirectSnapshotStart_ < kDirectSnapshotRefreshInterval) {
-            if (diagnostics.empty()) {
-                diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh is waiting."));
-            }
-            return;
-        }
-
-        const FilePath addinDirectory = *diagnosticsDriverDirectory_;
-        lastDirectSnapshotStart_ = now;
-        diagnostics = ResourceStringText(RES_STR("Lenovo Diagnostics Driver refresh started."));
-        trace_.Write(TracePrefix::LenovoDiagnosticsDriver, RES_STR("direct_snapshot_refresh_started"));
-        pendingDirectSnapshot_ = std::async(std::launch::async, [this, addinDirectory]() {
-            LenovoSensorSnapshot snapshot = CaptureLenovoDriverCpuTemperatureSensors(trace_, addinDirectory);
-            AppendGameZoneFans(snapshot);
-            return snapshot;
-        });
     }
 
     std::string ResolveTemperatureSensorName(const std::string& logicalName) const {
@@ -1559,22 +1298,13 @@ private:
     std::vector<NamedScalarMetric> temperatureMetricTemplate_;
     BoardMetricIndexBySourceName requestedFanIndexBySourceName_;
     BoardMetricIndexBySourceName requestedTemperatureIndexBySourceName_;
-    std::shared_ptr<LenovoServiceSnapshotState> serviceSnapshotState_ = std::make_shared<LenovoServiceSnapshotState>();
-    LenovoSensorSnapshot cachedServiceSnapshot_;
-    LenovoSensorSnapshot cachedDirectSnapshot_;
-    std::future<LenovoSensorSnapshot> pendingDirectSnapshot_;
-    std::optional<std::chrono::steady_clock::time_point> lastServiceSnapshotStart_;
-    std::optional<std::chrono::steady_clock::time_point> lastDirectSnapshotStart_;
     int serviceRetrySample_ = kSensorRetrySampleInterval;
     int gameZoneFanRetrySample_ = kSensorRetrySampleInterval;
     bool serviceUsable_ = true;
     bool gameZoneFanUsable_ = true;
     bool wantsDriverTemperature_ = false;
     bool wantsGameZoneFans_ = false;
-    bool hasCachedServiceSnapshot_ = false;
-    bool hasCachedDirectSnapshot_ = false;
     bool processElevated_ = IsCurrentProcessElevated();
-    bool synchronousSamples_ = false;
     bool initialized_ = false;
 };
 
@@ -1607,7 +1337,6 @@ BoardVendorTelemetrySample CaptureLenovoBoardServiceSample(Trace& trace, BoardVe
     return CreateRawLenovoSampleFromSnapshot(info, snapshot);
 }
 
-std::unique_ptr<BoardVendorTelemetryProvider> CreateLenovoBoardTelemetryProvider(
-    Trace& trace, BoardVendorInfo info, const BoardVendorTelemetryProviderOptions& options) {
-    return std::make_unique<LenovoDiagnosticsDriverBoardTelemetryProvider>(trace, std::move(info), options);
+std::unique_ptr<BoardVendorTelemetryProvider> CreateLenovoBoardTelemetryProvider(Trace& trace, BoardVendorInfo info) {
+    return std::make_unique<LenovoDiagnosticsDriverBoardTelemetryProvider>(trace, std::move(info));
 }

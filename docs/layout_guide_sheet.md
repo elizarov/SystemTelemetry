@@ -113,6 +113,7 @@ User-visible labels and documentation refer to the generated image as a `layout 
 - With the shipped palette, panel guide chrome uses its normal layout-edit hover colors, leader lines use `callout_leader_color` (`#FFE45CE6`), bubble fill uses `callout_fill_color` (`#06080BF5`), bubble border uses `callout_border_color` (`#B88A22FF`), parameter text uses `callout_parameter_color` (`#FFFFFFFF`), and description text uses `callout_description_color` (`#A5B4BEFF`).
 - Only callout-specific chrome, meaning leader lines and help bubbles, receives distinct layout guide sheet styling.
 - Layout guide sheet callout colors come directly from those `[layout_guide_sheet]` entries rather than from adjusted variants of other colors, and they are not exposed in the layout-edit dialog.
+- The `[layout_guide_sheet]` defaults live in a headless-only embedded resource. `CaseDashHeadless.exe` loads that resource before export, while `CaseDash.exe` does not link or load it.
 - Leader lines use the configured `leader_stroke_width`, are solid and square-capped, and are drawn above card content but below bubble borders and text.
 - Leader lines use `callout_leader_color` exactly as configured.
 - The leader starts at the representative target rectangle or anchor shape and ends at the closest compatible point on the bubble border.
@@ -159,9 +160,10 @@ The algorithm favors readable bubbles and deterministic output while preserving 
 
 ## Diagnostics Behavior
 
-- The layout guide sheet is requested explicitly with `/layout-guide-sheet[:path]` and does not appear as a side effect of `/screenshot`.
-- A headless `/exit` run that requests a layout guide sheet exports it once and exits.
-- A UI-attached run that requests a layout guide sheet refreshes it on the same cadence as other diagnostics screenshots unless the implementation defines a cheaper explicit-refresh policy in diagnostics docs.
+- The layout guide sheet is requested explicitly with `CaseDashHeadless.exe /layout-guide-sheet[:path]` and does not appear as a side effect of `/screenshot`.
+- `CaseDashHeadless.exe` behaves as a one-shot diagnostics run, so a run that requests a layout guide sheet exports it once and exits.
+- Example command: `CaseDashHeadless.exe /default-config /fake /layout-guide-sheet:build\diagnostics\guide.png`.
+- `CaseDash.exe` rejects `/layout-guide-sheet` and keeps layout guide sheet generation out of the shipped dashboard executable.
 - Explicit output paths resolve by the same current-working-directory rules as other diagnostics outputs.
 - The default output filename is `casedash_layout_guide_sheet.png`.
 - The output overwrite behavior matches ordinary screenshot export.

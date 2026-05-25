@@ -23,12 +23,14 @@ struct RenderColor {
 class RendererPalette {
 public:
     RendererPalette();
-    explicit RendererPalette(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet);
+    explicit RendererPalette(const ColorsConfig& colors);
 
-    void Rebuild(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet);
+    void Rebuild(const ColorsConfig& colors);
     const RenderColor& Get(RenderColorId id) const;
 
 private:
+    friend void RebuildLayoutGuideSheetColors(RendererPalette& palette, const LayoutGuideSheetConfig& layoutGuideSheet);
+
     static constexpr std::size_t kColorCount = static_cast<std::size_t>(RenderColorId::Count);
 
     std::array<RenderColor, kColorCount> colors_{};

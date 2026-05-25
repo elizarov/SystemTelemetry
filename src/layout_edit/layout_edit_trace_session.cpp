@@ -1,6 +1,7 @@
 #include "layout_edit/layout_edit_trace_session.h"
 
 #include "util/numeric_format.h"
+#include "util/resource_strings.h"
 #include "util/text_format.h"
 
 namespace {
@@ -15,14 +16,13 @@ double DurationMilliseconds(std::chrono::nanoseconds value) {
 
 }  // namespace
 
-void LayoutEditTraceSession::Begin(Trace& trace, const char* kind, const std::string& detail) {
+void LayoutEditTraceSession::Begin(Trace& trace, ResourceStringId kind, const std::string& detail) {
     *this = {};
     active_ = true;
-    kind_ = kind;
+    kind_ = ResourceStringText(kind);
     detail_ = detail;
     startedAt_ = std::chrono::steady_clock::now();
-    trace.WriteFmt(
-        TracePrefix::LayoutEditDrag, RES_STR("start kind=\"%s\" detail=\"%s\""), kind_.c_str(), detail_.c_str());
+    trace.WriteFmt(TracePrefix::Profile, RES_STR("start kind=\"%s\" detail=\"%s\""), kind_.c_str(), detail_.c_str());
 }
 
 void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chrono::nanoseconds elapsed) {
@@ -53,7 +53,7 @@ void LayoutEditTraceSession::Record(LayoutEditHost::TracePhase phase, std::chron
     ++stats->samples;
 }
 
-void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
+void LayoutEditTraceSession::End(Trace& trace, ResourceStringId reason) {
     if (!active_) {
         *this = {};
         return;
@@ -64,21 +64,25 @@ void LayoutEditTraceSession::End(Trace& trace, const char* reason) {
             return;
         }
         const double averageMs = DurationMilliseconds(stats.total) / static_cast<double>(stats.samples);
-        AppendFormat(
-            text, " avg_%s_ms=%s %s_samples=%zu", name, FormatMilliseconds(averageMs).c_str(), name, stats.samples);
+        AppendFormat(text,
+            RES_STR(" avg_%s_ms=%s %s_samples=%zu"),
+            name,
+            FormatMilliseconds(averageMs).c_str(),
+            name,
+            stats.samples);
     };
 
     const auto elapsed = std::chrono::steady_clock::now() - startedAt_;
-    std::string summary = FormatText("end kind=\"%s\" detail=\"%s\" reason=\"%s\" elapsed_ms=%s",
+    std::string summary = FormatText(RES_STR("end kind=\"%s\" detail=\"%s\" reason=\"%s\" elapsed_ms=%s"),
         kind_.c_str(),
         detail_.c_str(),
-        reason,
+        ResourceStringText(reason),
         FormatMilliseconds(DurationMilliseconds(std::chrono::duration_cast<std::chrono::nanoseconds>(elapsed)))
             .c_str());
     appendAverage(summary, "snap", snap_);
     appendAverage(summary, "apply", apply_);
     appendAverage(summary, "paint_total", paintTotal_);
     appendAverage(summary, "paint_draw", paintDraw_);
-    trace.Write(TracePrefix::LayoutEditDrag, summary);
+    trace.Write(TracePrefix::Profile, summary);
     *this = {};
 }

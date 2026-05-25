@@ -15,7 +15,7 @@
     "roots": ["src"],
     "header_suffix_group": "headers",
     "implementation_suffix_group": "implementations",
-    "cpp_without_header_allowlist": ["src/main/main.cpp"],
+    "cpp_without_header_allowlist": ["src/main/main.cpp", "src/headless/headless_main.cpp"],
     "control_keywords": ["catch", "for", "if", "switch", "while"]
   },
   "include_style": {
@@ -37,9 +37,10 @@
     "universal_package_dependencies": ["util"],
     "package_dependency_limits": {
       "main": ["dashboard", "diagnostics", "display"],
+      "headless": ["diagnostics", "layout_guide_sheet"],
       "dashboard": ["config", "diagnostics", "display", "layout_edit", "layout_edit_dialog", "layout_model", "telemetry", "widget"],
       "display": ["config", "diagnostics", "telemetry"],
-      "diagnostics": ["config", "dashboard_renderer", "layout_edit", "layout_guide_sheet", "renderer", "telemetry", "widget"],
+      "diagnostics": ["config", "dashboard_renderer", "layout_edit", "renderer", "telemetry", "widget"],
       "layout_edit_dialog": ["config", "layout_edit", "layout_model", "telemetry", "widget"],
       "layout_guide_sheet": ["config", "dashboard_renderer", "layout_edit", "layout_model", "renderer", "widget"],
       "dashboard_renderer": ["config", "layout_model", "renderer", "telemetry", "widget"],

@@ -10,6 +10,7 @@
 #include "util/function_ref.h"
 
 class DashboardRenderer;
+struct LayoutGuideSheetConfig;
 struct SystemSnapshot;
 
 struct LayoutGuideSheetRenderStats {
@@ -20,7 +21,7 @@ struct LayoutGuideSheetRenderStats {
 
 class LayoutGuideSheetRenderer {
 public:
-    explicit LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer);
+    LayoutGuideSheetRenderer(DashboardRenderer& dashboardRenderer, const LayoutGuideSheetConfig& guideSheet);
 
     bool SavePng(const FilePath& imagePath,
         const SystemSnapshot& snapshot,
@@ -50,4 +51,5 @@ private:
         LayoutGuideSheetRenderStats* stats);
 
     DashboardRenderer& dashboardRenderer_;
+    const LayoutGuideSheetConfig& guideSheet_;
 };

@@ -17,7 +17,6 @@
 #include "dashboard/dashboard_window_chrome.h"
 #include "display/monitor.h"
 #include "layout_edit/layout_edit_controller.h"
-#include "layout_edit/layout_edit_trace_session.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
 #include "util/scale.h"
@@ -110,9 +109,9 @@ private:
     void SyncDashboardMoveOverlayState();
     bool CreateDashboardTooltip();
     void DestroyDashboardTooltip();
-    void HideLayoutEditTooltip(std::string_view reason = "layout_edit_inactive");
-    void HideTitlebarTooltip(std::string_view reason = "titlebar_inactive");
-    void HideTooltipForLayoutEditUpdate(std::string_view reason);
+    void HideLayoutEditTooltip();
+    void HideTitlebarTooltip();
+    void HideTooltipForLayoutEditUpdate();
     void SetLayoutEditTooltipRefreshSuppressed(bool suppressed);
     void UpdateLayoutEditTooltip();
     void RefreshLayoutEditHoverFromCursor();
@@ -122,9 +121,6 @@ private:
     void RedrawMoveFrame();
     void RedrawLayoutEditDragFrame();
     void RelayLayoutEditTooltipMouseMessage(UINT message, WPARAM wParam, LPARAM lParam);
-    void TraceLayoutEditUiEvent(TracePrefix prefix, const char* event, const std::string& details = {}) const;
-    void TraceLayoutEditUiEventFmt(TracePrefix prefix, const char* event, const char* format, ...) const;
-    std::string BuildLayoutEditUiTraceState() const;
     bool CreateTrayIcon();
     void RemoveTrayIcon();
     HICON LoadAppIcon(int width, int height);
@@ -218,9 +214,9 @@ private:
     std::optional<DisplayResizeCorner> HitTestDashboardResizeHandle(RenderPoint clientPoint) const;
     std::optional<DisplayResizeCorner> HitTestNativeTitlebarResizeHandle(POINT clientPoint) const;
 
-    void BeginLayoutEditTraceSession(const char* kind, const std::string& detail) override;
+    void BeginLayoutEditTraceSession(ResourceStringId kind, const std::string& detail) override;
     void RecordLayoutEditTracePhase(TracePhase phase, std::chrono::nanoseconds elapsed) override;
-    void EndLayoutEditTraceSession(const char* reason) override;
+    void EndLayoutEditTraceSession(ResourceStringId reason) override;
 
     const AppConfig& LayoutEditConfig() const override;
     DashboardOverlayState& LayoutDashboardOverlayState() override;
@@ -318,5 +314,4 @@ private:
     LightweightMutex pendingTelemetryLock_;
     TelemetryUpdate pendingTelemetryUpdate_{};
     bool hasPendingTelemetryUpdate_ = false;
-    LayoutEditTraceSession layoutEditTraceSession_{};
 };

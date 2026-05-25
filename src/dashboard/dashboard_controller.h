@@ -71,11 +71,10 @@ public:
     const DashboardSessionState& State() const;
     bool InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     bool HandleTelemetryUpdate(DashboardShellHost& shell, const TelemetryUpdate& update);
-    bool WriteDiagnosticsOutputs();
+    bool WriteDiagnosticsOutputs(DashboardShellHost& shell);
     bool ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveDumpAs(DashboardShellHost& shell);
     void SaveScreenshotAs(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
-    void SaveLayoutGuideSheetAs(DashboardShellHost& shell);
     void SaveFullConfigAs(DashboardShellHost& shell);
     bool IsAutoStartEnabled() const;
     void ToggleAutoStart(DashboardShellHost& shell);

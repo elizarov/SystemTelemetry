@@ -49,6 +49,27 @@
   {
     "check": "source_dependency",
     "type": "finding",
+    "location": "diagnostics/violations -> layout_guide_sheet/public",
+    "kind": "package-dependency-diagnostics",
+    "message": "diagnostics/violations is in the diagnostics package and must depend only on diagnostics, config, dashboard_renderer, layout_edit, renderer, telemetry, util, or widget modules, not project module layout_guide_sheet/public."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "headless/violations -> dashboard/violations",
+    "kind": "package-dependency-headless",
+    "message": "headless/violations is in the headless package and must depend only on headless, diagnostics, layout_guide_sheet, or util modules, not project module dashboard/violations."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
+    "location": "headless/violations -> layout_edit_dialog/dialog",
+    "kind": "package-dependency-headless",
+    "message": "headless/violations is in the headless package and must depend only on headless, diagnostics, layout_guide_sheet, or util modules, not project module layout_edit_dialog/dialog."
+  },
+  {
+    "check": "source_dependency",
+    "type": "finding",
     "location": "renderer/render -> dashboard/violations",
     "kind": "package-dependency-renderer",
     "message": "renderer/render is in the renderer package and must depend only on renderer, config, or util modules, not project module dashboard/violations."

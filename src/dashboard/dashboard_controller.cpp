@@ -20,6 +20,7 @@
 #include "telemetry/metrics.h"
 #include "util/command_line.h"
 #include "util/elevated_process.h"
+#include "util/resource_strings.h"
 #include "util/scale.h"
 #include "util/strings.h"
 #include "util/temp_file.h"
@@ -96,7 +97,7 @@ bool DisplayScalesEqual(double left, double right) {
 }
 
 void TraceDisplayPositionUpdate(Trace& trace,
-    std::string_view source,
+    ResourceStringId source,
     const DisplayConfig& previous,
     const DisplayConfig& current,
     const MonitorPlacementInfo* placement = nullptr) {
@@ -106,10 +107,9 @@ void TraceDisplayPositionUpdate(Trace& trace,
     }
 
     trace.WriteFmt(TracePrefix::DisplayPlacement,
-        RES_STR("config_position source=\"%.*s\" monitor=\"%s\" old_monitor=\"%s\" position=%d,%d "
+        RES_STR("config_position source=\"%s\" monitor=\"%s\" old_monitor=\"%s\" position=%d,%d "
                 "old_position=%d,%d scale=%.6f old_scale=%.6f"),
-        static_cast<int>(source.size()),
-        source.data(),
+        ResourceStringText(source),
         current.monitorName.c_str(),
         previous.monitorName.c_str(),
         current.position.x,
@@ -120,10 +120,9 @@ void TraceDisplayPositionUpdate(Trace& trace,
         previous.scale);
     if (placement != nullptr) {
         trace.WriteFmt(TracePrefix::DisplayPlacement,
-            RES_STR("config_position_detail source=\"%.*s\" physical_position=%ld,%ld dpi=%u device=\"%s\" "
+            RES_STR("config_position_detail source=\"%s\" physical_position=%ld,%ld dpi=%u device=\"%s\" "
                     "config_monitor=\"%s\""),
-            static_cast<int>(source.size()),
-            source.data(),
+            ResourceStringText(source),
             placement->physicalRelativePosition.x,
             placement->physicalRelativePosition.y,
             placement->dpi,
@@ -331,10 +330,13 @@ bool DashboardController::CommitDisplayWallpaperTransition(
 bool DashboardController::InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions) {
     state_.lastError.clear();
     state_.config = LoadRuntimeConfig(diagnosticsOptions, ConfigParseContext{TelemetryMetricCatalog()});
-    if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions)) {
+    std::string diagnosticsOverrideError;
+    if (!ApplyDiagnosticsLayoutOverride(state_.config, diagnosticsOptions, nullptr, &diagnosticsOverrideError)) {
+        state_.lastError = diagnosticsOverrideError;
         return false;
     }
-    if (!ApplyDiagnosticsThemeOverride(state_.config, diagnosticsOptions)) {
+    if (!ApplyDiagnosticsThemeOverride(state_.config, diagnosticsOptions, nullptr, &diagnosticsOverrideError)) {
+        state_.lastError = diagnosticsOverrideError;
         return false;
     }
     shell.RendererDashboardOverlayState().similarityIndicatorMode = GetSimilarityIndicatorMode(diagnosticsOptions);
@@ -385,7 +387,7 @@ bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const
     ApplyResolvedTelemetrySelections(state_.config, state_.telemetryUpdate.resolvedSelections);
     if (state_.diagnostics != nullptr &&
         std::chrono::steady_clock::now() - state_.lastDiagnosticsOutput >= std::chrono::seconds(1)) {
-        if (!WriteDiagnosticsOutputs()) {
+        if (!WriteDiagnosticsOutputs(shell)) {
             return false;
         }
         state_.lastDiagnosticsOutput = std::chrono::steady_clock::now();
@@ -394,7 +396,7 @@ bool DashboardController::HandleTelemetryUpdate(DashboardShellHost& shell, const
     return true;
 }
 
-bool DashboardController::WriteDiagnosticsOutputs() {
+bool DashboardController::WriteDiagnosticsOutputs(DashboardShellHost& shell) {
     if (state_.diagnostics == nullptr || state_.telemetry == nullptr) {
         return true;
     }
@@ -402,6 +404,9 @@ bool DashboardController::WriteDiagnosticsOutputs() {
     const bool ok = state_.diagnostics->WriteOutputs(state_.telemetryUpdate.dump, state_.config);
     state_.diagnostics->WriteTraceMarker(
         TracePrefix::Diagnostics, ok ? RES_STR("write_outputs_done") : RES_STR("write_outputs_failed"));
+    if (!ok && state_.diagnostics->ShouldShowDialogs() && !state_.diagnostics->LastError().empty()) {
+        shell.ShowError(state_.diagnostics->LastError());
+    }
     return ok;
 }
 
@@ -419,12 +424,15 @@ bool DashboardController::ReloadConfigFromDisk(
             &telemetryError)) {
         if (!telemetryError.empty() && (state_.diagnostics == nullptr || state_.diagnostics->ShouldShowDialogs())) {
             shell.ShowError(FormatTelemetryInitializeError(telemetryError));
+        } else if (state_.diagnostics != nullptr && !state_.diagnostics->LastError().empty() &&
+                   state_.diagnostics->ShouldShowDialogs()) {
+            shell.ShowError(state_.diagnostics->LastError());
         }
         shell.ReleaseFonts();
         shell.InitializeFonts();
         return false;
     }
-    TraceDisplayPositionUpdate(shell.TraceLog(), "reload_config", previousDisplay, state_.config.display);
+    TraceDisplayPositionUpdate(shell.TraceLog(), RES_STR("reload_config"), previousDisplay, state_.config.display);
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsOptions.editLayout);
     if (!shell.Renderer().LastError().empty()) {
         if (state_.diagnostics != nullptr) {
@@ -500,31 +508,6 @@ void DashboardController::SaveScreenshotAs(DashboardShellHost& shell, const Diag
     }
 }
 
-void DashboardController::SaveLayoutGuideSheetAs(DashboardShellHost& shell) {
-    if (state_.telemetry == nullptr) {
-        return;
-    }
-    const auto path =
-        shell.PromptDiagnosticsSavePath(kDefaultLayoutGuideSheetFileName, StringViewWithTerminator(kPngFilter), "png");
-    if (!path.has_value()) {
-        return;
-    }
-    std::string errorText;
-    if (!SaveLayoutGuideSheet(*path,
-            state_.telemetryUpdate.dump.snapshot,
-            BuildCurrentConfigForSaving(),
-            shell.CurrentRenderScale(),
-            shell.TraceLog(),
-            &errorText)) {
-        const std::string pathText = path->string();
-        std::string message = FormatText("Failed to save layout guide sheet:\n%s", pathText.c_str());
-        if (!errorText.empty()) {
-            AppendFormat(message, "\n\n%s", errorText.c_str());
-        }
-        shell.ShowError(message);
-    }
-}
-
 void DashboardController::SaveFullConfigAs(DashboardShellHost& shell) {
     const auto path =
         shell.PromptDiagnosticsSavePath(kDefaultSavedFullConfigFileName, StringViewWithTerminator(kIniFilter), "ini");
@@ -568,7 +551,8 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
         return false;
     }
 
-    TraceDisplayPositionUpdate(shell.TraceLog(), "configure_display", previousConfig.display, updatedConfig.display);
+    TraceDisplayPositionUpdate(
+        shell.TraceLog(), RES_STR("configure_display"), previousConfig.display, updatedConfig.display);
     state_.config = std::move(updatedConfig);
     RefreshCommittedDisplayConfig(state_.config);
     SyncRenderer(shell, state_.isEditingLayout);
@@ -580,29 +564,13 @@ bool DashboardController::ConfigureDisplay(DashboardShellHost& shell, const Disp
 
 bool DashboardController::SwitchLayout(
     DashboardShellHost& shell, const std::string& layoutName, bool diagnosticsEditLayout) {
-    if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-            RES_STR("begin current_layout=\"%s\" requested_layout=\"%s\""),
-            state_.config.display.layout.c_str(),
-            layoutName.c_str());
-    }
     const std::string previousLayoutName = state_.config.display.layout;
     if (!SelectLayout(state_.config, layoutName)) {
-        if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarkerFmt(
-                TracePrefix::LayoutSwitch, RES_STR("select_failed requested_layout=\"%s\""), layoutName.c_str());
-        }
         return false;
     }
 
     SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
     if (!shell.Renderer().LastError().empty()) {
-        if (state_.diagnostics != nullptr) {
-            state_.diagnostics->WriteTraceMarkerFmt(TracePrefix::LayoutSwitch,
-                RES_STR("sync_failed requested_layout=\"%s\" renderer_error=\"%s\""),
-                layoutName.c_str(),
-                shell.Renderer().LastError().c_str());
-        }
         // The active config has already resolved a valid layout; rollback by name avoids a full config snapshot.
         SelectLayout(state_.config, previousLayoutName);
         SyncRenderer(shell, state_.isEditingLayout || diagnosticsEditLayout);
@@ -613,10 +581,6 @@ bool DashboardController::SwitchLayout(
     shell.ApplyConfigPlacement();
     shell.RedrawShellNow();
     RefreshLayoutEditSessionDirtyFlag();
-    if (state_.diagnostics != nullptr) {
-        state_.diagnostics->WriteTraceMarkerFmt(
-            TracePrefix::LayoutSwitch, RES_STR("done active_layout=\"%s\""), state_.config.display.layout.c_str());
-    }
     return true;
 }
 
@@ -648,7 +612,7 @@ bool DashboardController::SetDisplayScale(DashboardShellHost& shell, double scal
     state_.config.display.position.y = ScalePhysicalToLogical(placement.physicalRelativePosition.y, targetScale);
     state_.config.display.scale = HasExplicitDisplayScale(requestedScale) ? requestedScale : 0.0;
     TraceDisplayPositionUpdate(
-        shell.TraceLog(), "set_display_scale", previousDisplay, state_.config.display, &placement);
+        shell.TraceLog(), RES_STR("set_display_scale"), previousDisplay, state_.config.display, &placement);
     SyncRenderer(shell, state_.isEditingLayout);
     state_.placementWatchActive = true;
     shell.ApplyConfigPlacement();
@@ -888,7 +852,8 @@ void DashboardController::ApplyConfigSnapshot(DashboardShellHost& shell, const A
     const TelemetrySettings previousSettings = ExtractTelemetrySettings(state_.config);
     const DisplayConfig previousDisplay = state_.config.display;
     state_.config = config;
-    TraceDisplayPositionUpdate(shell.TraceLog(), "apply_config_snapshot", previousDisplay, state_.config.display);
+    TraceDisplayPositionUpdate(
+        shell.TraceLog(), RES_STR("apply_config_snapshot"), previousDisplay, state_.config.display);
     if (state_.telemetry != nullptr) {
         const TelemetrySettings nextSettings = ExtractTelemetrySettings(state_.config);
         if (previousSettings != nextSettings) {
@@ -927,7 +892,8 @@ void DashboardController::UpdateConfigFromMovePlacement(DashboardShellHost& shel
         !placement.configMonitorName.empty() ? placement.configMonitorName : placement.deviceName;
     state_.config.display.position.x = placement.relativePosition.x;
     state_.config.display.position.y = placement.relativePosition.y;
-    TraceDisplayPositionUpdate(shell.TraceLog(), "move_complete", previousDisplay, state_.config.display, &placement);
+    TraceDisplayPositionUpdate(
+        shell.TraceLog(), RES_STR("move_complete"), previousDisplay, state_.config.display, &placement);
 }
 
 void DashboardController::UpdateConfigFromResizePlacement(DashboardShellHost& shell) {
@@ -939,7 +905,8 @@ void DashboardController::UpdateConfigFromResizePlacement(DashboardShellHost& sh
         return;
     }
     state_.config.display = nextDisplay;
-    TraceDisplayPositionUpdate(shell.TraceLog(), "resize_complete", previousDisplay, state_.config.display, &placement);
+    TraceDisplayPositionUpdate(
+        shell.TraceLog(), RES_STR("resize_complete"), previousDisplay, state_.config.display, &placement);
 }
 
 bool DashboardController::SaveCurrentConfig(DashboardShellHost& shell) {

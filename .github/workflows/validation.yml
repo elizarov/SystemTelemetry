@@ -49,6 +49,17 @@ jobs:
         shell: cmd
         run: test.cmd
 
+      - name: Run headless diagnostics smoke test
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path build\diagnostics | Out-Null
+          & build\CaseDashHeadless.exe /default-config /fake /screenshot:build\diagnostics\headless.png /layout-guide-sheet:build\diagnostics\guide.png /app-icon:build\diagnostics\icon.png /app-icon-size:128 /trace:build\diagnostics\headless.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          foreach ($path in @('build\diagnostics\headless.png', 'build\diagnostics\guide.png', 'build\diagnostics\icon.png', 'build\diagnostics\headless.log')) {
+            $item = Get-Item -LiteralPath $path -ErrorAction Stop
+            if ($item.Length -le 0) { throw "$path is empty." }
+          }
+
       - name: Build MSI
         shell: cmd
         run: package.cmd

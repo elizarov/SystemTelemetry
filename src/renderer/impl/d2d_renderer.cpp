@@ -395,7 +395,7 @@ Microsoft::WRL::ComPtr<ID2D1Bitmap> CreatePanelIconAtlasMaskBitmap(
 
 }  // namespace
 
-D2DRenderer::D2DRenderer() : palette_(style_.colors, style_.layoutGuideSheet) {}
+D2DRenderer::D2DRenderer() : palette_(style_.colors) {}
 
 D2DRenderer::~D2DRenderer() {
     Shutdown();
@@ -407,8 +407,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
     nextStyle.scale = std::clamp(nextStyle.scale, 0.1, 16.0);
 
     const bool initialized = d2dFactory_ != nullptr && dwriteFactory_ != nullptr;
-    const bool colorsChanged =
-        style_.colors != nextStyle.colors || style_.layoutGuideSheet != nextStyle.layoutGuideSheet;
+    const bool colorsChanged = style_.colors != nextStyle.colors;
     const bool iconSourcesChanged = !initialized || style_.iconNames != nextStyle.iconNames;
     const bool textFormatsChanged =
         !initialized || style_.fonts != nextStyle.fonts || std::abs(style_.scale - nextStyle.scale) >= 0.0001;
@@ -418,7 +417,7 @@ bool D2DRenderer::SetStyle(const RendererStyle& style) {
         return false;
     }
     if (colorsChanged || !initialized) {
-        palette_.Rebuild(style_.colors, style_.layoutGuideSheet);
+        palette_.Rebuild(style_.colors);
         d2dCache_.Clear();
     }
     if (iconSourcesChanged && !LoadIcons()) {

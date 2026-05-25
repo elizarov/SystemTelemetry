@@ -10,9 +10,11 @@
 #include "config/config_resolution.h"
 #include "config/config_telemetry.h"
 #include "dashboard_renderer/dashboard_renderer.h"
+#include "dashboard_renderer/layout_guide_sheet_support.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_placement.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_planner.h"
 #include "layout_guide_sheet/impl/layout_guide_sheet_renderer.h"
+#include "layout_guide_sheet/layout_guide_sheet.h"
 #include "telemetry/impl/collector_fake.h"
 #include "util/file_path.h"
 #include "util/localization_catalog.h"
@@ -37,8 +39,16 @@ void LoadTestLocalizationCatalog() {
     ReplaceLocalizationCatalogForTesting(ParseLocalizationCatalog(buffer.str()));
 }
 
+std::string ReadSourceConfigText() {
+    std::ifstream input(SourceConfigPath().string(), std::ios::binary);
+    std::ostringstream buffer;
+    buffer << input.rdbuf();
+    return buffer.str();
+}
+
 struct BuiltInLayoutGuideSheetContext {
     AppConfig config;
+    LayoutGuideSheetConfig guideSheet;
     LayoutEditActiveRegions regions;
     LayoutEditActiveRegions overviewRegions;
     std::vector<LayoutGuideSheetCardSummary> cards;
@@ -47,6 +57,9 @@ struct BuiltInLayoutGuideSheetContext {
 BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* layoutName = "5x3") {
     LoadTestLocalizationCatalog();
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
+    LayoutGuideSheetConfig guideSheet;
+    EXPECT_TRUE(LoadLayoutGuideSheetConfigText(ReadSourceConfigText(), guideSheet));
+    ResolveLayoutGuideSheetColors(config, guideSheet);
     EXPECT_TRUE(SelectLayout(config, layoutName));
 
     Trace trace;
@@ -64,12 +77,13 @@ BuiltInLayoutGuideSheetContext BuildBuiltInLayoutGuideSheetContext(const char* l
     overlayState.showLayoutEditGuides = true;
     overlayState.forceLayoutEditAffordances = true;
     EXPECT_TRUE(renderer.RenderSnapshotOffscreen(telemetry->Snapshot(), overlayState)) << renderer.LastError();
-    LayoutGuideSheetRenderer sheetRenderer(renderer);
+    LayoutGuideSheetRenderer sheetRenderer(renderer, guideSheet);
 
     return BuiltInLayoutGuideSheetContext{config,
+        guideSheet,
         renderer.CollectLayoutEditActiveRegions(overlayState),
         sheetRenderer.CollectOverviewActiveRegions(telemetry->Snapshot()),
-        renderer.CollectLayoutGuideSheetCardSummaries()};
+        CollectLayoutGuideSheetCardSummaries(renderer)};
 }
 
 LayoutGuideSheetCardSummary TestCardSummary(std::string id, std::vector<WidgetClass> widgetClasses) {
@@ -102,7 +116,7 @@ TEST(LayoutGuideSheetPlanner, BuiltInCardSelectionDoesNotSelectNetworkWhenStorag
     EXPECT_EQ(selected, (std::vector<std::string>{"cpu", "storage", "time"}));
 }
 
-TEST(LayoutGuideSheetPlanner, BuiltInTimeCardReferencesUseConfiguredHeader) {
+TEST(LayoutGuideSheetPlanner, BuiltInTitlelessCardReferenceOmitsHeaderForThatPlacement) {
     AppConfig config = LoadConfig(SourceConfigPath(), true, TestConfigParseContext());
     Trace trace;
     DashboardRenderer renderer(trace);
@@ -110,7 +124,7 @@ TEST(LayoutGuideSheetPlanner, BuiltInTimeCardReferencesUseConfiguredHeader) {
     ASSERT_TRUE(SelectLayout(config, "5x3"));
     renderer.SetConfig(config);
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
-    std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(renderer);
     auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
     EXPECT_EQ(timeCard->title, "Time");
@@ -120,12 +134,12 @@ TEST(LayoutGuideSheetPlanner, BuiltInTimeCardReferencesUseConfiguredHeader) {
     ASSERT_TRUE(SelectLayout(config, "1x4"));
     renderer.SetConfig(config);
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
-    cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    cards = CollectLayoutGuideSheetCardSummaries(renderer);
     timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
-    EXPECT_EQ(timeCard->title, "Time");
-    EXPECT_EQ(timeCard->iconName, "time");
-    EXPECT_TRUE(timeCard->chromeLayout.hasHeader);
+    EXPECT_TRUE(timeCard->title.empty());
+    EXPECT_TRUE(timeCard->iconName.empty());
+    EXPECT_FALSE(timeCard->chromeLayout.hasHeader);
 }
 
 TEST(LayoutGuideSheetPlanner, TitlelessCardReferenceOmitsHeaderForThatPlacement) {
@@ -140,7 +154,7 @@ TEST(LayoutGuideSheetPlanner, TitlelessCardReferenceOmitsHeaderForThatPlacement)
     DashboardRenderer renderer(trace);
     renderer.SetConfig(config);
     ASSERT_TRUE(renderer.LastError().empty()) << renderer.LastError();
-    std::vector<LayoutGuideSheetCardSummary> cards = renderer.CollectLayoutGuideSheetCardSummaries();
+    std::vector<LayoutGuideSheetCardSummary> cards = CollectLayoutGuideSheetCardSummaries(renderer);
     const auto timeCard = std::find_if(cards.begin(), cards.end(), [](const auto& card) { return card.id == "time"; });
     ASSERT_NE(timeCard, cards.end());
     EXPECT_TRUE(timeCard->title.empty());

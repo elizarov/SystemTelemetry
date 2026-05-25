@@ -122,8 +122,6 @@ const char* Trace::PrefixName(TracePrefix prefix) {
             return "board_vendor";
         case TracePrefix::Crash:
             return "crash";
-        case TracePrefix::DashboardTooltip:
-            return "dashboard_tooltip";
         case TracePrefix::DisplayPlacement:
             return "display_placement";
         case TracePrefix::Diagnostics:
@@ -144,22 +142,6 @@ const char* Trace::PrefixName(TracePrefix prefix) {
             return "intel_level_zero";
         case TracePrefix::LenovoDiagnosticsDriver:
             return "lenovo_diagnostics_driver";
-        case TracePrefix::LayoutEditDialog:
-            return "layout_edit_dialog";
-        case TracePrefix::LayoutEditDrag:
-            return "layout_edit_drag";
-        case TracePrefix::LayoutEditHover:
-            return "layout_edit_hover";
-        case TracePrefix::LayoutEditModal:
-            return "layout_edit_modal";
-        case TracePrefix::LayoutEditMouseTracking:
-            return "layout_edit_mouse_tracking";
-        case TracePrefix::LayoutEditTooltip:
-            return "layout_edit_tooltip";
-        case TracePrefix::LayoutEditUi:
-            return "layout_edit_ui";
-        case TracePrefix::LayoutSwitch:
-            return "layout_switch";
         case TracePrefix::MsiCenter:
             return "msi_center";
         case TracePrefix::NvidiaNvml:

@@ -28,11 +28,11 @@ D2D1_COLOR_F RenderColor::ToD2DColorF() const {
 
 RendererPalette::RendererPalette() = default;
 
-RendererPalette::RendererPalette(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet) {
-    Rebuild(colors, layoutGuideSheet);
+RendererPalette::RendererPalette(const ColorsConfig& colors) {
+    Rebuild(colors);
 }
 
-void RendererPalette::Rebuild(const ColorsConfig& colors, const LayoutGuideSheetConfig& layoutGuideSheet) {
+void RendererPalette::Rebuild(const ColorsConfig& colors) {
     colors_[ColorSlot(RenderColorId::Background)] = ToRenderColor(colors.backgroundColor);
     colors_[ColorSlot(RenderColorId::Foreground)] = ToRenderColor(colors.foregroundColor);
     colors_[ColorSlot(RenderColorId::Icon)] = ToRenderColor(colors.iconColor);
@@ -48,13 +48,6 @@ void RendererPalette::Rebuild(const ColorsConfig& colors, const LayoutGuideSheet
     colors_[ColorSlot(RenderColorId::GraphBackground)] = ToRenderColor(colors.graphBackgroundColor);
     colors_[ColorSlot(RenderColorId::GraphMarker)] = ToRenderColor(colors.graphMarkerColor);
     colors_[ColorSlot(RenderColorId::GraphAxis)] = ToRenderColor(colors.graphAxisColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutLeader)] = ToRenderColor(layoutGuideSheet.calloutLeaderColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutFill)] = ToRenderColor(layoutGuideSheet.calloutFillColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutBorder)] = ToRenderColor(layoutGuideSheet.calloutBorderColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutParameter)] =
-        ToRenderColor(layoutGuideSheet.calloutParameterColor);
-    colors_[ColorSlot(RenderColorId::LayoutGuideCalloutDescription)] =
-        ToRenderColor(layoutGuideSheet.calloutDescriptionColor);
 }
 
 const RenderColor& RendererPalette::Get(RenderColorId id) const {

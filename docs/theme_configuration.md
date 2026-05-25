@@ -77,7 +77,7 @@ Inside color role sections, a bare identifier resolves through the reference rul
 
 Active theme token identifiers resolve to the matching token in the selected `[theme.<name>]` section.
 
-`[layout_guide_sheet]` color roles may reference `[colors]` roles in addition to active theme tokens.
+`[layout_guide_sheet]` color roles may reference `[colors]` roles in addition to active theme tokens when `CaseDashHeadless.exe` resolves layout guide sheet exports. Those defaults are loaded from the headless-only embedded resource rather than from the shipped app text atlas.
 
 ## Derived Color Expression Syntax
 
@@ -154,7 +154,7 @@ Color references form a limited dependency graph.
 Rules:
 
 - `[colors]` references may point only to entries in the active theme section.
-- `[layout_guide_sheet]` references may point to `[colors]` entries or entries in the active theme section.
+- `[layout_guide_sheet]` references may point to `[colors]` entries or entries in the active theme section for headless layout guide sheet exports.
 
 ## Overrides
 
@@ -205,4 +205,4 @@ Theme section behavior:
 - Per-field revert restores the whole color role expression, including its mode and all transformation controls.
 - The window displays the effective resolved color preview for both literal and derived roles. Derived roles also show the resolved `#RRGGBBAA` value as read-only text next to the preview swatch.
 
-`[layout_guide_sheet]` remains diagnostics-only and is not editable through the dialog.
+`[layout_guide_sheet]` remains diagnostics-only, is consumed by `CaseDashHeadless.exe` from its separate embedded resource, and is not editable through the dialog.

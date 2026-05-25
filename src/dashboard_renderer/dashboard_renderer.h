@@ -88,7 +88,6 @@ public:
     bool SaveSnapshotPng(const FilePath& imagePath, const SystemSnapshot& snapshot);
     bool SaveSnapshotPng(
         const FilePath& imagePath, const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
-    std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries() const;
     bool RenderSnapshotOffscreen(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool PrimeLayoutEditDynamicRegions(const SystemSnapshot& snapshot, const DashboardOverlayState& overlayState);
     bool HasActiveDashboardAnimation() const;
@@ -115,6 +114,31 @@ private:
     friend class DashboardLayoutEditOverlayRenderer;
     friend class DashboardRendererBenchmarkAccess;
     friend class LayoutGuideSheetRenderer;
+    friend std::vector<LayoutGuideSheetCardSummary> CollectLayoutGuideSheetCardSummaries(
+        const DashboardRenderer& renderer);
+    friend bool SaveLayoutGuideSheetSurfacePng(
+        DashboardRenderer& renderer, const FilePath& imagePath, int width, int height, Renderer::DrawCallback draw);
+    friend bool RenderLayoutGuideSheetSurfaceOffscreen(
+        DashboardRenderer& renderer, int width, int height, Renderer::DrawCallback draw);
+    friend void BeginLayoutGuideSheetDynamicArtifacts(
+        DashboardRenderer& renderer, const DashboardOverlayState& overlayState);
+    friend void ResolveLayoutGuideSheetDynamicArtifactCollisions(DashboardRenderer& renderer);
+    friend void EndLayoutGuideSheetDynamicArtifacts(DashboardRenderer& renderer);
+    friend void DrawLayoutGuideSheetCard(DashboardRenderer& renderer,
+        const std::string& cardId,
+        const RenderRect& sourceRect,
+        const RenderRect& destRect,
+        const MetricSource& metrics);
+    friend void DrawLayoutGuideSheetOverlay(DashboardRenderer& renderer,
+        const DashboardOverlayState& overlayState,
+        const RenderRect& sourceRect,
+        const RenderRect& destRect,
+        const MetricSource& metrics);
+    friend LayoutGuideSheetCardChromeArtifacts BuildLayoutGuideSheetCardChromeArtifacts(DashboardRenderer& renderer,
+        const std::string& cardId,
+        const RenderRect& rect,
+        const MetricSource* metrics,
+        bool suppressTitle);
 
     struct PresentationBuildOptions {
         bool useLiveLayerBitmaps = false;
@@ -195,22 +219,6 @@ private:
     void WriteTrace(ResourceStringId text) const;
     void WriteTraceFmt(const char* format, ...) const;
     void WriteTraceFmt(ResourceStringId format, ...) const;
-    bool SaveLayoutGuideSheetSurfacePng(const FilePath& imagePath, int width, int height, Renderer::DrawCallback draw);
-    bool RenderLayoutGuideSheetSurfaceOffscreen(int width, int height, Renderer::DrawCallback draw);
-    void BeginLayoutGuideSheetDynamicArtifacts(const DashboardOverlayState& overlayState);
-    void ResolveLayoutGuideSheetDynamicArtifactCollisions();
-    void EndLayoutGuideSheetDynamicArtifacts();
-    void DrawLayoutGuideSheetCard(const std::string& cardId,
-        const RenderRect& sourceRect,
-        const RenderRect& destRect,
-        const MetricSource& metrics);
-    void DrawLayoutGuideSheetOverlay(const DashboardOverlayState& overlayState,
-        const RenderRect& sourceRect,
-        const RenderRect& destRect,
-        const MetricSource& metrics);
-    LayoutGuideSheetCardChromeArtifacts BuildLayoutGuideSheetCardChromeArtifacts(
-        const std::string& cardId, const RenderRect& rect, const MetricSource* metrics, bool suppressTitle = false);
-
     AppConfig config_;
     Trace& trace_;
     std::unique_ptr<::Renderer> renderer_;

@@ -143,7 +143,7 @@ Generated dashboard screenshots use:
 - Render scale `2`.
 - The selected theme.
 
-Generated layout guide sheets use the same config, built-in synthetic telemetry, default-config behavior, scale, and selected theme. The layout guide sheet generation uses the diagnostics `/layout-guide-sheet` output instead of a separate web-only renderer.
+Generated layout guide sheets use the same config, built-in synthetic telemetry, default-config behavior, scale, selected theme, and headless-only `[layout_guide_sheet]` resource as other `CaseDashHeadless.exe` exports. Website asset generation runs `CaseDashHeadless.exe` and uses its diagnostics `/layout-guide-sheet` output instead of a separate web-only renderer.
 
 Generated dashboard screenshots, layout guide sheets, and website app icons are not committed. Generated files are written under the web build output so repository roots and documentation image folders stay clean. Generated dashboard screenshots and layout guide sheets are encoded as opaque 24-bit PNGs; generated app icons retain alpha and use compressed PNG output.
 
@@ -178,9 +178,9 @@ web-build.cmd
 
 The website build:
 
-1. Builds CaseDash through the project build entrypoint when generated website assets are stale or missing.
+1. Builds CaseDash and `CaseDashHeadless.exe` through the project build entrypoint when generated website assets are stale or missing.
 2. Reads theme definitions from `resources/config.ini`.
-3. Runs the built executable once per theme to generate that theme's dashboard screenshot, layout guide sheet, and app icon when any of those target files is missing.
+3. Runs `CaseDashHeadless.exe` once per theme to generate that theme's dashboard screenshot, layout guide sheet, and app icon when any of those target files is missing.
 4. Writes theme metadata JSON.
 5. Copies static website source and generated assets into `web/dist/`.
 

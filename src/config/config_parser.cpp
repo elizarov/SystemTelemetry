@@ -332,7 +332,25 @@ bool ApplyMetricsSectionValue(MetricsSectionConfig& metrics,
     return true;
 }
 
-void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigParseContext& context) {
+struct ApplyConfigTextContext {
+    AppConfig* config = nullptr;
+    const ConfigParseContext* parseContext = nullptr;
+};
+
+void ApplyConfigEntry(void* context, std::string_view section, std::string_view key, std::string_view value) {
+    auto& applyContext = *static_cast<ApplyConfigTextContext*>(context);
+    DispatchRuntimeConfigSection(
+        *applyContext.config, std::string(section), std::string(key), std::string(value), *applyContext.parseContext);
+}
+
+void ApplyConfigText(std::string_view text, AppConfig& config, const ConfigParseContext& context) {
+    ApplyConfigTextContext applyContext{&config, &context};
+    ForEachConfigEntry(text, &applyContext, &ApplyConfigEntry);
+}
+
+}  // namespace
+
+void ForEachConfigEntry(std::string_view text, void* context, ConfigEntryVisitor visitor) {
     std::string section;
 
     size_t lineStart = 0;
@@ -342,7 +360,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
             lineEnd = text.size();
         }
 
-        std::string line = text.substr(lineStart, lineEnd - lineStart);
+        std::string line(text.substr(lineStart, lineEnd - lineStart));
         line = Trim(line);
         if (line.empty() || line[0] == '#' || line[0] == ';') {
             if (lineEnd == text.size()) {
@@ -372,7 +390,7 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
         const std::string key = Trim(line.substr(0, eq));
         const std::string value = Trim(line.substr(eq + 1));
 
-        DispatchRuntimeConfigSection(config, section, key, value, context);
+        visitor(context, section, key, value);
         if (lineEnd == text.size()) {
             break;
         }
@@ -380,15 +398,21 @@ void ApplyConfigText(const std::string& text, AppConfig& config, const ConfigPar
     }
 }
 
-}  // namespace
-
 std::string LoadEmbeddedConfigTemplate() {
     return LoadTextResourceData(TextResourceId::ConfigTemplate);
 }
 
 AppConfig LoadConfig(const FilePath& path, bool includeOverlay, const ConfigParseContext& context) {
+    return LoadConfigWithExtraTemplate(path, includeOverlay, context, {});
+}
+
+AppConfig LoadConfigWithExtraTemplate(
+    const FilePath& path, bool includeOverlay, const ConfigParseContext& context, std::string_view extraTemplate) {
     AppConfig config;
     ApplyConfigText(LoadEmbeddedConfigTemplate(), config, context);
+    if (!extraTemplate.empty()) {
+        ApplyConfigText(extraTemplate, config, context);
+    }
     if (includeOverlay) {
         ApplyConfigText(ReadConfigFile(path), config, context);
     }

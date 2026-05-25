@@ -143,9 +143,9 @@ goto parse_build_args
 if "%BUILD_TOOLS_ONLY%"=="1" (
     cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDashTools
 ) else if "%BUILD_BENCHMARKS%"=="1" (
-    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashBenchmarks CaseDashTools
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashHeadless CaseDashTests CaseDashBenchmarks CaseDashTools
 ) else (
-    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashTests CaseDashTools
+    cmake --build "%CMAKE_BUILD_ROOT%" --config "%BUILD_CONFIG%" --target CaseDash CaseDashHeadless CaseDashTests CaseDashTools
 )
 
 :build_done

@@ -64,6 +64,7 @@ struct RuntimeConfigSectionDescriptor {
     std::uint32_t rootOffset = 0;
     std::uint32_t keyOffset = 0;
     std::uint32_t itemSize = 0;
+    std::uint16_t defaultOrder = 0;
     std::uint8_t nameLength = 0;
     RuntimeConfigSectionKind kind = RuntimeConfigSectionKind::Static;
     RuntimeConfigSectionCodec codec = RuntimeConfigSectionCodec::Structured;
@@ -78,6 +79,7 @@ std::string EncodeRuntimeConfigField(const RuntimeConfigFieldDescriptor& field, 
 bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const void* owner, const void* compareOwner);
 // Implemented by generated file build/cmake/generated/config/config_meta.generated.cpp.
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
+std::span<const RuntimeConfigFieldDescriptor> LayoutGuideSheetRuntimeConfigFields();
 std::span<const RuntimeConfigFieldDescriptor> RuntimeConfigFields(const RuntimeConfigSectionDescriptor& section);
 const RuntimeConfigSectionDescriptor* FindRuntimeConfigSection(std::string_view sectionName);
 const RuntimeConfigSectionDescriptor* FindRuntimeConfigDynamicSection(std::string_view sectionName);

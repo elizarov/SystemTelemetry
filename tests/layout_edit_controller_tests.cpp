@@ -75,11 +75,11 @@ public:
         ++invalidateCount;
     }
 
-    void BeginLayoutEditTraceSession(const char*, const std::string&) override {}
+    void BeginLayoutEditTraceSession(ResourceStringId, const std::string&) override {}
 
     void RecordLayoutEditTracePhase(TracePhase, std::chrono::nanoseconds) override {}
 
-    void EndLayoutEditTraceSession(const char*) override {}
+    void EndLayoutEditTraceSession(ResourceStringId) override {}
 
     void AddContainerChildReorderAnchor(int index, RenderRect childRect, RenderRect anchorRect) {
         LayoutEditAnchorRegion region;

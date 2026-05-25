@@ -10,7 +10,8 @@ See also: [docs/specifications.md](specifications.md) for product behavior, [doc
 - [dashboard_renderer](architecture/dashboard_renderer.md) - dashboard scene traversal, layout resolution, widget host services, drawing-mode state, and active-region collection.
 - [diagnostics](architecture/diagnostics.md) - diagnostics CLI parsing, headless runs, trace-owned exports, snapshot dumps, app icon export, and native crash reports.
 - [display](architecture/display.md) - monitor enumeration, display targeting, placement, scale, and wallpaper/configure-display helpers.
-- [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, tooltip text, and active-region trace output.
+- [headless](architecture/headless.md) - non-shipped diagnostics executable entry point and layout guide sheet output adapter for build, validation, and website asset generation.
+- [layout_edit](architecture/layout_edit.md) - live layout-edit interaction, hit testing, drag flow, config mutation helpers, and tooltip text.
 - [layout_edit_dialog](architecture/layout_edit_dialog.md) - modeless configuration editor window, editor controls, preview/revert flow, and theme preview drawing.
 - [layout_guide_sheet](architecture/layout_guide_sheet.md) - diagnostics layout guide sheet planning, representative-card selection, callout layout, leader routing, and sheet rendering.
 - [layout_model](architecture/layout_model.md) - renderer-safe layout-edit contracts, edit-target identity, active-region behavior, hit priority, and overlay state.
@@ -33,7 +34,7 @@ Other top-level areas:
 ## Layered Core
 
 - Dependencies flow downward. Higher layers may include lower-layer contracts, but lower layers do not include or call higher layers.
-- The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `layout_edit`, `layout_edit_dialog`, and `main`.
+- The core layer order is `util` -> `config` -> `renderer` and `telemetry` -> `widget` -> `layout_model` -> application-facing packages such as `dashboard`, `dashboard_renderer`, `diagnostics`, `display`, `headless`, `layout_edit`, `layout_edit_dialog`, and `main`.
 - `util` is the lowest layer and is available to every non-util package for domain-neutral helpers.
 - Cross-layer shared types belong in the lowest layer that semantically owns them. Config-language DTOs live in `config`, runtime telemetry DTOs live in `telemetry`, and domain-neutral helpers live in `util`.
 - Custom hash-based containers or caches that replace `std::unordered_map` live in a dedicated named `.h`/`.cpp` module under the owning package or its `impl` directory. Feature providers, renderers, and controllers use those modules through a small API instead of embedding hashing, probing, or collision handling locally.
@@ -45,7 +46,8 @@ Other top-level areas:
 
 - `lint.cmd` is the maintained checker for package dependency rules and package-private boundaries.
 - Package-specific notes under [docs/architecture/](architecture/) list the allowed dependency shape for each package.
-- Application-facing packages such as `dashboard`, `diagnostics`, `display`, and `main` may compose lower-layer services but do not move reusable lower-layer logic upward into shell code.
+- Application-facing packages such as `dashboard`, `diagnostics`, `display`, `headless`, and `main` may compose lower-layer services but do not move reusable lower-layer logic upward into shell code.
+- Only `headless` may depend on `layout_guide_sheet`; production UI, `main`, and `diagnostics` stay independent of that package.
 - Files below package subdirectories are package-private implementation modules. Dependencies from a different top-level package into modules such as `widget/impl/*`, `telemetry/board/*`, or `dashboard_renderer/impl/*` fail the source dependency check.
 
 ## Runtime Flows
@@ -54,16 +56,16 @@ Other top-level areas:
 - Telemetry collects through `telemetry`, publishes copied snapshots and resolved runtime selections, and supplies the metric data consumed by renderer-facing flows.
 - Rendering flows through `dashboard_renderer`, which combines the active config, latest telemetry snapshot, renderer style input, and widget draw contracts into live paints and diagnostics screenshot exports.
 - Layout-edit interaction starts from shell pointer events, resolves targets from renderer-produced active regions, mutates config through `layout_edit`, and shares preview behavior with `layout_edit_dialog`.
-- Diagnostics owns requested trace, snapshot dump, screenshot, layout guide sheet, app icon, and config exports, using the same runtime state and render paths as the live dashboard.
+- Diagnostics owns requested trace, snapshot dump, screenshot, app icon, and config exports, using the same runtime state and render paths as the live dashboard. `CaseDashHeadless.exe` supplies the layout guide sheet writer when that output is requested.
 - Persistence compares minimal saves against the loaded INI text, uses the embedded template for full exports, and relaunches through maintained elevation helpers when target files or registry/service state require elevation.
 
 ## Resources And Build Graph
 
-- `resources/CaseDash.rc` owns dialogs and icons; CMake generates the compressed embedded text atlas resource from config, localization, and the deduplicated first source-use `RES_STR` trace string catalog with collision-checked hash ids.
+- `resources/CaseDash.rc` owns dialogs and icons; CMake generates compressed embedded text atlas resources from config, localization, and the deduplicated first source-use `RES_STR` trace string catalog with collision-checked hash ids. The `[layout_guide_sheet]` section is generated as a separate headless-only resource linked by `CaseDashHeadless.exe`.
 - `resources/resource.h` owns resource and control ids used by shell and dialog code.
 - `CMakeLists.txt` is the single native build graph for the app, tests, benchmarks, resources, and mixed-mode board-provider bridge object libraries.
 - CMake reads `VERSION` and Git metadata during configure, then generates build metadata headers and target-specific manifest resource scripts.
-- The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable.
+- The native app target links shell, controller, config, telemetry, renderer, diagnostics, widget, and layout-edit subsystems into one Win32 executable. The non-shipped `CaseDashHeadless` target links diagnostics, renderer, telemetry, widget, layout-edit no-window logic, the headless-only `[layout_guide_sheet]` resource, and `layout_guide_sheet`, but not dashboard shell or layout-edit dialog packages.
 - `.github/workflows/validation.yml` checks formatting through `format.cmd`, builds through `build.cmd`, runs tests through `test.cmd`, packages the MSI through `package.cmd`, and runs the unused-include sweep through `lint.cmd includes` on the Windows runner.
 - `build.cmd` keeps the manifest-installed dependency tree in repo-root `vcpkg\`, while vcpkg download archives and registry clones live under the shared cache root.
 

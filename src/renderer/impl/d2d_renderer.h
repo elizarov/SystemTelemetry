@@ -79,6 +79,9 @@ public:
     bool FillPaths(std::span<const RenderPath> paths, RenderColorId color) override;
 
 private:
+    friend void RebuildLayoutGuideSheetRendererPalette(
+        D2DRenderer& renderer, const LayoutGuideSheetConfig& layoutGuideSheet);
+
     enum class ActiveDrawTarget {
         None,
         Window,

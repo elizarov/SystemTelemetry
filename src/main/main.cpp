@@ -68,6 +68,12 @@ std::optional<int> RelaunchElevatedIfRequested(const CommandLineArguments& comma
                : 1;
 }
 
+void ReportMainDiagnosticsError(const DiagnosticsOptions& options, std::string_view message) {
+    if (!options.trace) {
+        ShowAppMessageBox(message, MB_ICONERROR);
+    }
+}
+
 }  // namespace
 
 int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
@@ -78,7 +84,8 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
 
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
-    const DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions(commandLine);
+    DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions(commandLine);
+    diagnosticsOptions.reportError = &ReportMainDiagnosticsError;
     InstallCrashReportHandler(diagnosticsOptions);
 
     if (const auto elevatedSaveSource = GetSwitchValue(commandLine, "/save-config"); elevatedSaveSource.has_value()) {
@@ -106,7 +113,9 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int) {
         return *elevatedExitCode;
     }
 
-    if (!ValidateDiagnosticsOptions(diagnosticsOptions)) {
+    const DiagnosticsValidationResult diagnosticsValidation = ValidateDiagnosticsOptions(diagnosticsOptions);
+    if (!diagnosticsValidation.ok) {
+        ReportDiagnosticsError(diagnosticsOptions, diagnosticsValidation.message);
         return 2;
     }
 
