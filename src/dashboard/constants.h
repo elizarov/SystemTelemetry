@@ -22,7 +22,6 @@ inline constexpr UINT kTrayMessage = WM_APP + 1;
 inline constexpr UINT kTelemetryUpdateMessage = WM_APP + 2;
 inline constexpr UINT kCommandMove = 1001;
 inline constexpr UINT kCommandBringOnTop = 1002;
-inline constexpr UINT kCommandReloadConfig = 1003;
 inline constexpr UINT kCommandSaveConfig = 1004;
 inline constexpr UINT kCommandExit = 1005;
 inline constexpr UINT kCommandSaveDumpAs = 1006;

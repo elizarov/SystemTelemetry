@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdarg>
+#include <cstddef>
 #include <cstdio>
 #include <memory>
 #include <optional>
@@ -39,6 +40,13 @@ struct DiagnosticsValidationResult {
     std::string message;
 };
 
+using MarkDiagnosticsCommandLineArgumentFn = void (*)(void* context, size_t argumentIndex);
+
+struct DiagnosticsCommandLineTracker {
+    void* context = nullptr;
+    MarkDiagnosticsCommandLineArgumentFn markArgument = nullptr;
+};
+
 bool SaveDumpScreenshot(const FilePath& imagePath,
     const SystemSnapshot& snapshot,
     const AppConfig& config,
@@ -54,7 +62,8 @@ bool SaveDumpScreenshot(const FilePath& imagePath,
 bool SaveRenderedAppIcon(
     const FilePath& imagePath, const AppConfig& config, int size, std::string* errorText = nullptr);
 
-DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine);
+DiagnosticsOptions GetDiagnosticsOptions(
+    const CommandLineArguments& commandLine, DiagnosticsCommandLineTracker tracker = {});
 DiagnosticsValidationResult ValidateDiagnosticsOptions(
     const DiagnosticsOptions& options, DiagnosticsOutputHandlers handlers = {});
 void ReportDiagnosticsError(const DiagnosticsOptions& options, std::string_view message);
@@ -126,13 +135,3 @@ std::unique_ptr<TelemetryRuntime> InitializeTelemetryRuntimeInstance(const AppCo
     Trace& trace,
     TelemetryUpdateSink* callback,
     std::string* errorText = nullptr);
-bool ReloadTelemetryCollectorFromDisk(const FilePath& configPath,
-    AppConfig& activeConfig,
-    std::unique_ptr<TelemetryRuntime>& telemetry,
-    const DiagnosticsOptions& diagnosticsOptions,
-    Trace& trace,
-    DiagnosticsSession* diagnostics,
-    TelemetryUpdateSink* callback,
-    std::string* errorText = nullptr,
-    std::string_view extraTemplate = {},
-    ResolveDiagnosticsExtraConfigFn resolveExtraConfig = nullptr);

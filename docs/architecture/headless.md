@@ -5,6 +5,7 @@
 ## Responsibilities
 
 - Parse the same diagnostics command-line surface through `diagnostics` and force one-shot behavior as if `/exit` were supplied.
+- Own strict console-only command-line shape validation and usage help for `CaseDashHeadless.exe` by rejecting arguments left unconsumed by diagnostics parsing, keeping that text out of the shipped dashboard executable.
 - Install crash reporting and run diagnostics export orchestration without creating dashboard windows, menus, dialogs, tray icons, or service/elevation maintenance modes.
 - Build as an explicit console-subsystem executable and report validation or runtime diagnostics failures to `stderr`, with trace records still written when `/trace` is active.
 - Provide the only production-code adapter that connects diagnostics `/layout-guide-sheet` output to the public `layout_guide_sheet` package API.

@@ -18,7 +18,6 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 
 ### Source and config overrides
 
-- `/reload` forces a config reload through the normal live-dashboard reload path before exporting outputs.
 - `/fake[:path]` uses the built-in synthetic telemetry source or reloads the selected snapshot dump file once per second.
 - `/layout:<name>` overrides the active named layout for the current process.
 - `/theme:<name>` overrides the active named theme for the current process.
@@ -38,6 +37,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 ### Control flow
 
 - `/exit` runs the one-shot headless diagnostics path and does not start the interactive dashboard UI.
+- `/help` and `/?` print the `CaseDashHeadless.exe` console usage guide and exit successfully. The shipped dashboard executable does not link this console help.
 - `/elevate` relaunches the current command through the Windows `runas` verb, preserves all other arguments, preserves the current working directory for relative diagnostics paths, waits for the elevated child to exit, and returns the child exit code. If the process is already elevated, the switch is ignored and the current process continues.
 
 ### Invalid combinations
@@ -47,6 +47,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - `/app-icon-size:<pixels>` must be between `16` and `1024`.
 - `/trace-prefixes:<names>` accepts only exact supported trace prefix names.
 - `CaseDash.exe` rejects `/layout-guide-sheet` and reports that layout guide sheets are produced by `CaseDashHeadless.exe`.
+- `CaseDashHeadless.exe` rejects unsupported switches, positional arguments, switches with values where no value is accepted, and required-value switches without a value before diagnostics startup. These command-line shape failures return exit code `2` and print the detailed console usage guide.
 - With `/trace`, diagnostics validation failures append `diagnostics:validation_failed` with the reason and message before exit.
 
 ## Output Paths And File Behavior
@@ -56,7 +57,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - Default filenames are `casedash_trace.txt`, `casedash_dump.txt`, `casedash_screenshot.png`, `casedash_layout_guide_sheet.png`, `casedash_app_icon.png`, `casedash_config.ini`, and `casedash_full_config.ini`.
 - Trace output appends UTF-8 text without a BOM and uses the `[trace yyyy-mm-dd hh:mm:ss.mmm] <prefix>:` format. Supported prefix-filter names are `amd_adlx`, `asus_armoury_crate`, `board_vendor`, `crash`, `display_placement`, `diagnostics`, `fake`, `fps_etw`, `fps_provider`, `fps_service_client`, `gigabyte_siv`, `gpu_vendor`, `intel_level_zero`, `lenovo_diagnostics_driver`, `msi_center`, `nvidia_nvml`, `profile`, `renderer`, `telemetry`, `unsupported_board`, `unsupported_gpu`, and `wallpaper`.
 - Intel GPU traces use `intel_level_zero:load_done` to show available Sysman/core enumeration and component API groups, `intel_level_zero:wddm_clock_init` to show whether the selected adapter LUID opened for WDDM node-frequency queries, and `intel_level_zero:get_clock source=...` to show whether `gpu.clock` came from Sysman frequency domains, WDDM node performance data, Level Zero core device properties, or no clock source.
-- The `display_placement` trace prefix records display position config updates from move completion, display configuration, display scale changes, config reload, and config snapshot application.
+- The `display_placement` trace prefix records display position config updates from move completion, display configuration, display scale changes, and config snapshot application.
 - Snapshot dump, screenshot, app icon, minimal config overlay, and full config exports overwrite only their requested target file. Layout guide sheet exports follow the same overwrite behavior when produced by `CaseDashHeadless.exe`.
 - `/fake` without a path uses the built-in synthetic baseline and reads no external file. The built-in baseline uses the themed `fluxsim` FPS application label.
 - `/fake:<path>` reads only the selected snapshot dump file.
@@ -68,10 +69,9 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, app icon, and config outputs refresh once per second from the latest runtime state.
 - With `/exit`, `CaseDash.exe` loads config, performs the first update, optionally exports the requested non-layout-guide outputs once, and exits without entering the normal GUI lifetime.
 - `CaseDashHeadless.exe` always runs the one-shot diagnostics path, as if `/exit` were supplied, and additionally supports `/layout-guide-sheet`.
-- `CaseDashHeadless.exe` is a console diagnostics tool. Validation and runtime diagnostics failures write human-readable errors to `stderr`; when `/trace` is active, the same failure path also writes diagnostics failure records to trace.
+- `CaseDashHeadless.exe` is a console diagnostics tool. Command-line shape failures print an error plus usage guide to `stderr`; diagnostics validation and runtime diagnostics failures write human-readable errors to `stderr`; when `/trace` is active, diagnostics validation and runtime failure paths also write diagnostics failure records to trace.
 - With `/elevate`, trace, snapshot dump, screenshot, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
-- `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
-- `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
+- `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime.
 - `/fake` without `/exit` advances the built-in synthetic source on the telemetry-owned 250 ms refresh path so the dashboard exercises live fake values and the same retained-throughput smoothing as real telemetry.
 - `/fake /exit` keeps the built-in synthetic source on its static baseline so deterministic diagnostics exports stay stable.
 - `/fake:<path>` reloads the selected fake file from the telemetry-owned refresh path while the process runs so manual edits affect a later telemetry-published snapshot.
@@ -80,7 +80,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - App-icon exports create the target parent directory when it is missing.
 - Unhandled native process crashes write a best-effort minidump and text report named `casedash_crash_<timestamp>_<pid>.dmp` and `casedash_crash_<timestamp>_<pid>.txt`. Crash files are created in the launch working directory when it is writable, otherwise in the process temp directory.
 - Layout guide sheet exports follow the feature contract in [docs/layout_guide_sheet.md](layout_guide_sheet.md) and are produced by `CaseDashHeadless.exe`. The shipped app's embedded default config excludes `[layout_guide_sheet]`; headless loads that section from its own embedded resource when the guide-sheet output handler is available.
-- Headless trace output writes one `diagnostics:resolved_color` line per resolved `[colors]` color after startup config resolution and after a successful `/reload`. Each line includes the config section, color name, resolved `#RRGGBBAA` value, and source expression when the color came from a config expression.
+- Headless trace output writes one `diagnostics:resolved_color` line per resolved `[colors]` color after startup config resolution. Each line includes the config section, color name, resolved `#RRGGBBAA` value, and source expression when the color comes from a config expression.
 - When `/trace` is enabled with the `profile` prefix included, the app collects high-precision timing samples for the real runtime operations that mirror benchmark phases and writes `profile:timing` summaries about every 10 seconds, plus a final partial flush when the trace stream closes. Each summary line reports one operation with `op`, `samples`, `total_ms`, `avg_ms`, and `interval_ms`; current operations include `telemetry_update`, `hover_hit_test`, `snap`, `apply`, `paint_total`, `paint_draw`, `presentation_frame_build`, `presentation_resolve_metrics`, `snapshot_layer_bitmap`, `snapshot_layer_content`, `dynamic_edit_collisions`, `overlay_layer_bitmap`, `overlay_layer_content`, `presentation_frame_publish`, and `animation_frame`. The `animation_frame` operation measures animation sampling and composition work only; it excludes the live DXGI vsync wait. Use `/trace-prefixes:profile` for timing-only trace output without verbose provider logging.
 - When `/trace` and `/layout-guide-sheet` are both enabled in `CaseDashHeadless.exe`, each layout guide sheet export writes a `diagnostics:layout_guide_sheet` start marker, one `diagnostics:layout_guide_sheet detail` line per collected render detail such as canvas dimensions, leader scores, selected cards, placed callout count, and remaining leader intersections, one detail line per remaining intersection with its card, kind, sides, and callout keys, one `diagnostics:layout_guide_sheet stats` line with selected-card and callout counts plus active-region, planning, measurement, placement, and draw timings, and then an end marker.
 - When `/trace` and `/app-icon` are both enabled, each successful icon export writes `diagnostics:app_icon_saved`; failures write `diagnostics:app_icon_save_failed` with the target path, size, and error detail when available.
@@ -89,7 +89,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 
 ## Failure And Trace Policy
 
-- The diagnostics trace covers startup, reload, output export, renderer layout data, runtime timing summaries, telemetry collection, hardware-provider activity, powered-off GPU FPS zero decisions, presented-FPS service client probes, presented-FPS ETW probes, and unsupported-provider markers when `/trace` is enabled. Provider-specific trace markers are listed in [docs/hardware.md](hardware.md).
+- The diagnostics trace covers startup, output export, renderer layout data, runtime timing summaries, telemetry collection, hardware-provider activity, powered-off GPU FPS zero decisions, presented-FPS service client probes, presented-FPS ETW probes, and unsupported-provider markers when `/trace` is enabled. Provider-specific trace markers are listed in [docs/hardware.md](hardware.md).
 - Presented-FPS tracing reports `fps_service_client:*` service-client startup and sample failures when the `CashDashService` LocalSystem service is unavailable or stops responding, and reports `fps_etw:*` startup, provider-enable, sampled-present, and shutdown markers when local ETW collection is used. Presented-FPS sample diagnostics include cumulative source-event counts, the cleaned selected process name or `!admin` when Windows denies process-name access, the selected process window count, the raw rolling FPS value, the smoothed displayed FPS value, selected-adapter idle/off zero-FPS decisions, and formatted GPU Engine 3D selection details such as `gpu3d_filter`, `gpu3d_matched`, `top_gpu3d_process`, `top_gpu3d_pid`, `top_gpu3d`, and `selected_gpu3d`. If Windows denies ETW access or process-name access, diagnostics mark `gpu.fps` with the `permission_required` issue and record the failure in the active GPU provider diagnostics.
 - Diagnostics failures that occur while opening or writing outputs are written to trace before any error dialog is shown.
 - Unhandled native process crashes append a `crash:unhandled_exception` trace line when `/trace` is active and the trace file can be reopened. The line includes the exception code, exception address, crash report path, and minidump path.
@@ -123,7 +123,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - When validation is meant to exercise the built-in config, add `/default-config`.
 - Put explicit diagnostics paths under `build\` so repository files stay clean.
 - Prefer the smallest traced `/exit` command that exercises the changed behavior.
-- Add only the modifiers that matter to the change: `/reload`, `/blank`, `/layout:<name>`, `/theme:<name>`, `/edit-layout`, `/edit-layout:<widget-name>`, `/hover:<x>,<y>`, `/app-icon`, `/save-config`, or `/save-full-config`. Use `CaseDashHeadless.exe` for `/layout-guide-sheet`.
+- Add only the modifiers that matter to the change: `/blank`, `/layout:<name>`, `/theme:<name>`, `/edit-layout`, `/edit-layout:<widget-name>`, `/hover:<x>,<y>`, `/app-icon`, `/save-config`, or `/save-full-config`. Use `CaseDashHeadless.exe` for `/layout-guide-sheet`.
 
 Recommended coverage:
 

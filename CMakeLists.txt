@@ -644,6 +644,7 @@ add_executable(CaseDashHeadless
     ${CASEDASH_CONFIG_META_CPP}
     ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_HEADLESS_VERSION_RC}
+    src/headless/headless_command_line.cpp
     src/headless/headless_main.cpp
     src/headless/layout_guide_sheet_output.cpp
     src/diagnostics/diagnostics.cpp

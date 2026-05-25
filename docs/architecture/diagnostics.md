@@ -5,6 +5,7 @@
 ## Responsibilities
 
 - Parse diagnostics switches and choose one-shot or UI-attached diagnostics behavior.
+- Report which command-line arguments diagnostics parsing consumes so console entry points can reject unsupported or malformed leftovers without duplicating the diagnostics switch table.
 - Manage requested trace, snapshot dump, screenshot, app icon, minimal config overlay, and full config exports.
 - Expose explicit output-handler and config-extension boundaries for layout guide sheet export without depending on the `layout_guide_sheet` package.
 - Create and pass the top-level trace session when trace is enabled.

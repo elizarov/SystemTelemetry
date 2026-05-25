@@ -33,7 +33,6 @@ struct DiagnosticsOptions {
     bool fake = false;
     bool blank = false;
     bool editLayout = false;
-    bool reload = false;
     bool defaultConfig = false;
     bool saveConfig = false;
     bool saveFullConfig = false;

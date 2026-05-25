@@ -72,7 +72,6 @@ public:
     bool InitializeSession(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     bool HandleTelemetryUpdate(DashboardShellHost& shell, const TelemetryUpdate& update);
     bool WriteDiagnosticsOutputs(DashboardShellHost& shell);
-    bool ReloadConfigFromDisk(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveDumpAs(DashboardShellHost& shell);
     void SaveScreenshotAs(DashboardShellHost& shell, const DiagnosticsOptions& diagnosticsOptions);
     void SaveFullConfigAs(DashboardShellHost& shell);

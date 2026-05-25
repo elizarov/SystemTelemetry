@@ -82,12 +82,16 @@ std::string BuildCommandLineExcludingSwitch(const CommandLineArguments& argument
 }
 
 bool HasSwitch(const CommandLineArguments& arguments, std::string_view target) {
+    return FindSwitchIndex(arguments, target).has_value();
+}
+
+std::optional<size_t> FindSwitchIndex(const CommandLineArguments& arguments, std::string_view target) {
     for (size_t i = 1; i < arguments.size(); ++i) {
         if (EqualsAsciiInsensitive(arguments[i], target)) {
-            return true;
+            return i;
         }
     }
-    return false;
+    return std::nullopt;
 }
 
 std::optional<std::string> GetSwitchValue(const CommandLineArguments& arguments, std::string_view target) {
@@ -99,13 +103,21 @@ std::optional<std::string> GetSwitchValue(const CommandLineArguments& arguments,
     return std::nullopt;
 }
 
-std::optional<std::string> GetColonSwitchValue(const CommandLineArguments& arguments, std::string_view target) {
+std::optional<CommandLineColonSwitchValue> GetColonSwitchValueWithIndex(
+    const CommandLineArguments& arguments, std::string_view target) {
     for (size_t i = 1; i < arguments.size(); ++i) {
         const std::string& argument = arguments[i];
         if (argument.size() > target.size() && StartsWithAsciiInsensitive(argument, target) &&
             argument[target.size()] == ':') {
-            return argument.substr(target.size() + 1);
+            return CommandLineColonSwitchValue{i, std::string_view(argument).substr(target.size() + 1)};
         }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> GetColonSwitchValue(const CommandLineArguments& arguments, std::string_view target) {
+    if (const auto value = GetColonSwitchValueWithIndex(arguments, target); value.has_value()) {
+        return std::string(value->value);
     }
     return std::nullopt;
 }

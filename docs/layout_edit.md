@@ -6,10 +6,10 @@ See also: [docs/specifications.md](specifications.md) for general product behavi
 ## Mode Lifecycle
 
 - `Edit Layout` toggles interactive layout-edit mode from the popup menu and hover titlebar edit-layout button, `Layout Editor...` starts layout-edit mode when needed and opens the `Edit Configuration` window, and the command line can also start the dashboard in that mode for live UI or screenshot diagnostics.
-- Layout-edit mode stays active across move mode, corner resize mode, layout changes, scale changes, config reload, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
+- Layout-edit mode stays active across move mode, corner resize mode, layout changes, scale changes, and runtime network or storage selection changes. It ends only when the user explicitly turns it off or when `Save Config` or `Configure Display` completes successfully.
 - Closing the editor window closes only the modeless editor window, clears any tree-selection highlight from the dashboard, and keeps layout-edit mode active.
 - Turning off layout-edit mode uses the shared unsaved-session prompt with save, discard, and cancel outcomes.
-- Turning off layout-edit mode, exiting the app, reloading config, or restarting as administrator while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
+- Turning off layout-edit mode, exiting the app, or restarting as administrator while the edit session is dirty always gives the user an explicit save-or-discard choice before destructive loss of the edit-session state.
 
 ## Live Dashboard Interaction
 
