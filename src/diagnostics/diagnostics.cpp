@@ -306,15 +306,6 @@ std::optional<int> TryParseAppIconSizeValue(const std::string& text) {
     return value;
 }
 
-void AssignTrimmedColonSwitchValue(const CommandLineArguments& commandLine, const char* name, std::string& target) {
-    if (const auto value = GetColonSwitchValue(commandLine, name); value.has_value()) {
-        const std::string_view trimmed = TrimAsciiView(*value);
-        if (!trimmed.empty()) {
-            target.assign(trimmed);
-        }
-    }
-}
-
 bool TryParseTracePrefixFilter(std::string_view text, std::uint64_t& mask, std::string& invalidName) {
     mask = 0;
     invalidName.clear();
@@ -451,7 +442,14 @@ struct DiagnosticsPathSwitch {
     FilePath DiagnosticsOptions::* path;
 };
 
-void ApplyDiagnosticsPlainSwitches(DiagnosticsOptions& options, const CommandLineArguments& commandLine) {
+void MarkCommandLineArgument(DiagnosticsCommandLineTracker tracker, size_t argumentIndex) {
+    if (tracker.markArgument != nullptr) {
+        tracker.markArgument(tracker.context, argumentIndex);
+    }
+}
+
+void ApplyDiagnosticsPlainSwitches(
+    DiagnosticsOptions& options, const CommandLineArguments& commandLine, DiagnosticsCommandLineTracker tracker) {
     static constexpr DiagnosticsPlainSwitch kSwitches[] = {
         {"/exit", &DiagnosticsOptions::exit},
         {"/blank", &DiagnosticsOptions::blank},
@@ -461,11 +459,15 @@ void ApplyDiagnosticsPlainSwitches(DiagnosticsOptions& options, const CommandLin
     };
 
     for (const DiagnosticsPlainSwitch& entry : kSwitches) {
-        options.*entry.enabled = HasSwitch(commandLine, entry.name);
+        if (const auto switchIndex = FindSwitchIndex(commandLine, entry.name); switchIndex.has_value()) {
+            MarkCommandLineArgument(tracker, *switchIndex);
+            options.*entry.enabled = true;
+        }
     }
 }
 
-void ApplyDiagnosticsPathSwitches(DiagnosticsOptions& options, const CommandLineArguments& commandLine) {
+void ApplyDiagnosticsPathSwitches(
+    DiagnosticsOptions& options, const CommandLineArguments& commandLine, DiagnosticsCommandLineTracker tracker) {
     static constexpr DiagnosticsPathSwitch kSwitches[] = {
         {"/trace", &DiagnosticsOptions::trace, &DiagnosticsOptions::tracePath},
         {"/dump", &DiagnosticsOptions::dump, &DiagnosticsOptions::dumpPath},
@@ -478,26 +480,32 @@ void ApplyDiagnosticsPathSwitches(DiagnosticsOptions& options, const CommandLine
     };
 
     for (const DiagnosticsPathSwitch& entry : kSwitches) {
-        if (const auto value = GetColonSwitchValue(commandLine, entry.name); value.has_value()) {
+        if (const auto value = GetColonSwitchValueWithIndex(commandLine, entry.name); value.has_value()) {
+            MarkCommandLineArgument(tracker, value->index);
             options.*entry.enabled = true;
-            options.*entry.path = FilePath(*value);
+            options.*entry.path = FilePath(std::string(value->value));
         } else {
-            options.*entry.enabled = HasSwitch(commandLine, entry.name);
+            if (const auto switchIndex = FindSwitchIndex(commandLine, entry.name); switchIndex.has_value()) {
+                MarkCommandLineArgument(tracker, *switchIndex);
+                options.*entry.enabled = true;
+            }
         }
     }
 
-    if (const auto value = GetColonSwitchValue(commandLine, "/trace-prefixes"); value.has_value()) {
+    if (const auto value = GetColonSwitchValueWithIndex(commandLine, "/trace-prefixes"); value.has_value()) {
+        MarkCommandLineArgument(tracker, value->index);
         options.trace = true;
         std::uint64_t prefixFilter = 0;
         std::string invalidName;
-        if (TryParseTracePrefixFilter(*value, prefixFilter, invalidName)) {
+        if (TryParseTracePrefixFilter(value->value, prefixFilter, invalidName)) {
             options.hasTracePrefixFilter = true;
             options.tracePrefixFilter = prefixFilter;
         } else {
             options.hasInvalidTracePrefixFilter = true;
             options.invalidTracePrefixFilterName = invalidName;
         }
-    } else if (HasSwitch(commandLine, "/trace-prefixes")) {
+    } else if (const auto switchIndex = FindSwitchIndex(commandLine, "/trace-prefixes"); switchIndex.has_value()) {
+        MarkCommandLineArgument(tracker, *switchIndex);
         options.trace = true;
         options.hasInvalidTracePrefixFilter = true;
     }
@@ -519,12 +527,28 @@ LayoutSimilarityIndicatorMode GetSimilarityIndicatorMode(const DiagnosticsOption
     }
 }
 
-DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine) {
+void AssignTrimmedColonSwitchValue(const CommandLineArguments& commandLine,
+    const char* name,
+    std::string& target,
+    DiagnosticsCommandLineTracker tracker) {
+    if (const auto value = GetColonSwitchValueWithIndex(commandLine, name); value.has_value()) {
+        const std::string_view trimmed = TrimAsciiView(value->value);
+        if (!trimmed.empty()) {
+            MarkCommandLineArgument(tracker, value->index);
+            target.assign(trimmed);
+        }
+    }
+}
+
+DiagnosticsOptions GetDiagnosticsOptions(
+    const CommandLineArguments& commandLine, DiagnosticsCommandLineTracker tracker) {
     DiagnosticsOptions options;
-    ApplyDiagnosticsPlainSwitches(options, commandLine);
-    ApplyDiagnosticsPathSwitches(options, commandLine);
-    if (const auto editLayoutValue = GetColonSwitchValue(commandLine, "/edit-layout"); editLayoutValue.has_value()) {
-        const std::string mode = ToLower(Trim(*editLayoutValue));
+    ApplyDiagnosticsPlainSwitches(options, commandLine, tracker);
+    ApplyDiagnosticsPathSwitches(options, commandLine, tracker);
+    if (const auto editLayoutValue = GetColonSwitchValueWithIndex(commandLine, "/edit-layout");
+        editLayoutValue.has_value()) {
+        MarkCommandLineArgument(tracker, editLayoutValue->index);
+        const std::string mode = ToLower(Trim(std::string(editLayoutValue->value)));
         options.editLayout = true;
         if (mode == "horizontal-sizes" || mode == "horizonatal-sizes") {
             options.layoutSimilarityMode = DiagnosticsLayoutSimilarityMode::HorizontalSizes;
@@ -534,24 +558,30 @@ DiagnosticsOptions GetDiagnosticsOptions(const CommandLineArguments& commandLine
             options.editLayoutWidgetName = mode;
         }
     }
-    AssignTrimmedColonSwitchValue(commandLine, "/layout", options.layoutName);
-    AssignTrimmedColonSwitchValue(commandLine, "/theme", options.themeName);
-    if (const auto scale = GetScaleSwitchValue(commandLine); scale.has_value()) {
-        options.hasScaleOverride = true;
-        options.scale = *scale;
+    AssignTrimmedColonSwitchValue(commandLine, "/layout", options.layoutName, tracker);
+    AssignTrimmedColonSwitchValue(commandLine, "/theme", options.themeName, tracker);
+    if (const auto scaleValue = GetColonSwitchValueWithIndex(commandLine, "/scale"); scaleValue.has_value()) {
+        if (const auto scale = TryParseScaleValue(std::string(scaleValue->value)); scale.has_value()) {
+            MarkCommandLineArgument(tracker, scaleValue->index);
+            options.hasScaleOverride = true;
+            options.scale = *scale;
+        }
     }
-    if (const auto appIconSizeValue = GetColonSwitchValue(commandLine, "/app-icon-size");
+    if (const auto appIconSizeValue = GetColonSwitchValueWithIndex(commandLine, "/app-icon-size");
         appIconSizeValue.has_value()) {
+        MarkCommandLineArgument(tracker, appIconSizeValue->index);
         options.hasAppIconSize = true;
-        if (const auto appIconSize = TryParseAppIconSizeValue(*appIconSizeValue); appIconSize.has_value()) {
+        if (const auto appIconSize = TryParseAppIconSizeValue(std::string(appIconSizeValue->value));
+            appIconSize.has_value()) {
             options.appIconSize = *appIconSize;
         } else {
             options.appIconSize = 0;
         }
     }
-    if (const auto hoverValue = GetColonSwitchValue(commandLine, "/hover"); hoverValue.has_value()) {
+    if (const auto hoverValue = GetColonSwitchValueWithIndex(commandLine, "/hover"); hoverValue.has_value()) {
         DiagnosticsHoverPoint hoverPoint;
-        if (TryParseHoverPointValue(*hoverValue, hoverPoint)) {
+        if (TryParseHoverPointValue(std::string(hoverValue->value), hoverPoint)) {
+            MarkCommandLineArgument(tracker, hoverValue->index);
             options.hoverPoint = hoverPoint;
             options.editLayout = true;
         }

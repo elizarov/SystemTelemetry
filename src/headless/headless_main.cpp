@@ -22,17 +22,21 @@ int main() {
     SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
 
     const CommandLineArguments commandLine = GetCommandLineArguments();
-    const HeadlessCommandLineValidationResult commandLineValidation = ValidateHeadlessCommandLine(commandLine);
-    if (commandLineValidation.requestedHelp) {
+    if (IsHeadlessCommandLineHelpRequested(commandLine)) {
         PrintHeadlessCommandLineHelp(stdout);
         return 0;
     }
+
+    HeadlessCommandLineConsumption commandLineConsumption;
+    DiagnosticsOptions diagnosticsOptions =
+        GetDiagnosticsOptions(commandLine, CreateHeadlessCommandLineTracker(commandLineConsumption, commandLine));
+    const HeadlessCommandLineValidationResult commandLineValidation =
+        ValidateHeadlessCommandLine(commandLine, commandLineConsumption);
     if (!commandLineValidation.ok) {
         PrintHeadlessCommandLineHelp(stderr, commandLineValidation.message);
         return 2;
     }
 
-    DiagnosticsOptions diagnosticsOptions = GetDiagnosticsOptions(commandLine);
     diagnosticsOptions.reportError = &ReportHeadlessDiagnosticsError;
     diagnosticsOptions.exit = true;
 
