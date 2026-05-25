@@ -6,7 +6,6 @@
 #include "config/color_format.h"
 #include "config/color_math.h"
 #include "config/config_runtime_fields.h"
-#include "util/function_ref.h"
 #include "util/strings.h"
 
 namespace {
