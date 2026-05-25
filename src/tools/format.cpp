@@ -5548,6 +5548,22 @@ private:
         return tokens[marker].text == "default" || tokens[marker].text == "delete" || tokens[marker].text == "0";
     }
 
+    static bool IsTypeDeclarationLeadingSpecifierWord(std::string_view text) {
+        static constexpr std::string_view kWords[] = {
+            "const",
+            "consteval",
+            "constexpr",
+            "constinit",
+            "extern",
+            "inline",
+            "mutable",
+            "static",
+            "typedef",
+            "volatile"
+        };
+        return std::find(std::begin(kWords), std::end(kWords), text) != std::end(kWords);
+    }
+
     std::optional<size_t> FindTypeDeclarationKeyword(const std::vector<Token>& tokens) const {
         size_t first = NextSignificantIndex(tokens, 0);
         if (first >= tokens.size()) {
@@ -5567,8 +5583,14 @@ private:
                 return std::nullopt;
             }
         }
-        if (tokens[first].text == "class" || tokens[first].text == "struct" || tokens[first].text == "enum") {
-            return first;
+        while (first < tokens.size() && tokens[first].kind == TokenKind::Word) {
+            if (tokens[first].text == "class" || tokens[first].text == "struct" || tokens[first].text == "enum") {
+                return first;
+            }
+            if (!IsTypeDeclarationLeadingSpecifierWord(tokens[first].text)) {
+                return std::nullopt;
+            }
+            first = NextSignificantIndex(tokens, first + 1);
         }
         return std::nullopt;
     }

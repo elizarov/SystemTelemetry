@@ -861,6 +861,20 @@ void BuildLayoutEditTargetMenuLabel(const LayoutEditTarget* layoutEditTarget) {
     }
 }
 
+void BuildTitlebarTooltipControls() {
+    const struct {
+        DashboardTitlebarTooltipControl control;
+        const RECT& rect;
+    } controls[] = {
+        {DashboardTitlebarTooltipControl::Close, closeRect},
+        {DashboardTitlebarTooltipControl::Display, displayRect},
+        {DashboardTitlebarTooltipControl::EditLayout, editLayoutRect},
+        {DashboardTitlebarTooltipControl::Layout, layoutComboRect},
+        {DashboardTitlebarTooltipControl::Theme, themeComboRect},
+        {DashboardTitlebarTooltipControl::AppMenu, appMenuRect}
+    };
+}
+
 const char* SelectRevertLabel(bool isFontsSection, bool isThemeSection, bool isLayoutSection, bool isMetricsSection) {
     return isFontsSection ? "Revert Font Changes" :
         isThemeSection ? "Revert Theme" :

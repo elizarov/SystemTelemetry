@@ -489,6 +489,21 @@ else if(label.empty()&&focusKey.has_value()&&std::get_if<LayoutNodeFieldEditKey>
 else if(label.empty()&&focusKey.has_value()&&std::holds_alternative<LayoutContainerEditKey>(*focusKey)){label=BuildLayoutEditMenuLabel("layout container");}
 }}}
 
+void BuildTitlebarTooltipControls(){
+const struct {
+DashboardTitlebarTooltipControl control;
+const RECT& rect;
+}
+controls[] = {
+{DashboardTitlebarTooltipControl::Close, closeRect},
+{DashboardTitlebarTooltipControl::Display, displayRect},
+{DashboardTitlebarTooltipControl::EditLayout, editLayoutRect},
+{DashboardTitlebarTooltipControl::Layout, layoutComboRect},
+{DashboardTitlebarTooltipControl::Theme, themeComboRect},
+{DashboardTitlebarTooltipControl::AppMenu, appMenuRect}
+};
+}
+
 
 
 const char* SelectRevertLabel(bool isFontsSection,bool isThemeSection,bool isLayoutSection,bool isMetricsSection){
