@@ -38,6 +38,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 ### Control flow
 
 - `/exit` runs the one-shot headless diagnostics path and does not start the interactive dashboard UI.
+- `/help` and `/?` print the `CaseDashHeadless.exe` console usage guide and exit successfully. The shipped dashboard executable does not link this console help.
 - `/elevate` relaunches the current command through the Windows `runas` verb, preserves all other arguments, preserves the current working directory for relative diagnostics paths, waits for the elevated child to exit, and returns the child exit code. If the process is already elevated, the switch is ignored and the current process continues.
 
 ### Invalid combinations
@@ -47,6 +48,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - `/app-icon-size:<pixels>` must be between `16` and `1024`.
 - `/trace-prefixes:<names>` accepts only exact supported trace prefix names.
 - `CaseDash.exe` rejects `/layout-guide-sheet` and reports that layout guide sheets are produced by `CaseDashHeadless.exe`.
+- `CaseDashHeadless.exe` rejects unsupported switches, positional arguments, switches with values where no value is accepted, and required-value switches without a value before diagnostics startup. These command-line shape failures return exit code `2` and print the detailed console usage guide.
 - With `/trace`, diagnostics validation failures append `diagnostics:validation_failed` with the reason and message before exit.
 
 ## Output Paths And File Behavior
@@ -68,7 +70,7 @@ See also: [docs/specifications.md](specifications.md) for general user-visible r
 - In UI-attached mode, trace logging continues for the process lifetime and requested snapshot dump, screenshot, app icon, and config outputs refresh once per second from the latest runtime state.
 - With `/exit`, `CaseDash.exe` loads config, performs the first update, optionally exports the requested non-layout-guide outputs once, and exits without entering the normal GUI lifetime.
 - `CaseDashHeadless.exe` always runs the one-shot diagnostics path, as if `/exit` were supplied, and additionally supports `/layout-guide-sheet`.
-- `CaseDashHeadless.exe` is a console diagnostics tool. Validation and runtime diagnostics failures write human-readable errors to `stderr`; when `/trace` is active, the same failure path also writes diagnostics failure records to trace.
+- `CaseDashHeadless.exe` is a console diagnostics tool. Command-line shape failures print an error plus usage guide to `stderr`; diagnostics validation and runtime diagnostics failures write human-readable errors to `stderr`; when `/trace` is active, diagnostics validation and runtime failure paths also write diagnostics failure records to trace.
 - With `/elevate`, trace, snapshot dump, screenshot, app icon, config, and layout switches are handled by the elevated child process after relaunch; the unelevated parent does not open diagnostics outputs.
 - `/default-config`, `/layout:<name>`, `/theme:<name>`, and `/scale:<value>` stay active for the full process lifetime, including `/reload` runs inside that process.
 - `/reload /exit` performs the normal first startup and update path, reloads through the live-dashboard reload logic, then exports from the reloaded state.
