@@ -457,9 +457,19 @@ std::optional<size_t> FindControlHeaderEnd(TokenSpan tokens, size_t controlIndex
 
 void RewriteControlBracesRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output);
 
-size_t RewriteControlBracesStatement(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output);
+size_t RewriteControlBracesStatement(
+    TokenSpan tokens,
+    size_t begin,
+    size_t end,
+    std::vector<Token>& output
+);
 
-size_t RewriteIfControlStatement(TokenSpan tokens, size_t ifIndex, size_t end, std::vector<Token>& output);
+size_t RewriteIfControlStatement(
+    TokenSpan tokens,
+    size_t ifIndex,
+    size_t end,
+    std::vector<Token>& output
+);
 
 size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end);
 
@@ -568,7 +578,12 @@ size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end)
     return FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
 }
 
-void AppendRewrittenControlBody(TokenSpan tokens, size_t bodyBegin, size_t bodyEnd, std::vector<Token>& output) {
+void AppendRewrittenControlBody(
+    TokenSpan tokens,
+    size_t bodyBegin,
+    size_t bodyEnd,
+    std::vector<Token>& output
+) {
     output.push_back({TokenKind::Symbol, "{"});
     RewriteControlBracesStatement(tokens, bodyBegin, bodyEnd, output);
     output.push_back({TokenKind::Symbol, "}"});
@@ -596,7 +611,12 @@ size_t RewriteHeaderBodyControlStatement(
     return bodyEnd;
 }
 
-size_t RewriteElseControlStatement(TokenSpan tokens, size_t elseIndex, size_t end, std::vector<Token>& output) {
+size_t RewriteElseControlStatement(
+    TokenSpan tokens,
+    size_t elseIndex,
+    size_t end,
+    std::vector<Token>& output
+) {
     output.push_back(tokens[elseIndex]);
     const size_t bodyBegin = elseIndex + 1;
     const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
@@ -627,7 +647,12 @@ size_t RewriteElseControlStatement(TokenSpan tokens, size_t elseIndex, size_t en
     return bodyEnd;
 }
 
-size_t RewriteIfControlStatement(TokenSpan tokens, size_t ifIndex, size_t end, std::vector<Token>& output) {
+size_t RewriteIfControlStatement(
+    TokenSpan tokens,
+    size_t ifIndex,
+    size_t end,
+    std::vector<Token>& output
+) {
     size_t next = RewriteHeaderBodyControlStatement(tokens, ifIndex, end, output);
     const size_t elseIndex = NextCodeIndex(tokens, next, end);
     if (elseIndex < end && tokens[elseIndex].text == "else") {
@@ -637,7 +662,12 @@ size_t RewriteIfControlStatement(TokenSpan tokens, size_t ifIndex, size_t end, s
     return next;
 }
 
-size_t RewriteDoControlStatement(TokenSpan tokens, size_t doIndex, size_t end, std::vector<Token>& output) {
+size_t RewriteDoControlStatement(
+    TokenSpan tokens,
+    size_t doIndex,
+    size_t end,
+    std::vector<Token>& output
+) {
     output.push_back(tokens[doIndex]);
     const size_t bodyBegin = doIndex + 1;
     const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
@@ -656,7 +686,12 @@ size_t RewriteDoControlStatement(TokenSpan tokens, size_t doIndex, size_t end, s
     return bodyEnd;
 }
 
-size_t RewriteControlBracesStatement(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
+size_t RewriteControlBracesStatement(
+    TokenSpan tokens,
+    size_t begin,
+    size_t end,
+    std::vector<Token>& output
+) {
     const size_t statementStart = NextCodeIndex(tokens, begin, end);
     AppendTokenRange(tokens, begin, statementStart, output);
     if (statementStart >= end) {
@@ -948,7 +983,11 @@ private:
         return IsInsidePendingLambdaBody();
     }
 
-    bool ShouldForwardStandaloneLineCommentToPending(TokenSpan tokens, size_t newlineIndex, size_t newlineCount) const {
+    bool ShouldForwardStandaloneLineCommentToPending(
+        TokenSpan tokens,
+        size_t newlineIndex,
+        size_t newlineCount
+    ) const {
         if (newlineCount == 0 || pendingTokens_.empty()) {
             return false;
         }
@@ -972,7 +1011,11 @@ private:
         });
     }
 
-    bool ShouldPreserveOriginalBlankSeparator(TokenSpan tokens, size_t newlineIndex, size_t newlineCount) const {
+    bool ShouldPreserveOriginalBlankSeparator(
+        TokenSpan tokens,
+        size_t newlineIndex,
+        size_t newlineCount
+    ) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, newlineIndex);
         const bool hasBlankSeparator =
             newlineCount > 1 || (previous && tokens[*previous].kind == TokenKind::Preprocessor);
@@ -1372,7 +1415,8 @@ private:
         }
     }
 
-    std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(TokenSpan replacementTokens) const {
+    std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(
+        TokenSpan replacementTokens) const {
         if (!IsStructuredMacroReplacement(replacementTokens)) {
             return std::nullopt;
         }
@@ -1396,8 +1440,7 @@ private:
 
     std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
         std::string_view defineLine,
-        TokenSpan replacementTokens
-    ) const {
+        TokenSpan replacementTokens) const {
         std::vector<std::string> activeParameters = StatementLikeParametersForDefine(defineLine);
         if (activeParameters.empty()) {
             return {};
@@ -1578,7 +1621,7 @@ private:
     }
 
     void EmitEnumEnumerators(TokenSpan tokens) {
-        TokenSplitParts elements = SplitTopLevelParts(tokens, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(tokens, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(tokens, ',')) {
             EmitFormatted(tokens, ",");
             return;
@@ -1586,7 +1629,7 @@ private:
         bool emittedElement = false;
         for (size_t index = 0; index < elements.size(); ++index) {
             std::vector<std::string> elementLines =
-                FormatDelimitedElement(elements.At(index), indentLevel_, ",", false, true, false, emittedElement);
+                FormatDelimitedElement(elements[index], indentLevel_, ",", false, true, false, emittedElement);
             if (elementLines.empty()) {
                 continue;
             }
@@ -1849,12 +1892,6 @@ private:
         }
     };
 
-    struct ShiftChainParts {
-        TokenSpan receiver;
-        std::vector<TokenSpan> segments;
-        bool sawShiftOperator = false;
-    };
-
     std::vector<std::string> FormatRange(
         TokenSpan tokens,
         int indentLevel,
@@ -1996,7 +2033,11 @@ private:
         return best;
     }
 
-    void RenderLayoutTree(std::vector<std::string>& lines, TokenSpan tokens, const LayoutContext& context) const {
+    void RenderLayoutTree(
+        std::vector<std::string>& lines,
+        TokenSpan tokens,
+        const LayoutContext& context
+    ) const {
         const LayoutResult result = FormatLayoutTreeResult(tokens, context);
         switch (result.choice) {
             case LayoutChoiceKind::Compact:
@@ -3064,7 +3105,11 @@ private:
         return FormatInlineLength(firstLineTokens);
     }
 
-    LineTrimKind GroupOpeningTrimKind(TokenSpan tokens, GroupPair group, std::string_view prefix) const {
+    LineTrimKind GroupOpeningTrimKind(
+        TokenSpan tokens,
+        GroupPair group,
+        std::string_view prefix
+    ) const {
         if (prefix.empty() && group.open == 0 && group.open < tokens.size() && tokens[group.open].text == "{") {
             return LineTrimKind::OpenBrace;
         }
@@ -3167,7 +3212,11 @@ private:
         return std::nullopt;
     }
 
-    std::vector<std::string> FormatLambdaHeader(TokenSpan header, int indentLevel, std::string prefix) const {
+    std::vector<std::string> FormatLambdaHeader(
+        TokenSpan header,
+        int indentLevel,
+        std::string prefix
+    ) const {
         LayoutResult best;
         std::vector<std::string> bestLines;
         bool hasBest = false;
@@ -3230,7 +3279,9 @@ private:
         };
     }
 
-    std::string FormatLambdaHeaderAfterCaptures(TokenSpan header, TokenSpan captures) const {
+    std::string FormatLambdaHeaderAfterCaptures(
+        TokenSpan header,
+        TokenSpan captures) const {
         const std::string fullHeader = FormatInline(header);
         const std::string captureText = FormatInline(captures);
         if (fullHeader.size() >= captureText.size() && fullHeader.compare(0, captureText.size(), captureText) == 0) {
@@ -3280,14 +3331,14 @@ private:
         }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + std::string(prefix) + "[");
-        TokenSplitParts captures = SplitTopLevelParts(captureInner, ',');
+        std::vector<std::vector<Token>> captures = SplitTopLevel(captureInner, ',');
         for (size_t index = 0; index < captures.size(); ++index) {
             std::string elementSuffix;
             if (index + 1 < captures.size()) {
                 elementSuffix = ",";
             }
             std::vector<std::string> captureLines =
-                FormatRange(captures.At(index), indentLevel + 1, {}, std::move(elementSuffix), true);
+                FormatRange(captures[index], indentLevel + 1, {}, std::move(elementSuffix), true);
             lines.insert(lines.end(), captureLines.begin(), captureLines.end());
         }
         const std::optional<GroupPair> parameterGroup = FindLambdaParameterGroup(header);
@@ -3325,9 +3376,9 @@ private:
         TokenSpan header,
         int indentLevel
     ) const {
-        TokenSplitParts elements = SplitTopLevelParts(inner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements.At(index).empty()) {
+            if (elements[index].empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3335,7 +3386,7 @@ private:
                 elementSuffix = ",";
             }
             std::vector<std::string> elementLines =
-                FormatRange(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
+                FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
             AppendSplitElementLines(lines, elementLines, false);
         }
         TokenSpan afterTokens = TokenSubspan(header, group.close + 1, header.size());
@@ -3377,10 +3428,10 @@ private:
         TokenSpan header = TokenSubspan(tokens, 0, initializerColon);
         TokenSpan initializers = TokenSubspan(tokens, initializerColon + 1, tokens.size());
         std::vector<std::string> lines = FormatConstructorInitializerHeader(header, indentLevel, std::move(prefix));
-        TokenSplitParts elements = SplitTopLevelParts(initializers, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements.At(index).empty()) {
+            if (elements[index].empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3390,7 +3441,7 @@ private:
                 elementSuffix = suffix;
             }
             std::vector<std::string> elementLines =
-                FormatRange(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
+                FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
             lines.insert(lines.end(), elementLines.begin(), elementLines.end());
         }
         if (separateBodyOpen) {
@@ -3409,10 +3460,10 @@ private:
         TokenSpan header = TokenSubspan(tokens, 0, initializerColon);
         TokenSpan initializers = TokenSubspan(tokens, initializerColon + 1, tokens.size());
         LayoutResult result = FormatConstructorInitializerHeaderResult(header, indentLevel, std::move(prefix));
-        TokenSplitParts elements = SplitTopLevelParts(initializers, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements.At(index).empty()) {
+            if (elements[index].empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3421,8 +3472,7 @@ private:
             } else if (!separateBodyOpen) {
                 elementSuffix = suffix;
             }
-            LayoutResult elementResult =
-                FormatRangeResult(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
+            LayoutResult elementResult = FormatRangeResult(elements[index], indentLevel + 1, {}, elementSuffix, true);
             AppendMeasuredLayout(result, elementResult, false, 1);
         }
         if (separateBodyOpen) {
@@ -3446,7 +3496,11 @@ private:
         return FormatRange(header, indentLevel, std::move(prefix), " :");
     }
 
-    LayoutResult FormatConstructorInitializerHeaderResult(TokenSpan header, int indentLevel, std::string prefix) const {
+    LayoutResult FormatConstructorInitializerHeaderResult(
+        TokenSpan header,
+        int indentLevel,
+        std::string prefix
+    ) const {
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(header)) {
             TokenSpan inner = TokenSubspan(header, group->open + 1, group->close);
             if (header[group->open].text == "(" && ContainsTopLevelSeparator(inner, ',')) {
@@ -3497,7 +3551,7 @@ private:
             startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
-        TokenSplitParts elements = SplitTopLevelParts(inner, separator);
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             const bool indentSingleExpressionChains =
                 !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
@@ -3512,7 +3566,7 @@ private:
                 }
                 const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
                 LayoutResult elementResult = FormatDelimitedElementResult(
-                    elements.At(index),
+                    elements[index],
                     indentLevel + 1,
                     elementSuffix,
                     isInitializerElement,
@@ -3579,7 +3633,7 @@ private:
         const int nestedBreakDepth = NestedGroupBreakDepth(tokens, group, *nestedGroup);
         LayoutResult result = EmptyLayout(false, nestedBreakDepth, 0, LayoutChoiceKind::Group, {}, 1);
         AppendMeasuredLine(result, IndentWidth(indentLevel) + firstLineWidth, indentLevel, LineTrimKind::Other);
-        TokenSplitParts elements = SplitTopLevelParts(nestedInner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             LayoutResult childResult = FormatRangeResult(nestedInner, indentLevel + 1, {}, {}, true);
             AppendMeasuredLayout(result, childResult, false, nestedBreakDepth + 1);
@@ -3591,7 +3645,7 @@ private:
                     elementSuffix = ",";
                 }
                 LayoutResult elementResult = FormatDelimitedElementResult(
-                    elements.At(index),
+                    elements[index],
                     indentLevel + 1,
                     elementSuffix,
                     true,
@@ -3639,7 +3693,7 @@ private:
             startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
-        TokenSplitParts elements = SplitTopLevelParts(inner, separator);
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             const bool indentSingleExpressionChains =
                 !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
@@ -3653,7 +3707,7 @@ private:
                 }
                 const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
                 std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements.At(index),
+                    elements[index],
                     indentLevel + 1,
                     elementSuffix,
                     isInitializerElement,
@@ -3686,7 +3740,7 @@ private:
         lines.push_back(Indent(indentLevel) + std::string(prefix) + FormatInline(firstLineTokens));
 
         TokenSpan nestedInner = TokenSubspan(tokens, nestedGroup->open + 1, nestedGroup->close);
-        TokenSplitParts elements = SplitTopLevelParts(nestedInner, ',');
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             RenderRange(lines, nestedInner, indentLevel + 1, {}, {}, true);
         } else {
@@ -3697,7 +3751,7 @@ private:
                     elementSuffix = ",";
                 }
                 std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements.At(index),
+                    elements[index],
                     indentLevel + 1,
                     elementSuffix,
                     true,
@@ -3756,7 +3810,10 @@ private:
         return std::nullopt;
     }
 
-    std::string FormatGroupClosingLine(TokenSpan tokens, GroupPair group, TokenSpan suffixTokens) const {
+    std::string FormatGroupClosingLine(
+        TokenSpan tokens,
+        GroupPair group,
+        TokenSpan suffixTokens) const {
         if (!IsTemplateAngleGroup(tokens, group) || suffixTokens.empty()) {
             return FormatInline(suffixTokens);
         }
@@ -3772,7 +3829,10 @@ private:
         return closeLine;
     }
 
-    size_t FormatGroupClosingLineLength(TokenSpan tokens, GroupPair group, TokenSpan suffixTokens) const {
+    size_t FormatGroupClosingLineLength(
+        TokenSpan tokens,
+        GroupPair group,
+        TokenSpan suffixTokens) const {
         if (!IsTemplateAngleGroup(tokens, group) || suffixTokens.empty()) {
             return FormatInlineLength(suffixTokens);
         }
@@ -3813,7 +3873,10 @@ private:
             first != '}';
     }
 
-    bool IsPlainParenthesizedExpressionGroup(TokenSpan tokens, GroupPair group, TokenSpan firstLineTokens) const {
+    bool IsPlainParenthesizedExpressionGroup(
+        TokenSpan tokens,
+        GroupPair group,
+        TokenSpan firstLineTokens) const {
         if (group.open >= tokens.size() || tokens[group.open].text != "(") {
             return false;
         }
@@ -3872,7 +3935,10 @@ private:
         return std::nullopt;
     }
 
-    std::optional<size_t> InitializerListDeclarationDeclarator(TokenSpan tokens, GroupPair initializerList) const {
+    std::optional<size_t> InitializerListDeclarationDeclarator(
+        TokenSpan tokens,
+        GroupPair initializerList
+    ) const {
         if (initializerList.open >= tokens.size()) {
             return std::nullopt;
         }
@@ -4013,89 +4079,6 @@ private:
         return lines;
     }
 
-    std::vector<TokenSpan> SplitOperatorChainParts(TokenSpan tokens, ChainKind chainKind) const {
-        std::vector<TokenSpan> parts;
-        size_t partBegin = 0;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            UpdateDepth(tokens[index], depth);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
-                size_t partEnd = index + 1;
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    partEnd = index + 2;
-                    ++index;
-                }
-                parts.push_back(TokenSubspan(tokens, partBegin, partEnd));
-                partBegin = partEnd;
-            }
-        }
-        if (partBegin < tokens.size()) {
-            parts.push_back(TokenSubspan(tokens, partBegin, tokens.size()));
-        }
-        return parts;
-    }
-
-    std::vector<TokenSpan> SplitTernaryChainParts(TokenSpan tokens) const {
-        std::vector<TokenSpan> parts;
-        size_t partBegin = 0;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            UpdateDepth(tokens[index], depth);
-            if (depth == 0 && tokens[index].text == ":") {
-                size_t partEnd = index + 1;
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    partEnd = index + 2;
-                    ++index;
-                }
-                parts.push_back(TokenSubspan(tokens, partBegin, partEnd));
-                partBegin = partEnd;
-            }
-        }
-        if (partBegin < tokens.size()) {
-            parts.push_back(TokenSubspan(tokens, partBegin, tokens.size()));
-        }
-        return parts;
-    }
-
-    ShiftChainParts SplitShiftOperatorChain(TokenSpan tokens) const {
-        ShiftChainParts result;
-        size_t segmentBegin = 0;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            UpdateDepth(tokens[index], depth);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
-                if (!result.sawShiftOperator) {
-                    result.receiver = TokenSubspan(tokens, segmentBegin, index);
-                    result.sawShiftOperator = true;
-                } else {
-                    result.segments.push_back(TokenSubspan(tokens, segmentBegin, index));
-                }
-                segmentBegin = index;
-            }
-        }
-        if (result.sawShiftOperator && segmentBegin < tokens.size()) {
-            result.segments.push_back(TokenSubspan(tokens, segmentBegin, tokens.size()));
-        }
-        return result;
-    }
-
-    static TokenSpan MergeTokenSpans(TokenSpan first, TokenSpan second) {
-        if (first.empty()) {
-            return second;
-        }
-        if (second.empty()) {
-            return first;
-        }
-        return TokenSpan(first.data(), static_cast<size_t>((second.data() + second.size()) - first.data()));
-    }
-
-    static TokenSpan CombinedTokenSpan(const std::vector<TokenSpan>& spans) {
-        if (spans.empty()) {
-            return {};
-        }
-        return MergeTokenSpans(spans.front(), spans.back());
-    }
-
     LayoutResult FormatOperatorChainResult(
         TokenSpan tokens,
         int indentLevel,
@@ -4117,7 +4100,25 @@ private:
             result.choice = LayoutChoiceKind::OperatorChain;
             return result;
         }
-        const std::vector<TokenSpan> parts = SplitOperatorChainParts(tokens, chainKind);
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
         const bool indentSplitChainContinuation =
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
@@ -4161,7 +4162,25 @@ private:
             );
             return;
         }
-        const std::vector<TokenSpan> parts = SplitOperatorChainParts(tokens, chainKind);
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
         const bool indentSplitChainContinuation =
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
         const bool indentContinuation =
@@ -4186,16 +4205,39 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        ShiftChainParts chain = SplitShiftOperatorChain(tokens);
-        if (!chain.sawShiftOperator) {
+        std::vector<Token> receiver;
+        std::vector<std::vector<Token>> segments;
+        std::vector<Token> current;
+        bool sawShiftOperator = false;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                if (!sawShiftOperator) {
+                    receiver = current;
+                    sawShiftOperator = true;
+                } else {
+                    segments.push_back(current);
+                }
+                current.clear();
+                current.push_back(token);
+                continue;
+            }
+            current.push_back(token);
+        }
+        if (!sawShiftOperator) {
             return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
-        std::vector<std::string> lines = FormatRange(chain.receiver, indentLevel, std::move(prefix), {}, true);
-        if (std::optional<std::string> compactTail = CompactShiftTail(chain.segments, indentLevel + 1, suffix)) {
+        if (!current.empty()) {
+            segments.push_back(current);
+        }
+        std::vector<std::string> lines = FormatRange(receiver, indentLevel, std::move(prefix), {}, true);
+        if (std::optional<std::string> compactTail = CompactShiftTail(segments, indentLevel + 1, suffix)) {
             lines.push_back(Indent(indentLevel + 1) + *compactTail);
             return lines;
         }
-        std::vector<TokenSpan> segments = GroupShiftSegmentsByBreakRules(chain.segments);
+        segments = GroupShiftSegmentsByBreakRules(segments);
         for (size_t index = 0; index < segments.size();) {
             std::string segmentSuffix;
             if (index + 1 == segments.size()) {
@@ -4210,11 +4252,14 @@ private:
     }
 
     std::optional<std::string> CompactShiftTail(
-        const std::vector<TokenSpan>& segments,
+        const std::vector<std::vector<Token>>& segments,
         int indentLevel,
         std::string_view suffix
     ) const {
-        TokenSpan combined = CombinedTokenSpan(segments);
+        std::vector<Token> combined;
+        for (const std::vector<Token>& segment : segments) {
+            combined.insert(combined.end(), segment.begin(), segment.end());
+        }
         if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
             return std::nullopt;
         }
@@ -4232,14 +4277,37 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        ShiftChainParts chain = SplitShiftOperatorChain(tokens);
-        if (!chain.sawShiftOperator) {
+        std::vector<Token> receiver;
+        std::vector<std::vector<Token>> segments;
+        std::vector<Token> current;
+        bool sawShiftOperator = false;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                if (!sawShiftOperator) {
+                    receiver = current;
+                    sawShiftOperator = true;
+                } else {
+                    segments.push_back(current);
+                }
+                current.clear();
+                current.push_back(token);
+                continue;
+            }
+            current.push_back(token);
+        }
+        if (!sawShiftOperator) {
             return FormatChainPartResult(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
+        if (!current.empty()) {
+            segments.push_back(current);
+        }
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
-        LayoutResult receiverResult = FormatRangeResult(chain.receiver, indentLevel, std::move(prefix), {}, true);
+        LayoutResult receiverResult = FormatRangeResult(receiver, indentLevel, std::move(prefix), {}, true);
         AppendMeasuredLayout(result, receiverResult, false, 1);
-        if (std::optional<size_t> compactTailWidth = CompactShiftTailWidth(chain.segments, indentLevel + 1, suffix)) {
+        if (std::optional<size_t> compactTailWidth = CompactShiftTailWidth(segments, indentLevel + 1, suffix)) {
             AppendMeasuredLine(
                 result,
                 IndentWidth(indentLevel + 1) + *compactTailWidth,
@@ -4249,7 +4317,7 @@ private:
             result.variant = 1;
             return result;
         }
-        std::vector<TokenSpan> segments = GroupShiftSegmentsByBreakRules(chain.segments);
+        segments = GroupShiftSegmentsByBreakRules(segments);
         for (size_t index = 0; index < segments.size();) {
             std::string segmentSuffix;
             if (index + 1 == segments.size()) {
@@ -4265,11 +4333,14 @@ private:
     }
 
     std::optional<size_t> CompactShiftTailWidth(
-        const std::vector<TokenSpan>& segments,
+        const std::vector<std::vector<Token>>& segments,
         int indentLevel,
         std::string_view suffix
     ) const {
-        TokenSpan combined = CombinedTokenSpan(segments);
+        std::vector<Token> combined;
+        for (const std::vector<Token>& segment : segments) {
+            combined.insert(combined.end(), segment.begin(), segment.end());
+        }
         if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
             return std::nullopt;
         }
@@ -4280,17 +4351,20 @@ private:
         return width;
     }
 
-    std::vector<TokenSpan> GroupShiftSegmentsByBreakRules(const std::vector<TokenSpan>& segments) const {
-        std::vector<TokenSpan> grouped;
-        TokenSpan pendingConfiguration;
-        for (TokenSpan segment : segments) {
+    std::vector<std::vector<Token>> GroupShiftSegmentsByBreakRules(
+        const std::vector<std::vector<Token>>& segments
+    ) const {
+        std::vector<std::vector<Token>> grouped;
+        std::vector<Token> pendingConfiguration;
+        for (const std::vector<Token>& segment : segments) {
             if (IsStreamShiftConfigurationSegment(segment)) {
-                pendingConfiguration = MergeTokenSpans(pendingConfiguration, segment);
+                pendingConfiguration.insert(pendingConfiguration.end(), segment.begin(), segment.end());
                 continue;
             }
             if (!pendingConfiguration.empty()) {
-                grouped.push_back(MergeTokenSpans(pendingConfiguration, segment));
-                pendingConfiguration = {};
+                pendingConfiguration.insert(pendingConfiguration.end(), segment.begin(), segment.end());
+                grouped.push_back(std::move(pendingConfiguration));
+                pendingConfiguration.clear();
                 continue;
             }
             grouped.push_back(segment);
@@ -4364,7 +4438,25 @@ private:
             );
         }
 
-        const std::vector<TokenSpan> parts = SplitTernaryChainParts(tokens);
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && token.text == ":") {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
         std::vector<std::string> lines;
         const bool indentContinuation =
             indentSplitChains || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
@@ -4399,7 +4491,25 @@ private:
             );
         }
 
-        const std::vector<TokenSpan> parts = SplitTernaryChainParts(tokens);
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && token.text == ":") {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
         const bool indentContinuation =
             indentSplitChains || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
@@ -6326,7 +6436,10 @@ private:
         return afterColon < tokens.size();
     }
 
-    std::optional<size_t> FindConstructorParameterListCloseBeforeColon(TokenSpan tokens, size_t colon) const {
+    std::optional<size_t> FindConstructorParameterListCloseBeforeColon(
+        TokenSpan tokens,
+        size_t colon
+    ) const {
         size_t cursor = colon;
         while (std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, cursor)) {
             if (tokens[*previous].text == ")") {
@@ -6483,7 +6596,10 @@ private:
         return IsLikelyTypeBeforePointer(tokens, index) && IsLikelyDeclaratorContextBeforePointer(tokens, index);
     }
 
-    bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(TokenSpan tokens, size_t index) const {
+    bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(
+        TokenSpan tokens,
+        size_t index
+    ) const {
         if (index >= tokens.size() || tokens[index].text != "(") {
             return false;
         }
@@ -6806,7 +6922,11 @@ private:
         return std::nullopt;
     }
 
-    std::optional<size_t> FindTopLevelTokenAfter(TokenSpan tokens, std::string_view tokenText, size_t begin) const {
+    std::optional<size_t> FindTopLevelTokenAfter(
+        TokenSpan tokens,
+        std::string_view tokenText,
+        size_t begin
+    ) const {
         int depth = 0;
         for (size_t index = begin; index < tokens.size(); ++index) {
             UpdateDepth(tokens[index], depth);
