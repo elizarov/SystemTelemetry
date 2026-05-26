@@ -21,6 +21,11 @@ namespace {
 
 constexpr int kToolStaleExitCode = 3;
 
+const std::vector<std::string>& ToolRefreshExcludedPrefixes() {
+    static const std::vector<std::string> prefixes = {"src/vendor/", "src/tools/vendor/"};
+    return prefixes;
+}
+
 struct LintArgs {
     std::string configPath;
     bool check = false;
@@ -56,6 +61,11 @@ bool IsToolStale() {
         return true;
     }
     for (const std::string& path : RecursiveFiles(JoinPath(repoRoot, "src/tools"))) {
+        const std::string relative = RelativePath(path, repoRoot);
+        // The freshness check runs before lint config parsing, so keep vendored roots out here as well.
+        if (IsExcluded(relative, ToolRefreshExcludedPrefixes())) {
+            continue;
+        }
         const std::string suffix = Extension(path);
         if ((suffix == ".cpp" || suffix == ".h") && IsNewerThan(path, *exeTime)) {
             return true;
@@ -114,9 +124,11 @@ std::map<std::string, std::set<std::string>> ParseSuffixGroups(const JsonValue& 
     return groups;
 }
 
-void RequireSingleSuffixGroup(const std::map<std::string, std::set<std::string>>& suffixGroups,
+void RequireSingleSuffixGroup(
+    const std::map<std::string, std::set<std::string>>& suffixGroups,
     std::string_view configPath,
-    std::string_view groupName) {
+    std::string_view groupName
+) {
     const std::set<std::string> values = RequireSuffixGroup(suffixGroups, configPath, groupName);
     if (values.size() != 1) {
         throw std::runtime_error(std::string(configPath) + " must reference a suffix group with exactly one suffix");
@@ -125,29 +137,45 @@ void RequireSingleSuffixGroup(const std::map<std::string, std::set<std::string>>
 
 void ValidateConfig(const JsonValue& config, const std::map<std::string, std::set<std::string>>& suffixGroups) {
     RequireSuffixGroup(suffixGroups, "scan.suffix_group", config.At("scan").At("suffix_group").AsString());
-    RequireSingleSuffixGroup(suffixGroups,
+    RequireSingleSuffixGroup(
+        suffixGroups,
         "architecture.header_suffix_group",
-        config.At("architecture").At("header_suffix_group").AsString());
-    RequireSingleSuffixGroup(suffixGroups,
+        config.At("architecture").At("header_suffix_group").AsString()
+    );
+    RequireSingleSuffixGroup(
+        suffixGroups,
         "architecture.implementation_suffix_group",
-        config.At("architecture").At("implementation_suffix_group").AsString());
+        config.At("architecture").At("implementation_suffix_group").AsString()
+    );
     RequireSuffixGroup(
-        suffixGroups, "include_style.suffix_group", config.At("include_style").At("suffix_group").AsString());
-    RequireSuffixGroup(suffixGroups,
+        suffixGroups,
+        "include_style.suffix_group",
+        config.At("include_style").At("suffix_group").AsString()
+    );
+    RequireSuffixGroup(
+        suffixGroups,
         "source_dependencies.suffix_group",
-        config.At("source_dependencies").At("suffix_group").AsString());
-    RequireSuffixGroup(suffixGroups,
-        "source_dependencies.header_suffix_group",
-        config.At("source_dependencies").At("header_suffix_group").AsString());
+        config.At("source_dependencies").At("suffix_group").AsString()
+    );
     RequireSuffixGroup(
-        suffixGroups, "source_policy.suffix_group", config.At("source_policy").At("suffix_group").AsString());
+        suffixGroups,
+        "source_dependencies.header_suffix_group",
+        config.At("source_dependencies").At("header_suffix_group").AsString()
+    );
+    RequireSuffixGroup(
+        suffixGroups,
+        "source_policy.suffix_group",
+        config.At("source_policy").At("suffix_group").AsString()
+    );
     if (ConfigStrings(config.At("source_dependencies"), "roots").size() != 1) {
         throw std::runtime_error("source_dependencies.roots must contain exactly one root");
     }
 }
 
 ScanSettings ParseScanSettings(
-    const JsonValue& config, const std::map<std::string, std::set<std::string>>& suffixGroups) {
+    const JsonValue& config,
+    const std::map<std::string, std::set<std::string>>& suffixGroups
+) {
     const JsonValue& scan = config.At("scan");
     ScanSettings settings;
     settings.roots = ConfigStrings(scan, "roots");
@@ -206,9 +234,13 @@ std::vector<FileEntry> DiscoverLintInputs(const std::string& projectRoot, const 
         }
     }
 
-    std::sort(entries.begin(), entries.end(), [&](const FileEntry& left, const FileEntry& right) {
-        return RelativePath(left.path, projectRoot) < RelativePath(right.path, projectRoot);
-    });
+    std::sort(
+        entries.begin(),
+        entries.end(),
+        [&](const FileEntry& left, const FileEntry& right) {
+            return RelativePath(left.path, projectRoot) < RelativePath(right.path, projectRoot);
+        }
+    );
     return entries;
 }
 
@@ -269,11 +301,13 @@ std::string TruncateProgressLine(const std::string& prefix, const std::string& r
     return prefix + "..." + relative.substr(relative.size() - (pathBudget - 3));
 }
 
-std::vector<FileRecord> ScanLintInputs(const std::vector<FileEntry>& entries,
+std::vector<FileRecord> ScanLintInputs(
+    const std::vector<FileEntry>& entries,
     const std::string& projectRoot,
     const ScanSettings& settings,
     std::vector<std::unique_ptr<Checker>>& checkers,
-    bool showProgress) {
+    bool showProgress
+) {
     std::vector<FileRecord> records;
     records.reserve(entries.size());
     const bool useProgress = showProgress && _isatty(_fileno(stdout)) != 0;
@@ -282,9 +316,13 @@ std::vector<FileRecord> ScanLintInputs(const std::vector<FileEntry>& entries,
         if (useProgress) {
             const std::string relative = RelativePath(entries[static_cast<size_t>(index)].path, projectRoot);
             const std::string progress = TruncateProgressLine(
-                "[" + std::to_string(index + 1) + "/" + std::to_string(entries.size()) + "] lint-check ", relative);
+                "[" + std::to_string(index + 1) + "/" + std::to_string(entries.size()) + "] lint-check ",
+                relative
+            );
             const std::string padding(
-                previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0, ' ');
+                previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
+                ' '
+            );
             std::printf("\r%s%s", progress.c_str(), padding.c_str());
             std::fflush(stdout);
             previousProgressLength = progress.size();
@@ -379,7 +417,11 @@ void PrintFailureResult(const CheckResult& result) {
             std::printf("%s\n", diagnostic.message.c_str());
         } else {
             std::printf(
-                "%s: %s: %s\n", diagnostic.location.c_str(), diagnostic.kind.c_str(), diagnostic.message.c_str());
+                "%s: %s: %s\n",
+                diagnostic.location.c_str(),
+                diagnostic.kind.c_str(),
+                diagnostic.message.c_str()
+            );
         }
     }
     if (!result.summary.empty()) {
@@ -453,7 +495,12 @@ int RunLintCheck(int argc, char** argv) {
     std::vector<CheckResult> results;
     try {
         records = ScanLintInputs(
-            DiscoverLintInputs(projectRoot, settings), projectRoot, settings, checkers, !args.noProgress);
+            DiscoverLintInputs(projectRoot, settings),
+            projectRoot,
+            settings,
+            checkers,
+            !args.noProgress
+        );
         for (std::unique_ptr<Checker>& checker : checkers) {
             results.push_back(checker->Finish(args.verbose));
         }
@@ -463,9 +510,8 @@ int RunLintCheck(int argc, char** argv) {
         return 2;
     }
 
-    const bool failed = std::any_of(results.begin(), results.end(), [](const CheckResult& result) {
-        return result.Failed();
-    });
+    const bool failed =
+        std::any_of(results.begin(), results.end(), [](const CheckResult& result) { return result.Failed(); });
     const std::vector<Diagnostic> diagnostics = CollectDiagnostics(results);
 
     if (args.reportJson.has_value()) {
