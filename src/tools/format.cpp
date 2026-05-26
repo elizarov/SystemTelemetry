@@ -10,7 +10,6 @@
 #include <map>
 #include <optional>
 #include <regex>
-#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -20,6 +19,7 @@
 
 #include "tools/format_args.h"
 #include "tools/format_config.h"
+#include "tools/format_lexer.h"
 #include "tools/impl/lint_common.h"
 
 namespace {
@@ -27,25 +27,19 @@ namespace {
 using tools::format::FormatMode;
 using tools::format::FormatOptions;
 using tools::format::FormatterConfig;
-
-enum class TokenKind {
-    Word,
-    Number,
-    StringLiteral,
-    CharLiteral,
-    LineComment,
-    BlockComment,
-    Preprocessor,
-    Symbol,
-    Newline,
-};
-
-struct Token {
-    TokenKind kind = TokenKind::Symbol;
-    std::string text;
-};
-
-using TokenSpan = std::span<const Token>;
+using tools::format::DropTrailingCommas;
+using tools::format::IsCommentOrNewline;
+using tools::format::IsDigit;
+using tools::format::IsHexDigit;
+using tools::format::IsIdentifierBody;
+using tools::format::IsIdentifierStart;
+using tools::format::IsOctalDigit;
+using tools::format::IsSpaceButNotNewline;
+using tools::format::Token;
+using tools::format::TokenizeCharacterStream;
+using tools::format::TokenKind;
+using tools::format::TokenSpan;
+using tools::format::TokenSubspan;
 
 struct FileFormatResult {
     bool ok = true;
@@ -67,19 +61,6 @@ struct ParseResult {
     int errorColumn = 0;
     std::string errorSnippet;
 };
-
-TokenSpan TokenSubspan(TokenSpan tokens, size_t begin, size_t end) {
-    if (begin > tokens.size()) {
-        begin = tokens.size();
-    }
-    if (end < begin) {
-        end = begin;
-    }
-    if (end > tokens.size()) {
-        end = tokens.size();
-    }
-    return tokens.subspan(begin, end - begin);
-}
 
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
     const double seconds = std::chrono::duration<double>(elapsed).count();
@@ -124,260 +105,6 @@ std::string ToFileLineEndings(std::string_view text) {
 
 std::string Spaces(int count) {
     return std::string(static_cast<size_t>(std::max(0, count)), ' ');
-}
-
-bool IsIdentifierStart(char ch) {
-    return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_';
-}
-
-bool IsIdentifierBody(char ch) {
-    return IsIdentifierStart(ch) || (ch >= '0' && ch <= '9');
-}
-
-bool IsDigit(char ch) {
-    return ch >= '0' && ch <= '9';
-}
-
-bool IsHexDigit(char ch) {
-    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
-}
-
-bool IsOctalDigit(char ch) {
-    return ch >= '0' && ch <= '7';
-}
-
-bool IsSpaceButNotNewline(char ch) {
-    return ch == ' ' || ch == '\t' || ch == '\f' || ch == '\v';
-}
-
-bool IsCommentOrNewline(const Token& token) {
-    return token.kind == TokenKind::Newline ||
-        token.kind == TokenKind::LineComment ||
-        token.kind == TokenKind::BlockComment;
-}
-
-bool IsGroupClose(std::string_view text) {
-    return text == ")" || text == "]" || text == "}";
-}
-
-bool IsTrailingComma(TokenSpan tokens, size_t index) {
-    if (index >= tokens.size() || tokens[index].text != ",") {
-        return false;
-    }
-    for (size_t next = index + 1; next < tokens.size(); ++next) {
-        if (IsCommentOrNewline(tokens[next])) {
-            continue;
-        }
-        return IsGroupClose(tokens[next].text);
-    }
-    return false;
-}
-
-std::vector<Token> DropTrailingCommas(std::vector<Token> tokens) {
-    std::vector<Token> result;
-    result.reserve(tokens.size());
-    for (size_t index = 0; index < tokens.size(); ++index) {
-        if (!IsTrailingComma(tokens, index)) {
-            result.push_back(std::move(tokens[index]));
-        }
-    }
-    return result;
-}
-
-bool IsAtPreprocessorStart(std::string_view text, size_t index) {
-    if (index > text.size() || index != 0 && text[index - 1] != '\n') {
-        return false;
-    }
-    while (index < text.size() && IsSpaceButNotNewline(text[index])) {
-        ++index;
-    }
-    return index < text.size() && text[index] == '#';
-}
-
-std::string ReadPreprocessor(std::string_view text, size_t& index) {
-    const size_t start = index;
-    while (index < text.size()) {
-        const size_t lineStart = index;
-        while (index < text.size() && text[index] != '\n') {
-            ++index;
-        }
-        size_t lineEnd = index;
-        while (lineEnd > lineStart && IsSpaceButNotNewline(text[lineEnd - 1])) {
-            --lineEnd;
-        }
-        const bool continued = lineEnd > lineStart && text[lineEnd - 1] == '\\';
-        if (index < text.size() && text[index] == '\n') {
-            ++index;
-        }
-        if (!continued) {
-            break;
-        }
-    }
-    return std::string(text.substr(start, index - start));
-}
-
-std::string ReadQuoted(std::string_view text, size_t& index, char quote) {
-    const size_t start = index;
-    ++index;
-    while (index < text.size()) {
-        const char ch = text[index];
-        if (ch == '\\' && index + 1 < text.size()) {
-            index += 2;
-            continue;
-        }
-        ++index;
-        if (ch == quote) {
-            break;
-        }
-    }
-    return std::string(text.substr(start, index - start));
-}
-
-std::optional<std::string> TryReadRawString(std::string_view text, size_t& index) {
-    if (index + 1 >= text.size() || text[index] != 'R' || text[index + 1] != '"') {
-        return std::nullopt;
-    }
-    size_t delimiterStart = index + 2;
-    size_t openParen = delimiterStart;
-    while (openParen < text.size() && text[openParen] != '(' && text[openParen] != '\n') {
-        ++openParen;
-    }
-    if (openParen >= text.size() || text[openParen] != '(') {
-        return std::nullopt;
-    }
-    const std::string delimiter(text.substr(delimiterStart, openParen - delimiterStart));
-    const std::string terminator = ")" + delimiter + "\"";
-    const size_t end = text.find(terminator, openParen + 1);
-    if (end == std::string_view::npos) {
-        return std::nullopt;
-    }
-    const size_t start = index;
-    index = end + terminator.size();
-    return std::string(text.substr(start, index - start));
-}
-
-std::vector<Token> Tokenize(std::string_view text) {
-    std::vector<Token> tokens;
-    size_t index = 0;
-    while (index < text.size()) {
-        const char ch = text[index];
-        if (IsAtPreprocessorStart(text, index)) {
-            tokens.push_back({TokenKind::Preprocessor, ReadPreprocessor(text, index)});
-            continue;
-        }
-        if (ch == '\n') {
-            tokens.push_back({TokenKind::Newline, "\n"});
-            ++index;
-            continue;
-        }
-        if (IsSpaceButNotNewline(ch)) {
-            ++index;
-            continue;
-        }
-        if (ch == '/' && index + 1 < text.size() && text[index + 1] == '/') {
-            const size_t start = index;
-            index += 2;
-            while (index < text.size() && text[index] != '\n') {
-                ++index;
-            }
-            tokens.push_back({TokenKind::LineComment, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (ch == '/' && index + 1 < text.size() && text[index + 1] == '*') {
-            const size_t start = index;
-            index += 2;
-            while (index + 1 < text.size() && !(text[index] == '*' && text[index + 1] == '/')) {
-                ++index;
-            }
-            if (index + 1 < text.size()) {
-                index += 2;
-            }
-            tokens.push_back({TokenKind::BlockComment, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (ch == 'R') {
-            if (std::optional<std::string> raw = TryReadRawString(text, index)) {
-                tokens.push_back({TokenKind::StringLiteral, *raw});
-                continue;
-            }
-        }
-        if (ch == '"') {
-            tokens.push_back({TokenKind::StringLiteral, ReadQuoted(text, index, '"')});
-            continue;
-        }
-        if (ch == '\'') {
-            tokens.push_back({TokenKind::CharLiteral, ReadQuoted(text, index, '\'')});
-            continue;
-        }
-        if (IsIdentifierStart(ch)) {
-            const size_t start = index;
-            ++index;
-            while (index < text.size() && IsIdentifierBody(text[index])) {
-                ++index;
-            }
-            tokens.push_back({TokenKind::Word, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (IsDigit(ch)) {
-            const size_t start = index;
-            ++index;
-            while (index < text.size() && (IsIdentifierBody(text[index]) || text[index] == '.')) {
-                ++index;
-            }
-            tokens.push_back({TokenKind::Number, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        static constexpr std::string_view kThreeCharOps[] = {"<<=", ">>=", "<=>", "...", "->*"};
-        bool matched = false;
-        for (std::string_view op : kThreeCharOps) {
-            if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
-                tokens.push_back({TokenKind::Symbol, std::string(op)});
-                index += op.size();
-                matched = true;
-                break;
-            }
-        }
-        if (matched) {
-            continue;
-        }
-        static constexpr std::string_view kTwoCharOps[] = {
-            "::",
-            "->",
-            "++",
-            "--",
-            "&&",
-            "||",
-            "==",
-            "!=",
-            "<=",
-            ">=",
-            "+=",
-            "-=",
-            "*=",
-            "/=",
-            "%=",
-            "&=",
-            "|=",
-            "^=",
-            "<<",
-            ">>",
-            "##",
-            ".*"
-        };
-        for (std::string_view op : kTwoCharOps) {
-            if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
-                tokens.push_back({TokenKind::Symbol, std::string(op)});
-                index += op.size();
-                matched = true;
-                break;
-            }
-        }
-        if (!matched) {
-            tokens.push_back({TokenKind::Symbol, std::string(1, ch)});
-            ++index;
-        }
-    }
-    return DropTrailingCommas(std::move(tokens));
 }
 
 bool IsControlBraceGroupOpen(std::string_view text) {
@@ -1326,7 +1053,7 @@ private:
             pendingPreprocessorBlank_ = true;
             return;
         }
-        std::vector<Token> replacementTokens = Tokenize(replacement);
+        std::vector<Token> replacementTokens = TokenizeCharacterStream(replacement);
         if (
             std::vector<std::vector<Token>> statements =
                 SplitStatementLikeMacroReplacement(defineLine, replacementTokens);
@@ -1350,14 +1077,15 @@ private:
             pendingPreprocessorBlank_ = true;
             return;
         }
-        const std::string normalizedReplacement = FormatInline(Tokenize(replacement));
+        const std::string normalizedReplacement = FormatInline(TokenizeCharacterStream(replacement));
         if (FitsRawLine(defineLine + " " + normalizedReplacement)) {
             EmitLine(defineLine + " " + normalizedReplacement);
             pendingPreprocessorBlank_ = true;
             return;
         }
         EmitLine(defineLine + " \\");
-        std::vector<std::string> replacementLines = FormatRange(Tokenize(normalizedReplacement), 1, {}, {});
+        std::vector<std::string> replacementLines =
+            FormatRange(TokenizeCharacterStream(normalizedReplacement), 1, {}, {});
         EmitDefineReplacementLines(replacementLines);
         pendingPreprocessorBlank_ = true;
     }
@@ -7415,7 +7143,7 @@ FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& con
     result.parseErrorLine = parse.errorLine;
     result.parseErrorColumn = parse.errorColumn;
     result.parseErrorSnippet = parse.errorSnippet;
-    result.formatted = formatter.Format(AddRequiredControlBraces(Tokenize(includeSorted)));
+    result.formatted = formatter.Format(AddRequiredControlBraces(TokenizeCharacterStream(includeSorted)));
     result.changed = normalized != result.formatted;
     return result;
 }
