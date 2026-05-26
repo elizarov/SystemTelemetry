@@ -217,7 +217,7 @@ render(
 );
 ```
 
-When a split operator-chain part is followed by an expression that also must split, keep the next expression's opener on the operator line when that opener fits. This opener economy applies uniformly to parenthesized groups, calls and member-call chains, subscripts, and braced constructions.
+Split formatter-owned chains with two or more chain operators do not use opener economy across chain boundaries. Each chain operator stays with the part before it, and the following part begins on its own line even when that part must split internally. Binary expressions are not treated as chains for this rule.
 
 ```cpp
 selected = Matches(region) || (

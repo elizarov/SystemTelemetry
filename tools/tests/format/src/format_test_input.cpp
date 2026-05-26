@@ -550,10 +550,12 @@ const auto* special=std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlaySt
 if(MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight,region.key)||(special!=nullptr&&*special==LayoutEditSelectionHighlightSpecial::AllTexts&&LayoutEditAnchorParameter(region.key).has_value()&&IsFontEditParameter(*LayoutEditAnchorParameter(region.key)))){appendHighlight(region,true);}
 }
 
-void PreferOperatorChainOpenerEconomy(){
+void SplitOperatorChainPartsLineByLine(){
 const int metricValue=firstValue+builder.WithSource(sourceValue).BuildMetricValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
+const int chainedMetricValue=firstValue+builder.WithSource(sourceValue).BuildMetricValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName)+finalValueWithLongName;
 const bool found=currentKey==layoutLookupTable[ComputeLayoutKeyIndex(firstKeyPartWithLongName,secondKeyPartWithLongName,thirdKeyPartWithLongName,fourthKeyPartWithLongName,fifthKeyPartWithLongName)];
 const RenderRect bounds=baseBounds|RenderRect{leftValueWithLongName,topValueWithLongName,rightValueWithLongName,bottomValueWithLongName,extraValueWithLongName,finalValueWithLongName};
+const bool loaded=!LoadString(values,DumpKey(historyPrefix,".series_ref"),history.seriesRef,error)||!LoadDoubleArrayField(values,DumpKey(historyPrefix,".samples"),history.samples,error)||!LoadDoubleArrayField(values,DumpKey(historyPrefix,".throughput_live_samples"),history.throughputLiveSamples,error)||!LoadDouble(values,DumpKey(historyPrefix,".throughput_bucket_total"),history.throughputBucketTotal,error)||!LoadUnsigned(values,DumpKey(historyPrefix,".throughput_bucket_sample_count"),history.throughputBucketSampleCount,error);
 }
 
 void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){

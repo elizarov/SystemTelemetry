@@ -222,7 +222,8 @@ void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
             layoutResolver_->layoutEditGuides_.size() +
             containerChildTargetCount +
             layoutResolver_->gapEditAnchors_.size() +
-            layoutResolver_->widgetEditGuides_.size() + (
+            layoutResolver_->widgetEditGuides_.size() +
+            (
                 layoutResolver_->staticEditableAnchorRegions_.size() +
                 layoutResolver_->dynamicEditableAnchorRegions_.size()
             ) * 2 +
@@ -955,13 +956,21 @@ void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState, cons
     }
 }
 
-void PreferOperatorChainOpenerEconomy() {
+void SplitOperatorChainPartsLineByLine() {
     const int metricValue = firstValue + builder.WithSource(sourceValue).BuildMetricValue(
         firstArgumentWithLongName,
         secondArgumentWithLongName,
         thirdArgumentWithLongName,
         fourthArgumentWithLongName
     );
+    const int chainedMetricValue = firstValue +
+        builder.WithSource(sourceValue).BuildMetricValue(
+            firstArgumentWithLongName,
+            secondArgumentWithLongName,
+            thirdArgumentWithLongName,
+            fourthArgumentWithLongName
+        ) +
+        finalValueWithLongName;
     const bool found = currentKey == layoutLookupTable[ComputeLayoutKeyIndex(
         firstKeyPartWithLongName,
         secondKeyPartWithLongName,
@@ -977,6 +986,21 @@ void PreferOperatorChainOpenerEconomy() {
         extraValueWithLongName,
         finalValueWithLongName
     };
+    const bool loaded = !LoadString(values, DumpKey(historyPrefix, ".series_ref"), history.seriesRef, error) ||
+        !LoadDoubleArrayField(values, DumpKey(historyPrefix, ".samples"), history.samples, error) ||
+        !LoadDoubleArrayField(
+            values,
+            DumpKey(historyPrefix, ".throughput_live_samples"),
+            history.throughputLiveSamples,
+            error
+        ) ||
+        !LoadDouble(values, DumpKey(historyPrefix, ".throughput_bucket_total"), history.throughputBucketTotal, error) ||
+        !LoadUnsigned(
+            values,
+            DumpKey(historyPrefix, ".throughput_bucket_sample_count"),
+            history.throughputBucketSampleCount,
+            error
+        );
 }
 
 void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {

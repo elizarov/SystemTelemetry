@@ -1207,7 +1207,8 @@ private:
         }
         if (
             next < tokens.size() &&
-            tokens[next].kind == TokenKind::Word && (
+            tokens[next].kind == TokenKind::Word &&
+            (
                 tokens[next].text == "else" ||
                 tokens[next].text == "catch" ||
                 tokens[next].text == "finally" ||
@@ -3274,28 +3275,29 @@ private:
         if (!memberAccess) {
             return std::nullopt;
         }
-        const std::optional<GroupPair> group = FindFirstWrappableGroupPairAfter(tokens, *memberAccess + 1);
-        if (!group || tokens[group->open].text != "(") {
-            return std::nullopt;
+        size_t searchBegin = *memberAccess + 1;
+        while (std::optional<GroupPair> group = FindFirstWrappableGroupPairAfter(tokens, searchBegin)) {
+            searchBegin = group->close + 1;
+            if (tokens[group->open].text != "(" || IsFunctionPointerDeclaratorGroupOpen(tokens, group->open)) {
+                continue;
+            }
+            std::vector<Token> inner(
+                tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+                tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
+            );
+            if (
+                !ContainsTopLevelSeparator(inner, ',') &&
+                !FindCombinedNestedGroupCandidate(tokens, *group, indentLevel, prefix)
+            ) {
+                continue;
+            }
+            std::vector<Token> firstLineTokens(
+                tokens.begin(),
+                tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
+            );
+            return Fits(indentLevel, std::string(prefix) + FormatInline(firstLineTokens)) ? group : std::nullopt;
         }
-        if (IsFunctionPointerDeclaratorGroupOpen(tokens, group->open)) {
-            return std::nullopt;
-        }
-        std::vector<Token> inner(
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->close)
-        );
-        if (
-            !ContainsTopLevelSeparator(inner, ',') &&
-            !FindCombinedNestedGroupCandidate(tokens, *group, indentLevel, prefix)
-        ) {
-            return std::nullopt;
-        }
-        std::vector<Token> firstLineTokens(
-            tokens.begin(),
-            tokens.begin() + static_cast<std::ptrdiff_t>(group->open + 1)
-        );
-        return Fits(indentLevel, std::string(prefix) + FormatInline(firstLineTokens)) ? group : std::nullopt;
+        return std::nullopt;
     }
 
     std::optional<GroupPair> FindPreferredValueGroupAfterTemplateGroup(
@@ -3470,6 +3472,7 @@ private:
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
         const bool indentContinuation =
             indentSplitChainContinuation || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
+        const bool allowOpenerEconomy = CountChainBreakOperators(tokens, chainKind) < 2;
         for (size_t index = 0; index < parts.size(); ++index) {
             std::string partPrefix = index == 0 ? prefix : std::string{};
             std::string partSuffix;
@@ -3479,7 +3482,7 @@ private:
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             std::vector<std::string> partLines =
                 FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
-            if (index + 1 < parts.size()) {
+            if (allowOpenerEconomy && index + 1 < parts.size()) {
                 const std::string nextPartSuffix = index + 2 == parts.size() ? suffix : std::string{};
                 if (TryAppendOperatorChainPartOpeningToLastLine(
                     partLines,
@@ -3494,11 +3497,12 @@ private:
                     continue;
                 }
             }
-            if (index + 2 == parts.size() && partLines.size() > 1 && TryAppendFinalChainPartToLastLine(
-                partLines,
-                parts[index + 1],
-                suffix
-            )) {
+            if (
+                allowOpenerEconomy &&
+                index + 2 == parts.size() &&
+                partLines.size() > 1 &&
+                TryAppendFinalChainPartToLastLine(partLines, parts[index + 1], suffix)
+            ) {
                 lines.insert(lines.end(), partLines.begin(), partLines.end());
                 break;
             }
@@ -3858,6 +3862,9 @@ private:
         AppendSuffix(inlineText, suffix);
         if (Fits(indentLevel, inlineText)) {
             return {Indent(indentLevel) + inlineText};
+        }
+        if (std::optional<GroupPair> group = FindPreferredCallChainArgumentGroup(tokens, indentLevel, prefix)) {
+            return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
         }
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(tokens)) {
             return FormatSplitGroup(tokens, *group, indentLevel, std::move(prefix), std::move(suffix));
@@ -5143,6 +5150,18 @@ private:
 
     bool CanSplitOperatorChain(const std::vector<Token>& tokens) const {
         return SelectChainKind(tokens) != ChainKind::None;
+    }
+
+    size_t CountChainBreakOperators(const std::vector<Token>& tokens, ChainKind chainKind) const {
+        size_t count = 0;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
+                ++count;
+            }
+        }
+        return count;
     }
 
     ChainKind SelectChainKind(const std::vector<Token>& tokens) const {
