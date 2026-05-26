@@ -6,6 +6,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <io.h>
+#include <iterator>
 #include <map>
 #include <optional>
 #include <regex>
@@ -1820,15 +1821,41 @@ private:
         std::vector<LayoutNode> breakNodes;
     };
 
+    enum class LineTrimKind {
+        None,
+        Blank,
+        OpenBrace,
+        CloseBraceComma,
+        Other,
+    };
+
+    enum class LayoutChoiceKind {
+        None,
+        Compact,
+        TemplateDeclaration,
+        Assignment,
+        DeclarationValue,
+        Lambda,
+        ConstructorInitializer,
+        OperatorChain,
+        StringLiteralSequence,
+        Group,
+    };
+
     struct LayoutResult {
-        std::vector<std::string> lines;
         bool fits = false;
         int maxOverflow = 0;
         size_t lineCount = 0;
+        size_t lastLineWidth = 0;
         int deepestRenderedIndent = 0;
         int deepestBreakDepth = -1;
         size_t order = 0;
         bool compact = false;
+        LineTrimKind firstTrim = LineTrimKind::None;
+        LineTrimKind lastTrim = LineTrimKind::None;
+        LayoutChoiceKind choice = LayoutChoiceKind::None;
+        LayoutNode node{};
+        int variant = 0;
     };
 
     struct TernaryExpressionParts {
@@ -1845,14 +1872,39 @@ private:
         bool indentSplitChains = false,
         bool indentLogicalSplitChains = false
     ) const {
-        return FormatRangeResult(
+        std::vector<std::string> lines;
+        RenderRange(
+            lines,
             tokens,
             indentLevel,
             std::move(prefix),
             std::move(suffix),
             indentSplitChains,
             indentLogicalSplitChains
-        ).lines;
+        );
+        return lines;
+    }
+
+    void RenderRange(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        bool indentSplitChains = false,
+        bool indentLogicalSplitChains = false
+    ) const {
+        if (tokens.empty()) {
+            if (prefix.empty() && suffix.empty()) {
+                return;
+            }
+            lines.push_back(Indent(indentLevel) + prefix + suffix);
+            return;
+        }
+        const LayoutContext
+            context{indentLevel, std::move(prefix), std::move(suffix), indentSplitChains, indentLogicalSplitChains};
+        (void)FormatLayoutTreeResult(tokens, context);
+        RenderLayoutTree(lines, tokens, context);
     }
 
     LayoutResult FormatRangeResult(
@@ -1865,9 +1917,19 @@ private:
     ) const {
         if (tokens.empty()) {
             if (!prefix.empty() || !suffix.empty()) {
-                return ScoreLayoutCandidate({Indent(indentLevel) + prefix + suffix}, true, 0, 0);
+                return SingleLineLayout(
+                    indentLevel,
+                    prefix.size() + suffix.size(),
+                    true,
+                    0,
+                    0,
+                    LayoutChoiceKind::Compact,
+                    {},
+                    0,
+                    ClassifyTrimmedLine(prefix, suffix)
+                );
             }
-            return ScoreLayoutCandidate({}, true, 0, 0);
+            return EmptyLayout(true, 0, 0, LayoutChoiceKind::Compact, {}, 0);
         }
         const LayoutContext
             context{indentLevel, std::move(prefix), std::move(suffix), indentSplitChains, indentLogicalSplitChains};
@@ -1875,7 +1937,10 @@ private:
     }
 
     std::vector<std::string> FormatLayoutTree(const std::vector<Token>& tokens, const LayoutContext& context) const {
-        return FormatLayoutTreeResult(tokens, context).lines;
+        (void)FormatLayoutTreeResult(tokens, context);
+        std::vector<std::string> lines;
+        RenderLayoutTree(lines, tokens, context);
+        return lines;
     }
 
     LayoutResult FormatLayoutTreeResult(const std::vector<Token>& tokens, const LayoutContext& context) const {
@@ -1890,14 +1955,19 @@ private:
             !IsTemplateDeclarationPrefix(tokens) &&
             !IsRequiresClausePrefix(tokens);
         if (compactAllowed) {
-            std::string inlineText = context.prefix +
-                FormatInline(tokens, InlineBudget(context.indentLevel, context.prefix, context.suffix));
-            AppendSuffix(inlineText, context.suffix);
-            best = ScoreLayoutCandidate(
-                {Indent(context.indentLevel) + inlineText},
+            const size_t inlineWidth = context.prefix.size() +
+                FormatInlineLength(tokens, InlineBudget(context.indentLevel, context.prefix, context.suffix)) +
+                context.suffix.size();
+            best = SingleLineLayout(
+                context.indentLevel,
+                inlineWidth,
                 true,
                 static_cast<int>(tokens.size()) + 1,
-                0
+                0,
+                LayoutChoiceKind::Compact,
+                {},
+                0,
+                LineTrimKind::Other
             );
             hasBest = true;
         }
@@ -1908,6 +1978,10 @@ private:
                 continue;
             }
             OffsetBreakDepth(*candidate, node.depth);
+            candidate->node = node;
+            if (candidate->choice == LayoutChoiceKind::None) {
+                candidate->choice = LayoutChoiceForNode(node.kind);
+            }
             candidate->order = node.order;
             if (!hasBest || IsBetterLayout(*candidate, best)) {
                 best = std::move(*candidate);
@@ -1915,12 +1989,128 @@ private:
             }
         }
         if (!hasBest) {
-            std::string inlineText = context.prefix + FormatInline(tokens);
-            AppendSuffix(inlineText, context.suffix);
-            best = ScoreLayoutCandidate({Indent(context.indentLevel) + inlineText}, true, 0, 0);
+            best = SingleLineLayout(
+                context.indentLevel,
+                context.prefix.size() + FormatInlineLength(tokens) + context.suffix.size(),
+                true,
+                0,
+                0,
+                LayoutChoiceKind::Compact,
+                {},
+                0,
+                LineTrimKind::Other
+            );
         }
         layoutCache_[cacheKey] = best;
         return best;
+    }
+
+    void RenderLayoutTree(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        const LayoutContext& context
+    ) const {
+        const LayoutResult result = FormatLayoutTreeResult(tokens, context);
+        switch (result.choice) {
+            case LayoutChoiceKind::Compact:
+            case LayoutChoiceKind::None: {
+                std::string inlineText = context.prefix +
+                    FormatInline(tokens, InlineBudget(context.indentLevel, context.prefix, context.suffix));
+                AppendSuffix(inlineText, context.suffix);
+                lines.push_back(Indent(context.indentLevel) + inlineText);
+                return;
+            }
+            case LayoutChoiceKind::TemplateDeclaration:
+                AppendRenderedLines(
+                    lines,
+                    IsRequiresClausePrefix(tokens) ?
+                        FormatRequiresClause(tokens, context.indentLevel, context.prefix, context.suffix) :
+                        FormatTemplateDeclaration(tokens, context.indentLevel, context.prefix, context.suffix)
+                );
+                return;
+            case LayoutChoiceKind::Assignment:
+                RenderAssignment(
+                    lines,
+                    tokens,
+                    result.node.index,
+                    context.indentLevel,
+                    context.prefix,
+                    context.suffix,
+                    context.indentSplitChains,
+                    context.indentLogicalSplitChains
+                );
+                return;
+            case LayoutChoiceKind::DeclarationValue:
+                RenderDeclarationValueBreak(
+                    lines,
+                    tokens,
+                    result.node.index,
+                    context.indentLevel,
+                    context.prefix,
+                    context.suffix
+                );
+                return;
+            case LayoutChoiceKind::Lambda:
+                AppendRenderedLines(
+                    lines,
+                    FormatSplitLambda(tokens, result.node.index, context.indentLevel, context.prefix, context.suffix)
+                );
+                return;
+            case LayoutChoiceKind::ConstructorInitializer:
+                AppendRenderedLines(
+                    lines,
+                    FormatConstructorInitializerList(
+                        tokens,
+                        result.node.index,
+                        context.indentLevel,
+                        context.prefix,
+                        context.suffix
+                    )
+                );
+                return;
+            case LayoutChoiceKind::OperatorChain:
+                RenderOperatorChain(
+                    lines,
+                    tokens,
+                    context.indentLevel,
+                    context.prefix,
+                    context.suffix,
+                    context.indentSplitChains,
+                    context.indentLogicalSplitChains
+                );
+                return;
+            case LayoutChoiceKind::StringLiteralSequence:
+                AppendRenderedLines(
+                    lines,
+                    FormatStringLiteralSequence(tokens, context.indentLevel, context.prefix, context.suffix)
+                );
+                return;
+            case LayoutChoiceKind::Group:
+                if (result.variant == 1) {
+                    RenderStackedNestedGroup(
+                        lines,
+                        tokens,
+                        result.node.group,
+                        context.indentLevel,
+                        context.prefix,
+                        context.suffix
+                    );
+                } else {
+                    RenderSplitGroup(
+                        lines,
+                        tokens,
+                        result.node.group,
+                        context.indentLevel,
+                        context.prefix,
+                        context.suffix
+                    );
+                }
+                return;
+        }
+    }
+
+    static void AppendRenderedLines(std::vector<std::string>& lines, std::vector<std::string> rendered) {
+        lines.insert(lines.end(), std::make_move_iterator(rendered.begin()), std::make_move_iterator(rendered.end()));
     }
 
     LayoutTree BuildLayoutTree(const std::vector<Token>& tokens) const {
@@ -2103,18 +2293,6 @@ private:
         return GroupPair{open, *close};
     }
 
-    std::optional<std::vector<std::string>> FormatLayoutNode(
-        const std::vector<Token>& tokens,
-        const LayoutContext& context,
-        const LayoutNode& node
-    ) const {
-        std::optional<LayoutResult> result = FormatLayoutNodeResult(tokens, context, node);
-        if (!result) {
-            return std::nullopt;
-        }
-        return std::move(result->lines);
-    }
-
     std::optional<LayoutResult> FormatLayoutNodeResult(
         const std::vector<Token>& tokens,
         const LayoutContext& context,
@@ -2125,14 +2303,9 @@ private:
                 if (!IsRequiresClausePrefix(tokens) && !IsTemplateDeclarationPrefix(tokens)) {
                     return std::nullopt;
                 }
-                return ScoreLayoutCandidate(
-                    IsRequiresClausePrefix(tokens) ?
-                        FormatRequiresClause(tokens, context.indentLevel, context.prefix, context.suffix) :
-                        FormatTemplateDeclaration(tokens, context.indentLevel, context.prefix, context.suffix),
-                    false,
-                    0,
-                    0
-                );
+                return IsRequiresClausePrefix(tokens) ?
+                    FormatRequiresClauseResult(tokens, context.indentLevel, context.prefix, context.suffix) :
+                    FormatTemplateDeclarationResult(tokens, context.indentLevel, context.prefix, context.suffix);
             case LayoutNodeKind::Assignment:
                 return FormatAssignmentResult(
                     tokens,
@@ -2152,24 +2325,14 @@ private:
                     context.suffix
                 );
             case LayoutNodeKind::Lambda:
-                return ScoreLayoutCandidate(
-                    FormatSplitLambda(tokens, node.index, context.indentLevel, context.prefix, context.suffix),
-                    false,
-                    0,
-                    0
-                );
+                return FormatSplitLambdaResult(tokens, node.index, context.indentLevel, context.prefix, context.suffix);
             case LayoutNodeKind::ConstructorInitializer:
-                return ScoreLayoutCandidate(
-                    FormatConstructorInitializerList(
-                        tokens,
-                        node.index,
-                        context.indentLevel,
-                        context.prefix,
-                        context.suffix
-                    ),
-                    false,
-                    0,
-                    0
+                return FormatConstructorInitializerListResult(
+                    tokens,
+                    node.index,
+                    context.indentLevel,
+                    context.prefix,
+                    context.suffix
                 );
             case LayoutNodeKind::OperatorChain:
                 return FormatOperatorChainResult(
@@ -2181,12 +2344,7 @@ private:
                     context.indentLogicalSplitChains
                 );
             case LayoutNodeKind::StringLiteralSequence:
-                return ScoreLayoutCandidate(
-                    FormatStringLiteralSequence(tokens, context.indentLevel, context.prefix, context.suffix),
-                    false,
-                    0,
-                    0
-                );
+                return FormatStringLiteralSequenceResult(tokens, context.indentLevel, context.prefix, context.suffix);
             case LayoutNodeKind::Group:
                 return FormatSplitGroupResult(tokens, node.group, context.indentLevel, context.prefix, context.suffix);
         }
@@ -2199,27 +2357,134 @@ private:
         int breakDepth,
         size_t order
     ) const {
-        int maxOverflow = 0;
+        LayoutResult result = EmptyLayout(compact, breakDepth, order, LayoutChoiceKind::None, {}, 0);
         for (const std::string& line : lines) {
-            maxOverflow = std::max(maxOverflow, static_cast<int>(line.size()) - config_.columnLimit);
+            AppendMeasuredLine(result, line.size(), LeadingIndentLevel(line), ClassifyTrimmedLine(line));
         }
-        maxOverflow = std::max(0, maxOverflow);
-        const size_t lineCount = lines.size();
-        int deepestRenderedIndent = 0;
-        for (const std::string& line : lines) {
-            deepestRenderedIndent = std::max(deepestRenderedIndent, LeadingIndentLevel(line));
+        return result;
+    }
+
+    LayoutResult EmptyLayout(
+        bool compact,
+        int breakDepth,
+        size_t order,
+        LayoutChoiceKind choice,
+        LayoutNode node,
+        int variant
+    ) const {
+        LayoutResult result;
+        result.fits = true;
+        result.order = order;
+        result.compact = compact;
+        result.deepestBreakDepth = compact ? -1 : breakDepth;
+        result.choice = choice;
+        result.node = node;
+        result.variant = variant;
+        return result;
+    }
+
+    LayoutResult SingleLineLayout(
+        int indentLevel,
+        size_t contentWidth,
+        bool compact,
+        int breakDepth,
+        size_t order,
+        LayoutChoiceKind choice,
+        LayoutNode node,
+        int variant,
+        LineTrimKind trimKind = LineTrimKind::Other
+    ) const {
+        LayoutResult result = EmptyLayout(compact, breakDepth, order, choice, node, variant);
+        AppendMeasuredLine(result, IndentWidth(indentLevel) + contentWidth, indentLevel, trimKind);
+        return result;
+    }
+
+    void AppendMeasuredLine(LayoutResult& result, size_t width, int indentLevel, LineTrimKind trimKind) const {
+        const int overflow = std::max(0, static_cast<int>(width) - config_.columnLimit);
+        result.maxOverflow = std::max(result.maxOverflow, overflow);
+        result.fits = result.maxOverflow == 0;
+        result.deepestRenderedIndent = std::max(result.deepestRenderedIndent, indentLevel);
+        if (result.lineCount == 0) {
+            result.firstTrim = trimKind;
         }
-        const int deepestBreakDepth = compact ? -1 : breakDepth;
-        return LayoutResult{
-            std::move(lines),
-            maxOverflow == 0,
-            maxOverflow,
-            lineCount,
-            deepestRenderedIndent,
-            deepestBreakDepth,
-            order,
-            compact
-        };
+        result.lastTrim = trimKind;
+        result.lastLineWidth = width;
+        ++result.lineCount;
+    }
+
+    void AppendSuffixToLastLine(LayoutResult& result, std::string_view suffix) const {
+        if (suffix.empty() || result.lineCount == 0) {
+            return;
+        }
+        result.lastLineWidth += suffix.size();
+        result.maxOverflow = std::max(result.maxOverflow, OverflowForWidth(result.lastLineWidth));
+        result.fits = result.maxOverflow == 0;
+        result.lastTrim = LineTrimKind::Other;
+    }
+
+    void AppendMeasuredLayout(
+        LayoutResult& target,
+        const LayoutResult& child,
+        bool combineNestedInitializerBoundary = false,
+        int breakDepthOffset = 0
+    ) const {
+        if (child.lineCount == 0) {
+            MergeBreakDepth(target, child, breakDepthOffset);
+            return;
+        }
+        if (target.lineCount == 0) {
+            const int targetBreakDepth = target.deepestBreakDepth;
+            const bool targetCompact = target.compact;
+            const size_t targetOrder = target.order;
+            const LayoutChoiceKind targetChoice = target.choice;
+            const LayoutNode targetNode = target.node;
+            const int targetVariant = target.variant;
+            target = child;
+            target.deepestBreakDepth = targetBreakDepth;
+            target.compact = targetCompact;
+            target.order = targetOrder;
+            target.choice = targetChoice;
+            target.node = targetNode;
+            target.variant = targetVariant;
+            MergeBreakDepth(target, child, breakDepthOffset);
+            return;
+        }
+        if (
+            combineNestedInitializerBoundary &&
+            target.lastTrim == LineTrimKind::CloseBraceComma &&
+            child.firstTrim == LineTrimKind::OpenBrace
+        ) {
+            const size_t combinedWidth = target.lastLineWidth + 2;
+            target.maxOverflow =
+                std::max(target.maxOverflow, std::max(child.maxOverflow, OverflowForWidth(combinedWidth)));
+            target.fits = target.maxOverflow == 0;
+            target.lineCount += child.lineCount - 1;
+            if (child.lineCount == 1) {
+                target.lastLineWidth = combinedWidth;
+                target.lastTrim = LineTrimKind::Other;
+            } else {
+                target.lastLineWidth = child.lastLineWidth;
+                target.lastTrim = child.lastTrim;
+            }
+            target.deepestRenderedIndent = std::max(target.deepestRenderedIndent, child.deepestRenderedIndent);
+            MergeBreakDepth(target, child, breakDepthOffset);
+            return;
+        }
+        target.maxOverflow = std::max(target.maxOverflow, child.maxOverflow);
+        target.fits = target.maxOverflow == 0;
+        target.lineCount += child.lineCount;
+        target.lastLineWidth = child.lastLineWidth;
+        target.lastTrim = child.lastTrim;
+        target.deepestRenderedIndent = std::max(target.deepestRenderedIndent, child.deepestRenderedIndent);
+        MergeBreakDepth(target, child, breakDepthOffset);
+    }
+
+    int OverflowForWidth(size_t width) const {
+        return std::max(0, static_cast<int>(width) - config_.columnLimit);
+    }
+
+    size_t IndentWidth(int indentLevel) const {
+        return static_cast<size_t>(std::max(0, indentLevel)) * static_cast<size_t>(config_.indentWidth);
     }
 
     bool IsBetterLayout(const LayoutResult& candidate, const LayoutResult& current) const {
@@ -2244,6 +2509,28 @@ private:
         return candidate.compact && !current.compact;
     }
 
+    static LayoutChoiceKind LayoutChoiceForNode(LayoutNodeKind kind) {
+        switch (kind) {
+            case LayoutNodeKind::TemplateDeclaration:
+                return LayoutChoiceKind::TemplateDeclaration;
+            case LayoutNodeKind::Assignment:
+                return LayoutChoiceKind::Assignment;
+            case LayoutNodeKind::DeclarationValue:
+                return LayoutChoiceKind::DeclarationValue;
+            case LayoutNodeKind::Lambda:
+                return LayoutChoiceKind::Lambda;
+            case LayoutNodeKind::ConstructorInitializer:
+                return LayoutChoiceKind::ConstructorInitializer;
+            case LayoutNodeKind::OperatorChain:
+                return LayoutChoiceKind::OperatorChain;
+            case LayoutNodeKind::StringLiteralSequence:
+                return LayoutChoiceKind::StringLiteralSequence;
+            case LayoutNodeKind::Group:
+                return LayoutChoiceKind::Group;
+        }
+        return LayoutChoiceKind::None;
+    }
+
     void MergeBreakDepth(LayoutResult& target, const LayoutResult& nested, int depthOffset) const {
         if (nested.deepestBreakDepth < 0) {
             return;
@@ -2264,6 +2551,41 @@ private:
             ++spaces;
         }
         return static_cast<int>(spaces / static_cast<size_t>(config_.indentWidth));
+    }
+
+    LineTrimKind ClassifyTrimmedLine(std::string_view line) const {
+        size_t begin = 0;
+        while (begin < line.size() && IsSpaceButNotNewline(line[begin])) {
+            ++begin;
+        }
+        size_t end = line.size();
+        while (end > begin && IsSpaceButNotNewline(line[end - 1])) {
+            --end;
+        }
+        const std::string_view trimmed = line.substr(begin, end - begin);
+        if (trimmed.empty()) {
+            return LineTrimKind::Blank;
+        }
+        if (trimmed == "{") {
+            return LineTrimKind::OpenBrace;
+        }
+        if (trimmed == "},") {
+            return LineTrimKind::CloseBraceComma;
+        }
+        return LineTrimKind::Other;
+    }
+
+    LineTrimKind ClassifyTrimmedLine(std::string_view line, std::string_view suffix) const {
+        if (line.empty() && suffix.empty()) {
+            return LineTrimKind::Blank;
+        }
+        if (line == "{" && suffix.empty()) {
+            return LineTrimKind::OpenBrace;
+        }
+        if (line == "}" && suffix == ",") {
+            return LineTrimKind::CloseBraceComma;
+        }
+        return LineTrimKind::Other;
     }
 
     std::string LayoutCacheKey(const std::vector<Token>& tokens, const LayoutContext& context) const {
@@ -2338,6 +2660,72 @@ private:
         return lines;
     }
 
+    LayoutResult FormatTemplateDeclarationResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        const size_t open = NextSignificantIndex(tokens, 1);
+        const std::optional<size_t> close = FindTemplateAngleClose(tokens, open);
+        if (!close) {
+            return SingleLineLayout(
+                indentLevel,
+                prefix.size() + FormatInlineLength(tokens) + suffix.size(),
+                true,
+                0,
+                0,
+                LayoutChoiceKind::TemplateDeclaration,
+                {},
+                0,
+                LineTrimKind::Other
+            );
+        }
+        std::vector<Token> templatePrefix(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1));
+        std::vector<Token> declaration(tokens.begin() + static_cast<std::ptrdiff_t>(*close + 1), tokens.end());
+        const size_t templatePrefixWidth = prefix.size() + FormatInlineLength(templatePrefix);
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::TemplateDeclaration, {}, 0);
+        if (FitsWidth(indentLevel, templatePrefixWidth)) {
+            AppendMeasuredLine(
+                result,
+                IndentWidth(indentLevel) + templatePrefixWidth,
+                indentLevel,
+                LineTrimKind::Other
+            );
+        } else {
+            LayoutResult prefixResult =
+                FormatSplitGroupResult(templatePrefix, GroupPair{open, *close}, indentLevel, std::move(prefix), {});
+            AppendMeasuredLayout(result, prefixResult, false, 1);
+        }
+        if (declaration.empty()) {
+            AppendSuffixToLastLine(result, suffix);
+            return result;
+        }
+        if (std::optional<RequiresClauseParts> requiresClause = SplitRequiresClause(declaration)) {
+            const size_t inlineRequiresWidth = FormatInlineRequiresClauseLength(requiresClause->condition);
+            if (result.lineCount == 1 && FitsWidth(indentLevel, templatePrefixWidth + 1 + inlineRequiresWidth)) {
+                result = EmptyLayout(false, 0, 0, LayoutChoiceKind::TemplateDeclaration, {}, 0);
+                AppendMeasuredLine(
+                    result,
+                    IndentWidth(indentLevel) + templatePrefixWidth + 1 + inlineRequiresWidth,
+                    indentLevel,
+                    LineTrimKind::Other
+                );
+                LayoutResult declarationResult =
+                    FormatRangeResult(requiresClause->declaration, indentLevel, {}, std::move(suffix));
+                AppendMeasuredLayout(result, declarationResult, false, 1);
+            } else {
+                LayoutResult declarationResult =
+                    FormatRequiresClauseResult(declaration, indentLevel + 1, {}, std::move(suffix), indentLevel);
+                AppendMeasuredLayout(result, declarationResult, false, 1);
+            }
+            return result;
+        }
+        LayoutResult declarationResult = FormatRangeResult(declaration, indentLevel, {}, std::move(suffix));
+        AppendMeasuredLayout(result, declarationResult, false, 1);
+        return result;
+    }
+
     bool IsRequiresClausePrefix(const std::vector<Token>& tokens) const {
         return SplitRequiresClause(tokens).has_value();
     }
@@ -2370,6 +2758,10 @@ private:
 
     std::string FormatInlineRequiresClause(const std::vector<Token>& condition) const {
         return "requires(" + FormatInline(condition) + ")";
+    }
+
+    size_t FormatInlineRequiresClauseLength(const std::vector<Token>& condition) const {
+        return std::string_view("requires(").size() + FormatInlineLength(condition) + 1;
     }
 
     std::vector<std::string> FormatRequiresClause(
@@ -2408,6 +2800,53 @@ private:
         return lines;
     }
 
+    LayoutResult FormatRequiresClauseResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        std::optional<int> declarationIndentLevel = std::nullopt
+    ) const {
+        const std::optional<RequiresClauseParts> parts = SplitRequiresClause(tokens);
+        if (!parts) {
+            return SingleLineLayout(
+                indentLevel,
+                prefix.size() + FormatInlineLength(tokens) + suffix.size(),
+                true,
+                0,
+                0,
+                LayoutChoiceKind::TemplateDeclaration,
+                {},
+                0,
+                LineTrimKind::Other
+            );
+        }
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::TemplateDeclaration, {}, 0);
+        const size_t requiresLineWidth = prefix.size() + FormatInlineRequiresClauseLength(parts->condition);
+        if (FitsWidth(indentLevel, requiresLineWidth)) {
+            AppendMeasuredLine(result, IndentWidth(indentLevel) + requiresLineWidth, indentLevel, LineTrimKind::Other);
+        } else {
+            AppendMeasuredLine(
+                result,
+                IndentWidth(indentLevel) + prefix.size() + std::string_view("requires(").size(),
+                indentLevel,
+                LineTrimKind::Other
+            );
+            LayoutResult conditionResult = FormatRangeResult(parts->condition, indentLevel + 1, {}, {}, true);
+            AppendMeasuredLayout(result, conditionResult, false, 1);
+            AppendMeasuredLine(result, IndentWidth(indentLevel) + 1, indentLevel, LineTrimKind::Other);
+        }
+        if (parts->declaration.empty()) {
+            AppendSuffixToLastLine(result, suffix);
+            return result;
+        }
+        const int trailingDeclarationIndentLevel = declarationIndentLevel.value_or(indentLevel);
+        LayoutResult declarationResult =
+            FormatRangeResult(parts->declaration, trailingDeclarationIndentLevel, {}, std::move(suffix));
+        AppendMeasuredLayout(result, declarationResult, false, 1);
+        return result;
+    }
+
     std::vector<std::string> FormatAssignment(
         const std::vector<Token>& tokens,
         size_t assignment,
@@ -2417,7 +2856,9 @@ private:
         bool indentSplitChains,
         bool indentLogicalSplitChains
     ) const {
-        return FormatAssignmentResult(
+        std::vector<std::string> lines;
+        RenderAssignment(
+            lines,
             tokens,
             assignment,
             indentLevel,
@@ -2425,7 +2866,8 @@ private:
             std::move(suffix),
             indentSplitChains,
             indentLogicalSplitChains
-        ).lines;
+        );
+        return lines;
     }
 
     LayoutResult FormatAssignmentResult(
@@ -2438,23 +2880,44 @@ private:
         bool indentLogicalSplitChains
     ) const {
         if (StartsWithInitializerList(tokens, assignment + 1)) {
-            return ScoreLayoutCandidate(
-                FormatInitializerAssignment(tokens, assignment, indentLevel, std::move(prefix), std::move(suffix)),
-                false,
-                0,
-                0
+            const size_t open = NextSignificantIndex(tokens, assignment + 1);
+            const std::optional<size_t> close = FindMatchingClose(tokens, open);
+            if (!close) {
+                return SingleLineLayout(
+                    indentLevel,
+                    prefix.size() + FormatInlineLength(tokens) + suffix.size(),
+                    true,
+                    0,
+                    0,
+                    LayoutChoiceKind::Assignment,
+                    {},
+                    0,
+                    LineTrimKind::Other
+                );
+            }
+            LayoutResult result = FormatSplitGroupResult(
+                tokens,
+                GroupPair{open, *close},
+                indentLevel,
+                std::move(prefix),
+                std::move(suffix)
             );
+            result.choice = LayoutChoiceKind::Assignment;
+            result.variant = 0;
+            return result;
         }
-        std::vector<std::string> lines;
         std::vector<Token> lhs(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1));
         std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1), tokens.end());
-        lines.push_back(Indent(indentLevel) + prefix + FormatInline(lhs));
         LayoutResult rhsResult =
             FormatRangeResult(rhs, indentLevel + 1, {}, suffix, indentSplitChains, indentLogicalSplitChains);
-        lines.insert(lines.end(), rhsResult.lines.begin(), rhsResult.lines.end());
-
-        LayoutResult best = ScoreLayoutCandidate(std::move(lines), false, 0, 0);
-        MergeBreakDepth(best, rhsResult, 1);
+        LayoutResult best = EmptyLayout(false, 0, 0, LayoutChoiceKind::Assignment, {}, 1);
+        AppendMeasuredLine(
+            best,
+            IndentWidth(indentLevel) + prefix.size() + FormatInlineLength(lhs),
+            indentLevel,
+            LineTrimKind::Other
+        );
+        AppendMeasuredLayout(best, rhsResult, false, 1);
         std::string attachedPrefix = prefix + FormatInline(lhs) + " ";
         LayoutResult attachedRhs = FormatRangeResult(
             rhs,
@@ -2464,9 +2927,12 @@ private:
             indentSplitChains,
             indentLogicalSplitChains
         );
-        LayoutResult attached =
-            ScoreLayoutCandidate(std::move(attachedRhs.lines), attachedRhs.deepestBreakDepth < 0, 0, 1);
-        MergeBreakDepth(attached, attachedRhs, 1);
+        LayoutResult attached = attachedRhs;
+        attached.choice = LayoutChoiceKind::Assignment;
+        attached.variant = 2;
+        attached.order = 1;
+        attached.compact = attachedRhs.deepestBreakDepth < 0;
+        attached.deepestBreakDepth = attached.compact ? -1 : attachedRhs.deepestBreakDepth + 1;
         if (IsBetterLayout(attached, best)) {
             best = std::move(attached);
         }
@@ -2474,14 +2940,12 @@ private:
         std::vector<Token> lhsValue(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment));
         if (!lhsValue.empty()) {
             LayoutResult lhsResult = FormatRangeResult(lhsValue, indentLevel, prefix, " =", true);
-            if (!lhsResult.lines.empty()) {
+            if (lhsResult.lineCount > 0) {
                 LayoutResult splitRhs =
                     FormatRangeResult(rhs, indentLevel + 1, {}, suffix, indentSplitChains, indentLogicalSplitChains);
-                std::vector<std::string> lhsLines = std::move(lhsResult.lines);
-                lhsLines.insert(lhsLines.end(), splitRhs.lines.begin(), splitRhs.lines.end());
-                LayoutResult splitLhs = ScoreLayoutCandidate(std::move(lhsLines), false, 0, 2);
-                MergeBreakDepth(splitLhs, lhsResult, 1);
-                MergeBreakDepth(splitLhs, splitRhs, 1);
+                LayoutResult splitLhs = EmptyLayout(false, 0, 2, LayoutChoiceKind::Assignment, {}, 3);
+                AppendMeasuredLayout(splitLhs, lhsResult, false, 1);
+                AppendMeasuredLayout(splitLhs, splitRhs, false, 1);
                 if (IsBetterLayout(splitLhs, best)) {
                     best = std::move(splitLhs);
                 }
@@ -2502,17 +2966,95 @@ private:
         }
         std::vector<Token> typeTokens(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(declarator));
         std::vector<Token> valueTokens(tokens.begin() + static_cast<std::ptrdiff_t>(declarator), tokens.end());
-        std::string typeLine = prefix + FormatInline(typeTokens);
-        if (typeLine.empty()) {
+        const size_t typeWidth = prefix.size() + FormatInlineLength(typeTokens);
+        if (typeWidth == 0) {
             return std::nullopt;
         }
 
         LayoutResult valueResult = FormatRangeResult(valueTokens, indentLevel + 1, {}, std::move(suffix), true);
-        std::vector<std::string> lines{Indent(indentLevel) + std::move(typeLine)};
-        lines.insert(lines.end(), valueResult.lines.begin(), valueResult.lines.end());
-        LayoutResult result = ScoreLayoutCandidate(std::move(lines), false, 0, 0);
-        MergeBreakDepth(result, valueResult, 1);
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::DeclarationValue, {}, 0);
+        AppendMeasuredLine(result, IndentWidth(indentLevel) + typeWidth, indentLevel, LineTrimKind::Other);
+        AppendMeasuredLayout(result, valueResult, false, 1);
         return result;
+    }
+
+    void RenderAssignment(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        size_t assignment,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
+    ) const {
+        const LayoutResult result = FormatAssignmentResult(
+            tokens,
+            assignment,
+            indentLevel,
+            prefix,
+            suffix,
+            indentSplitChains,
+            indentLogicalSplitChains
+        );
+        if (StartsWithInitializerList(tokens, assignment + 1) || result.variant == 0) {
+            AppendRenderedLines(
+                lines,
+                FormatInitializerAssignment(tokens, assignment, indentLevel, std::move(prefix), std::move(suffix))
+            );
+            return;
+        }
+        std::vector<Token> lhs(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1));
+        std::vector<Token> rhs(tokens.begin() + static_cast<std::ptrdiff_t>(assignment + 1), tokens.end());
+        if (result.variant == 2) {
+            std::string attachedPrefix = std::move(prefix) + FormatInline(lhs) + " ";
+            RenderRange(
+                lines,
+                rhs,
+                indentLevel,
+                std::move(attachedPrefix),
+                std::move(suffix),
+                indentSplitChains,
+                indentLogicalSplitChains
+            );
+            return;
+        }
+        if (result.variant == 3) {
+            std::vector<Token> lhsValue(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(assignment));
+            RenderRange(lines, lhsValue, indentLevel, std::move(prefix), " =", true);
+            RenderRange(
+                lines,
+                rhs,
+                indentLevel + 1,
+                {},
+                std::move(suffix),
+                indentSplitChains,
+                indentLogicalSplitChains
+            );
+            return;
+        }
+        lines.push_back(Indent(indentLevel) + std::move(prefix) + FormatInline(lhs));
+        RenderRange(lines, rhs, indentLevel + 1, {}, std::move(suffix), indentSplitChains, indentLogicalSplitChains);
+    }
+
+    void RenderDeclarationValueBreak(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        size_t declarator,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        if (declarator == 0 || declarator >= tokens.size()) {
+            std::string inlineText = std::move(prefix) + FormatInline(tokens);
+            AppendSuffix(inlineText, suffix);
+            lines.push_back(Indent(indentLevel) + inlineText);
+            return;
+        }
+        std::vector<Token> typeTokens(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(declarator));
+        std::vector<Token> valueTokens(tokens.begin() + static_cast<std::ptrdiff_t>(declarator), tokens.end());
+        lines.push_back(Indent(indentLevel) + std::move(prefix) + FormatInline(typeTokens));
+        RenderRange(lines, valueTokens, indentLevel + 1, {}, std::move(suffix), true);
     }
 
     std::string FormatGroupOpeningLine(const std::vector<Token>& tokens, GroupPair group) const {
@@ -2529,6 +3071,33 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
         );
         return FormatInline(firstLineTokens);
+    }
+
+    size_t FormatGroupOpeningLineLength(const std::vector<Token>& tokens, GroupPair group) const {
+        if (group.open < tokens.size() && tokens[group.open].text == "<" && IsTemplateAngleOpen(tokens, group.open)) {
+            std::vector<Token> beforeOpen(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(group.open));
+            size_t length = FormatInlineLength(beforeOpen);
+            if (!beforeOpen.empty() && beforeOpen.back().text == "template") {
+                ++length;
+            }
+            return length + 1;
+        }
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+        );
+        return FormatInlineLength(firstLineTokens);
+    }
+
+    LineTrimKind GroupOpeningTrimKind(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        std::string_view prefix
+    ) const {
+        if (prefix.empty() && group.open == 0 && group.open < tokens.size() && tokens[group.open].text == "{") {
+            return LineTrimKind::OpenBrace;
+        }
+        return LineTrimKind::Other;
     }
 
     std::vector<std::string> FormatInitializerAssignment(
@@ -2580,6 +3149,21 @@ private:
         return lines;
     }
 
+    LayoutResult FormatSplitLambdaResult(
+        const std::vector<Token>& tokens,
+        size_t bodyOpen,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        return ScoreLayoutCandidate(
+            FormatSplitLambda(tokens, bodyOpen, indentLevel, std::move(prefix), std::move(suffix)),
+            false,
+            0,
+            0
+        );
+    }
+
     std::vector<std::string> FormatLambdaHeaderWithLeadingTokens(
         const std::vector<Token>& header,
         int indentLevel,
@@ -2621,12 +3205,14 @@ private:
         std::string prefix
     ) const {
         LayoutResult best;
+        std::vector<std::string> bestLines;
         bool hasBest = false;
         size_t order = 0;
         const auto consider = [&](std::vector<std::string> lines, int breakDepth) {
-            LayoutResult candidate = ScoreLayoutCandidate(std::move(lines), false, breakDepth, order++);
+            LayoutResult candidate = ScoreLayoutCandidate(lines, false, breakDepth, order++);
             if (!hasBest || IsBetterLayout(candidate, best)) {
                 best = std::move(candidate);
+                bestLines = std::move(lines);
                 hasBest = true;
             }
         };
@@ -2651,7 +3237,7 @@ private:
         ) {
             consider(*splitCaptures, 0);
         }
-        return best.lines;
+        return bestLines;
     }
 
     std::optional<std::vector<std::string>> FormatDetachedLambdaParameterLine(
@@ -2870,6 +3456,41 @@ private:
         return lines;
     }
 
+    LayoutResult FormatConstructorInitializerListResult(
+        const std::vector<Token>& tokens,
+        size_t initializerColon,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<Token> header(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(initializerColon));
+        std::vector<Token> initializers(
+            tokens.begin() + static_cast<std::ptrdiff_t>(initializerColon + 1),
+            tokens.end()
+        );
+        LayoutResult result = FormatConstructorInitializerHeaderResult(header, indentLevel, std::move(prefix));
+        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
+        const bool separateBodyOpen = suffix == " {";
+        for (size_t index = 0; index < elements.size(); ++index) {
+            if (elements[index].empty()) {
+                continue;
+            }
+            std::string elementSuffix;
+            if (index + 1 < elements.size()) {
+                elementSuffix = ",";
+            } else if (!separateBodyOpen) {
+                elementSuffix = suffix;
+            }
+            LayoutResult elementResult = FormatRangeResult(elements[index], indentLevel + 1, {}, elementSuffix, true);
+            AppendMeasuredLayout(result, elementResult, false, 1);
+        }
+        if (separateBodyOpen) {
+            AppendMeasuredLine(result, IndentWidth(indentLevel) + 1, indentLevel, LineTrimKind::OpenBrace);
+        }
+        result.choice = LayoutChoiceKind::ConstructorInitializer;
+        return result;
+    }
+
     std::vector<std::string> FormatConstructorInitializerHeader(
         const std::vector<Token>& header,
         int indentLevel,
@@ -2887,6 +3508,23 @@ private:
         return FormatRange(header, indentLevel, std::move(prefix), " :");
     }
 
+    LayoutResult FormatConstructorInitializerHeaderResult(
+        const std::vector<Token>& header,
+        int indentLevel,
+        std::string prefix
+    ) const {
+        if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(header)) {
+            std::vector<Token> inner(
+                header.begin() + static_cast<std::ptrdiff_t>(group->open + 1),
+                header.begin() + static_cast<std::ptrdiff_t>(group->close)
+            );
+            if (header[group->open].text == "(" && ContainsTopLevelSeparator(inner, ',')) {
+                return FormatSplitGroupResult(header, *group, indentLevel, std::move(prefix), " :");
+            }
+        }
+        return FormatRangeResult(header, indentLevel, std::move(prefix), " :");
+    }
+
     std::vector<std::string> FormatSplitGroup(
         const std::vector<Token>& tokens,
         GroupPair group,
@@ -2894,7 +3532,14 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        return FormatSplitGroupResult(tokens, group, indentLevel, std::move(prefix), std::move(suffix)).lines;
+        const LayoutResult result = FormatSplitGroupResult(tokens, group, indentLevel, prefix, suffix);
+        std::vector<std::string> lines;
+        if (result.variant == 1) {
+            RenderStackedNestedGroup(lines, tokens, group, indentLevel, prefix, suffix);
+        } else {
+            RenderSplitGroup(lines, tokens, group, indentLevel, std::move(prefix), std::move(suffix));
+        }
+        return lines;
     }
 
     LayoutResult FormatSplitGroupResult(
@@ -2915,21 +3560,24 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
         );
         std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
-        std::vector<std::string> lines;
-        lines.push_back(Indent(indentLevel) + prefix + FormatGroupOpeningLine(tokens, group));
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::Group, {}, 0);
+        AppendMeasuredLine(
+            result,
+            IndentWidth(indentLevel) + prefix.size() + FormatGroupOpeningLineLength(tokens, group),
+            indentLevel,
+            GroupOpeningTrimKind(tokens, group, prefix)
+        );
         const bool startsWithControlFor = StartsWithControlFor(firstLineTokens);
         const bool splitForHeader =
             startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
         std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
-        std::vector<LayoutResult> nestedResults;
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             const bool indentSingleExpressionChains =
                 !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
             LayoutResult childResult = FormatRangeResult(inner, indentLevel + 1, {}, {}, indentSingleExpressionChains);
-            lines.insert(lines.end(), childResult.lines.begin(), childResult.lines.end());
-            nestedResults.push_back(std::move(childResult));
+            AppendMeasuredLayout(result, childResult, false, 1);
         } else {
             bool emittedElement = false;
             for (size_t index = 0; index < elements.size(); ++index) {
@@ -2947,21 +3595,19 @@ private:
                     startsWithControlFor,
                     emittedElement
                 );
-                if (elementResult.lines.empty()) {
+                if (elementResult.lineCount == 0) {
                     continue;
                 }
-                AppendSplitElementLines(lines, elementResult.lines, isInitializerElement);
-                nestedResults.push_back(std::move(elementResult));
+                AppendMeasuredLayout(result, elementResult, isInitializerElement, 1);
                 emittedElement = true;
             }
         }
-        std::string closeLine = FormatGroupClosingLine(tokens, group, suffixTokens);
-        AppendSuffix(closeLine, suffix);
-        lines.push_back(Indent(indentLevel) + closeLine);
-        LayoutResult result = ScoreLayoutCandidate(std::move(lines), false, 0, 0);
-        for (const LayoutResult& nestedResult : nestedResults) {
-            MergeBreakDepth(result, nestedResult, 1);
-        }
+        AppendMeasuredLine(
+            result,
+            IndentWidth(indentLevel) + FormatGroupClosingLineLength(tokens, group, suffixTokens) + suffix.size(),
+            indentLevel,
+            GroupClosingTrimKind(suffixTokens, suffix)
+        );
         if (stacked) {
             stacked->order = 1;
             if (IsBetterLayout(*stacked, result)) {
@@ -2982,7 +3628,9 @@ private:
         if (!result) {
             return std::nullopt;
         }
-        return std::move(result->lines);
+        std::vector<std::string> lines;
+        RenderStackedNestedGroup(lines, tokens, group, indentLevel, prefix, suffix);
+        return lines;
     }
 
     std::optional<LayoutResult> FormatStackedNestedGroupResult(
@@ -3000,8 +3648,8 @@ private:
             tokens.begin(),
             tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->open + 1)
         );
-        std::string firstLine = std::string(prefix) + FormatInline(firstLineTokens);
-        if (!Fits(indentLevel, firstLine)) {
+        const size_t firstLineWidth = prefix.size() + FormatInlineLength(firstLineTokens);
+        if (!FitsWidth(indentLevel, firstLineWidth)) {
             return std::nullopt;
         }
 
@@ -3009,13 +3657,13 @@ private:
             tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->open + 1),
             tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->close)
         );
-        std::vector<std::string> lines{Indent(indentLevel) + std::move(firstLine)};
+        const int nestedBreakDepth = NestedGroupBreakDepth(tokens, group, *nestedGroup);
+        LayoutResult result = EmptyLayout(false, nestedBreakDepth, 0, LayoutChoiceKind::Group, {}, 1);
+        AppendMeasuredLine(result, IndentWidth(indentLevel) + firstLineWidth, indentLevel, LineTrimKind::Other);
         std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
-        std::vector<LayoutResult> nestedResults;
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             LayoutResult childResult = FormatRangeResult(nestedInner, indentLevel + 1, {}, {}, true);
-            lines.insert(lines.end(), childResult.lines.begin(), childResult.lines.end());
-            nestedResults.push_back(std::move(childResult));
+            AppendMeasuredLayout(result, childResult, false, nestedBreakDepth + 1);
         } else {
             bool emittedElement = false;
             for (size_t index = 0; index < elements.size(); ++index) {
@@ -3032,12 +3680,129 @@ private:
                     false,
                     emittedElement
                 );
-                if (elementResult.lines.empty()) {
+                if (elementResult.lineCount == 0) {
                     continue;
                 }
-                AppendSplitElementLines(lines, elementResult.lines, tokens[nestedGroup->open].text == "{");
-                nestedResults.push_back(std::move(elementResult));
+                AppendMeasuredLayout(
+                    result,
+                    elementResult,
+                    tokens[nestedGroup->open].text == "{",
+                    nestedBreakDepth + 1
+                );
                 emittedElement = true;
+            }
+        }
+
+        std::vector<Token> closingTokens(
+            tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->close),
+            tokens.end()
+        );
+        AppendMeasuredLine(
+            result,
+            IndentWidth(indentLevel) + FormatInlineLength(closingTokens) + suffix.size(),
+            indentLevel,
+            LineTrimKind::Other
+        );
+        return result;
+    }
+
+    void RenderSplitGroup(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1)
+        );
+        std::vector<Token> inner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(group.close)
+        );
+        std::vector<Token> suffixTokens(tokens.begin() + static_cast<std::ptrdiff_t>(group.close), tokens.end());
+        lines.push_back(Indent(indentLevel) + std::move(prefix) + FormatGroupOpeningLine(tokens, group));
+        const bool startsWithControlFor = StartsWithControlFor(firstLineTokens);
+        const bool splitForHeader =
+            startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
+        const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
+        const char separator = splitForHeader ? ';' : ',';
+        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
+        if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
+            const bool indentSingleExpressionChains =
+                !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
+            RenderRange(lines, inner, indentLevel + 1, {}, {}, indentSingleExpressionChains);
+        } else {
+            bool emittedElement = false;
+            for (size_t index = 0; index < elements.size(); ++index) {
+                std::string elementSuffix;
+                if (index + 1 < elements.size()) {
+                    elementSuffix = std::string(1, separator);
+                }
+                const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
+                std::vector<std::string> elementLines = FormatDelimitedElement(
+                    elements[index],
+                    indentLevel + 1,
+                    elementSuffix,
+                    isInitializerElement,
+                    indentElementChains,
+                    startsWithControlFor,
+                    emittedElement
+                );
+                AppendSplitElementLines(lines, elementLines, isInitializerElement);
+                emittedElement = emittedElement || !elementLines.empty();
+            }
+        }
+        std::string closeLine = FormatGroupClosingLine(tokens, group, suffixTokens);
+        AppendSuffix(closeLine, suffix);
+        lines.push_back(Indent(indentLevel) + closeLine);
+    }
+
+    void RenderStackedNestedGroup(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        const std::optional<GroupPair> nestedGroup = FindStackableNestedGroup(tokens, group);
+        if (!nestedGroup) {
+            return;
+        }
+        std::vector<Token> firstLineTokens(
+            tokens.begin(),
+            tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->open + 1)
+        );
+        lines.push_back(Indent(indentLevel) + std::string(prefix) + FormatInline(firstLineTokens));
+
+        std::vector<Token> nestedInner(
+            tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->open + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(nestedGroup->close)
+        );
+        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
+        if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
+            RenderRange(lines, nestedInner, indentLevel + 1, {}, {}, true);
+        } else {
+            bool emittedElement = false;
+            for (size_t index = 0; index < elements.size(); ++index) {
+                std::string elementSuffix;
+                if (index + 1 < elements.size()) {
+                    elementSuffix = ",";
+                }
+                std::vector<std::string> elementLines = FormatDelimitedElement(
+                    elements[index],
+                    indentLevel + 1,
+                    elementSuffix,
+                    true,
+                    true,
+                    false,
+                    emittedElement
+                );
+                AppendSplitElementLines(lines, elementLines, tokens[nestedGroup->open].text == "{");
+                emittedElement = emittedElement || !elementLines.empty();
             }
         }
 
@@ -3048,12 +3813,6 @@ private:
         std::string closeLine = FormatInline(closingTokens);
         AppendSuffix(closeLine, suffix);
         lines.push_back(Indent(indentLevel) + closeLine);
-        const int nestedBreakDepth = NestedGroupBreakDepth(tokens, group, *nestedGroup);
-        LayoutResult result = ScoreLayoutCandidate(std::move(lines), false, nestedBreakDepth, 0);
-        for (const LayoutResult& nestedResult : nestedResults) {
-            MergeBreakDepth(result, nestedResult, nestedBreakDepth + 1);
-        }
-        return result;
     }
 
     int NestedGroupBreakDepth(const std::vector<Token>& tokens, GroupPair outer, GroupPair nested) const {
@@ -3117,6 +3876,34 @@ private:
             closeLine += afterText;
         }
         return closeLine;
+    }
+
+    size_t FormatGroupClosingLineLength(
+        const std::vector<Token>& tokens,
+        GroupPair group,
+        const std::vector<Token>& suffixTokens
+    ) const {
+        if (!IsTemplateAngleGroup(tokens, group) || suffixTokens.empty()) {
+            return FormatInlineLength(suffixTokens);
+        }
+        size_t length = suffixTokens.front().text.size();
+        std::vector<Token> afterClose(suffixTokens.begin() + 1, suffixTokens.end());
+        const size_t afterLength = FormatInlineLength(afterClose);
+        if (afterLength > 0) {
+            std::string afterText = FormatInline(afterClose);
+            if (NeedsSpaceAfterSplitTemplateClose(afterText)) {
+                ++length;
+            }
+            length += afterLength;
+        }
+        return length;
+    }
+
+    LineTrimKind GroupClosingTrimKind(const std::vector<Token>& suffixTokens, std::string_view suffix) const {
+        if (suffixTokens.size() == 1 && suffixTokens.front().text == "}" && suffix == ",") {
+            return LineTrimKind::CloseBraceComma;
+        }
+        return LineTrimKind::Other;
     }
 
     static bool NeedsSpaceAfterSplitTemplateClose(std::string_view afterText) {
@@ -3283,6 +4070,45 @@ private:
         return lines;
     }
 
+    LayoutResult FormatStringLiteralSequenceResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::optional<size_t> lastStringLiteral;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (tokens[index].kind == TokenKind::StringLiteral) {
+                lastStringLiteral = index;
+            }
+        }
+        if (
+            std::optional<size_t> last = PreviousNonNewlineIndex(tokens, tokens.size());
+            last && tokens[*last].text == ";"
+        ) {
+            suffix = ";" + suffix;
+        }
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::StringLiteralSequence, {}, 0);
+        bool first = true;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            if (token.kind != TokenKind::StringLiteral) {
+                continue;
+            }
+            size_t lineWidth = token.text.size();
+            if (first) {
+                lineWidth += prefix.size();
+            }
+            if (lastStringLiteral && index == *lastStringLiteral) {
+                lineWidth += suffix.size();
+            }
+            const int lineIndent = first ? indentLevel : indentLevel + 1;
+            AppendMeasuredLine(result, IndentWidth(lineIndent) + lineWidth, lineIndent, LineTrimKind::Other);
+            first = false;
+        }
+        return result;
+    }
+
     std::vector<std::string> FormatOperatorChain(
         const std::vector<Token>& tokens,
         int indentLevel,
@@ -3291,14 +4117,20 @@ private:
         bool indentSplitChains,
         bool indentLogicalSplitChains
     ) const {
-        return FormatOperatorChainResult(
+        (
+            void
+        ) FormatOperatorChainResult(tokens, indentLevel, prefix, suffix, indentSplitChains, indentLogicalSplitChains);
+        std::vector<std::string> lines;
+        RenderOperatorChain(
+            lines,
             tokens,
             indentLevel,
             std::move(prefix),
             std::move(suffix),
             indentSplitChains,
             indentLogicalSplitChains
-        ).lines;
+        );
+        return lines;
     }
 
     LayoutResult FormatOperatorChainResult(
@@ -3311,20 +4143,16 @@ private:
     ) const {
         const ChainKind chainKind = SelectChainKind(tokens);
         if (chainKind == ChainKind::Ternary) {
-            return ScoreLayoutCandidate(
-                FormatTernaryChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains),
-                false,
-                0,
-                0
-            );
+            LayoutResult result =
+                FormatTernaryChainResult(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains);
+            result.choice = LayoutChoiceKind::OperatorChain;
+            return result;
         }
         if (chainKind == ChainKind::Shift) {
-            return ScoreLayoutCandidate(
-                FormatShiftOperatorChain(tokens, indentLevel, std::move(prefix), std::move(suffix)),
-                false,
-                0,
-                0
-            );
+            LayoutResult result =
+                FormatShiftOperatorChainResult(tokens, indentLevel, std::move(prefix), std::move(suffix));
+            result.choice = LayoutChoiceKind::OperatorChain;
+            return result;
         }
         std::vector<std::vector<Token>> parts;
         std::vector<Token> current;
@@ -3345,8 +4173,7 @@ private:
         if (!current.empty()) {
             parts.push_back(current);
         }
-        std::vector<std::string> lines;
-        std::vector<LayoutResult> nestedResults;
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
         const bool indentSplitChainContinuation =
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
         const bool indentContinuation =
@@ -3360,14 +4187,70 @@ private:
             const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
             LayoutResult partResult =
                 FormatChainPartResult(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
-            lines.insert(lines.end(), partResult.lines.begin(), partResult.lines.end());
-            nestedResults.push_back(std::move(partResult));
-        }
-        LayoutResult result = ScoreLayoutCandidate(std::move(lines), false, 0, 0);
-        for (const LayoutResult& nestedResult : nestedResults) {
-            MergeBreakDepth(result, nestedResult, 1);
+            AppendMeasuredLayout(result, partResult, false, 1);
         }
         return result;
+    }
+
+    void RenderOperatorChain(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        bool indentSplitChains,
+        bool indentLogicalSplitChains
+    ) const {
+        const ChainKind chainKind = SelectChainKind(tokens);
+        if (chainKind == ChainKind::Ternary) {
+            AppendRenderedLines(
+                lines,
+                FormatTernaryChain(tokens, indentLevel, std::move(prefix), std::move(suffix), indentSplitChains)
+            );
+            return;
+        }
+        if (chainKind == ChainKind::Shift) {
+            AppendRenderedLines(
+                lines,
+                FormatShiftOperatorChain(tokens, indentLevel, std::move(prefix), std::move(suffix))
+            );
+            return;
+        }
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
+        const bool indentSplitChainContinuation =
+            indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
+        const bool indentContinuation =
+            indentSplitChainContinuation || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
+        for (size_t index = 0; index < parts.size(); ++index) {
+            std::string partPrefix = index == 0 ? prefix : std::string{};
+            std::string partSuffix;
+            if (index + 1 == parts.size()) {
+                partSuffix = suffix;
+            }
+            const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
+            AppendRenderedLines(
+                lines,
+                FormatChainPart(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix))
+            );
+        }
     }
 
     std::vector<std::string> FormatShiftOperatorChain(
@@ -3440,6 +4323,86 @@ private:
             return std::nullopt;
         }
         return line;
+    }
+
+    LayoutResult FormatShiftOperatorChainResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::vector<Token> receiver;
+        std::vector<std::vector<Token>> segments;
+        std::vector<Token> current;
+        bool sawShiftOperator = false;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                if (!sawShiftOperator) {
+                    receiver = current;
+                    sawShiftOperator = true;
+                } else {
+                    segments.push_back(current);
+                }
+                current.clear();
+                current.push_back(token);
+                continue;
+            }
+            current.push_back(token);
+        }
+        if (!sawShiftOperator) {
+            return FormatChainPartResult(tokens, indentLevel, std::move(prefix), std::move(suffix));
+        }
+        if (!current.empty()) {
+            segments.push_back(current);
+        }
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
+        LayoutResult receiverResult = FormatRangeResult(receiver, indentLevel, std::move(prefix), {}, true);
+        AppendMeasuredLayout(result, receiverResult, false, 1);
+        if (std::optional<size_t> compactTailWidth = CompactShiftTailWidth(segments, indentLevel + 1, suffix)) {
+            AppendMeasuredLine(
+                result,
+                IndentWidth(indentLevel + 1) + *compactTailWidth,
+                indentLevel + 1,
+                LineTrimKind::Other
+            );
+            result.variant = 1;
+            return result;
+        }
+        segments = GroupShiftSegmentsByBreakRules(segments);
+        for (size_t index = 0; index < segments.size();) {
+            std::string segmentSuffix;
+            if (index + 1 == segments.size()) {
+                segmentSuffix = suffix;
+            }
+            LayoutResult segmentResult =
+                FormatChainPartResult(segments[index], indentLevel + 1, {}, std::move(segmentSuffix));
+            AppendMeasuredLayout(result, segmentResult, false, 1);
+            ++index;
+        }
+        result.variant = 2;
+        return result;
+    }
+
+    std::optional<size_t> CompactShiftTailWidth(
+        const std::vector<std::vector<Token>>& segments,
+        int indentLevel,
+        std::string_view suffix
+    ) const {
+        std::vector<Token> combined;
+        for (const std::vector<Token>& segment : segments) {
+            combined.insert(combined.end(), segment.begin(), segment.end());
+        }
+        if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
+            return std::nullopt;
+        }
+        const size_t width = FormatInlineLength(combined) + suffix.size();
+        if (!FitsWidth(indentLevel, width)) {
+            return std::nullopt;
+        }
+        return width;
     }
 
     std::vector<std::vector<Token>> GroupShiftSegmentsByBreakRules(
@@ -3565,6 +4528,59 @@ private:
         return lines;
     }
 
+    LayoutResult FormatTernaryChainResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        bool indentSplitChains
+    ) const {
+        if (std::optional<TernaryExpressionParts> single = SplitSingleTopLevelTernary(tokens)) {
+            return FormatSingleTernaryExpressionResult(
+                *single,
+                indentLevel,
+                std::move(prefix),
+                std::move(suffix),
+                indentSplitChains
+            );
+        }
+
+        std::vector<std::vector<Token>> parts;
+        std::vector<Token> current;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            UpdateDepth(token, depth);
+            current.push_back(token);
+            if (depth == 0 && token.text == ":") {
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    current.push_back(tokens[index + 1]);
+                    ++index;
+                }
+                parts.push_back(current);
+                current.clear();
+            }
+        }
+        if (!current.empty()) {
+            parts.push_back(current);
+        }
+        LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
+        const bool indentContinuation =
+            indentSplitChains || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
+        for (size_t index = 0; index < parts.size(); ++index) {
+            std::string partPrefix = index == 0 ? prefix : std::string{};
+            std::string partSuffix;
+            if (index + 1 == parts.size()) {
+                partSuffix = suffix;
+            }
+            const int partIndent = indentContinuation && index > 0 ? indentLevel + 1 : indentLevel;
+            LayoutResult partResult =
+                FormatTernaryChainPartResult(parts[index], partIndent, std::move(partPrefix), std::move(partSuffix));
+            AppendMeasuredLayout(result, partResult, false, 1);
+        }
+        return result;
+    }
+
     std::vector<std::string> FormatSingleTernaryExpression(
         const TernaryExpressionParts& parts,
         int indentLevel,
@@ -3573,12 +4589,14 @@ private:
         bool indentSplitChains
     ) const {
         LayoutResult best;
+        std::vector<std::string> bestLines;
         bool hasBest = false;
         size_t order = 0;
         const auto consider = [&](std::vector<std::string> lines, int breakDepth) {
-            LayoutResult candidate = ScoreLayoutCandidate(std::move(lines), false, breakDepth, order++);
+            LayoutResult candidate = ScoreLayoutCandidate(lines, false, breakDepth, order++);
             if (!hasBest || IsBetterLayout(candidate, best)) {
                 best = std::move(candidate);
+                bestLines = std::move(lines);
                 hasBest = true;
             }
         };
@@ -3616,7 +4634,71 @@ private:
         bothBreaks.insert(bothBreaks.end(), bothFalseLines.begin(), bothFalseLines.end());
         consider(std::move(bothBreaks), 0);
 
-        return best.lines;
+        return bestLines;
+    }
+
+    LayoutResult FormatSingleTernaryExpressionResult(
+        const TernaryExpressionParts& parts,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix,
+        bool indentSplitChains
+    ) const {
+        LayoutResult best;
+        bool hasBest = false;
+        size_t order = 0;
+        const auto consider = [&](LayoutResult candidate, int breakDepth) {
+            candidate.compact = false;
+            candidate.deepestBreakDepth = std::max(candidate.deepestBreakDepth, breakDepth);
+            candidate.order = order++;
+            candidate.choice = LayoutChoiceKind::OperatorChain;
+            if (!hasBest || IsBetterLayout(candidate, best)) {
+                best = std::move(candidate);
+                hasBest = true;
+            }
+        };
+
+        const std::string conditionText = FormatInline(parts.condition);
+        const std::string trueText = FormatInline(parts.trueBranch);
+        std::string falseText = FormatInline(parts.falseBranch);
+        AppendSuffix(falseText, suffix);
+        const std::string conditionPrefix = prefix + conditionText + " ? ";
+        const std::string trueSuffix = " : " + falseText;
+        consider(FormatRangeResult(parts.trueBranch, indentLevel, conditionPrefix, trueSuffix, true), 1);
+
+        std::string conditionSuffix = " ? " + trueText + " : " + falseText;
+        consider(FormatRangeResult(parts.condition, indentLevel, prefix, conditionSuffix, true), 1);
+
+        consider(
+            FormatRangeResult(parts.falseBranch, indentLevel, conditionPrefix + trueText + " : ", suffix, true),
+            1
+        );
+
+        LayoutResult questionBreak = EmptyLayout(false, 0, order, LayoutChoiceKind::OperatorChain, {}, 0);
+        LayoutResult questionCondition =
+            FormatRangeResult(parts.condition, indentLevel, prefix, " ?", indentSplitChains);
+        LayoutResult questionTrue = FormatRangeResult(parts.trueBranch, indentLevel + 1, {}, trueSuffix, true);
+        AppendMeasuredLayout(questionBreak, questionCondition, false, 1);
+        AppendMeasuredLayout(questionBreak, questionTrue, false, 1);
+        consider(std::move(questionBreak), 0);
+
+        LayoutResult colonBreak = EmptyLayout(false, 0, order, LayoutChoiceKind::OperatorChain, {}, 0);
+        LayoutResult colonTrue = FormatRangeResult(parts.trueBranch, indentLevel, conditionPrefix, " :", true);
+        LayoutResult colonFalse = FormatRangeResult(parts.falseBranch, indentLevel + 1, {}, suffix, true);
+        AppendMeasuredLayout(colonBreak, colonTrue, false, 1);
+        AppendMeasuredLayout(colonBreak, colonFalse, false, 1);
+        consider(std::move(colonBreak), 0);
+
+        LayoutResult bothBreaks = EmptyLayout(false, 0, order, LayoutChoiceKind::OperatorChain, {}, 0);
+        LayoutResult bothCondition = FormatRangeResult(parts.condition, indentLevel, prefix, " ?", indentSplitChains);
+        LayoutResult bothTrue = FormatRangeResult(parts.trueBranch, indentLevel + 1, {}, " :", true);
+        LayoutResult bothFalse = FormatRangeResult(parts.falseBranch, indentLevel + 1, {}, suffix, true);
+        AppendMeasuredLayout(bothBreaks, bothCondition, false, 1);
+        AppendMeasuredLayout(bothBreaks, bothTrue, false, 1);
+        AppendMeasuredLayout(bothBreaks, bothFalse, false, 1);
+        consider(std::move(bothBreaks), 0);
+
+        return best;
     }
 
     std::vector<std::string> FormatTernaryChainPart(
@@ -3637,6 +4719,35 @@ private:
             return *splitPart;
         }
         return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
+    }
+
+    LayoutResult FormatTernaryChainPartResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        const size_t inlineWidth = prefix.size() + FormatInlineLength(tokens) + suffix.size();
+        if (FitsWidth(indentLevel, inlineWidth)) {
+            return SingleLineLayout(
+                indentLevel,
+                inlineWidth,
+                true,
+                0,
+                0,
+                LayoutChoiceKind::Compact,
+                {},
+                0,
+                LineTrimKind::Other
+            );
+        }
+        if (
+            std::optional<LayoutResult> splitPart =
+                FormatTernaryChainConditionPartResult(tokens, indentLevel, prefix, suffix)
+        ) {
+            return *splitPart;
+        }
+        return FormatChainPartResult(tokens, indentLevel, std::move(prefix), std::move(suffix));
     }
 
     std::optional<std::vector<std::string>> FormatTernaryChainConditionPart(
@@ -3666,6 +4777,35 @@ private:
         );
         std::string valuePrefix = std::string(prefix) + FormatInline(condition) + " ? ";
         return FormatRange(value, indentLevel, std::move(valuePrefix), std::move(valueSuffix), true);
+    }
+
+    std::optional<LayoutResult> FormatTernaryChainConditionPartResult(
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view prefix,
+        std::string_view suffix
+    ) const {
+        const std::optional<size_t> question = FindTopLevelToken(tokens, "?");
+        if (!question || FindMatchingTernaryColon(tokens, *question)) {
+            return std::nullopt;
+        }
+        size_t valueEnd = tokens.size();
+        std::string valueSuffix(suffix);
+        const std::optional<size_t> last = PreviousNonNewlineIndex(tokens, tokens.size());
+        if (last && tokens[*last].text == ":") {
+            valueEnd = *last;
+            valueSuffix.insert(0, " :");
+        }
+        if (*question + 1 >= valueEnd) {
+            return std::nullopt;
+        }
+        std::vector<Token> condition(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*question));
+        std::vector<Token> value(
+            tokens.begin() + static_cast<std::ptrdiff_t>(*question + 1),
+            tokens.begin() + static_cast<std::ptrdiff_t>(valueEnd)
+        );
+        std::string valuePrefix = std::string(prefix) + FormatInline(condition) + " ? ";
+        return FormatRangeResult(value, indentLevel, std::move(valuePrefix), std::move(valueSuffix), true);
     }
 
     std::optional<TernaryExpressionParts> SplitSingleTopLevelTernary(const std::vector<Token>& tokens) const {
@@ -3728,7 +4868,10 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        return FormatChainPartResult(tokens, indentLevel, std::move(prefix), std::move(suffix)).lines;
+        (void)FormatChainPartResult(tokens, indentLevel, prefix, suffix);
+        std::vector<std::string> lines;
+        RenderChainPart(lines, tokens, indentLevel, std::move(prefix), std::move(suffix));
+        return lines;
     }
 
     LayoutResult FormatChainPartResult(
@@ -3737,10 +4880,19 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        std::string inlineText = prefix + FormatInline(tokens);
-        AppendSuffix(inlineText, suffix);
-        if (Fits(indentLevel, inlineText)) {
-            return ScoreLayoutCandidate({Indent(indentLevel) + inlineText}, true, 0, 0);
+        const size_t inlineWidth = prefix.size() + FormatInlineLength(tokens) + suffix.size();
+        if (FitsWidth(indentLevel, inlineWidth)) {
+            return SingleLineLayout(
+                indentLevel,
+                inlineWidth,
+                true,
+                0,
+                0,
+                LayoutChoiceKind::Compact,
+                {},
+                0,
+                LineTrimKind::Other
+            );
         }
         const ChainKind chainKind = SelectChainKind(tokens);
         const std::optional<size_t> trailingOperator = PreviousNonNewlineIndex(tokens, tokens.size());
@@ -3754,10 +4906,47 @@ private:
             if (!value.empty()) {
                 std::string operatorSuffix = " " + tokens[*trailingOperator].text;
                 AppendSuffix(operatorSuffix, suffix);
-                return FormatRangeResult(value, indentLevel, std::move(prefix), std::move(operatorSuffix), true);
+                LayoutResult result =
+                    FormatRangeResult(value, indentLevel, std::move(prefix), std::move(operatorSuffix), true);
+                result.variant = 1;
+                return result;
             }
         }
-        return FormatRangeResult(tokens, indentLevel, std::move(prefix), std::move(suffix), true);
+        LayoutResult result = FormatRangeResult(tokens, indentLevel, std::move(prefix), std::move(suffix), true);
+        result.variant = 2;
+        return result;
+    }
+
+    void RenderChainPart(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string prefix,
+        std::string suffix
+    ) const {
+        std::string inlineText = prefix + FormatInline(tokens);
+        AppendSuffix(inlineText, suffix);
+        if (Fits(indentLevel, inlineText)) {
+            lines.push_back(Indent(indentLevel) + inlineText);
+            return;
+        }
+        const ChainKind chainKind = SelectChainKind(tokens);
+        const std::optional<size_t> trailingOperator = PreviousNonNewlineIndex(tokens, tokens.size());
+        if (
+            chainKind != ChainKind::None &&
+            trailingOperator &&
+            *trailingOperator + 1 == tokens.size() &&
+            IsChainBreakOperator(tokens, *trailingOperator, chainKind)
+        ) {
+            std::vector<Token> value(tokens.begin(), tokens.begin() + static_cast<std::ptrdiff_t>(*trailingOperator));
+            if (!value.empty()) {
+                std::string operatorSuffix = " " + tokens[*trailingOperator].text;
+                AppendSuffix(operatorSuffix, suffix);
+                RenderRange(lines, value, indentLevel, std::move(prefix), std::move(operatorSuffix), true);
+                return;
+            }
+        }
+        RenderRange(lines, tokens, indentLevel, std::move(prefix), std::move(suffix), true);
     }
 
     std::string JoinOutput() const {
@@ -3767,6 +4956,71 @@ private:
             result.push_back('\n');
         }
         return result;
+    }
+
+    size_t FormatInlineLength(const std::vector<Token>& tokens, std::optional<size_t> maxLength = std::nullopt) const {
+        size_t length = 0;
+        std::optional<Token> previous;
+        std::optional<std::string> trailingStringLiteral;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            const Token& token = tokens[index];
+            if (token.kind == TokenKind::Newline) {
+                continue;
+            }
+            if (token.kind == TokenKind::LineComment) {
+                if (length > 0) {
+                    length += 2;
+                }
+                length += TrimmedLength(token.text);
+                previous = token;
+                trailingStringLiteral.reset();
+                continue;
+            }
+            if (
+                token.kind == TokenKind::StringLiteral &&
+                previous &&
+                previous->kind == TokenKind::StringLiteral &&
+                trailingStringLiteral &&
+                !HasUserDefinedLiteralSuffix(tokens, index)
+            ) {
+                if (std::optional<std::string> currentTail = ConcatenatedStringLiteralTail(
+                    *trailingStringLiteral,
+                    token.text
+                )) {
+                    const size_t candidateLength = length - 1 + currentTail->size();
+                    if (!maxLength || candidateLength <= *maxLength) {
+                        length = candidateLength;
+                        trailingStringLiteral->pop_back();
+                        trailingStringLiteral->append(*currentTail);
+                        previous = Token{TokenKind::StringLiteral, *trailingStringLiteral};
+                        continue;
+                    }
+                }
+            }
+            if (previous && NeedsSpaceBefore(tokens, index, *previous)) {
+                ++length;
+            }
+            length += token.text.size();
+            previous = token;
+            if (token.kind == TokenKind::StringLiteral) {
+                trailingStringLiteral = token.text;
+            } else {
+                trailingStringLiteral.reset();
+            }
+        }
+        return length;
+    }
+
+    static size_t TrimmedLength(std::string_view value) {
+        size_t begin = 0;
+        while (begin < value.size() && IsSpaceButNotNewline(value[begin])) {
+            ++begin;
+        }
+        size_t end = value.size();
+        while (end > begin && IsSpaceButNotNewline(value[end - 1])) {
+            --end;
+        }
+        return end - begin;
     }
 
     std::string FormatInline(const std::vector<Token>& tokens, std::optional<size_t> maxLength = std::nullopt) const {
@@ -4464,6 +5718,10 @@ private:
         return static_cast<int>(indentLevel * config_.indentWidth + text.size()) <= config_.columnLimit;
     }
 
+    bool FitsWidth(int indentLevel, size_t textWidth) const {
+        return static_cast<int>(IndentWidth(indentLevel) + textWidth) <= config_.columnLimit;
+    }
+
     std::optional<size_t> InlineBudget(int indentLevel, std::string_view prefix, std::string_view suffix) const {
         const int usedWidth =
             indentLevel * config_.indentWidth + static_cast<int>(prefix.size()) + static_cast<int>(suffix.size());
@@ -4502,7 +5760,7 @@ private:
         bool indentLogicalSplitChains,
         bool preserveLeadingBlankSeparator
     ) const {
-        return FormatDelimitedElementResult(
+        (void)FormatDelimitedElementResult(
             tokens,
             indentLevel,
             suffix,
@@ -4510,7 +5768,19 @@ private:
             indentSplitChains,
             indentLogicalSplitChains,
             preserveLeadingBlankSeparator
-        ).lines;
+        );
+        std::vector<std::string> lines;
+        RenderDelimitedElement(
+            lines,
+            tokens,
+            indentLevel,
+            suffix,
+            isInitializerElement,
+            indentSplitChains,
+            indentLogicalSplitChains,
+            preserveLeadingBlankSeparator
+        );
+        return lines;
     }
 
     LayoutResult FormatDelimitedElementResult(
@@ -4522,7 +5792,7 @@ private:
         bool indentLogicalSplitChains,
         bool preserveLeadingBlankSeparator
     ) const {
-        std::vector<std::string> lines;
+        LayoutResult result = EmptyLayout(true, 0, 0, LayoutChoiceKind::None, {}, 0);
         size_t begin = 0;
         bool preserveBlankSeparator = preserveLeadingBlankSeparator;
         while (begin < tokens.size()) {
@@ -4532,7 +5802,70 @@ private:
                 ++begin;
             }
             if (begin >= tokens.size()) {
-                return ScoreLayoutCandidate(std::move(lines), true, 0, 0);
+                return result;
+            }
+            const bool hasBlankSeparator = newlineCount > 1;
+            if (tokens[begin].kind == TokenKind::LineComment) {
+                if (hasBlankSeparator && preserveBlankSeparator) {
+                    AppendMeasuredLine(result, 0, 0, LineTrimKind::Blank);
+                }
+                AppendMeasuredLine(
+                    result,
+                    IndentWidth(indentLevel) + TrimmedLength(tokens[begin].text),
+                    indentLevel,
+                    LineTrimKind::Other
+                );
+                ++begin;
+                preserveBlankSeparator = true;
+                continue;
+            }
+            if (hasBlankSeparator && preserveBlankSeparator) {
+                AppendMeasuredLine(result, 0, 0, LineTrimKind::Blank);
+            }
+            break;
+        }
+        std::vector<Token> remaining(tokens.begin() + static_cast<std::ptrdiff_t>(begin), tokens.end());
+        if (remaining.empty() || ContainsOnlyNewlines(remaining, 0, remaining.size())) {
+            return result;
+        }
+        LayoutResult remainingResult;
+        if (isInitializerElement) {
+            remainingResult = FormatRangeResult(remaining, indentLevel, {}, std::string(suffix), true);
+        } else {
+            remainingResult = FormatRangeResult(
+                remaining,
+                indentLevel,
+                {},
+                std::string(suffix),
+                indentSplitChains,
+                indentLogicalSplitChains
+            );
+        }
+        result.compact = remainingResult.deepestBreakDepth < 0 && result.compact;
+        AppendMeasuredLayout(result, remainingResult);
+        return result;
+    }
+
+    void RenderDelimitedElement(
+        std::vector<std::string>& lines,
+        const std::vector<Token>& tokens,
+        int indentLevel,
+        std::string_view suffix,
+        bool isInitializerElement,
+        bool indentSplitChains,
+        bool indentLogicalSplitChains,
+        bool preserveLeadingBlankSeparator
+    ) const {
+        size_t begin = 0;
+        bool preserveBlankSeparator = preserveLeadingBlankSeparator;
+        while (begin < tokens.size()) {
+            size_t newlineCount = 0;
+            while (begin < tokens.size() && tokens[begin].kind == TokenKind::Newline) {
+                ++newlineCount;
+                ++begin;
+            }
+            if (begin >= tokens.size()) {
+                return;
             }
             const bool hasBlankSeparator = newlineCount > 1;
             if (tokens[begin].kind == TokenKind::LineComment) {
@@ -4551,13 +5884,13 @@ private:
         }
         std::vector<Token> remaining(tokens.begin() + static_cast<std::ptrdiff_t>(begin), tokens.end());
         if (remaining.empty() || ContainsOnlyNewlines(remaining, 0, remaining.size())) {
-            return ScoreLayoutCandidate(std::move(lines), true, 0, 0);
+            return;
         }
-        LayoutResult remainingResult;
         if (isInitializerElement) {
-            remainingResult = FormatRangeResult(remaining, indentLevel, {}, std::string(suffix), true);
+            RenderRange(lines, remaining, indentLevel, {}, std::string(suffix), true);
         } else {
-            remainingResult = FormatRangeResult(
+            RenderRange(
+                lines,
                 remaining,
                 indentLevel,
                 {},
@@ -4566,10 +5899,6 @@ private:
                 indentLogicalSplitChains
             );
         }
-        lines.insert(lines.end(), remainingResult.lines.begin(), remainingResult.lines.end());
-        LayoutResult result = ScoreLayoutCandidate(std::move(lines), remainingResult.deepestBreakDepth < 0, 0, 0);
-        MergeBreakDepth(result, remainingResult, 0);
-        return result;
     }
 
     void AppendSplitElementLines(
