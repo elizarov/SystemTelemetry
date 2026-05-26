@@ -9,6 +9,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 - Never use vertical alignment.
 - When a wrapped construct closes, the matching closing delimiter begins a line at the owning indent.
 - Keep lists and same-operator chains either fully compact or split item-by-item.
+- Use no heuristics or weights; use only the general line-break optimization rule.
 - Use indentation changes as visual group borders.
 - Use one indentation size for every indentation change.
 
@@ -40,7 +41,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 - Put two spaces before a trailing `//` comment after code, e.g. `value;  // note`.
 - Put one space after a preprocessor directive keyword before its operand, e.g. `#pragma once`.
 
-## Structural Lines
+## Line Hygiene
 
 - Remove trailing whitespace from every line.
 - Use 4 spaces per indent level. Do not emit tabs.
@@ -49,10 +50,21 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 - Drop blank lines at the beginning of a block and immediately before a closing brace.
 - Insert required structural blank lines even when source omits them.
 - Remove trailing commas except in enum bodies.
-- Break after each statement-terminating semicolon.
+
+## Mandatory Line Breaks
+
+Mandatory line breaks are structural boundaries. The break is always taken before optional wrapping is considered.
+
+- Break between complete statements and declarations, including after each statement-terminating semicolon.
+- The single-statement lambda is an exception: a complete single-statement lambda body may remain one segment when the lambda fits.
 - Put block-opening braces at the end of the introducing line, then break.
 - Break after a code-block closing brace unless the following token is `else`, `catch`, `finally`, or the `while` that closes a do-while statement.
 - Treat a standalone braced statement block as a block. Its closing brace does not attach to the following statement.
+- Break around preprocessor directives and macro continuation lines.
+- Break between enum enumerators; enum bodies keep one enumerator per line.
+- Break between declaration groups where declaration-scope separation rules require a blank line.
+- Break multi-statement lambda bodies after `{`, format each body statement with normal mandatory statement breaks, and put the closing `}` on its own line.
+- Preserve a standalone line comment on its own line. An end-of-line comment attached to one list or chain element forces the owning structure into split form.
 
 ```cpp
 if (ready) {
@@ -75,6 +87,20 @@ if (value != next) {
 }
 ```
 
+## Line Break Opportunities
+
+Line break opportunities are optional boundaries that the optimizer may take when formatting one segment between mandatory breaks.
+
+- After assignment operators and after binary or ternary operators.
+- Before stream-shift operators `<<` and `>>`.
+- After delimiter openers and before matching closers for `()`, `[]`, `{}`, and template `<>`.
+- After commas in lists, including call arguments, declaration parameters, template arguments, braced initializer elements, subscript lists, and enum bodies.
+- Between a declaration type and its direct-initialized declarator value.
+- After semicolons inside `for` and control headers.
+- Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
+
+A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no optional breaks in a structure. Split form takes the structure's coupled opportunities: lists and same-operator chains split all items or none, and delimiter groups split after the opener and before the closer together.
+
 ## Lists
 
 Lists use compact or split form.
@@ -91,9 +117,9 @@ call(
 
 The rule applies to function arguments, template arguments, braced initializer lists, subscript lists, declaration parameter lists, enum bodies, and similar comma-separated syntax.
 
-When a template list wraps, `<` stays with the owner when it fits, each top-level argument occupies one line, and the closing `>` starts the continuation line.
+When a template list wraps, `<` stays with the owner, each top-level argument occupies one line, and the closing `>` starts the continuation line.
 
-Nested braced initializer and braced constructor elements stay compact when they fit their own line. Nested elements split only when their compact line does not fit.
+Nested braced initializer and braced constructor elements are independent structural parts. Each nested element uses the same compact-or-split optimization as any other segment. In a split braced comma-list, adjacent split braced elements may render the comma boundary as `}, {`; this is the only comma-list boundary form that combines two split elements.
 
 ```cpp
 Widget rows[] = {
@@ -133,7 +159,7 @@ struct Context {
 
 ## Operator Chains
 
-Formatter-owned operator chains use compact or split form.
+Formatter-owned same-operator chains use compact or split form. A single binary operator is not a chain: it may stay compact while a nested structural part splits, or it may take the operator break when that is the selected shortest fitting layout.
 
 ```cpp
 int value = a + b + c;
@@ -155,14 +181,14 @@ const char* key =
 
 Logical chains split by `&&` or `||`. Inside `if` and `while`, split logical parts stay at condition indentation. Inside a split `for` header, a wrapped logical chain inside one semicolon part uses continuation indentation.
 
-Stream-shift chains split before `<<` or `>>`. If the shifted tail fits on one continuation line, keep it compact. Otherwise, put each continued shift segment at the start of a continuation line.
+Stream-shift chains split before `<<` or `>>`. Shift chains have one extra compact-tail form: the receiver may occupy one line and the shifted tail may stay compact on the next line. If the compact shifted tail does not fit, each continued shift segment starts a continuation line.
 
 ```cpp
 std::cout
     << "name=" << name << " value=" << value << "\n";
 ```
 
-Stream configuration methods listed in `.cpp-format` stay on the same continuation line as the following streamed value when the combined line fits.
+Stream configuration methods listed in `.cpp-format` bind to the following shifted value. A split stream chain does not take the `<<` or `>>` opportunity between a configured stream manipulator run and that following value.
 
 Adjacent string literals are an implicit concatenation chain. When the sequence stays split, the first literal uses expression indentation and later fragments use one additional indent.
 
@@ -181,43 +207,20 @@ Line-fragment strings ending with escaped `\n` or `\r\n` stay separate. A bounda
 
 Repeated `+` and repeated `*` are formatter-owned arithmetic chains. `-`, `/`, and `%` are ordinary binary operators.
 
-## Greedy Wrapping
+## Break Selection Algorithm
 
-The formatter uses a greedy outer-first algorithm.
+For each token segment between mandatory line breaks, the formatter builds a token-derived layout tree that follows the syntactic shape of the segment. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments.
 
-- Emit mandatory statement, block, declaration-group, and comment boundaries.
-- Try compact form for the current syntax owner.
-- Keep compact form when it fits.
-- Keep generated lines within 120 columns when syntax provides a safe break.
-- Split the outermost wrappable owner when compact form overflows.
-- Reformat each child at its new indentation.
+Each node exposes its legal compact and split layouts. The optimizer chooses which optional breaks to take with dynamic programming:
 
-```cpp
-render(first, second, transform(inputA, inputB), third);
+- Prefer layouts with no physical line over the configured column limit.
+- If no legal layout fits, choose the layout with the smallest maximum overflow.
+- Among fitting layouts, minimize the physical line count.
+- On equal line count, prefer the layout whose deepest taken break renders at the shallower indentation level; if still tied, prefer the structurally shallower deepest taken break, then source-order-stable compact behavior.
 
-render(
-    first,
-    second,
-    transform(inputA, inputB),
-    third
-);
-```
+The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
 
-If a child still overflows after the parent splits, split the child.
-
-```cpp
-render(
-    first,
-    second,
-    transform(
-        veryLongInputA,
-        veryLongInputB
-    ),
-    third
-);
-```
-
-Split formatter-owned chains with two or more chain operators do not use opener economy across chain boundaries. Each chain operator stays with the part before it, and the following part begins on its own line even when that part must split internally. Binary expressions are not treated as chains for this rule.
+Lists and same-operator chains are all-or-nothing. Either every top-level comma or same-operator opportunity in the structure is taken, or none are taken. A split braced comma-list may still combine adjacent braced element boundaries as `}, {` when both element interiors are split. Stream-shift chains are the exception: they may split once between the receiver and the compact shifted tail before splitting every shifted segment.
 
 ```cpp
 selected = Matches(region) || (
@@ -225,45 +228,45 @@ selected = Matches(region) || (
     IsActive(*special)
 );
 
+loaded = LoadFirst() ||
+    LoadSecond(
+        source,
+        target
+    ) ||
+    LoadThird();
+```
+
+Binary expressions are not same-operator chains by themselves, so a single binary operator may stay attached while a child delimiter group splits.
+
+```cpp
 value = first + BuildValue(
     left,
     right
 );
 ```
 
-Assignment-like expressions split after the assignment when the right-hand side fits at continuation indentation. If the right-hand side must split and its first split line fits after the assignment prefix, attach that first split line to the assignment.
+Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
+When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
 
 ```cpp
-HBITMAP colorBitmap =
-    CreateDIBSection(nullptr, reinterpret_cast<BITMAPINFO*>(&header), DIB_RGB_COLORS, &bits, nullptr, 0);
-
-target = RenderPoint{
-    x,
-    y
-};
-```
-
-A wrapped parenthesized group with one expression keeps the compact expression on one continuation line when it fits. This includes control conditions, so the outer condition or call break wins before a nested single-argument call.
-
-```cpp
-metrics.definitions.push_back(
-    MetricDefinitionConfig{"gpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"}
+render(
+    first,
+    transform(
+        veryLongInputA,
+        veryLongInputB
+    ),
+    third
 );
+
+Widget rows[] = {{
+    first,
+    second
+}};
 ```
 
-A split receiver closing with `)`, `]`, or `}` may keep a trailing member chain or expression suffix on the closing line when it fits.
+Ternary chains use special all-or-nothing handling: a chain either breaks after every `:` or stays compact. A single ternary is more flexible and may break after `?`, after `:`, after both, or inside either branch while keeping the selected branch attached to its `?` or `:` marker.
 
-```cpp
-const int width = MeasureTextWidthForControl(
-    hwnd,
-    controlId,
-    ReadDialogControlText(hwnd, controlId)
-) + 8;
-```
-
-Inside a plain parenthesized expression, split chains stay at the expression indent.
-
-Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, or compiler declaration prefix groups.
+Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, compiler declaration prefix groups, `__declspec` groups, operator function names, or template-angle tokens that are not template argument lists. Unary operators and declarator `*` or `&` are token facts, not operator-chain break points.
 
 Defaulted, deleted, and pure-virtual method markers stay with the declaration tail.
 
@@ -276,8 +279,6 @@ update(
     third
 );
 ```
-
-If no legal wrapping point exists, the line may exceed 120 columns.
 
 ## Declaration Groups
 
@@ -395,7 +396,7 @@ if (
 }
 ```
 
-A long control condition that is one nested call keeps the control opener and nested call opener on the same line when that line fits. Nested call arguments use one indent. The call close and control close combine on the body-opening line.
+A control condition whose selected split is a nested call keeps the control opener and nested call opener on the same line when that chosen layout fits. Nested call arguments use one indent. The call close and control close combine on the body-opening line.
 
 ```cpp
 if (!::ConfigureDisplay(
@@ -448,9 +449,9 @@ Nested switches restore the enclosing switch case indentation after the inner sw
 
 Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement on its own line, and close on their own line.
 
-When a wrapped lambda is assigned to a variable, keep the assignment prefix and lambda opener on the same line if the opener fits.
+When a wrapped lambda is assigned to a variable, the assignment prefix is part of the lambda header context, so the optimizer may keep the prefix and lambda opener on the same line.
 
-If the opener does not fit, first keep the capture list compact and split between `]` and `(` when both lines fit.
+Lambda captures and lambda parameters are separate break opportunities. Captures, parameters, and the body opener use the same compact-or-split optimization as other delimiter groups.
 
 When the lambda parameter list splits, keep the body `{` on the closing-parameter line.
 
@@ -464,7 +465,7 @@ const auto updateKey = [&](
 };
 ```
 
-Split a multi-parameter parameter list before splitting captures. Split captures last.
+Multi-parameter lambda parameter lists and capture lists split all-or-nothing.
 
 ## Preprocessor And Macros
 

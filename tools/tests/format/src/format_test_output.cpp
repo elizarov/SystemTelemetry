@@ -241,17 +241,16 @@ void WriteMetricConfig() {
 }
 
 void WriteInitialConfigText() {
-    const std::string initialText =
-        "[display]\r\n"
-            "monitor_name = TL160ADMP03-0\r\n"
-            "position = 258,117\r\n"
-            "scale = 2\r\n"
-            "\r\n"
-            "[network]\r\n"
-            "adapter_name = Wi-Fi\r\n"
-            "\r\n"
-            "[storage]\r\n"
-            "drives = C\r\n";
+    const std::string initialText = "[display]\r\n"
+        "monitor_name = TL160ADMP03-0\r\n"
+        "position = 258,117\r\n"
+        "scale = 2\r\n"
+        "\r\n"
+        "[network]\r\n"
+        "adapter_name = Wi-Fi\r\n"
+        "\r\n"
+        "[storage]\r\n"
+        "drives = C\r\n";
 }
 
 struct OklabColor {
@@ -437,8 +436,9 @@ ColorConfig& MutableColorField(void* owner, const RuntimeConfigFieldDescriptor& 
 }
 
 void StartLenovoSnapshot(void* contextPtr) {
-    std::unique_ptr<LenovoServiceSnapshotThreadContext>
-        context(static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr));
+    std::unique_ptr<LenovoServiceSnapshotThreadContext> context(
+        static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr)
+    );
 }
 
 HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_) {
@@ -519,11 +519,8 @@ void TrackFeatureLevels() {
         D3D_FEATURE_LEVEL_10_1,
         D3D_FEATURE_LEVEL_10_0
     };
-    const std::array<D3D_FEATURE_LEVEL, 3> fallbackFeatureLevels{
-        D3D_FEATURE_LEVEL_11_0,
-        D3D_FEATURE_LEVEL_10_1,
-        D3D_FEATURE_LEVEL_10_0
-    };
+    const std::array<D3D_FEATURE_LEVEL, 3>
+        fallbackFeatureLevels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
     Use(preferredFeatureLevels, fallbackFeatureLevels);
 }
 
@@ -891,8 +888,8 @@ std::string SelectCurrentSensorName(const BoardConfig& board, const std::string&
 }
 
 const char* LayoutGuideAxisSizingKey(const LayoutGuide* guide) {
-    return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide" :
-        "overview_vertical_sizing_guide";
+    return guide->axis == LayoutGuideAxis::Horizontal ?
+        "overview_horizontal_sizing_guide" : "overview_vertical_sizing_guide";
 }
 
 std::optional<double> LayoutEditAnchorValue(const LayoutEditAnchor* anchor) {
@@ -944,14 +941,12 @@ bool HasMissingReflectionMembers(const ReflectionContext* context) {
 
 void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState, const LayoutEditAnchorRegion& region) {
     const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
-    if (
-        MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) || (
-            special != nullptr &&
-            *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
-            LayoutEditAnchorParameter(region.key).has_value() &&
-            IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
-        )
-    ) {
+    if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) || (
+        special != nullptr &&
+        *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
+        LayoutEditAnchorParameter(region.key).has_value() &&
+        IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
+    )) {
         appendHighlight(region, true);
     }
 }
@@ -1001,6 +996,69 @@ void SplitOperatorChainPartsLineByLine() {
             history.throughputBucketSampleCount,
             error
         );
+}
+
+void UniversalBreakSelectionCases() {
+    const int singleBinaryValue = firstValue + BuildValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    );
+    const int sameOperatorChainValue = firstValue +
+        BuildValue(
+            firstArgumentWithLongName,
+            secondArgumentWithLongName,
+            thirdArgumentWithLongName,
+            fourthArgumentWithLongName
+        ) +
+        finalValueWithLongName;
+    const int nestedTieValue = OuterValue(
+        FirstValue(firstArgumentWithLongName, secondArgumentWithLongName),
+        SecondValue(thirdArgumentWithLongName, fourthArgumentWithLongName),
+        finalArgumentWithLongName
+    );
+    const int singleTernaryValue = conditionWithLongName ?
+        BuildValue(firstArgumentWithLongName, secondArgumentWithLongName, thirdArgumentWithLongName) :
+        fallbackValueWithLongName;
+    const int ternaryChainValue = firstConditionWithLongName ? firstValueWithLongName :
+        secondConditionWithLongName ? BuildValue(
+            firstArgumentWithLongName,
+            secondArgumentWithLongName,
+            thirdArgumentWithLongName
+        ) :
+        fallbackValueWithLongName;
+    UseTemplate<
+        FirstTemplateArgumentWithLongName,
+        SecondTemplateArgumentWithLongName,
+        ThirdTemplateArgumentWithLongName
+    >();
+}
+
+void FormatterSelfBreakCases() {
+    if (
+        tokens[statementStart].text == "for" ||
+        tokens[statementStart].text == "while" ||
+        tokens[statementStart].text == "switch"
+    ) {
+        return;
+    }
+    if (next < tokens.size() && tokens[next].kind == TokenKind::Word && (
+        tokens[next].text == "else" ||
+        tokens[next].text == "catch" ||
+        tokens[next].text == "finally" ||
+        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+    )) {
+        return;
+    }
+    if (
+        pendingTokens_.empty() &&
+        pendingPrefix_.empty() &&
+        IsTrailingCommentAfterEmittedClose(tokens, index) &&
+        !outputLines_.empty()
+    ) {
+        return;
+    }
 }
 
 void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {
@@ -1244,8 +1302,8 @@ void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
         TracePrefix::LayoutEditUi,
         "wm_capturechanged",
         "new_owner=\"%s\" handled=\"%s\"",
-        reinterpret_cast<HWND>(lParam) == nullptr ? "none" :
-            (reinterpret_cast<HWND>(lParam) == hwnd ? "dashboard" : "other"),
+        reinterpret_cast<HWND>(lParam) == nullptr ?
+            "none" : (reinterpret_cast<HWND>(lParam) == hwnd ? "dashboard" : "other"),
         firstValueWithLongName +
             secondValueWithLongName +
             thirdValueWithLongName +

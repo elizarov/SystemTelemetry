@@ -558,6 +558,21 @@ const RenderRect bounds=baseBounds|RenderRect{leftValueWithLongName,topValueWith
 const bool loaded=!LoadString(values,DumpKey(historyPrefix,".series_ref"),history.seriesRef,error)||!LoadDoubleArrayField(values,DumpKey(historyPrefix,".samples"),history.samples,error)||!LoadDoubleArrayField(values,DumpKey(historyPrefix,".throughput_live_samples"),history.throughputLiveSamples,error)||!LoadDouble(values,DumpKey(historyPrefix,".throughput_bucket_total"),history.throughputBucketTotal,error)||!LoadUnsigned(values,DumpKey(historyPrefix,".throughput_bucket_sample_count"),history.throughputBucketSampleCount,error);
 }
 
+void UniversalBreakSelectionCases(){
+const int singleBinaryValue=firstValue+BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
+const int sameOperatorChainValue=firstValue+BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName)+finalValueWithLongName;
+const int nestedTieValue=OuterValue(FirstValue(firstArgumentWithLongName,secondArgumentWithLongName),SecondValue(thirdArgumentWithLongName,fourthArgumentWithLongName),finalArgumentWithLongName);
+const int singleTernaryValue=conditionWithLongName?BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName):fallbackValueWithLongName;
+const int ternaryChainValue=firstConditionWithLongName?firstValueWithLongName:secondConditionWithLongName?BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName):fallbackValueWithLongName;
+UseTemplate<FirstTemplateArgumentWithLongName,SecondTemplateArgumentWithLongName,ThirdTemplateArgumentWithLongName>();
+}
+
+void FormatterSelfBreakCases(){
+if(tokens[statementStart].text=="for"||tokens[statementStart].text=="while"||tokens[statementStart].text=="switch"){return;}
+if(next<tokens.size()&&tokens[next].kind==TokenKind::Word&&(tokens[next].text=="else"||tokens[next].text=="catch"||tokens[next].text=="finally"||(tokens[next].text=="while"&&closedBlock.kind==BlockKind::DoStatement))){return;}
+if(pendingTokens_.empty()&&pendingPrefix_.empty()&&IsTrailingCommentAfterEmittedClose(tokens,index)&&!outputLines_.empty()){return;}
+}
+
 void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
 if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
 }
