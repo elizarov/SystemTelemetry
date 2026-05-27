@@ -209,7 +209,7 @@ Repeated `+` and repeated `*` are formatter-owned arithmetic chains. `-`, `/`, a
 
 ## Break Selection Algorithm
 
-For each parsed segment between mandatory line breaks, the formatter builds a tree-sitter-derived layout model that follows the syntactic shape of the segment. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments.
+For each parsed segment between mandatory line breaks, the formatter uses a tree-sitter-derived layout model built directly from the parsed syntax tree. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments. Macro replacement text and parse-recovered macro-shaped regions that have no reliable tree-sitter subtree may fall back to token-span structure discovery; regular parsed source does not rebuild syntax from a flat token stream.
 
 Each node exposes its legal compact and split layouts. The optimizer chooses which optional breaks to take with dynamic programming:
 

@@ -5,6 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <initializer_list>
 #include <io.h>
 #include <iterator>
 #include <map>
@@ -15,6 +16,7 @@
 #include <string_view>
 #include <tree_sitter/api.h>
 #include <tree_sitter_cpp.h>
+#include <utility>
 #include <vector>
 
 #include "tools/format_args.h"
@@ -61,6 +63,36 @@ struct ParseResult {
     int errorLine = 0;
     int errorColumn = 0;
     std::string errorSnippet;
+};
+
+enum class SourceLayoutKind {
+    Root,
+    TemplateDeclaration,
+    Assignment,
+    DeclarationValue,
+    Lambda,
+    ConstructorInitializer,
+    OperatorChain,
+    StringLiteralSequence,
+    Group,
+};
+
+struct SourceLayoutNode {
+    SourceLayoutKind kind = SourceLayoutKind::Root;
+    size_t begin = kNoTokenIndex;
+    size_t end = kNoTokenIndex;
+    size_t index = kNoTokenIndex;
+    size_t groupOpen = kNoTokenIndex;
+    size_t groupClose = kNoTokenIndex;
+    bool stopChildren = false;
+    int depth = 0;
+    size_t order = 0;
+    std::vector<SourceLayoutNode> children;
+};
+
+struct SourceLayoutTree {
+    bool available = false;
+    SourceLayoutNode root;
 };
 
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
@@ -573,8 +605,9 @@ public:
     explicit PrettyFormatter(
         const FormatterConfig& config,
         int initialIndentLevel = 0,
-        bool executableBodyContext = false
-    ) : config_(config), indentLevel_(initialIndentLevel) {
+        bool executableBodyContext = false,
+        const SourceLayoutTree* sourceLayout = nullptr
+    ) : config_(config), sourceLayout_(sourceLayout), indentLevel_(initialIndentLevel) {
         if (executableBodyContext) {
             blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
         }
@@ -1831,6 +1864,13 @@ private:
     }
 
     LayoutTree BuildLayoutTree(TokenSpan tokens) const {
+        if (CanUseSourceLayout(tokens)) {
+            return BuildTreeSitterLayoutTree(tokens);
+        }
+        return BuildFallbackLayoutTree(tokens);
+    }
+
+    LayoutTree BuildFallbackLayoutTree(TokenSpan tokens) const {
         LayoutTree tree;
         size_t order = 0;
         const auto addNode = [&](LayoutNode node) {
@@ -1899,6 +1939,189 @@ private:
         }
         CollectLayoutGroupNodes(tokens, 0, tokens.size(), chainKind == ChainKind::None ? 0 : 1, tree.breakNodes, order);
         return tree;
+    }
+
+    bool CanUseSourceLayout(TokenSpan tokens) const {
+        if (sourceLayout_ == nullptr || !sourceLayout_->available || tokens.empty()) {
+            return false;
+        }
+        bool hasSourceToken = false;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (tokens[index].modelIndex == kNoTokenIndex) {
+                return false;
+            }
+            if (index > 0 && tokens[index].modelIndex != tokens[index - 1].modelIndex + 1) {
+                return false;
+            }
+            hasSourceToken = hasSourceToken || tokens[index].sourceBegin != kNoTokenIndex;
+        }
+        return hasSourceToken;
+    }
+
+    bool HasOnlyTrailingStatementSuffix(TokenSpan tokens, size_t spanBegin, size_t sourceEnd) const {
+        if (sourceEnd < spanBegin) {
+            return false;
+        }
+        size_t index = sourceEnd - spanBegin;
+        if (index > tokens.size()) {
+            return false;
+        }
+        bool sawTerminator = false;
+        for (; index < tokens.size(); ++index) {
+            if (IsCommentOrNewline(tokens[index])) {
+                continue;
+            }
+            if (!sawTerminator && (tokens[index].text == ";" || tokens[index].text == ",")) {
+                sawTerminator = true;
+                continue;
+            }
+            return false;
+        }
+        return sawTerminator;
+    }
+
+    LayoutTree BuildTreeSitterLayoutTree(TokenSpan tokens) const {
+        LayoutTree tree;
+        if (sourceLayout_ == nullptr || !sourceLayout_->available || tokens.empty()) {
+            return tree;
+        }
+        const size_t spanBegin = tokens.front().modelIndex;
+        const size_t spanEnd = tokens.back().modelIndex + 1;
+        size_t order = 0;
+        CollectTreeSitterLayoutNodes(sourceLayout_->root, tokens, spanBegin, spanEnd, tree, order);
+        return tree;
+    }
+
+    void CollectTreeSitterLayoutNodes(
+        const SourceLayoutNode& source,
+        TokenSpan tokens,
+        size_t spanBegin,
+        size_t spanEnd,
+        LayoutTree& tree,
+        size_t& order
+    ) const {
+        for (const SourceLayoutNode& child : source.children) {
+            if (child.end <= spanBegin || child.begin >= spanEnd) {
+                continue;
+            }
+            bool stopAtChild = false;
+            const bool contained = child.begin >= spanBegin && child.end <= spanEnd;
+            const bool partialTemplate = child.kind == SourceLayoutKind::TemplateDeclaration &&
+                child.begin >= spanBegin &&
+                child.begin < spanEnd;
+            const bool partialLambda = child.kind == SourceLayoutKind::Lambda &&
+                child.index != kNoTokenIndex &&
+                child.index >= spanBegin &&
+                child.index < spanEnd;
+            if (contained || partialTemplate || partialLambda) {
+                stopAtChild = AddTreeSitterLayoutNode(child, tokens, spanBegin, spanEnd, tree, order);
+            }
+            if (!stopAtChild) {
+                CollectTreeSitterLayoutNodes(child, tokens, spanBegin, spanEnd, tree, order);
+            }
+        }
+    }
+
+    bool AddTreeSitterLayoutNode(
+        const SourceLayoutNode& source,
+        TokenSpan tokens,
+        size_t spanBegin,
+        size_t spanEnd,
+        LayoutTree& tree,
+        size_t& order
+    ) const {
+        const auto addNode = [&](LayoutNode node) {
+            for (const LayoutNode& existing : tree.breakNodes) {
+                if (
+                    existing.kind == node.kind &&
+                    existing.index == node.index &&
+                    existing.group.open == node.group.open &&
+                    existing.group.close == node.group.close
+                ) {
+                    return false;
+                }
+            }
+            node.depth = source.depth;
+            node.order = order++;
+            tree.breakNodes.push_back(node);
+            return true;
+        };
+
+        switch (source.kind) {
+            case SourceLayoutKind::Root:
+                return false;
+            case SourceLayoutKind::TemplateDeclaration:
+                return addNode({LayoutNodeKind::TemplateDeclaration, 0, {}, source.depth, 0});
+            case SourceLayoutKind::Assignment:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::Assignment, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::DeclarationValue:
+                if (source.index == kNoTokenIndex || source.index <= spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::DeclarationValue, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::Lambda:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::Lambda, source.index - spanBegin, {}, source.depth, 0});
+            case SourceLayoutKind::ConstructorInitializer:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::ConstructorInitializer, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::OperatorChain: {
+                const bool ownsSegment = source.begin == spanBegin &&
+                    (source.end == spanEnd || HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end));
+                const bool ownsReturnSegment = source.end <= spanEnd &&
+                    HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end) &&
+                    !tokens.empty() &&
+                    tokens.front().text == "return";
+                if (!ownsSegment && !ownsReturnSegment) {
+                    return false;
+                }
+                if (!CanSplitOperatorChain(tokens)) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::OperatorChain, 0, {}, source.depth, 0}) && source.stopChildren;
+            }
+            case SourceLayoutKind::StringLiteralSequence:
+                if (source.begin != spanBegin || (
+                    source.end != spanEnd && !HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end)
+                )) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::StringLiteralSequence, 0, {}, source.depth, 0});
+            case SourceLayoutKind::Group: {
+                if (
+                    source.groupOpen < spanBegin ||
+                    source.groupClose < spanBegin ||
+                    source.groupOpen == kNoTokenIndex ||
+                    source.groupClose == kNoTokenIndex
+                ) {
+                    return false;
+                }
+                const size_t open = source.groupOpen - spanBegin;
+                const size_t close = source.groupClose - spanBegin;
+                if (
+                    open >= tokens.size() ||
+                    close >= tokens.size() ||
+                    IsEmptyGroupPair(tokens, open, close) ||
+                    IsNonWrappablePrefixGroup(tokens, open, close) ||
+                    IsFunctionPointerDeclaratorGroupOpen(tokens, open)
+                ) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::Group, 0, GroupPair{open, close}, source.depth, 0});
+                return false;
+            }
+        }
+        return false;
     }
 
     void CollectLayoutGroupNodes(
@@ -2835,7 +3058,7 @@ private:
         TokenSpan body = TokenSubspan(tokens, bodyOpen + 1, *bodyClose);
         TokenSpan after = TokenSubspan(tokens, *bodyClose + 1, tokens.size());
         std::vector<std::string> lines = FormatLambdaHeaderWithLeadingTokens(header, indentLevel, std::move(prefix));
-        PrettyFormatter bodyFormatter(config_, indentLevel + 1, true);
+        PrettyFormatter bodyFormatter(config_, indentLevel + 1, true, sourceLayout_);
         std::vector<std::string> bodyLines = tools::lint::SplitLines(bodyFormatter.Format(body));
         while (!bodyLines.empty() && bodyLines.back().empty()) {
             bodyLines.pop_back();
@@ -6950,6 +7173,7 @@ private:
     std::vector<BlockState> blockStack_;
     mutable std::map<std::string, LayoutResult> layoutCache_;
     const FormatterConfig& config_;
+    const SourceLayoutTree* sourceLayout_ = nullptr;
     int indentLevel_ = 0;
     int groupDepth_ = 0;
     int caseBodyIndentLevel_ = -1;
@@ -7122,6 +7346,7 @@ std::vector<Token> SortIncludeTokens(
 struct FormatModel {
     ParseResult parse;
     std::vector<Token> tokens;
+    SourceLayoutTree layout;
 };
 
 bool IsNewlineByte(char ch) {
@@ -7189,7 +7414,9 @@ std::string SourceText(std::string_view text, uint32_t begin, uint32_t end) {
 void AppendPreprocessorDirective(std::string_view text, size_t& index, std::vector<Token>& tokens) {
     const size_t start = index;
     const size_t directiveEnd = PreprocessorLineEnd(text, index);
-    tokens.push_back({TokenKind::Preprocessor, std::string(text.substr(start, directiveEnd - start))});
+    tokens.push_back(
+        {TokenKind::Preprocessor, std::string(text.substr(start, directiveEnd - start)), start, directiveEnd}
+    );
     index = SkipFollowingNewline(text, directiveEnd);
 }
 
@@ -7201,8 +7428,9 @@ size_t AppendSourceTrivia(std::string_view text, size_t begin, size_t end, std::
             continue;
         }
         if (IsNewlineByte(text[index])) {
-            tokens.push_back({TokenKind::Newline, "\n"});
-            index = AdvanceNewline(text, index);
+            const size_t newlineEnd = AdvanceNewline(text, index);
+            tokens.push_back({TokenKind::Newline, "\n", index, newlineEnd});
+            index = newlineEnd;
             continue;
         }
         ++index;
@@ -7293,7 +7521,7 @@ void AppendTreeTokens(TSNode node, std::string_view text, std::vector<Token>& to
         return;
     }
     if (IsSimplePreprocessorNode(type)) {
-        tokens.push_back({TokenKind::Preprocessor, SourceText(text, start, end)});
+        tokens.push_back({TokenKind::Preprocessor, SourceText(text, start, end), start, end});
         return;
     }
     if (IsAtomicTreeNode(type, childCount)) {
@@ -7301,7 +7529,7 @@ void AppendTreeTokens(TSNode node, std::string_view text, std::vector<Token>& to
         if (type == "comment" && tools::lint::StartsWith(tokenText, "//")) {
             TrimLineCommentTerminator(tokenText);
         }
-        tokens.push_back({ClassifyTreeToken(type, tokenText), tokenText});
+        tokens.push_back({ClassifyTreeToken(type, tokenText), tokenText, start, end});
         return;
     }
     AppendTreeChildTokens(node, text, tokens);
@@ -7321,6 +7549,461 @@ ParseResult ParseTreeResult(TSNode root, std::string_view text) {
     }
     return result;
 }
+
+struct SourceTokenLookup {
+    std::map<size_t, size_t> byBegin;
+    const std::vector<Token>* tokens = nullptr;
+};
+
+SourceTokenLookup BuildSourceTokenLookup(const std::vector<Token>& tokens) {
+    SourceTokenLookup lookup;
+    lookup.tokens = &tokens;
+    for (size_t index = 0; index < tokens.size(); ++index) {
+        if (tokens[index].sourceBegin != kNoTokenIndex) {
+            lookup.byBegin.emplace(tokens[index].sourceBegin, index);
+        }
+    }
+    return lookup;
+}
+
+std::optional < std::pair<
+    size_t,
+    size_t
+> > TokenSpanForByteRange(const SourceTokenLookup& lookup, size_t begin, size_t end) {
+    if (lookup.tokens == nullptr || begin >= end) {
+        return std::nullopt;
+    }
+    auto current = lookup.byBegin.lower_bound(begin);
+    if (current == lookup.byBegin.end() || current->first >= end) {
+        return std::nullopt;
+    }
+    size_t first = current->second;
+    size_t last = current->second;
+    for (; current != lookup.byBegin.end() && current->first < end; ++current) {
+        first = std::min(first, current->second);
+        last = std::max(last, current->second);
+    }
+    if (first > last) {
+        return std::nullopt;
+    }
+    return std::pair<size_t, size_t>{first, last + 1};
+}
+
+std::optional<std::pair<size_t, size_t>> TokenSpanForTreeNode(const SourceTokenLookup& lookup, TSNode node) {
+    return TokenSpanForByteRange(lookup, ts_node_start_byte(node), ts_node_end_byte(node));
+}
+
+std::optional<size_t> FindFirstSourceTokenText(
+    const SourceTokenLookup& lookup,
+    size_t begin,
+    size_t end,
+    std::string_view text
+) {
+    if (lookup.tokens == nullptr) {
+        return std::nullopt;
+    }
+    for (
+        auto current = lookup.byBegin.lower_bound(begin);
+        current != lookup.byBegin.end() && current->first < end;
+        ++current
+    ) {
+        if ((*lookup.tokens)[current->second].text == text) {
+            return current->second;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> FindLastSourceTokenText(
+    const SourceTokenLookup& lookup,
+    size_t begin,
+    size_t end,
+    std::string_view text
+) {
+    if (lookup.tokens == nullptr) {
+        return std::nullopt;
+    }
+    std::optional<size_t> result;
+    for (
+        auto current = lookup.byBegin.lower_bound(begin);
+        current != lookup.byBegin.end() && current->first < end;
+        ++current
+    ) {
+        if ((*lookup.tokens)[current->second].text == text) {
+            result = current->second;
+        }
+    }
+    return result;
+}
+
+std::optional<size_t> FindFirstSourceTokenAnyText(
+    const SourceTokenLookup& lookup,
+    size_t begin,
+    size_t end,
+    std::initializer_list<std::string_view> texts
+) {
+    if (lookup.tokens == nullptr) {
+        return std::nullopt;
+    }
+    for (
+        auto current = lookup.byBegin.lower_bound(begin);
+        current != lookup.byBegin.end() && current->first < end;
+        ++current
+    ) {
+        const std::string& tokenText = (*lookup.tokens)[current->second].text;
+        for (std::string_view text : texts) {
+            if (tokenText == text) {
+                return current->second;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> FindDirectChildSourceTokenAnyText(
+    TSNode node,
+    const SourceTokenLookup& lookup,
+    std::initializer_list<std::string_view> texts
+) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(node, index);
+        const std::optional<std::pair<size_t, size_t>> span = TokenSpanForTreeNode(lookup, child);
+        if (!span || span->second != span->first + 1 || lookup.tokens == nullptr) {
+            continue;
+        }
+        const std::string& tokenText = (*lookup.tokens)[span->first].text;
+        for (std::string_view text : texts) {
+            if (tokenText == text) {
+                return span->first;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<std::string> FindDirectChildSourceTokenText(
+    TSNode node,
+    const SourceTokenLookup& lookup,
+    std::initializer_list<std::string_view> texts
+) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(node, index);
+        const std::optional<std::pair<size_t, size_t>> span = TokenSpanForTreeNode(lookup, child);
+        if (!span || span->second != span->first + 1 || lookup.tokens == nullptr) {
+            continue;
+        }
+        const std::string& tokenText = (*lookup.tokens)[span->first].text;
+        for (std::string_view text : texts) {
+            if (tokenText == text) {
+                return tokenText;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> FindLastSourceTokenAnyText(
+    const SourceTokenLookup& lookup,
+    size_t begin,
+    size_t end,
+    std::initializer_list<std::string_view> texts
+) {
+    if (lookup.tokens == nullptr) {
+        return std::nullopt;
+    }
+    std::optional<size_t> result;
+    for (
+        auto current = lookup.byBegin.lower_bound(begin);
+        current != lookup.byBegin.end() && current->first < end;
+        ++current
+    ) {
+        const std::string& tokenText = (*lookup.tokens)[current->second].text;
+        for (std::string_view text : texts) {
+            if (tokenText == text) {
+                result = current->second;
+            }
+        }
+    }
+    return result;
+}
+
+bool TreeNodeHasDirectChildType(TSNode node, std::string_view type) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        if (std::string_view(ts_node_type(ts_node_child(node, index))) == type) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<TSNode> FindDirectChildType(TSNode node, std::string_view type) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        TSNode child = ts_node_child(node, index);
+        if (std::string_view(ts_node_type(child)) == type) {
+            return child;
+        }
+    }
+    return std::nullopt;
+}
+
+bool IsTreeGroupNodeType(std::string_view type) {
+    return type == "argument_list" ||
+        type == "parameter_list" ||
+        type == "requires_parameter_list" ||
+        type == "condition_clause" ||
+        type == "parenthesized_expression" ||
+        type == "initializer_list" ||
+        type == "subscript_argument_list" ||
+        type == "lambda_capture_specifier" ||
+        type == "structured_binding_declarator" ||
+        type == "template_argument_list" ||
+        type == "template_parameter_list";
+}
+
+bool IsTreeControlHeaderNodeType(std::string_view type) {
+    return type == "if_statement" ||
+        type == "for_statement" ||
+        type == "for_range_loop" ||
+        type == "while_statement" ||
+        type == "switch_statement";
+}
+
+std::string_view TreeGroupOpenDelimiter(std::string_view type) {
+    if (
+        type == "subscript_argument_list" ||
+        type == "lambda_capture_specifier" ||
+        type == "structured_binding_declarator"
+    ) {
+        return "[";
+    }
+    if (type == "initializer_list") {
+        return "{";
+    }
+    if (type == "template_argument_list" || type == "template_parameter_list") {
+        return "<";
+    }
+    return "(";
+}
+
+bool IsTreeGroupCloseDelimiter(std::string_view type, std::string_view text) {
+    if (
+        type == "subscript_argument_list" ||
+        type == "lambda_capture_specifier" ||
+        type == "structured_binding_declarator"
+    ) {
+        return text == "]";
+    }
+    if (type == "initializer_list") {
+        return text == "}";
+    }
+    if (type == "template_argument_list" || type == "template_parameter_list") {
+        return text == ">" || text == ">>";
+    }
+    return text == ")";
+}
+
+bool IsAssignmentTreeNodeType(std::string_view type) {
+    return type == "assignment_expression" || type == "init_declarator" || type == "condition_declaration";
+}
+
+std::optional<std::string> FindBinaryOperatorText(TSNode node, const SourceTokenLookup& lookup) {
+    if (std::string_view(ts_node_type(node)) != "binary_expression") {
+        return std::nullopt;
+    }
+    return FindDirectChildSourceTokenText(
+        node,
+        lookup,
+        {"&&", "||", "|", "^", "==", "!=", "<", ">", "<=", ">=", "<<", ">>", "+", "*"}
+    );
+}
+
+bool HasDirectBinaryChildWithOperator(TSNode node, const SourceTokenLookup& lookup, std::string_view text) {
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(node, index);
+        const std::optional<std::string> childOperator = FindBinaryOperatorText(child, lookup);
+        if (childOperator && *childOperator == text) {
+            return true;
+        }
+    }
+    return false;
+}
+
+std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTokenLookup& lookup, size_t order) {
+    const std::string_view type = ts_node_type(node);
+    const size_t nodeBegin = ts_node_start_byte(node);
+    const size_t nodeEnd = ts_node_end_byte(node);
+    const std::optional<std::pair<size_t, size_t>> span = TokenSpanForByteRange(lookup, nodeBegin, nodeEnd);
+    if (!span) {
+        return std::nullopt;
+    }
+
+    SourceLayoutNode source;
+    source.begin = span->first;
+    source.end = span->second;
+    source.order = order;
+
+    if (type == "template_declaration" || type == "requires_clause") {
+        source.kind = SourceLayoutKind::TemplateDeclaration;
+        return source;
+    }
+    if (type == "lambda_expression") {
+        std::optional<size_t> bodyOpen;
+        if (const std::optional<TSNode> body = FindDirectChildType(node, "compound_statement")) {
+            bodyOpen = FindFirstSourceTokenText(lookup, ts_node_start_byte(*body), ts_node_end_byte(*body), "{");
+        }
+        if (!bodyOpen) {
+            return std::nullopt;
+        }
+        source.kind = SourceLayoutKind::Lambda;
+        source.index = *bodyOpen;
+        return source;
+    }
+    if (type == "field_initializer_list") {
+        const std::optional<size_t> colon = FindFirstSourceTokenText(lookup, nodeBegin, nodeEnd, ":");
+        if (!colon) {
+            return std::nullopt;
+        }
+        source.kind = SourceLayoutKind::ConstructorInitializer;
+        source.index = *colon;
+        return source;
+    }
+    if (IsAssignmentTreeNodeType(type)) {
+        const std::optional<size_t> assignment = FindDirectChildSourceTokenAnyText(
+            node,
+            lookup,
+            {"=", "*=", "/=", "%=", "+=", "-=", "<<=", ">>=", "&=", "^=", "|=", "and_eq", "or_eq", "xor_eq"}
+        );
+        if (assignment) {
+            source.kind = SourceLayoutKind::Assignment;
+            source.index = *assignment;
+            return source;
+        }
+        if (type == "init_declarator" && (
+            TreeNodeHasDirectChildType(node, "initializer_list") || TreeNodeHasDirectChildType(node, "argument_list")
+        )) {
+            source.kind = SourceLayoutKind::DeclarationValue;
+            source.index = span->first;
+            return source;
+        }
+    }
+    if (type == "conditional_expression") {
+        source.kind = SourceLayoutKind::OperatorChain;
+        source.stopChildren = TreeNodeHasDirectChildType(node, "conditional_expression");
+        return source;
+    }
+    if (type == "binary_expression") {
+        const std::optional<std::string> breakOperator = FindBinaryOperatorText(node, lookup);
+        if (!breakOperator) {
+            return std::nullopt;
+        }
+        source.kind = SourceLayoutKind::OperatorChain;
+        source.stopChildren = HasDirectBinaryChildWithOperator(node, lookup, *breakOperator);
+        return source;
+    }
+    if (type == "concatenated_string") {
+        source.kind = SourceLayoutKind::StringLiteralSequence;
+        return source;
+    }
+    if (IsTreeControlHeaderNodeType(type)) {
+        const std::optional<size_t> open = FindFirstSourceTokenText(lookup, nodeBegin, nodeEnd, "(");
+        if (!open || lookup.tokens == nullptr) {
+            return std::nullopt;
+        }
+        const size_t close = (*lookup.tokens)[*open].matchingIndex;
+        if (close == kNoTokenIndex || close <= *open || close >= lookup.tokens->size()) {
+            return std::nullopt;
+        }
+        source.kind = SourceLayoutKind::Group;
+        source.begin = *open;
+        source.end = close + 1;
+        source.groupOpen = *open;
+        source.groupClose = close;
+        return source;
+    }
+    if (IsTreeGroupNodeType(type)) {
+        const std::optional<size_t> open =
+            FindFirstSourceTokenText(lookup, nodeBegin, nodeEnd, TreeGroupOpenDelimiter(type));
+        std::optional<size_t> close;
+        if (lookup.tokens != nullptr) {
+            for (
+                auto current = lookup.byBegin.lower_bound(nodeBegin);
+                current != lookup.byBegin.end() && current->first < nodeEnd;
+                ++current
+            ) {
+                if (IsTreeGroupCloseDelimiter(type, (*lookup.tokens)[current->second].text)) {
+                    close = current->second;
+                }
+            }
+        }
+        if (!open || !close || *open >= *close) {
+            return std::nullopt;
+        }
+        if (
+            type == "template_parameter_list" &&
+            lookup.tokens != nullptr &&
+            *open > 0 &&
+            (*lookup.tokens)[*open - 1].text == "template"
+        ) {
+            source.kind = SourceLayoutKind::TemplateDeclaration;
+            source.begin = *open - 1;
+            source.end = span->second;
+            return source;
+        }
+        source.kind = SourceLayoutKind::Group;
+        source.begin = *open;
+        source.end = *close + 1;
+        source.groupOpen = *open;
+        source.groupClose = *close;
+        return source;
+    }
+    return std::nullopt;
+}
+
+void AppendSourceLayoutNodes(
+    TSNode node,
+    const SourceTokenLookup& lookup,
+    SourceLayoutNode& parent,
+    int depth,
+    size_t& order
+) {
+    SourceLayoutNode* childParent = &parent;
+    std::optional<SourceLayoutNode> source = MakeSourceLayoutNode(node, lookup, order);
+    if (source) {
+        source->depth = depth;
+        source->order = order++;
+        parent.children.push_back(std::move(*source));
+        childParent = &parent.children.back();
+        ++depth;
+    }
+
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(node, index);
+        if (ts_node_start_byte(child) == ts_node_end_byte(child)) {
+            continue;
+        }
+        AppendSourceLayoutNodes(child, lookup, *childParent, depth, order);
+    }
+}
+
+SourceLayoutTree BuildSourceLayoutTree(TSNode root, const std::vector<Token>& tokens) {
+    SourceLayoutTree tree;
+    tree.available = true;
+    tree.root.kind = SourceLayoutKind::Root;
+    tree.root.begin = 0;
+    tree.root.end = tokens.size();
+    const SourceTokenLookup lookup = BuildSourceTokenLookup(tokens);
+    size_t order = 0;
+    AppendSourceLayoutNodes(root, lookup, tree.root, 0, order);
+    return tree;
+}
+
+void AnnotateTokenIndexesAndGroups(std::vector<Token>& tokens);
 
 FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
     TSParser* parser = ts_parser_new();
@@ -7343,6 +8026,10 @@ FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& confi
     (void)AppendSourceTrivia(text, ts_node_end_byte(root), text.size(), model.tokens);
     model.tokens = SortIncludeTokens(std::move(model.tokens), config, sourcePath);
     model.tokens = DropTrailingCommas(std::move(model.tokens));
+    AnnotateTokenIndexesAndGroups(model.tokens);
+    model.tokens = AddRequiredControlBraces(model.tokens);
+    AnnotateTokenIndexesAndGroups(model.tokens);
+    model.layout = BuildSourceLayoutTree(root, model.tokens);
     ts_tree_delete(tree);
     ts_parser_delete(parser);
     return model;
@@ -7408,17 +8095,14 @@ FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& con
     if (!model.parse.ok) {
         return {.ok = false, .error = "tree-sitter parser setup failed"};
     }
-    AnnotateTokenIndexesAndGroups(model.tokens);
-    std::vector<Token> tokens = AddRequiredControlBraces(model.tokens);
-    AnnotateTokenIndexesAndGroups(tokens);
-    PrettyFormatter formatter(config);
+    PrettyFormatter formatter(config, 0, false, &model.layout);
     FileFormatResult result;
     result.parseHadErrors = model.parse.hasErrors;
     result.parseErrorNodeType = model.parse.errorNodeType;
     result.parseErrorLine = model.parse.errorLine;
     result.parseErrorColumn = model.parse.errorColumn;
     result.parseErrorSnippet = model.parse.errorSnippet;
-    result.formatted = formatter.Format(tokens);
+    result.formatted = formatter.Format(model.tokens);
     result.changed = !TextMatchesFormattedOutput(text, result.formatted);
     return result;
 }

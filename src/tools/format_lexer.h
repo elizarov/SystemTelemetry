@@ -25,6 +25,8 @@ enum class TokenKind {
 struct Token {
     TokenKind kind = TokenKind::Symbol;
     std::string text;
+    size_t sourceBegin = kNoTokenIndex;
+    size_t sourceEnd = kNoTokenIndex;
     size_t modelIndex = kNoTokenIndex;
     size_t matchingIndex = kNoTokenIndex;
 };
