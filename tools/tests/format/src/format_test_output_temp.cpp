@@ -294,7 +294,7 @@ namespace format_fixture {
         }
     }
 
-    void ManagedReferenceSpacing(NativeType& nativeRef, NativeType&& nativeRvalueRef, NativeType*& pointerRef, NativeType*&& pointerRvalueRef, NativeType** pointerPointer, ManagedWidget^managedHandle, ManagedWidget^% managedTrackingRef, ManagedWidget% managedReference) {
+    void ManagedReferenceSpacing(NativeType& nativeRef, NativeType&& nativeRvalueRef, NativeType*& pointerRef, NativeType*&& pointerRvalueRef, NativeType** pointerPointer, ManagedWidget^ managedHandle, ManagedWidget^% managedTrackingRef, ManagedWidget% managedReference) {
         Use(nativeRef, nativeRvalueRef, pointerRef, pointerRvalueRef, pointerPointer, managedHandle, managedTrackingRef, managedReference);
     }
 

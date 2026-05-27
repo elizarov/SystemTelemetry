@@ -111,6 +111,18 @@ class FormatCommandTests(unittest.TestCase):
             self.assertEqual("int main() {\n    return 1;\n}\n", source.read_text(encoding="utf-8").replace("\r\n", "\n"))
             self.assertIn("Formatted 1 file", result.stdout)
 
+    def test_declarator_reference_tokens_include_managed_cpp(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text="void f(Object ^ handle,Object % tracking,int && moved,int * pointer){}\n",
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "void f(Object^ handle, Object% tracking, int&& moved, int* pointer) {\n}\n",
+            result.stdout,
+        )
+
     def test_parse_error_rejects_stdout_formatting(self) -> None:
         result = native_format("--style=file", input_text="int main( { return 1; }\n")
 

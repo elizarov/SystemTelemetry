@@ -61,7 +61,12 @@ enum class SyntaxTreeKind : std::uint16_t {
     ConditionalExpression,
     AssignmentExpression,
     PointerDeclarator,
+    AbstractPointerDeclarator,
     ReferenceDeclarator,
+    AbstractReferenceDeclarator,
+    HandleDeclarator,
+    AbstractHandleDeclarator,
+    MemberPointerDeclarator,
     FunctionDeclarator,
     ParameterList,
     ArgumentList,
@@ -215,8 +220,21 @@ enum class KnownToken : std::uint16_t {
     KeywordCoYield,
 };
 
+enum class TokenClass : std::uint32_t {
+    Keyword = 1u << 0,
+    ControlKeyword = 1u << 1,
+    AttachAfterBlockKeyword = 1u << 2,
+    AccessKeyword = 1u << 3,
+    MemberOperator = 1u << 4,
+    AssignmentOperator = 1u << 5,
+    BinaryOperator = 1u << 6,
+    UnaryOperator = 1u << 7,
+    DeclaratorReferenceToken = 1u << 8,
+};
+
 KnownToken KnownTokenFromText(std::string_view text);
 std::string_view KnownTokenText(KnownToken token);
+bool KnownTokenHasClass(KnownToken token, TokenClass tokenClass);
 
 struct SyntaxNode {
     SyntaxNodeKind kind = SyntaxNodeKind::Tree;

@@ -37,36 +37,11 @@ bool IsPreprocessorNode(SyntaxTreeKind kind) {
         kind == SyntaxTreeKind::PreprocUsing;
 }
 
-bool IsControlKeyword(KnownToken token) {
-    return token == KnownToken::KeywordIf ||
-        token == KnownToken::KeywordFor ||
-        token == KnownToken::KeywordWhile ||
-        token == KnownToken::KeywordSwitch ||
-        token == KnownToken::KeywordCatch;
-}
-
-bool IsAttachAfterBlockKeyword(KnownToken token) {
-    return token == KnownToken::KeywordElse ||
-        token == KnownToken::KeywordCatch ||
-        token == KnownToken::KeywordFinally ||
-        token == KnownToken::KeywordWhile;
-}
-
-bool IsAccessKeyword(KnownToken token) {
-    return token == KnownToken::KeywordPublic ||
-        token == KnownToken::KeywordProtected ||
-        token == KnownToken::KeywordPrivate;
-}
-
-bool IsKeyword(KnownToken token) {
-    return token >= KnownToken::KeywordAlignas && token <= KnownToken::KeywordCoYield;
-}
-
 bool IsWordLike(const PrintToken& token) {
     if (token.kind == PrintTokenKind::Free) {
         return true;
     }
-    return token.kind == PrintTokenKind::Known && IsKeyword(token.known);
+    return token.kind == PrintTokenKind::Known && KnownTokenHasClass(token.known, TokenClass::Keyword);
 }
 
 bool IsStringLike(const PrintToken& token) {
@@ -75,79 +50,23 @@ bool IsStringLike(const PrintToken& token) {
         token.treeKind == SyntaxTreeKind::CharacterLiteral;
 }
 
-bool IsMemberOperator(KnownToken token) {
-    return token == KnownToken::Dot ||
-        token == KnownToken::Arrow ||
-        token == KnownToken::DotStar ||
-        token == KnownToken::ArrowStar ||
-        token == KnownToken::ColonColon;
+bool IsDeclaratorReferenceParent(SyntaxTreeKind kind) {
+    return kind == SyntaxTreeKind::PointerDeclarator ||
+        kind == SyntaxTreeKind::AbstractPointerDeclarator ||
+        kind == SyntaxTreeKind::ReferenceDeclarator ||
+        kind == SyntaxTreeKind::AbstractReferenceDeclarator ||
+        kind == SyntaxTreeKind::HandleDeclarator ||
+        kind == SyntaxTreeKind::AbstractHandleDeclarator ||
+        kind == SyntaxTreeKind::MemberPointerDeclarator;
 }
 
-bool IsAssignmentOperator(KnownToken token) {
-    return token == KnownToken::Equal ||
-        token == KnownToken::PlusEqual ||
-        token == KnownToken::MinusEqual ||
-        token == KnownToken::StarEqual ||
-        token == KnownToken::SlashEqual ||
-        token == KnownToken::PercentEqual ||
-        token == KnownToken::CaretEqual ||
-        token == KnownToken::AmpersandEqual ||
-        token == KnownToken::PipeEqual ||
-        token == KnownToken::LessLessEqual ||
-        token == KnownToken::GreaterGreaterEqual;
-}
-
-bool IsBinaryOperator(KnownToken token) {
-    switch (token) {
-    case KnownToken::Plus:
-    case KnownToken::Minus:
-    case KnownToken::Star:
-    case KnownToken::Slash:
-    case KnownToken::Percent:
-    case KnownToken::Caret:
-    case KnownToken::Ampersand:
-    case KnownToken::Pipe:
-    case KnownToken::Less:
-    case KnownToken::Greater:
-    case KnownToken::LessEqual:
-    case KnownToken::GreaterEqual:
-    case KnownToken::EqualEqual:
-    case KnownToken::BangEqual:
-    case KnownToken::Spaceship:
-    case KnownToken::LessLess:
-    case KnownToken::GreaterGreater:
-    case KnownToken::AmpersandAmpersand:
-    case KnownToken::PipePipe:
-        return true;
-    default:
-        return false;
-    }
-}
-
-bool IsUnaryOperator(KnownToken token) {
-    return token == KnownToken::Bang ||
-        token == KnownToken::Tilde ||
-        token == KnownToken::Plus ||
-        token == KnownToken::Minus ||
-        token == KnownToken::Star ||
-        token == KnownToken::Ampersand ||
-        token == KnownToken::PlusPlus ||
-        token == KnownToken::MinusMinus;
-}
-
-bool IsPointerDeclaratorToken(const PrintToken& token) {
-    return token.parentKind == SyntaxTreeKind::PointerDeclarator &&
-        (token.known == KnownToken::Star || token.known == KnownToken::Ampersand);
-}
-
-bool IsReferenceDeclaratorToken(const PrintToken& token) {
-    return token.parentKind == SyntaxTreeKind::ReferenceDeclarator &&
-        (token.known == KnownToken::Ampersand || token.known == KnownToken::AmpersandAmpersand ||
-         token.known == KnownToken::Percent);
+bool IsReferenceToken(const PrintToken& token) {
+    return token.kind == PrintTokenKind::Known &&
+        KnownTokenHasClass(token.known, TokenClass::DeclaratorReferenceToken);
 }
 
 bool IsDeclaratorBindingToken(const PrintToken& token) {
-    return IsPointerDeclaratorToken(token) || IsReferenceDeclaratorToken(token);
+    return IsDeclaratorReferenceParent(token.parentKind) && IsReferenceToken(token);
 }
 
 bool IsUnaryContext(const PrintToken& token) {
@@ -407,7 +326,9 @@ private:
             cur == KnownToken::Semicolon || cur == KnownToken::ColonColon || cur == KnownToken::Dot ||
             cur == KnownToken::Arrow || cur == KnownToken::DotStar || cur == KnownToken::ArrowStar) {
             if (cur == KnownToken::ColonColon &&
-                (IsKeyword(prev) || IsAssignmentOperator(prev) || prev == KnownToken::KeywordReturn)) {
+                (KnownTokenHasClass(prev, TokenClass::Keyword) ||
+                 KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
+                 prev == KnownToken::KeywordReturn)) {
                 return true;
             }
             return false;
@@ -424,7 +345,8 @@ private:
             return true;
         }
         if (cur == KnownToken::LeftParen) {
-            return previous->kind == PrintTokenKind::Known && IsControlKeyword(prev);
+            return previous->kind == PrintTokenKind::Known &&
+                KnownTokenHasClass(prev, TokenClass::ControlKeyword);
         }
         if (cur == KnownToken::LeftBracket) {
             return false;
@@ -443,13 +365,14 @@ private:
         }
         if (prev == KnownToken::Colon) {
             return current.parentKind != SyntaxTreeKind::CaseStatement &&
-                !IsAccessKeyword(previous->known);
+                !KnownTokenHasClass(previous->known, TokenClass::AccessKeyword);
         }
         if (cur == KnownToken::Less && prev == KnownToken::KeywordTemplate) {
             return true;
         }
         if (cur == KnownToken::Colon) {
-            if (previous->known == KnownToken::KeywordDefault || IsAccessKeyword(previous->known)) {
+            if (previous->known == KnownToken::KeywordDefault ||
+                KnownTokenHasClass(previous->known, TokenClass::AccessKeyword)) {
                 return false;
             }
             return current.parentKind != SyntaxTreeKind::CaseStatement;
@@ -458,26 +381,35 @@ private:
             return false;
         }
         if (IsDeclaratorBindingToken(*previous)) {
+            if (cur == KnownToken::Greater) {
+                return false;
+            }
             return !IsDeclaratorBindingToken(current);
         }
-        if (prev == KnownToken::KeywordReturn && current.kind == PrintTokenKind::Known && IsUnaryOperator(cur)) {
+        if (prev == KnownToken::KeywordReturn && current.kind == PrintTokenKind::Known &&
+            KnownTokenHasClass(cur, TokenClass::UnaryOperator)) {
             return true;
         }
         if (current.kind == PrintTokenKind::Known &&
-            (IsAssignmentOperator(cur) || (IsBinaryOperator(cur) && IsBinaryContext(current)))) {
+            (KnownTokenHasClass(cur, TokenClass::AssignmentOperator) ||
+             (KnownTokenHasClass(cur, TokenClass::BinaryOperator) && IsBinaryContext(current)))) {
             return true;
         }
         if (previous->kind == PrintTokenKind::Known &&
-            (IsAssignmentOperator(prev) || (IsBinaryOperator(prev) && IsBinaryContext(*previous)))) {
+            (KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
+             (KnownTokenHasClass(prev, TokenClass::BinaryOperator) && IsBinaryContext(*previous)))) {
             return true;
         }
-        if (current.kind == PrintTokenKind::Known && IsUnaryOperator(cur) && IsUnaryContext(current)) {
+        if (current.kind == PrintTokenKind::Known && KnownTokenHasClass(cur, TokenClass::UnaryOperator) &&
+            IsUnaryContext(current)) {
             return false;
         }
-        if (previous->kind == PrintTokenKind::Known && IsUnaryOperator(prev) && IsUnaryContext(*previous)) {
+        if (previous->kind == PrintTokenKind::Known && KnownTokenHasClass(prev, TokenClass::UnaryOperator) &&
+            IsUnaryContext(*previous)) {
             return false;
         }
-        if (IsMemberOperator(prev) || IsMemberOperator(cur)) {
+        if (KnownTokenHasClass(prev, TokenClass::MemberOperator) ||
+            KnownTokenHasClass(cur, TokenClass::MemberOperator)) {
             return false;
         }
         if (IsWordLike(*previous) && IsWordLike(current)) {
@@ -594,7 +526,8 @@ private:
             Write(":");
             if (token.parentKind == SyntaxTreeKind::CaseStatement ||
                 (previous != nullptr && previous->kind == PrintTokenKind::Known &&
-                 (previous->known == KnownToken::KeywordDefault || IsAccessKeyword(previous->known)))) {
+                 (previous->known == KnownToken::KeywordDefault ||
+                  KnownTokenHasClass(previous->known, TokenClass::AccessKeyword)))) {
                 NewLine();
             }
             return;
@@ -633,7 +566,7 @@ private:
             Write("}");
             if (next != nullptr && next->kind == PrintTokenKind::Known &&
                 (next->known == KnownToken::Semicolon || next->known == KnownToken::Comma ||
-                 IsAttachAfterBlockKeyword(next->known))) {
+                 KnownTokenHasClass(next->known, TokenClass::AttachAfterBlockKeyword))) {
                 return;
             }
             NewLine();
