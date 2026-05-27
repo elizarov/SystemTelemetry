@@ -90,11 +90,6 @@ struct SourceLayoutNode {
     std::vector<SourceLayoutNode> children;
 };
 
-struct SourceLayoutTree {
-    bool available = false;
-    SourceLayoutNode root;
-};
-
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
     const double seconds = std::chrono::duration<double>(elapsed).count();
     char buffer[64] = {};
@@ -604,9 +599,9 @@ class PrettyFormatter {
 public:
     explicit PrettyFormatter(
         const FormatterConfig& config,
+        const SourceLayoutNode& sourceLayout,
         int initialIndentLevel = 0,
-        bool executableBodyContext = false,
-        const SourceLayoutTree* sourceLayout = nullptr
+        bool executableBodyContext = false
     ) : config_(config), sourceLayout_(sourceLayout), indentLevel_(initialIndentLevel) {
         if (executableBodyContext) {
             blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
@@ -1139,7 +1134,7 @@ private:
         if (!IsStructuredMacroReplacement(replacementTokens)) {
             return std::nullopt;
         }
-        PrettyFormatter formatter(config_, 1);
+        PrettyFormatter formatter(config_, sourceLayout_, 1);
         std::vector<std::string> lines = tools::lint::SplitLines(formatter.Format(replacementTokens));
         lines.erase(std::remove(lines.begin(), lines.end(), std::string{}), lines.end());
         if (lines.empty()) {
@@ -1942,7 +1937,7 @@ private:
     }
 
     bool CanUseSourceLayout(TokenSpan tokens) const {
-        if (sourceLayout_ == nullptr || !sourceLayout_->available || tokens.empty()) {
+        if (tokens.empty()) {
             return false;
         }
         bool hasSourceToken = false;
@@ -1982,13 +1977,13 @@ private:
 
     LayoutTree BuildTreeSitterLayoutTree(TokenSpan tokens) const {
         LayoutTree tree;
-        if (sourceLayout_ == nullptr || !sourceLayout_->available || tokens.empty()) {
+        if (tokens.empty()) {
             return tree;
         }
         const size_t spanBegin = tokens.front().modelIndex;
         const size_t spanEnd = tokens.back().modelIndex + 1;
         size_t order = 0;
-        CollectTreeSitterLayoutNodes(sourceLayout_->root, tokens, spanBegin, spanEnd, tree, order);
+        CollectTreeSitterLayoutNodes(sourceLayout_, tokens, spanBegin, spanEnd, tree, order);
         return tree;
     }
 
@@ -3058,7 +3053,7 @@ private:
         TokenSpan body = TokenSubspan(tokens, bodyOpen + 1, *bodyClose);
         TokenSpan after = TokenSubspan(tokens, *bodyClose + 1, tokens.size());
         std::vector<std::string> lines = FormatLambdaHeaderWithLeadingTokens(header, indentLevel, std::move(prefix));
-        PrettyFormatter bodyFormatter(config_, indentLevel + 1, true, sourceLayout_);
+        PrettyFormatter bodyFormatter(config_, sourceLayout_, indentLevel + 1, true);
         std::vector<std::string> bodyLines = tools::lint::SplitLines(bodyFormatter.Format(body));
         while (!bodyLines.empty() && bodyLines.back().empty()) {
             bodyLines.pop_back();
@@ -7173,7 +7168,7 @@ private:
     std::vector<BlockState> blockStack_;
     mutable std::map<std::string, LayoutResult> layoutCache_;
     const FormatterConfig& config_;
-    const SourceLayoutTree* sourceLayout_ = nullptr;
+    const SourceLayoutNode& sourceLayout_;
     int indentLevel_ = 0;
     int groupDepth_ = 0;
     int caseBodyIndentLevel_ = -1;
@@ -7346,7 +7341,7 @@ std::vector<Token> SortIncludeTokens(
 struct FormatModel {
     ParseResult parse;
     std::vector<Token> tokens;
-    SourceLayoutTree layout;
+    SourceLayoutNode layout;
 };
 
 bool IsNewlineByte(char ch) {
@@ -7991,16 +7986,15 @@ void AppendSourceLayoutNodes(
     }
 }
 
-SourceLayoutTree BuildSourceLayoutTree(TSNode root, const std::vector<Token>& tokens) {
-    SourceLayoutTree tree;
-    tree.available = true;
-    tree.root.kind = SourceLayoutKind::Root;
-    tree.root.begin = 0;
-    tree.root.end = tokens.size();
+SourceLayoutNode BuildSourceLayoutRoot(TSNode root, const std::vector<Token>& tokens) {
+    SourceLayoutNode treeRoot;
+    treeRoot.kind = SourceLayoutKind::Root;
+    treeRoot.begin = 0;
+    treeRoot.end = tokens.size();
     const SourceTokenLookup lookup = BuildSourceTokenLookup(tokens);
     size_t order = 0;
-    AppendSourceLayoutNodes(root, lookup, tree.root, 0, order);
-    return tree;
+    AppendSourceLayoutNodes(root, lookup, treeRoot, 0, order);
+    return treeRoot;
 }
 
 void AnnotateTokenIndexesAndGroups(std::vector<Token>& tokens);
@@ -8029,7 +8023,7 @@ FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& confi
     AnnotateTokenIndexesAndGroups(model.tokens);
     model.tokens = AddRequiredControlBraces(model.tokens);
     AnnotateTokenIndexesAndGroups(model.tokens);
-    model.layout = BuildSourceLayoutTree(root, model.tokens);
+    model.layout = BuildSourceLayoutRoot(root, model.tokens);
     ts_tree_delete(tree);
     ts_parser_delete(parser);
     return model;
@@ -8095,7 +8089,7 @@ FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& con
     if (!model.parse.ok) {
         return {.ok = false, .error = "tree-sitter parser setup failed"};
     }
-    PrettyFormatter formatter(config, 0, false, &model.layout);
+    PrettyFormatter formatter(config, model.layout);
     FileFormatResult result;
     result.parseHadErrors = model.parse.hasErrors;
     result.parseErrorNodeType = model.parse.errorNodeType;
