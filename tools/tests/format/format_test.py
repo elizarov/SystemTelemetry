@@ -119,7 +119,7 @@ class FormatCommandTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertEqual(
-            "void f(Object^ handle, Object% tracking, int&& moved, int* pointer) {\n}\n",
+            "void f(Object^ handle, Object% tracking, int&& moved, int* pointer) {}\n",
             result.stdout,
         )
 
