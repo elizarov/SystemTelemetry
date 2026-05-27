@@ -4,9 +4,7 @@
 #include <string>
 #include <vector>
 
-#include "tools/format_lexer.h"
-
-namespace tools::format {
+#include "tools/impl/format_lexer.h"
 
 struct ParseResult {
     bool ok = false;
@@ -88,5 +86,3 @@ struct LayoutNode {
 struct LayoutTree {
     std::vector<LayoutNode> breakNodes;
 };
-
-}  // namespace tools::format

@@ -234,13 +234,9 @@ std::vector<FileEntry> DiscoverLintInputs(const std::string& projectRoot, const 
         }
     }
 
-    std::sort(
-        entries.begin(),
-        entries.end(),
-        [&](const FileEntry& left, const FileEntry& right) {
-            return RelativePath(left.path, projectRoot) < RelativePath(right.path, projectRoot);
-        }
-    );
+    std::sort(entries.begin(), entries.end(), [&](const FileEntry& left, const FileEntry& right) {
+        return RelativePath(left.path, projectRoot) < RelativePath(right.path, projectRoot);
+    });
     return entries;
 }
 
@@ -447,6 +443,7 @@ double ElapsedSeconds(std::chrono::steady_clock::time_point started) {
 }  // namespace tools::lint
 
 int RunLintCheck(int argc, char** argv) {
+    using namespace tools;
     using namespace tools::lint;
 
     const auto started = std::chrono::steady_clock::now();

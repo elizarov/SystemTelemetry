@@ -1,4 +1,4 @@
-#include "tools/format_include_sorter.h"
+#include "tools/impl/format_include_sorter.h"
 
 #include <algorithm>
 #include <optional>
@@ -7,9 +7,7 @@
 #include <string_view>
 #include <vector>
 
-#include "tools/impl/lint_common.h"
-
-namespace tools::format {
+#include "tools/impl/tools_common.h"
 
 namespace {
 
@@ -21,9 +19,9 @@ struct IncludeLine {
 };
 
 std::optional<IncludeLine> ParseIncludeLine(std::string_view line) {
-    const std::string trimmed = tools::lint::Trim(line);
+    const std::string trimmed = tools::Trim(line);
     constexpr std::string_view prefix = "#include";
-    if (!tools::lint::StartsWith(trimmed, prefix)) {
+    if (!tools::StartsWith(trimmed, prefix)) {
         return std::nullopt;
     }
     size_t index = prefix.size();
@@ -42,7 +40,7 @@ std::optional<IncludeLine> ParseIncludeLine(std::string_view line) {
     if (end == std::string::npos) {
         return std::nullopt;
     }
-    if (!tools::lint::Trim(std::string_view(trimmed).substr(end + 1)).empty()) {
+    if (!tools::Trim(std::string_view(trimmed).substr(end + 1)).empty()) {
         return std::nullopt;
     }
     IncludeLine include;
@@ -53,7 +51,7 @@ std::optional<IncludeLine> ParseIncludeLine(std::string_view line) {
 }
 
 std::string Stem(std::string_view path) {
-    const std::string normalized = tools::lint::NormalizeSeparators(std::string(path));
+    const std::string normalized = tools::NormalizeSeparators(std::string(path));
     const size_t slash = normalized.find_last_of('/');
     const size_t start = slash == std::string::npos ? 0 : slash + 1;
     const size_t dot = normalized.find_last_of('.');
@@ -68,15 +66,15 @@ bool IsMainInclude(const IncludeLine& include, const FormatterConfig& config, st
         return false;
     }
     std::string includeText = include.spelling.substr(1, include.spelling.size() - 2);
-    if (tools::lint::Extension(includeText) != ".h") {
+    if (tools::Extension(includeText) != ".h") {
         return false;
     }
     const std::string includeStem = Stem(includeText);
     const std::string sourceStem = Stem(sourcePath);
-    if (tools::lint::StartsWith(sourceStem, includeStem + ".")) {
+    if (tools::StartsWith(sourceStem, includeStem + ".")) {
         return true;
     }
-    if (!tools::lint::StartsWith(includeStem, sourceStem)) {
+    if (!tools::StartsWith(includeStem, sourceStem)) {
         return false;
     }
     const std::string suffix = includeStem.substr(sourceStem.size());
@@ -103,7 +101,7 @@ void SortIncludeRun(std::vector<IncludeLine>& includes, const FormatterConfig& c
         if (left.group != right.group) {
             return left.group < right.group;
         }
-        return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
+        return tools::ToLowerAscii(left.spelling) < tools::ToLowerAscii(right.spelling);
     });
 }
 
@@ -111,7 +109,7 @@ std::optional<IncludeLine> ParseIncludeToken(const Token& token) {
     if (token.kind != TokenKind::Preprocessor) {
         return std::nullopt;
     }
-    std::vector<std::string> lines = tools::lint::SplitLines(token.text);
+    std::vector<std::string> lines = tools::SplitLines(token.text);
     if (lines.empty()) {
         lines.push_back(token.text);
     }
@@ -146,5 +144,3 @@ std::vector<std::optional<std::string>> SortedIncludeRunLines(
     }
     return lines;
 }
-
-}  // namespace tools::format

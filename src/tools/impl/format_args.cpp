@@ -1,10 +1,8 @@
-#include "tools/format_args.h"
+#include "tools/impl/format_args.h"
 
 #include <cstdio>
 
-#include "tools/impl/lint_common.h"
-
-namespace tools::format {
+#include "tools/impl/tools_common.h"
 
 namespace {
 
@@ -23,13 +21,13 @@ std::optional<std::string> ParseStyleValue(std::string_view value, std::string& 
             error = "--style=file:<path> requires a path";
             return std::string{};
         }
-        return tools::lint::AbsolutePath(path);
+        return tools::AbsolutePath(path);
     }
     if (value.empty()) {
         error = "--style requires a value";
         return std::string{};
     }
-    return tools::lint::AbsolutePath(value);
+    return tools::AbsolutePath(value);
 }
 
 bool AppendFilesFromList(std::string_view path, FormatOptions& options, std::string& error) {
@@ -37,15 +35,15 @@ bool AppendFilesFromList(std::string_view path, FormatOptions& options, std::str
         error = "--files requires a path";
         return false;
     }
-    const std::string absolute = tools::lint::AbsolutePath(path);
-    std::optional<std::string> text = tools::lint::ReadFileText(absolute);
+    const std::string absolute = tools::AbsolutePath(path);
+    std::optional<std::string> text = tools::ReadFileText(absolute);
     if (!text) {
         error = "failed to read --files list " + std::string(path);
         return false;
     }
     options.fileListProvided = true;
-    for (std::string line : tools::lint::SplitLines(*text)) {
-        line = tools::lint::Trim(line);
+    for (std::string line : tools::SplitLines(*text)) {
+        line = tools::Trim(line);
         if (!line.empty()) {
             options.files.push_back(line);
         }
@@ -139,5 +137,3 @@ void PrintFormatUsage(FILE* output) {
             "[--files <path>|--files=<path>] [file...]\n"
     );
 }
-
-}  // namespace tools::format

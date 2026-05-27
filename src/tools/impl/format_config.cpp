@@ -1,12 +1,10 @@
-#include "tools/format_config.h"
+#include "tools/impl/format_config.h"
 
 #include <algorithm>
 #include <cstdio>
 #include <stdexcept>
 
-#include "tools/impl/lint_common.h"
-
-namespace tools::format {
+#include "tools/impl/tools_common.h"
 
 namespace {
 
@@ -38,12 +36,12 @@ std::string StripYamlComment(std::string_view text) {
         }
         result.push_back(ch);
     }
-    return tools::lint::Trim(result);
+    return tools::Trim(result);
 }
 
 std::vector<ConfigLine> ReadConfigLines(std::string_view text) {
     std::vector<ConfigLine> lines;
-    for (const std::string& line : tools::lint::SplitLines(text)) {
+    for (const std::string& line : tools::SplitLines(text)) {
         std::string stripped = StripYamlComment(line);
         if (stripped.empty() || stripped == "---" || stripped == "...") {
             continue;
@@ -58,11 +56,11 @@ std::pair<std::string, std::string> SplitKeyValue(std::string_view text) {
     if (colon == std::string_view::npos) {
         return {};
     }
-    return {tools::lint::Trim(text.substr(0, colon)), tools::lint::Trim(text.substr(colon + 1))};
+    return {tools::Trim(text.substr(0, colon)), tools::Trim(text.substr(colon + 1))};
 }
 
 std::string UnquoteScalar(std::string value) {
-    value = tools::lint::Trim(value);
+    value = tools::Trim(value);
     if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') {
         std::string result;
         for (size_t index = 1; index + 1 < value.size(); ++index) {
@@ -122,12 +120,12 @@ void ParseIncludeCategories(const std::vector<ConfigLine>& lines, size_t& index,
             --index;
             break;
         }
-        if (!tools::lint::StartsWith(line.text, "- ")) {
+        if (!tools::StartsWith(line.text, "- ")) {
             continue;
         }
         IncludeGroup group;
         group.priority = static_cast<int>(groups.size()) + 1;
-        std::string first = tools::lint::Trim(std::string_view(line.text).substr(2));
+        std::string first = tools::Trim(std::string_view(line.text).substr(2));
         if (!first.empty()) {
             const auto [key, value] = SplitKeyValue(first);
             if (key == "Regex") {
@@ -156,11 +154,9 @@ void ParseIncludeCategories(const std::vector<ConfigLine>& lines, size_t& index,
         }
         groups.push_back(std::move(group));
     }
-    std::sort(
-        groups.begin(),
-        groups.end(),
-        [](const IncludeGroup& left, const IncludeGroup& right) { return left.priority < right.priority; }
-    );
+    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {
+        return left.priority < right.priority;
+    });
     config.includeGroups = std::move(groups);
 }
 
@@ -225,22 +221,22 @@ FormatterConfig ParseFormatterConfig(std::string_view text) {
 }
 
 std::string StartDirectory(std::string_view path) {
-    const std::string absolute = tools::lint::AbsolutePath(path);
-    if (tools::lint::DirectoryExists(absolute)) {
+    const std::string absolute = tools::AbsolutePath(path);
+    if (tools::DirectoryExists(absolute)) {
         return absolute;
     }
-    return tools::lint::ParentPath(absolute);
+    return tools::ParentPath(absolute);
 }
 
 std::optional<std::string> FindUpwards(std::string_view startDirectory, std::string_view fileName) {
-    std::string directory = tools::lint::AbsolutePath(startDirectory);
+    std::string directory = tools::AbsolutePath(startDirectory);
     while (!directory.empty()) {
-        const std::string candidate = tools::lint::JoinPath(directory, fileName);
-        if (tools::lint::FileExists(candidate)) {
+        const std::string candidate = tools::JoinPath(directory, fileName);
+        if (tools::FileExists(candidate)) {
             return candidate;
         }
-        const std::string parent = tools::lint::ParentPath(directory);
-        if (parent.empty() || tools::lint::NormalizePathKey(parent) == tools::lint::NormalizePathKey(directory)) {
+        const std::string parent = tools::ParentPath(directory);
+        if (parent.empty() || tools::NormalizePathKey(parent) == tools::NormalizePathKey(directory)) {
             break;
         }
         directory = parent;
@@ -249,7 +245,7 @@ std::optional<std::string> FindUpwards(std::string_view startDirectory, std::str
 }
 
 std::optional<FormatterConfig> LoadConfigFile(std::string_view path, std::string& error) {
-    const std::optional<std::string> text = tools::lint::ReadFileText(path);
+    const std::optional<std::string> text = tools::ReadFileText(path);
     if (!text.has_value()) {
         error = "could not read formatter config: " + std::string(path);
         return std::nullopt;
@@ -264,26 +260,26 @@ std::optional<FormatterConfig> LoadConfigFile(std::string_view path, std::string
 
 FormatterIgnoreFile ParseIgnoreFile(std::string_view path, std::string_view text) {
     FormatterIgnoreFile ignore;
-    ignore.path = tools::lint::AbsolutePath(path);
-    ignore.directory = tools::lint::ParentPath(ignore.path);
-    for (const std::string& line : tools::lint::SplitLines(text)) {
+    ignore.path = tools::AbsolutePath(path);
+    ignore.directory = tools::ParentPath(ignore.path);
+    for (const std::string& line : tools::SplitLines(text)) {
         std::string entry = StripYamlComment(line);
-        entry = tools::lint::NormalizeSeparators(entry);
-        while (tools::lint::StartsWith(entry, "./")) {
+        entry = tools::NormalizeSeparators(entry);
+        while (tools::StartsWith(entry, "./")) {
             entry.erase(0, 2);
         }
         while (!entry.empty() && entry.back() == '/') {
             entry.pop_back();
         }
         if (!entry.empty()) {
-            ignore.entries.push_back(tools::lint::ToLowerAscii(entry));
+            ignore.entries.push_back(tools::ToLowerAscii(entry));
         }
     }
     return ignore;
 }
 
 std::optional<FormatterIgnoreFile> LoadIgnoreFile(std::string_view path, std::string& error) {
-    const std::optional<std::string> text = tools::lint::ReadFileText(path);
+    const std::optional<std::string> text = tools::ReadFileText(path);
     if (!text.has_value()) {
         error = "could not read formatter ignore file: " + std::string(path);
         return std::nullopt;
@@ -295,11 +291,11 @@ std::optional<FormatterIgnoreFile> LoadIgnoreFile(std::string_view path, std::st
 
 bool FormatterIgnoreFile::Ignores(std::string_view filePath) const {
     const std::string relative =
-        tools::lint::ToLowerAscii(tools::lint::NormalizeSeparators(tools::lint::RelativePath(filePath, directory)));
-    const std::vector<std::string> parts = tools::lint::Split(relative, '/');
+        tools::ToLowerAscii(tools::NormalizeSeparators(tools::RelativePath(filePath, directory)));
+    const std::vector<std::string> parts = tools::Split(relative, '/');
     for (const std::string& entry : entries) {
-        if (tools::lint::Contains(entry, "/")) {
-            if (relative == entry || tools::lint::StartsWith(relative, entry + "/")) {
+        if (tools::Contains(entry, "/")) {
+            if (relative == entry || tools::StartsWith(relative, entry + "/")) {
                 return true;
             }
             continue;
@@ -325,7 +321,7 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
     }
 
     const std::string start = StartDirectory(path);
-    const std::string startKey = tools::lint::NormalizePathKey(start);
+    const std::string startKey = tools::NormalizePathKey(start);
     auto cachedSearch = configSearchCache_.find(startKey);
     if (cachedSearch == configSearchCache_.end()) {
         cachedSearch = configSearchCache_.emplace(startKey, FindUpwards(start, ".cpp-format")).first;
@@ -335,8 +331,8 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
         return nullptr;
     }
 
-    const std::string configPath = tools::lint::AbsolutePath(*cachedSearch->second);
-    const std::string configKey = tools::lint::NormalizePathKey(configPath);
+    const std::string configPath = tools::AbsolutePath(*cachedSearch->second);
+    const std::string configKey = tools::NormalizePathKey(configPath);
     auto cachedConfig = configsByPath_.find(configKey);
     if (cachedConfig == configsByPath_.end()) {
         std::optional<FormatterConfig> loaded = LoadConfigFile(configPath, error);
@@ -350,7 +346,7 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
 
 bool FormatStyleCache::IsIgnored(std::string_view path, std::string& error) {
     const std::string start = StartDirectory(path);
-    const std::string startKey = tools::lint::NormalizePathKey(start);
+    const std::string startKey = tools::NormalizePathKey(start);
     auto cachedSearch = ignoreSearchCache_.find(startKey);
     if (cachedSearch == ignoreSearchCache_.end()) {
         cachedSearch = ignoreSearchCache_.emplace(startKey, FindUpwards(start, ".cpp-format-ignore")).first;
@@ -359,8 +355,8 @@ bool FormatStyleCache::IsIgnored(std::string_view path, std::string& error) {
         return false;
     }
 
-    const std::string ignorePath = tools::lint::AbsolutePath(*cachedSearch->second);
-    const std::string ignoreKey = tools::lint::NormalizePathKey(ignorePath);
+    const std::string ignorePath = tools::AbsolutePath(*cachedSearch->second);
+    const std::string ignoreKey = tools::NormalizePathKey(ignorePath);
     auto cachedIgnore = ignoresByPath_.find(ignoreKey);
     if (cachedIgnore == ignoresByPath_.end()) {
         std::optional<FormatterIgnoreFile> loaded = LoadIgnoreFile(ignorePath, error);
@@ -371,5 +367,3 @@ bool FormatStyleCache::IsIgnored(std::string_view path, std::string& error) {
     }
     return cachedIgnore->second.Ignores(path);
 }
-
-}  // namespace tools::format

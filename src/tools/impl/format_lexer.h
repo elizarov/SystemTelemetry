@@ -6,8 +6,6 @@
 #include <string_view>
 #include <vector>
 
-namespace tools::format {
-
 inline constexpr size_t kNoTokenIndex = static_cast<size_t>(-1);
 
 enum class TokenKind {
@@ -55,5 +53,3 @@ bool IsSpaceButNotNewline(char ch);
 bool IsCommentOrNewline(const Token& token);
 
 std::vector<Token> TokenizeCharacterStream(std::string_view text);
-
-}  // namespace tools::format

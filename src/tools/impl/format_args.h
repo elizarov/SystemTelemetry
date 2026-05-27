@@ -5,8 +5,6 @@
 #include <string>
 #include <vector>
 
-namespace tools::format {
-
 enum class FormatMode {
     Stdout,
     InPlace,
@@ -24,5 +22,3 @@ struct FormatOptions {
 
 std::optional<FormatOptions> ParseFormatArgs(int argc, char** argv, std::string& error);
 void PrintFormatUsage(FILE* output);
-
-}  // namespace tools::format

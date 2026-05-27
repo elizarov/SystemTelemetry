@@ -1,752 +1,23 @@
-#include "tools/format.h"
+#include "tools/impl/format_pretty_printer.h"
 
 #include <algorithm>
-#include <chrono>
-#include <cstdio>
-#include <cstdlib>
-#include <cstring>
-#include <io.h>
 #include <iterator>
 #include <map>
 #include <optional>
-#include <regex>
-#include <span>
-#include <stdexcept>
 #include <string>
 #include <string_view>
-#include <tree_sitter/api.h>
-#include <tree_sitter_cpp.h>
+#include <utility>
 #include <vector>
 
-#include "tools/format_args.h"
-#include "tools/format_config.h"
-#include "tools/impl/lint_common.h"
+#include "tools/impl/format_include_sorter.h"
+#include "tools/impl/format_lexer.h"
+#include "tools/impl/format_macro_fallback.h"
+#include "tools/impl/tools_common.h"
 
 namespace {
 
-using tools::format::FormatMode;
-using tools::format::FormatOptions;
-using tools::format::FormatterConfig;
-
-enum class TokenKind {
-    Word,
-    Number,
-    StringLiteral,
-    CharLiteral,
-    LineComment,
-    BlockComment,
-    Preprocessor,
-    Symbol,
-    Newline,
-};
-
-struct Token {
-    TokenKind kind = TokenKind::Symbol;
-    std::string text;
-};
-
-using TokenSpan = std::span<const Token>;
-
-struct FileFormatResult {
-    bool ok = true;
-    bool changed = false;
-    bool parseHadErrors = false;
-    std::string parseErrorNodeType;
-    int parseErrorLine = 0;
-    int parseErrorColumn = 0;
-    std::string parseErrorSnippet;
-    std::string formatted;
-    std::string error;
-};
-
-struct ParseResult {
-    bool ok = false;
-    bool hasErrors = false;
-    std::string errorNodeType;
-    int errorLine = 0;
-    int errorColumn = 0;
-    std::string errorSnippet;
-};
-
-TokenSpan TokenSubspan(TokenSpan tokens, size_t begin, size_t end) {
-    if (begin > tokens.size()) {
-        begin = tokens.size();
-    }
-    if (end < begin) {
-        end = begin;
-    }
-    if (end > tokens.size()) {
-        end = tokens.size();
-    }
-    return tokens.subspan(begin, end - begin);
-}
-
-std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
-    const double seconds = std::chrono::duration<double>(elapsed).count();
-    char buffer[64] = {};
-    if (seconds < 1.0) {
-        std::snprintf(buffer, sizeof(buffer), "%dms", static_cast<int>(seconds * 1000.0 + 0.5));
-    } else {
-        std::snprintf(buffer, sizeof(buffer), "%.3fs", seconds);
-    }
-    return buffer;
-}
-
-std::string NormalizeLineEndings(std::string_view text) {
-    std::string result;
-    result.reserve(text.size());
-    for (size_t index = 0; index < text.size(); ++index) {
-        const char ch = text[index];
-        if (ch == '\r') {
-            if (index + 1 < text.size() && text[index + 1] == '\n') {
-                ++index;
-            }
-            result.push_back('\n');
-        } else {
-            result.push_back(ch);
-        }
-    }
-    return result;
-}
-
-std::string ToFileLineEndings(std::string_view text) {
-    std::string result;
-    result.reserve(text.size() + text.size() / 24);
-    for (char ch : text) {
-        if (ch == '\n') {
-            result += "\r\n";
-        } else {
-            result.push_back(ch);
-        }
-    }
-    return result;
-}
-
 std::string Spaces(int count) {
     return std::string(static_cast<size_t>(std::max(0, count)), ' ');
-}
-
-bool IsIdentifierStart(char ch) {
-    return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z') || ch == '_';
-}
-
-bool IsIdentifierBody(char ch) {
-    return IsIdentifierStart(ch) || (ch >= '0' && ch <= '9');
-}
-
-bool IsDigit(char ch) {
-    return ch >= '0' && ch <= '9';
-}
-
-bool IsHexDigit(char ch) {
-    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
-}
-
-bool IsOctalDigit(char ch) {
-    return ch >= '0' && ch <= '7';
-}
-
-bool IsSpaceButNotNewline(char ch) {
-    return ch == ' ' || ch == '\t' || ch == '\f' || ch == '\v';
-}
-
-bool IsCommentOrNewline(const Token& token) {
-    return token.kind == TokenKind::Newline ||
-        token.kind == TokenKind::LineComment ||
-        token.kind == TokenKind::BlockComment;
-}
-
-bool IsGroupClose(std::string_view text) {
-    return text == ")" || text == "]" || text == "}";
-}
-
-bool IsTrailingComma(TokenSpan tokens, size_t index) {
-    if (index >= tokens.size() || tokens[index].text != ",") {
-        return false;
-    }
-    for (size_t next = index + 1; next < tokens.size(); ++next) {
-        if (IsCommentOrNewline(tokens[next])) {
-            continue;
-        }
-        return IsGroupClose(tokens[next].text);
-    }
-    return false;
-}
-
-std::vector<Token> DropTrailingCommas(std::vector<Token> tokens) {
-    std::vector<Token> result;
-    result.reserve(tokens.size());
-    for (size_t index = 0; index < tokens.size(); ++index) {
-        if (!IsTrailingComma(tokens, index)) {
-            result.push_back(std::move(tokens[index]));
-        }
-    }
-    return result;
-}
-
-bool IsAtPreprocessorStart(std::string_view text, size_t index) {
-    if (index > text.size() || index != 0 && text[index - 1] != '\n') {
-        return false;
-    }
-    while (index < text.size() && IsSpaceButNotNewline(text[index])) {
-        ++index;
-    }
-    return index < text.size() && text[index] == '#';
-}
-
-std::string ReadPreprocessor(std::string_view text, size_t& index) {
-    const size_t start = index;
-    while (index < text.size()) {
-        const size_t lineStart = index;
-        while (index < text.size() && text[index] != '\n') {
-            ++index;
-        }
-        size_t lineEnd = index;
-        while (lineEnd > lineStart && IsSpaceButNotNewline(text[lineEnd - 1])) {
-            --lineEnd;
-        }
-        const bool continued = lineEnd > lineStart && text[lineEnd - 1] == '\\';
-        if (index < text.size() && text[index] == '\n') {
-            ++index;
-        }
-        if (!continued) {
-            break;
-        }
-    }
-    return std::string(text.substr(start, index - start));
-}
-
-std::string ReadQuoted(std::string_view text, size_t& index, char quote) {
-    const size_t start = index;
-    ++index;
-    while (index < text.size()) {
-        const char ch = text[index];
-        if (ch == '\\' && index + 1 < text.size()) {
-            index += 2;
-            continue;
-        }
-        ++index;
-        if (ch == quote) {
-            break;
-        }
-    }
-    return std::string(text.substr(start, index - start));
-}
-
-std::optional<std::string> TryReadRawString(std::string_view text, size_t& index) {
-    if (index + 1 >= text.size() || text[index] != 'R' || text[index + 1] != '"') {
-        return std::nullopt;
-    }
-    size_t delimiterStart = index + 2;
-    size_t openParen = delimiterStart;
-    while (openParen < text.size() && text[openParen] != '(' && text[openParen] != '\n') {
-        ++openParen;
-    }
-    if (openParen >= text.size() || text[openParen] != '(') {
-        return std::nullopt;
-    }
-    const std::string delimiter(text.substr(delimiterStart, openParen - delimiterStart));
-    const std::string terminator = ")" + delimiter + "\"";
-    const size_t end = text.find(terminator, openParen + 1);
-    if (end == std::string_view::npos) {
-        return std::nullopt;
-    }
-    const size_t start = index;
-    index = end + terminator.size();
-    return std::string(text.substr(start, index - start));
-}
-
-std::vector<Token> Tokenize(std::string_view text) {
-    std::vector<Token> tokens;
-    size_t index = 0;
-    while (index < text.size()) {
-        const char ch = text[index];
-        if (IsAtPreprocessorStart(text, index)) {
-            tokens.push_back({TokenKind::Preprocessor, ReadPreprocessor(text, index)});
-            continue;
-        }
-        if (ch == '\n') {
-            tokens.push_back({TokenKind::Newline, "\n"});
-            ++index;
-            continue;
-        }
-        if (IsSpaceButNotNewline(ch)) {
-            ++index;
-            continue;
-        }
-        if (ch == '/' && index + 1 < text.size() && text[index + 1] == '/') {
-            const size_t start = index;
-            index += 2;
-            while (index < text.size() && text[index] != '\n') {
-                ++index;
-            }
-            tokens.push_back({TokenKind::LineComment, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (ch == '/' && index + 1 < text.size() && text[index + 1] == '*') {
-            const size_t start = index;
-            index += 2;
-            while (index + 1 < text.size() && !(text[index] == '*' && text[index + 1] == '/')) {
-                ++index;
-            }
-            if (index + 1 < text.size()) {
-                index += 2;
-            }
-            tokens.push_back({TokenKind::BlockComment, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (ch == 'R') {
-            if (std::optional<std::string> raw = TryReadRawString(text, index)) {
-                tokens.push_back({TokenKind::StringLiteral, *raw});
-                continue;
-            }
-        }
-        if (ch == '"') {
-            tokens.push_back({TokenKind::StringLiteral, ReadQuoted(text, index, '"')});
-            continue;
-        }
-        if (ch == '\'') {
-            tokens.push_back({TokenKind::CharLiteral, ReadQuoted(text, index, '\'')});
-            continue;
-        }
-        if (IsIdentifierStart(ch)) {
-            const size_t start = index;
-            ++index;
-            while (index < text.size() && IsIdentifierBody(text[index])) {
-                ++index;
-            }
-            tokens.push_back({TokenKind::Word, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        if (IsDigit(ch)) {
-            const size_t start = index;
-            ++index;
-            while (index < text.size() && (IsIdentifierBody(text[index]) || text[index] == '.')) {
-                ++index;
-            }
-            tokens.push_back({TokenKind::Number, std::string(text.substr(start, index - start))});
-            continue;
-        }
-        static constexpr std::string_view kThreeCharOps[] = {"<<=", ">>=", "<=>", "...", "->*"};
-        bool matched = false;
-        for (std::string_view op : kThreeCharOps) {
-            if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
-                tokens.push_back({TokenKind::Symbol, std::string(op)});
-                index += op.size();
-                matched = true;
-                break;
-            }
-        }
-        if (matched) {
-            continue;
-        }
-        static constexpr std::string_view kTwoCharOps[] = {
-            "::",
-            "->",
-            "++",
-            "--",
-            "&&",
-            "||",
-            "==",
-            "!=",
-            "<=",
-            ">=",
-            "+=",
-            "-=",
-            "*=",
-            "/=",
-            "%=",
-            "&=",
-            "|=",
-            "^=",
-            "<<",
-            ">>",
-            "##",
-            ".*"
-        };
-        for (std::string_view op : kTwoCharOps) {
-            if (index + op.size() <= text.size() && text.substr(index, op.size()) == op) {
-                tokens.push_back({TokenKind::Symbol, std::string(op)});
-                index += op.size();
-                matched = true;
-                break;
-            }
-        }
-        if (!matched) {
-            tokens.push_back({TokenKind::Symbol, std::string(1, ch)});
-            ++index;
-        }
-    }
-    return DropTrailingCommas(std::move(tokens));
-}
-
-bool IsControlBraceGroupOpen(std::string_view text) {
-    return text == "(" || text == "[" || text == "{";
-}
-
-std::string ControlBraceMatchingClose(std::string_view text) {
-    if (text == "(") {
-        return ")";
-    }
-    if (text == "[") {
-        return "]";
-    }
-    return "}";
-}
-
-size_t NextCodeIndex(TokenSpan tokens, size_t index, size_t end) {
-    while (index < end && IsCommentOrNewline(tokens[index])) {
-        ++index;
-    }
-    return index;
-}
-
-std::optional<size_t> FindControlBraceMatchingClose(TokenSpan tokens, size_t openIndex, size_t end) {
-    if (openIndex >= end || !IsControlBraceGroupOpen(tokens[openIndex].text)) {
-        return std::nullopt;
-    }
-    const std::string close = ControlBraceMatchingClose(tokens[openIndex].text);
-    int depth = 0;
-    for (size_t index = openIndex; index < end; ++index) {
-        if (tokens[index].text == tokens[openIndex].text) {
-            ++depth;
-        } else if (tokens[index].text == close) {
-            --depth;
-            if (depth == 0) {
-                return index;
-            }
-        }
-    }
-    return std::nullopt;
-}
-
-void AppendTokenRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
-    if (begin >= end) {
-        return;
-    }
-    output.insert(
-        output.end(),
-        tokens.begin() + static_cast<std::ptrdiff_t>(begin),
-        tokens.begin() + static_cast<std::ptrdiff_t>(end)
-    );
-}
-
-bool IsBraceRequiredControlToken(const Token& token) {
-    return token.kind == TokenKind::Word && (
-        token.text == "if" ||
-        token.text == "else" ||
-        token.text == "for" ||
-        token.text == "while" ||
-        token.text == "do" ||
-        token.text == "switch"
-    );
-}
-
-std::optional<size_t> FindControlHeaderEnd(TokenSpan tokens, size_t controlIndex, size_t end) {
-    for (size_t index = controlIndex + 1; index < end; ++index) {
-        if (tokens[index].text != "(") {
-            continue;
-        }
-        if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, index, end)) {
-            return *close + 1;
-        }
-        return std::nullopt;
-    }
-    return std::nullopt;
-}
-
-void RewriteControlBracesRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output);
-
-size_t RewriteControlBracesStatement(
-    TokenSpan tokens,
-    size_t begin,
-    size_t end,
-    std::vector<Token>& output
-);
-
-size_t RewriteIfControlStatement(
-    TokenSpan tokens,
-    size_t ifIndex,
-    size_t end,
-    std::vector<Token>& output
-);
-
-size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end);
-
-size_t RewriteBraceBlock(TokenSpan tokens, size_t openIndex, size_t end, std::vector<Token>& output) {
-    const std::optional<size_t> close = FindControlBraceMatchingClose(tokens, openIndex, end);
-    if (!close) {
-        output.push_back(tokens[openIndex]);
-        return openIndex + 1;
-    }
-    output.push_back(tokens[openIndex]);
-    RewriteControlBracesRange(tokens, openIndex + 1, *close, output);
-    output.push_back(tokens[*close]);
-    return *close + 1;
-}
-
-size_t FindSimpleControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    for (size_t index = begin; index < end; ++index) {
-        if (IsControlBraceGroupOpen(tokens[index].text)) {
-            if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, index, end)) {
-                index = *close;
-                continue;
-            }
-        }
-        if (tokens[index].text == ";") {
-            return index + 1;
-        }
-    }
-    return end;
-}
-
-size_t FindIfControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, begin, end);
-    if (!headerEnd) {
-        return FindSimpleControlBracesStatementEnd(tokens, begin, end);
-    }
-    size_t statementEnd = FindControlBracesStatementEnd(tokens, *headerEnd, end);
-    const size_t elseIndex = NextCodeIndex(tokens, statementEnd, end);
-    if (elseIndex < end && tokens[elseIndex].text == "else") {
-        statementEnd = FindControlBracesStatementEnd(tokens, elseIndex, end);
-    }
-    return statementEnd;
-}
-
-size_t FindElseControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    return FindControlBracesStatementEnd(tokens, begin + 1, end);
-}
-
-bool ContainsOnlyNewlines(TokenSpan tokens, size_t begin, size_t end) {
-    for (size_t index = begin; index < end; ++index) {
-        if (tokens[index].kind != TokenKind::Newline) {
-            return false;
-        }
-    }
-    return true;
-}
-
-size_t FindHeaderBodyControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, begin, end);
-    if (!headerEnd) {
-        return FindSimpleControlBracesStatementEnd(tokens, begin, end);
-    }
-    return FindControlBracesStatementEnd(tokens, *headerEnd, end);
-}
-
-size_t FindDoControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, begin + 1, end);
-    const size_t whileIndex = NextCodeIndex(tokens, bodyEnd, end);
-    if (whileIndex >= end || tokens[whileIndex].text != "while") {
-        return bodyEnd;
-    }
-    const std::optional<size_t> whileHeaderEnd = FindControlHeaderEnd(tokens, whileIndex, end);
-    if (!whileHeaderEnd) {
-        return FindSimpleControlBracesStatementEnd(tokens, whileIndex, end);
-    }
-    const size_t semicolon = NextCodeIndex(tokens, *whileHeaderEnd, end);
-    return semicolon < end && tokens[semicolon].text == ";" ? semicolon + 1 : *whileHeaderEnd;
-}
-
-size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
-    const size_t statementStart = NextCodeIndex(tokens, begin, end);
-    if (statementStart >= end) {
-        return end;
-    }
-    if (tokens[statementStart].text == "{") {
-        if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, statementStart, end)) {
-            return *close + 1;
-        }
-        return end;
-    }
-    if (tokens[statementStart].text == "if") {
-        return FindIfControlBracesStatementEnd(tokens, statementStart, end);
-    }
-    if (tokens[statementStart].text == "else") {
-        return FindElseControlBracesStatementEnd(tokens, statementStart, end);
-    }
-    if (tokens[statementStart].text == "do") {
-        return FindDoControlBracesStatementEnd(tokens, statementStart, end);
-    }
-    if (
-        tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
-    ) {
-        return FindHeaderBodyControlBracesStatementEnd(tokens, statementStart, end);
-    }
-    return FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
-}
-
-void AppendRewrittenControlBody(
-    TokenSpan tokens,
-    size_t bodyBegin,
-    size_t bodyEnd,
-    std::vector<Token>& output
-) {
-    output.push_back({TokenKind::Symbol, "{"});
-    RewriteControlBracesStatement(tokens, bodyBegin, bodyEnd, output);
-    output.push_back({TokenKind::Symbol, "}"});
-}
-
-size_t RewriteHeaderBodyControlStatement(
-    TokenSpan tokens,
-    size_t controlIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
-    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, controlIndex, end);
-    if (!headerEnd) {
-        output.push_back(tokens[controlIndex]);
-        return controlIndex + 1;
-    }
-    AppendTokenRange(tokens, controlIndex, *headerEnd, output);
-    const size_t bodyBegin = *headerEnd;
-    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
-    if (bodyStart < end && tokens[bodyStart].text == "{") {
-        return RewriteControlBracesStatement(tokens, bodyBegin, end, output);
-    }
-    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
-    AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
-    return bodyEnd;
-}
-
-size_t RewriteElseControlStatement(
-    TokenSpan tokens,
-    size_t elseIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
-    output.push_back(tokens[elseIndex]);
-    const size_t bodyBegin = elseIndex + 1;
-    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
-    if (bodyStart < end && tokens[bodyStart].text == "if") {
-        AppendTokenRange(tokens, bodyBegin, bodyStart, output);
-        return RewriteIfControlStatement(tokens, bodyStart, end, output);
-    }
-    if (bodyStart < end && tokens[bodyStart].text == "{") {
-        const std::optional<size_t> bodyClose = FindControlBraceMatchingClose(tokens, bodyStart, end);
-        if (bodyClose && ContainsOnlyNewlines(tokens, bodyBegin, bodyStart)) {
-            const size_t innerStart = NextCodeIndex(tokens, bodyStart + 1, *bodyClose);
-            if (innerStart < *bodyClose && tokens[innerStart].text == "if") {
-                const size_t innerEnd = FindIfControlBracesStatementEnd(tokens, innerStart, *bodyClose);
-                if (
-                    innerEnd <= *bodyClose &&
-                    ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
-                    ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)
-                ) {
-                    RewriteIfControlStatement(tokens, innerStart, *bodyClose, output);
-                    return *bodyClose + 1;
-                }
-            }
-        }
-        return RewriteControlBracesStatement(tokens, bodyBegin, end, output);
-    }
-    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
-    AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
-    return bodyEnd;
-}
-
-size_t RewriteIfControlStatement(
-    TokenSpan tokens,
-    size_t ifIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
-    size_t next = RewriteHeaderBodyControlStatement(tokens, ifIndex, end, output);
-    const size_t elseIndex = NextCodeIndex(tokens, next, end);
-    if (elseIndex < end && tokens[elseIndex].text == "else") {
-        AppendTokenRange(tokens, next, elseIndex, output);
-        next = RewriteElseControlStatement(tokens, elseIndex, end, output);
-    }
-    return next;
-}
-
-size_t RewriteDoControlStatement(
-    TokenSpan tokens,
-    size_t doIndex,
-    size_t end,
-    std::vector<Token>& output
-) {
-    output.push_back(tokens[doIndex]);
-    const size_t bodyBegin = doIndex + 1;
-    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
-    size_t bodyEnd = bodyBegin;
-    if (bodyStart < end && tokens[bodyStart].text == "{") {
-        bodyEnd = RewriteControlBracesStatement(tokens, bodyBegin, end, output);
-    } else {
-        bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
-        AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
-    }
-    const size_t whileIndex = NextCodeIndex(tokens, bodyEnd, end);
-    if (whileIndex < end && tokens[whileIndex].text == "while") {
-        AppendTokenRange(tokens, bodyEnd, FindDoControlBracesStatementEnd(tokens, doIndex, end), output);
-        return FindDoControlBracesStatementEnd(tokens, doIndex, end);
-    }
-    return bodyEnd;
-}
-
-size_t RewriteControlBracesStatement(
-    TokenSpan tokens,
-    size_t begin,
-    size_t end,
-    std::vector<Token>& output
-) {
-    const size_t statementStart = NextCodeIndex(tokens, begin, end);
-    AppendTokenRange(tokens, begin, statementStart, output);
-    if (statementStart >= end) {
-        return end;
-    }
-    if (tokens[statementStart].text == "{") {
-        return RewriteBraceBlock(tokens, statementStart, end, output);
-    }
-    if (tokens[statementStart].text == "if") {
-        return RewriteIfControlStatement(tokens, statementStart, end, output);
-    }
-    if (tokens[statementStart].text == "else") {
-        return RewriteElseControlStatement(tokens, statementStart, end, output);
-    }
-    if (tokens[statementStart].text == "do") {
-        return RewriteDoControlStatement(tokens, statementStart, end, output);
-    }
-    if (
-        tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
-    ) {
-        return RewriteHeaderBodyControlStatement(tokens, statementStart, end, output);
-    }
-    const size_t statementEnd = FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
-    RewriteControlBracesRange(tokens, statementStart, statementEnd, output);
-    return statementEnd;
-}
-
-void RewriteControlBracesRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
-    size_t index = begin;
-    while (index < end) {
-        const size_t codeIndex = NextCodeIndex(tokens, index, end);
-        AppendTokenRange(tokens, index, codeIndex, output);
-        if (codeIndex >= end) {
-            return;
-        }
-        if (IsBraceRequiredControlToken(tokens[codeIndex])) {
-            index = RewriteControlBracesStatement(tokens, codeIndex, end, output);
-            continue;
-        }
-        if (tokens[codeIndex].text == "{") {
-            index = RewriteBraceBlock(tokens, codeIndex, end, output);
-            continue;
-        }
-        output.push_back(tokens[codeIndex]);
-        index = codeIndex + 1;
-    }
-}
-
-std::vector<Token> AddRequiredControlBraces(TokenSpan tokens) {
-    std::vector<Token> output;
-    output.reserve(tokens.size());
-    RewriteControlBracesRange(tokens, 0, tokens.size(), output);
-    return output;
 }
 
 bool IsWordLike(const Token& token) {
@@ -844,43 +115,44 @@ std::string TrimLeft(std::string_view value) {
     return std::string(value.substr(index));
 }
 
-std::string SingleLineSnippet(std::string_view text, uint32_t startByte, uint32_t endByte) {
-    if (startByte >= text.size()) {
-        return {};
+std::optional<size_t> AnnotatedMatchingIndex(TokenSpan tokens, size_t index) {
+    if (index >= tokens.size()) {
+        return std::nullopt;
     }
-    if (endByte <= startByte || endByte > text.size()) {
-        endByte = static_cast<uint32_t>(std::min(text.size(), static_cast<size_t>(startByte) + 120));
+    const size_t matching = tokens[index].matchingIndex;
+    if (matching == kNoTokenIndex) {
+        return std::nullopt;
     }
-    std::string snippet(text.substr(startByte, std::min<uint32_t>(endByte - startByte, 120)));
-    for (char& ch : snippet) {
-        if (ch == '\r' || ch == '\n' || ch == '\t') {
-            ch = ' ';
-        }
+    const size_t base = tokens.front().modelIndex;
+    if (base == kNoTokenIndex || matching < base) {
+        return std::nullopt;
     }
-    return tools::lint::Trim(snippet);
+    const size_t relative = matching - base;
+    if (relative >= tokens.size() || tokens[relative].modelIndex != matching) {
+        return std::nullopt;
+    }
+    return relative;
 }
 
-TSNode FindFirstErrorNode(TSNode node) {
-    const uint32_t childCount = ts_node_child_count(node);
-    for (uint32_t index = 0; index < childCount; ++index) {
-        const TSNode child = ts_node_child(node, index);
-        if (ts_node_has_error(child)) {
-            return FindFirstErrorNode(child);
+bool ContainsOnlyNewlines(TokenSpan tokens, size_t begin, size_t end) {
+    for (size_t index = begin; index < end && index < tokens.size(); ++index) {
+        if (!IsCommentOrNewline(tokens[index])) {
+            return false;
         }
     }
-    if (std::strcmp(ts_node_type(node), "ERROR") == 0 || ts_node_is_missing(node)) {
-        return node;
-    }
-    return node;
+    return true;
 }
 
 class PrettyFormatter {
 public:
     explicit PrettyFormatter(
         const FormatterConfig& config,
+        const SourceLayoutNode& sourceLayout,
+        std::string_view sourcePath,
         int initialIndentLevel = 0,
         bool executableBodyContext = false
-    ) : config_(config), indentLevel_(initialIndentLevel) {
+    ) : config_(config), sourceLayout_(sourceLayout), sourcePath_(sourcePath), indentLevel_(initialIndentLevel) {
+        CollectIncludeRuns(sourceLayout_);
         if (executableBodyContext) {
             blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
         }
@@ -888,6 +160,11 @@ public:
 
     std::string Format(TokenSpan tokens) {
         for (size_t index = 0; index < tokens.size(); ++index) {
+            if (std::optional<size_t> includeRunEnd = IncludeRunEnd(tokens, index)) {
+                EmitSortedIncludeRun(TokenSubspan(tokens, index, *includeRunEnd));
+                index = *includeRunEnd - 1;
+                continue;
+            }
             const Token& token = tokens[index];
             switch (token.kind) {
                 case TokenKind::Newline:
@@ -925,6 +202,34 @@ private:
         TypeDeclaration,
         FunctionDefinition,
     };
+
+    void CollectIncludeRuns(const SourceLayoutNode& node) {
+        if (node.kind == SourceLayoutKind::IncludeRun && node.begin < node.end) {
+            includeRuns_.emplace(node.begin, node.end);
+        }
+        for (const SourceLayoutNode& child : node.children) {
+            CollectIncludeRuns(child);
+        }
+    }
+
+    std::optional<size_t> IncludeRunEnd(TokenSpan tokens, size_t index) const {
+        if (index >= tokens.size() || tokens[index].modelIndex == kNoTokenIndex) {
+            return std::nullopt;
+        }
+        const auto includeRun = includeRuns_.find(tokens[index].modelIndex);
+        if (includeRun == includeRuns_.end()) {
+            return std::nullopt;
+        }
+        size_t end = index + 1;
+        while (
+            end < tokens.size() &&
+            tokens[end].modelIndex != kNoTokenIndex &&
+            tokens[end].modelIndex < includeRun->second
+        ) {
+            ++end;
+        }
+        return end;
+    }
 
     enum class DeclarationKind {
         None,
@@ -983,11 +288,7 @@ private:
         return IsInsidePendingLambdaBody();
     }
 
-    bool ShouldForwardStandaloneLineCommentToPending(
-        TokenSpan tokens,
-        size_t newlineIndex,
-        size_t newlineCount
-    ) const {
+    bool ShouldForwardStandaloneLineCommentToPending(TokenSpan tokens, size_t newlineIndex, size_t newlineCount) const {
         if (newlineCount == 0 || pendingTokens_.empty()) {
             return false;
         }
@@ -1011,11 +312,7 @@ private:
         });
     }
 
-    bool ShouldPreserveOriginalBlankSeparator(
-        TokenSpan tokens,
-        size_t newlineIndex,
-        size_t newlineCount
-    ) const {
+    bool ShouldPreserveOriginalBlankSeparator(TokenSpan tokens, size_t newlineIndex, size_t newlineCount) const {
         const std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, newlineIndex);
         const bool hasBlankSeparator =
             newlineCount > 1 || (previous && tokens[*previous].kind == TokenKind::Preprocessor);
@@ -1032,7 +329,7 @@ private:
         if (outputLines_.empty() || outputLines_.back().empty()) {
             return false;
         }
-        const std::string trimmed = tools::lint::Trim(outputLines_.back());
+        const std::string trimmed = tools::Trim(outputLines_.back());
         if (trimmed.empty()) {
             return false;
         }
@@ -1270,7 +567,7 @@ private:
             FlushPending();
             return;
         }
-        std::vector<std::string> lines = tools::lint::SplitLines(text);
+        std::vector<std::string> lines = tools::SplitLines(text);
         for (std::string& line : lines) {
             EmitLine(Indent() + TrimRight(TrimLeft(line)));
         }
@@ -1287,7 +584,7 @@ private:
     void EmitPreprocessor(std::string_view text) {
         FlushPending();
         EmitPendingLogicalBlankBefore({});
-        std::vector<std::string> lines = tools::lint::SplitLines(text);
+        std::vector<std::string> lines = tools::SplitLines(text);
         if (pendingUndefBlank_) {
             pendingUndefBlank_ = false;
             EmitRequiredBlankLine();
@@ -1328,15 +625,25 @@ private:
         pendingPreprocessorBlank_ = true;
     }
 
+    void EmitSortedIncludeRun(TokenSpan tokens) {
+        for (const std::optional<std::string>& line : SortedIncludeRunLines(tokens, config_, sourcePath_)) {
+            if (!line) {
+                EmitRequiredBlankLine();
+                continue;
+            }
+            EmitPreprocessor(*line);
+        }
+    }
+
     bool IsPragmaOnceDirective(const std::vector<std::string>& lines) const {
-        return !lines.empty() && tools::lint::Trim(lines.front()) == "#pragma once";
+        return !lines.empty() && tools::Trim(lines.front()) == "#pragma once";
     }
 
     bool IsDefineDirective(const std::vector<std::string>& lines) const {
         if (lines.empty()) {
             return false;
         }
-        return tools::lint::StartsWith(TrimRight(TrimLeft(lines.front())), "#define ");
+        return tools::StartsWith(TrimRight(TrimLeft(lines.front())), "#define ");
     }
 
     bool IsUndefDirective(const std::vector<std::string>& lines) const {
@@ -1344,7 +651,7 @@ private:
             return false;
         }
         const std::string line = TrimRight(TrimLeft(lines.front()));
-        return line == "#undef" || tools::lint::StartsWith(line, "#undef ");
+        return line == "#undef" || tools::StartsWith(line, "#undef ");
     }
 
     bool ShouldFormatDefineContinuation(const std::vector<std::string>& lines) const {
@@ -1369,7 +676,7 @@ private:
             pendingPreprocessorBlank_ = true;
             return;
         }
-        std::vector<Token> replacementTokens = Tokenize(replacement);
+        std::vector<Token> replacementTokens = TokenizeCharacterStream(replacement);
         if (
             std::vector<std::vector<Token>> statements =
                 SplitStatementLikeMacroReplacement(defineLine, replacementTokens);
@@ -1393,14 +700,15 @@ private:
             pendingPreprocessorBlank_ = true;
             return;
         }
-        const std::string normalizedReplacement = FormatInline(Tokenize(replacement));
+        const std::string normalizedReplacement = FormatInline(TokenizeCharacterStream(replacement));
         if (FitsRawLine(defineLine + " " + normalizedReplacement)) {
             EmitLine(defineLine + " " + normalizedReplacement);
             pendingPreprocessorBlank_ = true;
             return;
         }
         EmitLine(defineLine + " \\");
-        std::vector<std::string> replacementLines = FormatRange(Tokenize(normalizedReplacement), 1, {}, {});
+        std::vector<std::string> replacementLines =
+            FormatRange(TokenizeCharacterStream(normalizedReplacement), 1, {}, {});
         EmitDefineReplacementLines(replacementLines);
         pendingPreprocessorBlank_ = true;
     }
@@ -1415,13 +723,12 @@ private:
         }
     }
 
-    std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(
-        TokenSpan replacementTokens) const {
+    std::optional<std::vector<std::string>> FormatStructuredMacroReplacement(TokenSpan replacementTokens) const {
         if (!IsStructuredMacroReplacement(replacementTokens)) {
             return std::nullopt;
         }
-        PrettyFormatter formatter(config_, 1);
-        std::vector<std::string> lines = tools::lint::SplitLines(formatter.Format(replacementTokens));
+        PrettyFormatter formatter(config_, sourceLayout_, sourcePath_, 1);
+        std::vector<std::string> lines = tools::SplitLines(formatter.Format(replacementTokens));
         lines.erase(std::remove(lines.begin(), lines.end(), std::string{}), lines.end());
         if (lines.empty()) {
             return std::nullopt;
@@ -1440,7 +747,8 @@ private:
 
     std::vector<std::vector<Token>> SplitStatementLikeMacroReplacement(
         std::string_view defineLine,
-        TokenSpan replacementTokens) const {
+        TokenSpan replacementTokens
+    ) const {
         std::vector<std::string> activeParameters = StatementLikeParametersForDefine(defineLine);
         if (activeParameters.empty()) {
             return {};
@@ -1485,7 +793,7 @@ private:
     std::vector<std::string> ParseDefineParameters(std::string_view defineLine) const {
         static constexpr std::string_view kDefinePrefix = "#define";
         std::string text = TrimLeft(defineLine);
-        if (!tools::lint::StartsWith(text, kDefinePrefix)) {
+        if (!tools::StartsWith(text, kDefinePrefix)) {
             return {};
         }
         text.erase(0, kDefinePrefix.size());
@@ -1591,7 +899,7 @@ private:
         }
         const std::string declarationIndent = LeadingWhitespace(lines.front());
         for (size_t index = 1; index < lines.size(); ++index) {
-            if (tools::lint::Trim(lines[index]).empty()) {
+            if (tools::Trim(lines[index]).empty()) {
                 continue;
             }
             if (LeadingWhitespace(lines[index]) != declarationIndent) {
@@ -1621,7 +929,7 @@ private:
     }
 
     void EmitEnumEnumerators(TokenSpan tokens) {
-        std::vector<std::vector<Token>> elements = SplitTopLevel(tokens, ',');
+        TokenSplitParts elements = SplitTopLevelParts(tokens, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(tokens, ',')) {
             EmitFormatted(tokens, ",");
             return;
@@ -1629,7 +937,7 @@ private:
         bool emittedElement = false;
         for (size_t index = 0; index < elements.size(); ++index) {
             std::vector<std::string> elementLines =
-                FormatDelimitedElement(elements[index], indentLevel_, ",", false, true, false, emittedElement);
+                FormatDelimitedElement(elements.At(index), indentLevel_, ",", false, true, false, emittedElement);
             if (elementLines.empty()) {
                 continue;
             }
@@ -1762,11 +1070,11 @@ private:
         if (outputLines_.empty() || outputLines_.back().empty()) {
             return;
         }
-        const std::string trimmed = tools::lint::Trim(outputLines_.back());
+        const std::string trimmed = tools::Trim(outputLines_.back());
         if (!trimmed.empty() && trimmed.back() == '{') {
             return;
         }
-        if (tools::lint::StartsWith(trimmed, "//") || tools::lint::StartsWith(trimmed, "/*")) {
+        if (tools::StartsWith(trimmed, "//") || tools::StartsWith(trimmed, "/*")) {
             return;
         }
         outputLines_.push_back({});
@@ -1787,52 +1095,12 @@ private:
         groupDepth_ = 0;
     }
 
-    struct GroupPair {
-        size_t open = 0;
-        size_t close = 0;
-    };
-
-    enum class ChainKind {
-        None,
-        Ternary,
-        Logical,
-        Bitwise,
-        Equality,
-        Relational,
-        Shift,
-        Additive,
-        Multiplicative,
-    };
-
-    enum class LayoutNodeKind {
-        TemplateDeclaration,
-        Assignment,
-        DeclarationValue,
-        Lambda,
-        ConstructorInitializer,
-        OperatorChain,
-        StringLiteralSequence,
-        Group,
-    };
-
     struct LayoutContext {
         int indentLevel = 0;
         std::string prefix;
         std::string suffix;
         bool indentSplitChains = false;
         bool indentLogicalSplitChains = false;
-    };
-
-    struct LayoutNode {
-        LayoutNodeKind kind = LayoutNodeKind::Group;
-        size_t index = 0;
-        GroupPair group{};
-        int depth = 0;
-        size_t order = 0;
-    };
-
-    struct LayoutTree {
-        std::vector<LayoutNode> breakNodes;
     };
 
     enum class LineTrimKind {
@@ -1890,6 +1158,12 @@ private:
         TokenSpan At(size_t index) const {
             return usesCopies ? TokenSpan(copies[index]) : spans[index];
         }
+    };
+
+    struct ShiftChainParts {
+        TokenSpan receiver;
+        std::vector<TokenSpan> segments;
+        bool sawShiftOperator = false;
     };
 
     std::vector<std::string> FormatRange(
@@ -2033,11 +1307,7 @@ private:
         return best;
     }
 
-    void RenderLayoutTree(
-        std::vector<std::string>& lines,
-        TokenSpan tokens,
-        const LayoutContext& context
-    ) const {
+    void RenderLayoutTree(std::vector<std::string>& lines, TokenSpan tokens, const LayoutContext& context) const {
         const LayoutResult result = FormatLayoutTreeResult(tokens, context);
         switch (result.choice) {
             case LayoutChoiceKind::Compact:
@@ -2142,8 +1412,105 @@ private:
     }
 
     LayoutTree BuildLayoutTree(TokenSpan tokens) const {
+        if (CanUseSourceLayout(tokens)) {
+            return BuildTreeSitterLayoutTree(tokens);
+        }
+        return BuildFallbackLayoutTree(tokens);
+    }
+
+    LayoutTree BuildFallbackLayoutTree(TokenSpan tokens) const {
+        return BuildMacroFallbackLayoutTree(tokens);
+    }
+
+    bool CanUseSourceLayout(TokenSpan tokens) const {
+        if (tokens.empty()) {
+            return false;
+        }
+        bool hasSourceToken = false;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            if (tokens[index].modelIndex == kNoTokenIndex) {
+                return false;
+            }
+            if (index > 0 && tokens[index].modelIndex != tokens[index - 1].modelIndex + 1) {
+                return false;
+            }
+            hasSourceToken = hasSourceToken || tokens[index].sourceBegin != kNoTokenIndex;
+        }
+        return hasSourceToken;
+    }
+
+    bool HasOnlyTrailingStatementSuffix(TokenSpan tokens, size_t spanBegin, size_t sourceEnd) const {
+        if (sourceEnd < spanBegin) {
+            return false;
+        }
+        size_t index = sourceEnd - spanBegin;
+        if (index > tokens.size()) {
+            return false;
+        }
+        bool sawTerminator = false;
+        for (; index < tokens.size(); ++index) {
+            if (IsCommentOrNewline(tokens[index])) {
+                continue;
+            }
+            if (!sawTerminator && (tokens[index].text == ";" || tokens[index].text == ",")) {
+                sawTerminator = true;
+                continue;
+            }
+            return false;
+        }
+        return sawTerminator;
+    }
+
+    LayoutTree BuildTreeSitterLayoutTree(TokenSpan tokens) const {
         LayoutTree tree;
+        if (tokens.empty()) {
+            return tree;
+        }
+        const size_t spanBegin = tokens.front().modelIndex;
+        const size_t spanEnd = tokens.back().modelIndex + 1;
         size_t order = 0;
+        CollectTreeSitterLayoutNodes(sourceLayout_, tokens, spanBegin, spanEnd, tree, order);
+        return tree;
+    }
+
+    void CollectTreeSitterLayoutNodes(
+        const SourceLayoutNode& source,
+        TokenSpan tokens,
+        size_t spanBegin,
+        size_t spanEnd,
+        LayoutTree& tree,
+        size_t& order
+    ) const {
+        for (const SourceLayoutNode& child : source.children) {
+            if (child.end <= spanBegin || child.begin >= spanEnd) {
+                continue;
+            }
+            bool stopAtChild = false;
+            const bool contained = child.begin >= spanBegin && child.end <= spanEnd;
+            const bool partialTemplate = child.kind == SourceLayoutKind::TemplateDeclaration &&
+                child.begin >= spanBegin &&
+                child.begin < spanEnd;
+            const bool partialLambda = child.kind == SourceLayoutKind::Lambda &&
+                child.index != kNoTokenIndex &&
+                child.index >= spanBegin &&
+                child.index < spanEnd;
+            if (contained || partialTemplate || partialLambda) {
+                stopAtChild = AddTreeSitterLayoutNode(child, tokens, spanBegin, spanEnd, tree, order);
+            }
+            if (!stopAtChild) {
+                CollectTreeSitterLayoutNodes(child, tokens, spanBegin, spanEnd, tree, order);
+            }
+        }
+    }
+
+    bool AddTreeSitterLayoutNode(
+        const SourceLayoutNode& source,
+        TokenSpan tokens,
+        size_t spanBegin,
+        size_t spanEnd,
+        LayoutTree& tree,
+        size_t& order
+    ) const {
         const auto addNode = [&](LayoutNode node) {
             for (const LayoutNode& existing : tree.breakNodes) {
                 if (
@@ -2152,64 +1519,92 @@ private:
                     existing.group.open == node.group.open &&
                     existing.group.close == node.group.close
                 ) {
-                    return;
+                    return false;
                 }
             }
+            node.depth = source.depth;
             node.order = order++;
             tree.breakNodes.push_back(node);
+            return true;
         };
-        if (IsTemplateDeclarationPrefix(tokens)) {
-            addNode({LayoutNodeKind::TemplateDeclaration, 0, {}, 0, 0});
-            return tree;
-        }
-        if (IsRequiresClausePrefix(tokens)) {
-            addNode({LayoutNodeKind::TemplateDeclaration, 0, {}, 0, 0});
-            return tree;
-        }
-        if (std::optional<size_t> topLevelLambdaBody = FindTopLevelLambdaBodyOpen(tokens)) {
-            addNode({LayoutNodeKind::Lambda, *topLevelLambdaBody, {}, 0, 0});
-            return tree;
-        }
-        if (std::optional<GroupPair> group = FindFirstWrappableGroupPairWithTopLevelSeparatorAndLambda(tokens, ',')) {
-            addNode({LayoutNodeKind::Group, 0, *group, 0, 0});
-        }
-        if (std::optional<size_t> initializerColon = FindConstructorInitializerColon(tokens)) {
-            addNode({LayoutNodeKind::ConstructorInitializer, *initializerColon, {}, 0, 0});
-        }
-        if (std::optional<GroupPair> controlHeader = FindLeadingControlHeaderGroup(tokens)) {
-            addNode({LayoutNodeKind::Group, 0, *controlHeader, 0, 0});
-        }
-        if (
-            std::optional<size_t> assignment = FindTopLevelAssignment(tokens);
-            assignment && !IsDefaultedDeletedOrPureVirtualMethodDeclaration(tokens)
-        ) {
-            addNode({LayoutNodeKind::Assignment, *assignment, {}, 0, 0});
-            CollectLayoutGroupNodes(tokens, 0, *assignment, 0, tree.breakNodes, order);
-            return tree;
-        }
-        const ChainKind chainKind = SelectChainKind(tokens);
-        if (chainKind != ChainKind::None) {
-            addNode({LayoutNodeKind::OperatorChain, 0, {}, 0, 0});
-            if (chainKind == ChainKind::Shift || IsTrueOperatorChain(tokens, chainKind)) {
-                return tree;
+
+        switch (source.kind) {
+            case SourceLayoutKind::Root:
+                return false;
+            case SourceLayoutKind::TemplateDeclaration:
+                return addNode({LayoutNodeKind::TemplateDeclaration, 0, {}, source.depth, 0});
+            case SourceLayoutKind::Assignment:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::Assignment, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::DeclarationValue:
+                if (source.index == kNoTokenIndex || source.index <= spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::DeclarationValue, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::Lambda:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::Lambda, source.index - spanBegin, {}, source.depth, 0});
+            case SourceLayoutKind::ConstructorInitializer:
+                if (source.index == kNoTokenIndex || source.index < spanBegin) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::ConstructorInitializer, source.index - spanBegin, {}, source.depth, 0});
+                return false;
+            case SourceLayoutKind::OperatorChain: {
+                const bool ownsSegment = source.begin == spanBegin &&
+                    (source.end == spanEnd || HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end));
+                const bool ownsReturnSegment = source.end <= spanEnd &&
+                    HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end) &&
+                    !tokens.empty() &&
+                    tokens.front().text == "return";
+                if (!ownsSegment && !ownsReturnSegment) {
+                    return false;
+                }
+                if (!CanSplitOperatorChain(tokens)) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::OperatorChain, 0, {}, source.depth, 0}) && source.stopChildren;
+            }
+            case SourceLayoutKind::StringLiteralSequence:
+                if (source.begin != spanBegin || (
+                    source.end != spanEnd && !HasOnlyTrailingStatementSuffix(tokens, spanBegin, source.end)
+                )) {
+                    return false;
+                }
+                return addNode({LayoutNodeKind::StringLiteralSequence, 0, {}, source.depth, 0});
+            case SourceLayoutKind::IncludeRun:
+                return false;
+            case SourceLayoutKind::Group: {
+                if (
+                    source.groupOpen < spanBegin ||
+                    source.groupClose < spanBegin ||
+                    source.groupOpen == kNoTokenIndex ||
+                    source.groupClose == kNoTokenIndex
+                ) {
+                    return false;
+                }
+                const size_t open = source.groupOpen - spanBegin;
+                const size_t close = source.groupClose - spanBegin;
+                if (
+                    open >= tokens.size() ||
+                    close >= tokens.size() ||
+                    IsEmptyGroupPair(tokens, open, close) ||
+                    IsNonWrappablePrefixGroup(tokens, open, close) ||
+                    IsFunctionPointerDeclaratorGroupOpen(tokens, open)
+                ) {
+                    return false;
+                }
+                (void)addNode({LayoutNodeKind::Group, 0, GroupPair{open, close}, source.depth, 0});
+                return false;
             }
         }
-        if (IsStringLiteralSequence(tokens)) {
-            addNode({LayoutNodeKind::StringLiteralSequence, 0, {}, 0, 0});
-            return tree;
-        }
-        if (std::optional<GroupPair> initializerList = FindTopLevelInitializerListDeclarationGroup(tokens)) {
-            if (std::optional<size_t> declarator = InitializerListDeclarationDeclarator(tokens, *initializerList)) {
-                addNode({LayoutNodeKind::DeclarationValue, *declarator, {}, 0, 0});
-            }
-            addNode({LayoutNodeKind::Group, 0, *initializerList, 0, 0});
-        }
-        if (std::optional<size_t> nestedLambdaBody = FindLambdaBodyOpen(tokens)) {
-            addNode({LayoutNodeKind::Lambda, *nestedLambdaBody, {}, 1, 0});
-            return tree;
-        }
-        CollectLayoutGroupNodes(tokens, 0, tokens.size(), chainKind == ChainKind::None ? 0 : 1, tree.breakNodes, order);
-        return tree;
+        return false;
     }
 
     void CollectLayoutGroupNodes(
@@ -3105,11 +2500,7 @@ private:
         return FormatInlineLength(firstLineTokens);
     }
 
-    LineTrimKind GroupOpeningTrimKind(
-        TokenSpan tokens,
-        GroupPair group,
-        std::string_view prefix
-    ) const {
+    LineTrimKind GroupOpeningTrimKind(TokenSpan tokens, GroupPair group, std::string_view prefix) const {
         if (prefix.empty() && group.open == 0 && group.open < tokens.size() && tokens[group.open].text == "{") {
             return LineTrimKind::OpenBrace;
         }
@@ -3150,8 +2541,8 @@ private:
         TokenSpan body = TokenSubspan(tokens, bodyOpen + 1, *bodyClose);
         TokenSpan after = TokenSubspan(tokens, *bodyClose + 1, tokens.size());
         std::vector<std::string> lines = FormatLambdaHeaderWithLeadingTokens(header, indentLevel, std::move(prefix));
-        PrettyFormatter bodyFormatter(config_, indentLevel + 1, true);
-        std::vector<std::string> bodyLines = tools::lint::SplitLines(bodyFormatter.Format(body));
+        PrettyFormatter bodyFormatter(config_, sourceLayout_, sourcePath_, indentLevel + 1, true);
+        std::vector<std::string> bodyLines = tools::SplitLines(bodyFormatter.Format(body));
         while (!bodyLines.empty() && bodyLines.back().empty()) {
             bodyLines.pop_back();
         }
@@ -3212,11 +2603,7 @@ private:
         return std::nullopt;
     }
 
-    std::vector<std::string> FormatLambdaHeader(
-        TokenSpan header,
-        int indentLevel,
-        std::string prefix
-    ) const {
+    std::vector<std::string> FormatLambdaHeader(TokenSpan header, int indentLevel, std::string prefix) const {
         LayoutResult best;
         std::vector<std::string> bestLines;
         bool hasBest = false;
@@ -3279,9 +2666,7 @@ private:
         };
     }
 
-    std::string FormatLambdaHeaderAfterCaptures(
-        TokenSpan header,
-        TokenSpan captures) const {
+    std::string FormatLambdaHeaderAfterCaptures(TokenSpan header, TokenSpan captures) const {
         const std::string fullHeader = FormatInline(header);
         const std::string captureText = FormatInline(captures);
         if (fullHeader.size() >= captureText.size() && fullHeader.compare(0, captureText.size(), captureText) == 0) {
@@ -3331,14 +2716,14 @@ private:
         }
         std::vector<std::string> lines;
         lines.push_back(Indent(indentLevel) + std::string(prefix) + "[");
-        std::vector<std::vector<Token>> captures = SplitTopLevel(captureInner, ',');
+        TokenSplitParts captures = SplitTopLevelParts(captureInner, ',');
         for (size_t index = 0; index < captures.size(); ++index) {
             std::string elementSuffix;
             if (index + 1 < captures.size()) {
                 elementSuffix = ",";
             }
             std::vector<std::string> captureLines =
-                FormatRange(captures[index], indentLevel + 1, {}, std::move(elementSuffix), true);
+                FormatRange(captures.At(index), indentLevel + 1, {}, std::move(elementSuffix), true);
             lines.insert(lines.end(), captureLines.begin(), captureLines.end());
         }
         const std::optional<GroupPair> parameterGroup = FindLambdaParameterGroup(header);
@@ -3376,9 +2761,9 @@ private:
         TokenSpan header,
         int indentLevel
     ) const {
-        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, ',');
+        TokenSplitParts elements = SplitTopLevelParts(inner, ',');
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            if (elements.At(index).empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3386,7 +2771,7 @@ private:
                 elementSuffix = ",";
             }
             std::vector<std::string> elementLines =
-                FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                FormatRange(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
             AppendSplitElementLines(lines, elementLines, false);
         }
         TokenSpan afterTokens = TokenSubspan(header, group.close + 1, header.size());
@@ -3428,10 +2813,10 @@ private:
         TokenSpan header = TokenSubspan(tokens, 0, initializerColon);
         TokenSpan initializers = TokenSubspan(tokens, initializerColon + 1, tokens.size());
         std::vector<std::string> lines = FormatConstructorInitializerHeader(header, indentLevel, std::move(prefix));
-        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
+        TokenSplitParts elements = SplitTopLevelParts(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            if (elements.At(index).empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3441,7 +2826,7 @@ private:
                 elementSuffix = suffix;
             }
             std::vector<std::string> elementLines =
-                FormatRange(elements[index], indentLevel + 1, {}, elementSuffix, true);
+                FormatRange(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
             lines.insert(lines.end(), elementLines.begin(), elementLines.end());
         }
         if (separateBodyOpen) {
@@ -3460,10 +2845,10 @@ private:
         TokenSpan header = TokenSubspan(tokens, 0, initializerColon);
         TokenSpan initializers = TokenSubspan(tokens, initializerColon + 1, tokens.size());
         LayoutResult result = FormatConstructorInitializerHeaderResult(header, indentLevel, std::move(prefix));
-        std::vector<std::vector<Token>> elements = SplitTopLevel(initializers, ',');
+        TokenSplitParts elements = SplitTopLevelParts(initializers, ',');
         const bool separateBodyOpen = suffix == " {";
         for (size_t index = 0; index < elements.size(); ++index) {
-            if (elements[index].empty()) {
+            if (elements.At(index).empty()) {
                 continue;
             }
             std::string elementSuffix;
@@ -3472,7 +2857,8 @@ private:
             } else if (!separateBodyOpen) {
                 elementSuffix = suffix;
             }
-            LayoutResult elementResult = FormatRangeResult(elements[index], indentLevel + 1, {}, elementSuffix, true);
+            LayoutResult elementResult =
+                FormatRangeResult(elements.At(index), indentLevel + 1, {}, elementSuffix, true);
             AppendMeasuredLayout(result, elementResult, false, 1);
         }
         if (separateBodyOpen) {
@@ -3496,11 +2882,7 @@ private:
         return FormatRange(header, indentLevel, std::move(prefix), " :");
     }
 
-    LayoutResult FormatConstructorInitializerHeaderResult(
-        TokenSpan header,
-        int indentLevel,
-        std::string prefix
-    ) const {
+    LayoutResult FormatConstructorInitializerHeaderResult(TokenSpan header, int indentLevel, std::string prefix) const {
         if (std::optional<GroupPair> group = FindFirstWrappableGroupPair(header)) {
             TokenSpan inner = TokenSubspan(header, group->open + 1, group->close);
             if (header[group->open].text == "(" && ContainsTopLevelSeparator(inner, ',')) {
@@ -3551,7 +2933,7 @@ private:
             startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
-        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
+        TokenSplitParts elements = SplitTopLevelParts(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             const bool indentSingleExpressionChains =
                 !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
@@ -3566,7 +2948,7 @@ private:
                 }
                 const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
                 LayoutResult elementResult = FormatDelimitedElementResult(
-                    elements[index],
+                    elements.At(index),
                     indentLevel + 1,
                     elementSuffix,
                     isInitializerElement,
@@ -3633,7 +3015,7 @@ private:
         const int nestedBreakDepth = NestedGroupBreakDepth(tokens, group, *nestedGroup);
         LayoutResult result = EmptyLayout(false, nestedBreakDepth, 0, LayoutChoiceKind::Group, {}, 1);
         AppendMeasuredLine(result, IndentWidth(indentLevel) + firstLineWidth, indentLevel, LineTrimKind::Other);
-        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
+        TokenSplitParts elements = SplitTopLevelParts(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             LayoutResult childResult = FormatRangeResult(nestedInner, indentLevel + 1, {}, {}, true);
             AppendMeasuredLayout(result, childResult, false, nestedBreakDepth + 1);
@@ -3645,7 +3027,7 @@ private:
                     elementSuffix = ",";
                 }
                 LayoutResult elementResult = FormatDelimitedElementResult(
-                    elements[index],
+                    elements.At(index),
                     indentLevel + 1,
                     elementSuffix,
                     true,
@@ -3693,7 +3075,7 @@ private:
             startsWithControlFor || (StartsWithControlHeader(firstLineTokens) && ContainsTopLevelSeparator(inner, ';'));
         const bool indentElementChains = startsWithControlFor || !StartsWithControlHeader(firstLineTokens);
         const char separator = splitForHeader ? ';' : ',';
-        std::vector<std::vector<Token>> elements = SplitTopLevel(inner, separator);
+        TokenSplitParts elements = SplitTopLevelParts(inner, separator);
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(inner, separator)) {
             const bool indentSingleExpressionChains =
                 !IsPlainParenthesizedExpressionGroup(tokens, group, firstLineTokens);
@@ -3707,7 +3089,7 @@ private:
                 }
                 const bool isInitializerElement = tokens[group.open].text == "{" && separator == ',';
                 std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements[index],
+                    elements.At(index),
                     indentLevel + 1,
                     elementSuffix,
                     isInitializerElement,
@@ -3740,7 +3122,7 @@ private:
         lines.push_back(Indent(indentLevel) + std::string(prefix) + FormatInline(firstLineTokens));
 
         TokenSpan nestedInner = TokenSubspan(tokens, nestedGroup->open + 1, nestedGroup->close);
-        std::vector<std::vector<Token>> elements = SplitTopLevel(nestedInner, ',');
+        TokenSplitParts elements = SplitTopLevelParts(nestedInner, ',');
         if (elements.size() <= 1 && !ContainsTopLevelSeparator(nestedInner, ',')) {
             RenderRange(lines, nestedInner, indentLevel + 1, {}, {}, true);
         } else {
@@ -3751,7 +3133,7 @@ private:
                     elementSuffix = ",";
                 }
                 std::vector<std::string> elementLines = FormatDelimitedElement(
-                    elements[index],
+                    elements.At(index),
                     indentLevel + 1,
                     elementSuffix,
                     true,
@@ -3810,10 +3192,7 @@ private:
         return std::nullopt;
     }
 
-    std::string FormatGroupClosingLine(
-        TokenSpan tokens,
-        GroupPair group,
-        TokenSpan suffixTokens) const {
+    std::string FormatGroupClosingLine(TokenSpan tokens, GroupPair group, TokenSpan suffixTokens) const {
         if (!IsTemplateAngleGroup(tokens, group) || suffixTokens.empty()) {
             return FormatInline(suffixTokens);
         }
@@ -3829,10 +3208,7 @@ private:
         return closeLine;
     }
 
-    size_t FormatGroupClosingLineLength(
-        TokenSpan tokens,
-        GroupPair group,
-        TokenSpan suffixTokens) const {
+    size_t FormatGroupClosingLineLength(TokenSpan tokens, GroupPair group, TokenSpan suffixTokens) const {
         if (!IsTemplateAngleGroup(tokens, group) || suffixTokens.empty()) {
             return FormatInlineLength(suffixTokens);
         }
@@ -3873,10 +3249,7 @@ private:
             first != '}';
     }
 
-    bool IsPlainParenthesizedExpressionGroup(
-        TokenSpan tokens,
-        GroupPair group,
-        TokenSpan firstLineTokens) const {
+    bool IsPlainParenthesizedExpressionGroup(TokenSpan tokens, GroupPair group, TokenSpan firstLineTokens) const {
         if (group.open >= tokens.size() || tokens[group.open].text != "(") {
             return false;
         }
@@ -3935,10 +3308,7 @@ private:
         return std::nullopt;
     }
 
-    std::optional<size_t> InitializerListDeclarationDeclarator(
-        TokenSpan tokens,
-        GroupPair initializerList
-    ) const {
+    std::optional<size_t> InitializerListDeclarationDeclarator(TokenSpan tokens, GroupPair initializerList) const {
         if (initializerList.open >= tokens.size()) {
             return std::nullopt;
         }
@@ -4079,6 +3449,89 @@ private:
         return lines;
     }
 
+    std::vector<TokenSpan> SplitOperatorChainParts(TokenSpan tokens, ChainKind chainKind) const {
+        std::vector<TokenSpan> parts;
+        size_t partBegin = 0;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
+                size_t partEnd = index + 1;
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    partEnd = index + 2;
+                    ++index;
+                }
+                parts.push_back(TokenSubspan(tokens, partBegin, partEnd));
+                partBegin = partEnd;
+            }
+        }
+        if (partBegin < tokens.size()) {
+            parts.push_back(TokenSubspan(tokens, partBegin, tokens.size()));
+        }
+        return parts;
+    }
+
+    std::vector<TokenSpan> SplitTernaryChainParts(TokenSpan tokens) const {
+        std::vector<TokenSpan> parts;
+        size_t partBegin = 0;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && tokens[index].text == ":") {
+                size_t partEnd = index + 1;
+                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
+                    partEnd = index + 2;
+                    ++index;
+                }
+                parts.push_back(TokenSubspan(tokens, partBegin, partEnd));
+                partBegin = partEnd;
+            }
+        }
+        if (partBegin < tokens.size()) {
+            parts.push_back(TokenSubspan(tokens, partBegin, tokens.size()));
+        }
+        return parts;
+    }
+
+    ShiftChainParts SplitShiftOperatorChain(TokenSpan tokens) const {
+        ShiftChainParts result;
+        size_t segmentBegin = 0;
+        int depth = 0;
+        for (size_t index = 0; index < tokens.size(); ++index) {
+            UpdateDepth(tokens[index], depth);
+            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
+                if (!result.sawShiftOperator) {
+                    result.receiver = TokenSubspan(tokens, segmentBegin, index);
+                    result.sawShiftOperator = true;
+                } else {
+                    result.segments.push_back(TokenSubspan(tokens, segmentBegin, index));
+                }
+                segmentBegin = index;
+            }
+        }
+        if (result.sawShiftOperator && segmentBegin < tokens.size()) {
+            result.segments.push_back(TokenSubspan(tokens, segmentBegin, tokens.size()));
+        }
+        return result;
+    }
+
+    static TokenSpan MergeTokenSpans(TokenSpan first, TokenSpan second) {
+        if (first.empty()) {
+            return second;
+        }
+        if (second.empty()) {
+            return first;
+        }
+        return TokenSpan(first.data(), static_cast<size_t>((second.data() + second.size()) - first.data()));
+    }
+
+    static TokenSpan CombinedTokenSpan(const std::vector<TokenSpan>& spans) {
+        if (spans.empty()) {
+            return {};
+        }
+        return MergeTokenSpans(spans.front(), spans.back());
+    }
+
     LayoutResult FormatOperatorChainResult(
         TokenSpan tokens,
         int indentLevel,
@@ -4100,25 +3553,7 @@ private:
             result.choice = LayoutChoiceKind::OperatorChain;
             return result;
         }
-        std::vector<std::vector<Token>> parts;
-        std::vector<Token> current;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            current.push_back(token);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    current.push_back(tokens[index + 1]);
-                    ++index;
-                }
-                parts.push_back(current);
-                current.clear();
-            }
-        }
-        if (!current.empty()) {
-            parts.push_back(current);
-        }
+        const std::vector<TokenSpan> parts = SplitOperatorChainParts(tokens, chainKind);
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
         const bool indentSplitChainContinuation =
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
@@ -4162,25 +3597,7 @@ private:
             );
             return;
         }
-        std::vector<std::vector<Token>> parts;
-        std::vector<Token> current;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            current.push_back(token);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, chainKind)) {
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    current.push_back(tokens[index + 1]);
-                    ++index;
-                }
-                parts.push_back(current);
-                current.clear();
-            }
-        }
-        if (!current.empty()) {
-            parts.push_back(current);
-        }
+        const std::vector<TokenSpan> parts = SplitOperatorChainParts(tokens, chainKind);
         const bool indentSplitChainContinuation =
             indentSplitChains && (chainKind != ChainKind::Logical || indentLogicalSplitChains);
         const bool indentContinuation =
@@ -4205,39 +3622,16 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        std::vector<Token> receiver;
-        std::vector<std::vector<Token>> segments;
-        std::vector<Token> current;
-        bool sawShiftOperator = false;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
-                if (!sawShiftOperator) {
-                    receiver = current;
-                    sawShiftOperator = true;
-                } else {
-                    segments.push_back(current);
-                }
-                current.clear();
-                current.push_back(token);
-                continue;
-            }
-            current.push_back(token);
-        }
-        if (!sawShiftOperator) {
+        ShiftChainParts chain = SplitShiftOperatorChain(tokens);
+        if (!chain.sawShiftOperator) {
             return FormatChainPart(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
-        if (!current.empty()) {
-            segments.push_back(current);
-        }
-        std::vector<std::string> lines = FormatRange(receiver, indentLevel, std::move(prefix), {}, true);
-        if (std::optional<std::string> compactTail = CompactShiftTail(segments, indentLevel + 1, suffix)) {
+        std::vector<std::string> lines = FormatRange(chain.receiver, indentLevel, std::move(prefix), {}, true);
+        if (std::optional<std::string> compactTail = CompactShiftTail(chain.segments, indentLevel + 1, suffix)) {
             lines.push_back(Indent(indentLevel + 1) + *compactTail);
             return lines;
         }
-        segments = GroupShiftSegmentsByBreakRules(segments);
+        std::vector<TokenSpan> segments = GroupShiftSegmentsByBreakRules(chain.segments);
         for (size_t index = 0; index < segments.size();) {
             std::string segmentSuffix;
             if (index + 1 == segments.size()) {
@@ -4252,14 +3646,11 @@ private:
     }
 
     std::optional<std::string> CompactShiftTail(
-        const std::vector<std::vector<Token>>& segments,
+        const std::vector<TokenSpan>& segments,
         int indentLevel,
         std::string_view suffix
     ) const {
-        std::vector<Token> combined;
-        for (const std::vector<Token>& segment : segments) {
-            combined.insert(combined.end(), segment.begin(), segment.end());
-        }
+        TokenSpan combined = CombinedTokenSpan(segments);
         if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
             return std::nullopt;
         }
@@ -4277,37 +3668,14 @@ private:
         std::string prefix,
         std::string suffix
     ) const {
-        std::vector<Token> receiver;
-        std::vector<std::vector<Token>> segments;
-        std::vector<Token> current;
-        bool sawShiftOperator = false;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            if (depth == 0 && IsChainBreakOperator(tokens, index, ChainKind::Shift)) {
-                if (!sawShiftOperator) {
-                    receiver = current;
-                    sawShiftOperator = true;
-                } else {
-                    segments.push_back(current);
-                }
-                current.clear();
-                current.push_back(token);
-                continue;
-            }
-            current.push_back(token);
-        }
-        if (!sawShiftOperator) {
+        ShiftChainParts chain = SplitShiftOperatorChain(tokens);
+        if (!chain.sawShiftOperator) {
             return FormatChainPartResult(tokens, indentLevel, std::move(prefix), std::move(suffix));
         }
-        if (!current.empty()) {
-            segments.push_back(current);
-        }
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
-        LayoutResult receiverResult = FormatRangeResult(receiver, indentLevel, std::move(prefix), {}, true);
+        LayoutResult receiverResult = FormatRangeResult(chain.receiver, indentLevel, std::move(prefix), {}, true);
         AppendMeasuredLayout(result, receiverResult, false, 1);
-        if (std::optional<size_t> compactTailWidth = CompactShiftTailWidth(segments, indentLevel + 1, suffix)) {
+        if (std::optional<size_t> compactTailWidth = CompactShiftTailWidth(chain.segments, indentLevel + 1, suffix)) {
             AppendMeasuredLine(
                 result,
                 IndentWidth(indentLevel + 1) + *compactTailWidth,
@@ -4317,7 +3685,7 @@ private:
             result.variant = 1;
             return result;
         }
-        segments = GroupShiftSegmentsByBreakRules(segments);
+        std::vector<TokenSpan> segments = GroupShiftSegmentsByBreakRules(chain.segments);
         for (size_t index = 0; index < segments.size();) {
             std::string segmentSuffix;
             if (index + 1 == segments.size()) {
@@ -4333,14 +3701,11 @@ private:
     }
 
     std::optional<size_t> CompactShiftTailWidth(
-        const std::vector<std::vector<Token>>& segments,
+        const std::vector<TokenSpan>& segments,
         int indentLevel,
         std::string_view suffix
     ) const {
-        std::vector<Token> combined;
-        for (const std::vector<Token>& segment : segments) {
-            combined.insert(combined.end(), segment.begin(), segment.end());
-        }
+        TokenSpan combined = CombinedTokenSpan(segments);
         if (combined.empty() || HasOriginalBlankSeparator(combined) || ShouldForceSplit(combined)) {
             return std::nullopt;
         }
@@ -4351,20 +3716,17 @@ private:
         return width;
     }
 
-    std::vector<std::vector<Token>> GroupShiftSegmentsByBreakRules(
-        const std::vector<std::vector<Token>>& segments
-    ) const {
-        std::vector<std::vector<Token>> grouped;
-        std::vector<Token> pendingConfiguration;
-        for (const std::vector<Token>& segment : segments) {
+    std::vector<TokenSpan> GroupShiftSegmentsByBreakRules(const std::vector<TokenSpan>& segments) const {
+        std::vector<TokenSpan> grouped;
+        TokenSpan pendingConfiguration;
+        for (TokenSpan segment : segments) {
             if (IsStreamShiftConfigurationSegment(segment)) {
-                pendingConfiguration.insert(pendingConfiguration.end(), segment.begin(), segment.end());
+                pendingConfiguration = MergeTokenSpans(pendingConfiguration, segment);
                 continue;
             }
             if (!pendingConfiguration.empty()) {
-                pendingConfiguration.insert(pendingConfiguration.end(), segment.begin(), segment.end());
-                grouped.push_back(std::move(pendingConfiguration));
-                pendingConfiguration.clear();
+                grouped.push_back(MergeTokenSpans(pendingConfiguration, segment));
+                pendingConfiguration = {};
                 continue;
             }
             grouped.push_back(segment);
@@ -4438,25 +3800,7 @@ private:
             );
         }
 
-        std::vector<std::vector<Token>> parts;
-        std::vector<Token> current;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            current.push_back(token);
-            if (depth == 0 && token.text == ":") {
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    current.push_back(tokens[index + 1]);
-                    ++index;
-                }
-                parts.push_back(current);
-                current.clear();
-            }
-        }
-        if (!current.empty()) {
-            parts.push_back(current);
-        }
+        const std::vector<TokenSpan> parts = SplitTernaryChainParts(tokens);
         std::vector<std::string> lines;
         const bool indentContinuation =
             indentSplitChains || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
@@ -4491,25 +3835,7 @@ private:
             );
         }
 
-        std::vector<std::vector<Token>> parts;
-        std::vector<Token> current;
-        int depth = 0;
-        for (size_t index = 0; index < tokens.size(); ++index) {
-            const Token& token = tokens[index];
-            UpdateDepth(token, depth);
-            current.push_back(token);
-            if (depth == 0 && token.text == ":") {
-                if (index + 1 < tokens.size() && tokens[index + 1].kind == TokenKind::LineComment) {
-                    current.push_back(tokens[index + 1]);
-                    ++index;
-                }
-                parts.push_back(current);
-                current.clear();
-            }
-        }
-        if (!current.empty()) {
-            parts.push_back(current);
-        }
+        const std::vector<TokenSpan> parts = SplitTernaryChainParts(tokens);
         LayoutResult result = EmptyLayout(false, 0, 0, LayoutChoiceKind::OperatorChain, {}, 0);
         const bool indentContinuation =
             indentSplitChains || !prefix.empty() || (!tokens.empty() && tokens.front().text == "return");
@@ -5518,7 +4844,7 @@ private:
         if (!beforeOpen || tokens[*beforeOpen].kind != TokenKind::Word) {
             return true;
         }
-        return !tools::lint::EndsWith(tokens[*beforeOpen].text, "_v");
+        return !tools::EndsWith(tokens[*beforeOpen].text, "_v");
     }
 
     bool IsLikelyDeclaratorContextBeforePointer(TokenSpan tokens, size_t index) const {
@@ -5850,8 +5176,8 @@ private:
         if (
             combineNestedInitializerBoundary &&
             !lines.empty() &&
-            tools::lint::Trim(lines.back()) == "}," &&
-            tools::lint::Trim(elementLines.front()) == "{"
+            tools::Trim(lines.back()) == "}," &&
+            tools::Trim(elementLines.front()) == "{"
         ) {
             lines.back() = TrimRight(lines.back()) + " " + TrimLeft(elementLines.front());
             firstElementLine = 1;
@@ -6146,6 +5472,9 @@ private:
     }
 
     std::optional<size_t> FindMatchingClose(TokenSpan tokens, size_t openIndex) const {
+        if (std::optional<size_t> annotated = AnnotatedMatchingIndex(tokens, openIndex)) {
+            return annotated;
+        }
         const std::string close = MatchingClose(tokens[openIndex].text);
         int depth = 0;
         for (size_t index = openIndex; index < tokens.size(); ++index) {
@@ -6162,6 +5491,9 @@ private:
     }
 
     std::optional<size_t> FindMatchingOpen(TokenSpan tokens, size_t closeIndex) const {
+        if (std::optional<size_t> annotated = AnnotatedMatchingIndex(tokens, closeIndex)) {
+            return annotated;
+        }
         const std::string& close = tokens[closeIndex].text;
         std::string open;
         if (close == ")") {
@@ -6436,10 +5768,7 @@ private:
         return afterColon < tokens.size();
     }
 
-    std::optional<size_t> FindConstructorParameterListCloseBeforeColon(
-        TokenSpan tokens,
-        size_t colon
-    ) const {
+    std::optional<size_t> FindConstructorParameterListCloseBeforeColon(TokenSpan tokens, size_t colon) const {
         size_t cursor = colon;
         while (std::optional<size_t> previous = PreviousNonNewlineIndex(tokens, cursor)) {
             if (tokens[*previous].text == ")") {
@@ -6596,10 +5925,7 @@ private:
         return IsLikelyTypeBeforePointer(tokens, index) && IsLikelyDeclaratorContextBeforePointer(tokens, index);
     }
 
-    bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(
-        TokenSpan tokens,
-        size_t index
-    ) const {
+    bool FunctionPointerDeclaratorGroupStartsWithCallingConvention(TokenSpan tokens, size_t index) const {
         if (index >= tokens.size() || tokens[index].text != "(") {
             return false;
         }
@@ -6922,11 +6248,7 @@ private:
         return std::nullopt;
     }
 
-    std::optional<size_t> FindTopLevelTokenAfter(
-        TokenSpan tokens,
-        std::string_view tokenText,
-        size_t begin
-    ) const {
+    std::optional<size_t> FindTopLevelTokenAfter(TokenSpan tokens, std::string_view tokenText, size_t begin) const {
         int depth = 0;
         for (size_t index = begin; index < tokens.size(); ++index) {
             UpdateDepth(tokens[index], depth);
@@ -6960,8 +6282,8 @@ private:
         if (previous == "public" || previous == "private" || previous == "protected" || previous == "default") {
             return true;
         }
-        const std::string trimmed = tools::lint::Trim(FormatInline(pendingTokens_));
-        return tools::lint::StartsWith(trimmed, "case ");
+        const std::string trimmed = tools::Trim(FormatInline(pendingTokens_));
+        return tools::StartsWith(trimmed, "case ");
     }
 
     bool IsAccessSpecifierLabel() const {
@@ -6980,8 +6302,8 @@ private:
         if (previous == "default") {
             return true;
         }
-        const std::string trimmed = tools::lint::Trim(FormatInline(pendingTokens_));
-        return tools::lint::StartsWith(trimmed, "case ");
+        const std::string trimmed = tools::Trim(FormatInline(pendingTokens_));
+        return tools::StartsWith(trimmed, "case ");
     }
 
     bool IsLabelColonToken(TokenSpan tokens, size_t index) const {
@@ -7332,8 +6654,11 @@ private:
     std::vector<Token> pendingTokens_;
     std::string pendingPrefix_;
     std::vector<BlockState> blockStack_;
+    std::map<size_t, size_t> includeRuns_;
     mutable std::map<std::string, LayoutResult> layoutCache_;
     const FormatterConfig& config_;
+    const SourceLayoutNode& sourceLayout_;
+    std::string_view sourcePath_;
     int indentLevel_ = 0;
     int groupDepth_ = 0;
     int caseBodyIndentLevel_ = -1;
@@ -7347,437 +6672,9 @@ private:
     bool justEmittedCaseLabel_ = false;
 };
 
-struct IncludeLine {
-    std::string line;
-    std::string spelling;
-    bool quoted = false;
-    int group = 0;
-};
-
-std::optional<IncludeLine> ParseIncludeLine(std::string_view line) {
-    const std::string trimmed = tools::lint::Trim(line);
-    constexpr std::string_view prefix = "#include";
-    if (!tools::lint::StartsWith(trimmed, prefix)) {
-        return std::nullopt;
-    }
-    size_t index = prefix.size();
-    while (index < trimmed.size() && IsSpaceButNotNewline(trimmed[index])) {
-        ++index;
-    }
-    if (index >= trimmed.size()) {
-        return std::nullopt;
-    }
-    const char open = trimmed[index];
-    const char close = open == '"' ? '"' : open == '<' ? '>' : '\0';
-    if (close == '\0') {
-        return std::nullopt;
-    }
-    const size_t end = trimmed.find(close, index + 1);
-    if (end == std::string::npos) {
-        return std::nullopt;
-    }
-    if (!tools::lint::Trim(std::string_view(trimmed).substr(end + 1)).empty()) {
-        return std::nullopt;
-    }
-    IncludeLine include;
-    include.line = "#include " + trimmed.substr(index, end - index + 1);
-    include.spelling = trimmed.substr(index, end - index + 1);
-    include.quoted = open == '"';
-    return include;
-}
-
-std::string Stem(std::string_view path) {
-    const std::string normalized = tools::lint::NormalizeSeparators(std::string(path));
-    const size_t slash = normalized.find_last_of('/');
-    const size_t start = slash == std::string::npos ? 0 : slash + 1;
-    const size_t dot = normalized.find_last_of('.');
-    if (dot == std::string::npos || dot < start) {
-        return normalized.substr(start);
-    }
-    return normalized.substr(start, dot - start);
-}
-
-bool IsMainInclude(const IncludeLine& include, const FormatterConfig& config, std::string_view sourcePath) {
-    if (!include.quoted || !config.mainIncludeQuote) {
-        return false;
-    }
-    std::string includeText = include.spelling.substr(1, include.spelling.size() - 2);
-    if (tools::lint::Extension(includeText) != ".h") {
-        return false;
-    }
-    const std::string includeStem = Stem(includeText);
-    const std::string sourceStem = Stem(sourcePath);
-    if (tools::lint::StartsWith(sourceStem, includeStem + ".")) {
-        return true;
-    }
-    if (!tools::lint::StartsWith(includeStem, sourceStem)) {
-        return false;
-    }
-    const std::string suffix = includeStem.substr(sourceStem.size());
-    return std::regex_match(suffix, std::regex(config.mainIncludeRegex));
-}
-
-int IncludeGroupIndex(const IncludeLine& include, const FormatterConfig& config, std::string_view sourcePath) {
-    if (IsMainInclude(include, config, sourcePath)) {
-        return 0;
-    }
-    for (size_t index = 0; index < config.includeGroups.size(); ++index) {
-        if (std::regex_match(include.spelling, config.includeGroups[index].regex)) {
-            return static_cast<int>(index + 1);
-        }
-    }
-    return static_cast<int>(config.includeGroups.size() + 1);
-}
-
-std::vector<std::string> FormatIncludeRun(
-    std::vector<IncludeLine> includes,
-    const FormatterConfig& config,
-    std::string_view sourcePath
-) {
-    for (IncludeLine& include : includes) {
-        include.group = IncludeGroupIndex(include, config, sourcePath);
-    }
-    std::sort(includes.begin(), includes.end(), [](const IncludeLine& left, const IncludeLine& right) {
-        if (left.group != right.group) {
-            return left.group < right.group;
-        }
-        return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
-    });
-    std::vector<std::string> lines;
-    int lastGroup = -1;
-    for (const IncludeLine& include : includes) {
-        if (lastGroup != -1 && include.group != lastGroup) {
-            lines.push_back({});
-        }
-        lines.push_back(include.line);
-        lastGroup = include.group;
-    }
-    return lines;
-}
-
-std::string SortIncludes(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
-    std::vector<std::string> lines = tools::lint::SplitLines(text);
-    std::vector<std::string> output;
-    std::vector<IncludeLine> includeRun;
-    auto flushRun = [&]() {
-        if (includeRun.empty()) {
-            return;
-        }
-        std::vector<std::string> sorted = FormatIncludeRun(std::move(includeRun), config, sourcePath);
-        output.insert(output.end(), sorted.begin(), sorted.end());
-        includeRun.clear();
-    };
-    for (const std::string& line : lines) {
-        if (std::optional<IncludeLine> include = ParseIncludeLine(line)) {
-            includeRun.push_back(*include);
-            continue;
-        }
-        if (tools::lint::Trim(line).empty() && !includeRun.empty()) {
-            continue;
-        }
-        flushRun();
-        if (!tools::lint::Trim(line).empty() && !output.empty() && tools::lint::StartsWith(output.back(), "#include")) {
-            output.push_back({});
-        }
-        output.push_back(TrimRight(line));
-    }
-    flushRun();
-    std::string result;
-    for (const std::string& line : output) {
-        result += line;
-        result.push_back('\n');
-    }
-    return result;
-}
-
-ParseResult ParseCpp(std::string_view text) {
-    TSParser* parser = ts_parser_new();
-    if (parser == nullptr) {
-        return {};
-    }
-    if (!ts_parser_set_language(parser, tree_sitter_cpp())) {
-        ts_parser_delete(parser);
-        return {};
-    }
-    TSTree* tree = ts_parser_parse_string(parser, nullptr, text.data(), static_cast<uint32_t>(text.size()));
-    if (tree == nullptr) {
-        ts_parser_delete(parser);
-        return {};
-    }
-    const TSNode root = ts_tree_root_node(tree);
-    ParseResult result;
-    result.ok = true;
-    result.hasErrors = ts_node_has_error(root);
-    if (result.hasErrors) {
-        const TSNode errorNode = FindFirstErrorNode(root);
-        const TSPoint point = ts_node_start_point(errorNode);
-        result.errorNodeType = ts_node_type(errorNode);
-        result.errorLine = static_cast<int>(point.row) + 1;
-        result.errorColumn = static_cast<int>(point.column) + 1;
-        result.errorSnippet = SingleLineSnippet(text, ts_node_start_byte(errorNode), ts_node_end_byte(errorNode));
-    }
-    ts_tree_delete(tree);
-    ts_parser_delete(parser);
-    return result;
-}
-
-FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
-    const std::string normalized = NormalizeLineEndings(text);
-    const std::string includeSorted = SortIncludes(normalized, config, sourcePath);
-    const ParseResult parse = ParseCpp(includeSorted);
-    if (!parse.ok) {
-        return {.ok = false, .error = "tree-sitter parser setup failed"};
-    }
-    PrettyFormatter formatter(config);
-    FileFormatResult result;
-    result.parseHadErrors = parse.hasErrors;
-    result.parseErrorNodeType = parse.errorNodeType;
-    result.parseErrorLine = parse.errorLine;
-    result.parseErrorColumn = parse.errorColumn;
-    result.parseErrorSnippet = parse.errorSnippet;
-    result.formatted = formatter.Format(AddRequiredControlBraces(Tokenize(includeSorted)));
-    result.changed = normalized != result.formatted;
-    return result;
-}
-
-std::string ReadStdinText() {
-    std::string text;
-    char buffer[4096];
-    while (true) {
-        const size_t bytesRead = std::fread(buffer, 1, sizeof(buffer), stdin);
-        if (bytesRead > 0) {
-            text.append(buffer, bytesRead);
-        }
-        if (bytesRead < sizeof(buffer)) {
-            break;
-        }
-    }
-    return text;
-}
-
-FILE* SummaryStream(const FormatOptions& options) {
-    return options.mode == FormatMode::Stdout ? stderr : stdout;
-}
-
-void PrintParseRecovery(const FileFormatResult& result, const std::string& path, const std::string& root) {
-    const std::string relative = tools::lint::NormalizeSeparators(tools::lint::RelativePath(path, root));
-    std::fprintf(
-        stderr,
-        "%s:%d:%d: tree-sitter parse recovery at %s: %s\n",
-        relative.c_str(),
-        result.parseErrorLine,
-        result.parseErrorColumn,
-        result.parseErrorNodeType.c_str(),
-        result.parseErrorSnippet.c_str()
-    );
-}
-
-void PrintFormatSummary(
-    FILE* output,
-    const char* verb,
-    int processedCount,
-    int changedCount,
-    int ignoredCount,
-    int parseErrorCount,
-    std::chrono::steady_clock::time_point start
-) {
-    std::fprintf(
-        output,
-        "%s %d file%s in %s.",
-        verb,
-        processedCount,
-        processedCount == 1 ? "" : "s",
-        FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-    );
-    if (changedCount > 0) {
-        std::fprintf(output, " %d file%s require formatting.", changedCount, changedCount == 1 ? "" : "s");
-    }
-    if (ignoredCount > 0) {
-        std::fprintf(output, " Skipped %d ignored file%s.", ignoredCount, ignoredCount == 1 ? "" : "s");
-    }
-    if (parseErrorCount > 0) {
-        std::fprintf(
-            output,
-            " %d file%s parsed with tree-sitter errors.",
-            parseErrorCount,
-            parseErrorCount == 1 ? "" : "s"
-        );
-    }
-    std::fprintf(output, "\n");
-}
-
 }  // namespace
 
-int RunFormat(int argc, char** argv) {
-    const auto start = std::chrono::steady_clock::now();
-    std::string optionsError;
-    std::optional<FormatOptions> parsed = tools::format::ParseFormatArgs(argc, argv, optionsError);
-    if (!parsed) {
-        if (!optionsError.empty()) {
-            std::fprintf(stderr, "%s\n", optionsError.c_str());
-        }
-        tools::format::PrintFormatUsage(stderr);
-        return 2;
-    }
-    const FormatOptions& options = *parsed;
-    if (options.help) {
-        tools::format::PrintFormatUsage(stdout);
-        return 0;
-    }
-
-    tools::format::FormatStyleCache styleCache(options.explicitStylePath);
-    const std::string currentDirectory = tools::lint::CurrentDirectoryAbsolute();
-    FILE* summary = SummaryStream(options);
-
-    if (options.files.empty() && !options.fileListProvided) {
-        std::string error;
-        const FormatterConfig* config = styleCache.ConfigForPath(currentDirectory, error);
-        if (config == nullptr) {
-            std::fprintf(stderr, "%s\n", error.c_str());
-            return 2;
-        }
-        FileFormatResult result = FormatOneText(ReadStdinText(), *config, "<stdin>");
-        if (!result.ok) {
-            std::fprintf(stderr, "<stdin>: %s\n", result.error.c_str());
-            return 1;
-        }
-        if (options.verbose && result.parseHadErrors) {
-            PrintParseRecovery(result, "<stdin>", currentDirectory);
-        }
-        if (options.mode == FormatMode::DryRun && result.changed) {
-            std::fprintf(
-                summary,
-                "Formatting is required for stdin. Checked stdin in %s.\n",
-                FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-            );
-            return 1;
-        }
-        if (options.mode == FormatMode::Stdout) {
-            std::fwrite(result.formatted.data(), 1, result.formatted.size(), stdout);
-        }
-        std::fprintf(
-            summary,
-            "%s stdin in %s.\n",
-            options.mode == FormatMode::DryRun ? "Checked" : "Formatted",
-            FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-        );
-        return 0;
-    }
-
-    bool failed = false;
-    int parseErrorCount = 0;
-    int changedCount = 0;
-    int ignoredCount = 0;
-    int processedCount = 0;
-    const bool showProgress = _isatty(_fileno(summary)) != 0;
-    size_t previousProgressLength = 0;
-
-    for (int index = 0; index < static_cast<int>(options.files.size()); ++index) {
-        const std::string file = tools::lint::AbsolutePath(options.files[static_cast<size_t>(index)]);
-        std::string error;
-        if (styleCache.IsIgnored(file, error)) {
-            ++ignoredCount;
-            continue;
-        }
-        if (!error.empty()) {
-            std::fprintf(stderr, "%s\n", error.c_str());
-            return 2;
-        }
-
-        const FormatterConfig* config = styleCache.ConfigForPath(file, error);
-        if (config == nullptr) {
-            std::fprintf(stderr, "%s\n", error.c_str());
-            return 2;
-        }
-        if (showProgress) {
-            const std::string relative =
-                tools::lint::NormalizeSeparators(tools::lint::RelativePath(file, currentDirectory));
-            std::string progress =
-                "[" + std::to_string(index + 1) + "/" + std::to_string(options.files.size()) + "] format " + relative;
-            if (progress.size() > 119) {
-                progress = progress.substr(0, 116) + "...";
-            }
-            const std::string padding(
-                previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
-                ' '
-            );
-            std::fprintf(summary, "\r%s%s", progress.c_str(), padding.c_str());
-            std::fflush(summary);
-            previousProgressLength = progress.size();
-        }
-
-        std::optional<std::string> text = tools::lint::ReadFileText(file);
-        if (!text) {
-            std::fprintf(stderr, "Failed to read %s\n", file.c_str());
-            failed = true;
-            continue;
-        }
-        ++processedCount;
-        FileFormatResult result = FormatOneText(*text, *config, file);
-        if (!result.ok) {
-            std::fprintf(stderr, "%s: %s\n", file.c_str(), result.error.c_str());
-            failed = true;
-            continue;
-        }
-        if (result.parseHadErrors) {
-            ++parseErrorCount;
-            if (options.verbose) {
-                PrintParseRecovery(result, file, currentDirectory);
-            }
-        }
-        if (options.mode == FormatMode::Stdout) {
-            std::fwrite(result.formatted.data(), 1, result.formatted.size(), stdout);
-        } else if (result.changed) {
-            ++changedCount;
-            if (options.mode == FormatMode::InPlace) {
-                if (!tools::lint::WriteFileText(file, ToFileLineEndings(result.formatted))) {
-                    std::fprintf(stderr, "Failed to write %s\n", file.c_str());
-                    failed = true;
-                }
-            } else {
-                failed = true;
-            }
-        }
-    }
-    if (showProgress) {
-        std::fprintf(summary, "\r%s\r", std::string(previousProgressLength, ' ').c_str());
-        std::fflush(summary);
-    }
-    if (failed) {
-        if (options.mode == FormatMode::InPlace) {
-            std::fprintf(summary, "Formatting failed");
-        } else {
-            std::fprintf(summary, "Formatting is required for %d file%s", changedCount, changedCount == 1 ? "" : "s");
-        }
-        if (parseErrorCount > 0) {
-            std::fprintf(
-                summary,
-                " (%d file%s parsed with tree-sitter errors)",
-                parseErrorCount,
-                parseErrorCount == 1 ? "" : "s"
-            );
-        }
-        if (ignoredCount > 0) {
-            std::fprintf(summary, ". Skipped %d ignored file%s", ignoredCount, ignoredCount == 1 ? "" : "s");
-        }
-        std::fprintf(
-            summary,
-            ". Checked %d file%s in %s.\n",
-            processedCount,
-            processedCount == 1 ? "" : "s",
-            FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
-        );
-        return 1;
-    }
-    const char* verb = options.mode == FormatMode::DryRun ? "Checked" : "Formatted";
-    PrintFormatSummary(
-        summary,
-        verb,
-        processedCount,
-        options.mode == FormatMode::DryRun ? changedCount : 0,
-        ignoredCount,
-        parseErrorCount,
-        start
-    );
-    return 0;
+std::string FormatModelText(const FormatterConfig& config, const FormatModel& model, std::string_view sourcePath) {
+    PrettyFormatter formatter(config, model.layout, sourcePath);
+    return formatter.Format(model.tokens);
 }

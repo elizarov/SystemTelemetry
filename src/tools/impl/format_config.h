@@ -7,8 +7,6 @@
 #include <string_view>
 #include <vector>
 
-namespace tools::format {
-
 struct IncludeGroup {
     std::string name;
     std::regex regex;
@@ -49,5 +47,3 @@ private:
     std::map<std::string, std::optional<std::string>> configSearchCache_;
     std::map<std::string, std::optional<std::string>> ignoreSearchCache_;
 };
-
-}  // namespace tools::format

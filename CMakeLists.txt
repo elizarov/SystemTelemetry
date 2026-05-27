@@ -855,17 +855,18 @@ target_compile_options(CaseDashTreeSitterCppGrammar PRIVATE
 add_executable(CaseDashTools
     src/tools/tools_main.cpp
     src/tools/format.cpp
-    src/tools/format_args.cpp
-    src/tools/format_config.cpp
-    src/tools/format_include_sorter.cpp
-    src/tools/format_lexer.cpp
-    src/tools/format_macro_fallback.cpp
-    src/tools/format_model_builder.cpp
-    src/tools/format_pretty_printer.cpp
+    src/tools/impl/format_args.cpp
+    src/tools/impl/format_config.cpp
+    src/tools/impl/format_include_sorter.cpp
+    src/tools/impl/format_lexer.cpp
+    src/tools/impl/format_macro_fallback.cpp
+    src/tools/impl/format_model_builder.cpp
+    src/tools/impl/format_pretty_printer.cpp
     src/tools/lint_check.cpp
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp
     src/tools/impl/lint_json.cpp
+    src/tools/impl/tools_common.cpp
 )
 target_include_directories(CaseDashTools PRIVATE
     "${CMAKE_SOURCE_DIR}/src"

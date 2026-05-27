@@ -1,4 +1,4 @@
-#include "tools/format_model_builder.h"
+#include "tools/impl/format_model_builder.h"
 
 #include <algorithm>
 #include <cstring>
@@ -10,9 +10,7 @@
 #include <utility>
 #include <vector>
 
-#include "tools/impl/lint_common.h"
-
-namespace tools::format {
+#include "tools/impl/tools_common.h"
 
 std::string SingleLineSnippet(std::string_view text, uint32_t startByte, uint32_t endByte) {
     if (startByte >= text.size()) {
@@ -27,7 +25,7 @@ std::string SingleLineSnippet(std::string_view text, uint32_t startByte, uint32_
             ch = ' ';
         }
     }
-    return tools::lint::Trim(snippet);
+    return tools::Trim(snippet);
 }
 
 TSNode FindFirstErrorNode(TSNode node) {
@@ -218,7 +216,7 @@ bool IsAtomicTreeNode(std::string_view type, uint32_t childCount) {
 
 TokenKind ClassifyTreeToken(std::string_view type, std::string_view text) {
     if (type == "comment") {
-        return tools::lint::StartsWith(text, "//") ? TokenKind::LineComment : TokenKind::BlockComment;
+        return tools::StartsWith(text, "//") ? TokenKind::LineComment : TokenKind::BlockComment;
     }
     if (type == "char_literal") {
         return TokenKind::CharLiteral;
@@ -260,7 +258,7 @@ bool TryAppendTreeToken(TSNode node, SourceLayoutBuildContext& context) {
     }
     if (IsAtomicTreeNode(type, childCount)) {
         std::string tokenText = SourceText(context.text, start, end);
-        if (type == "comment" && tools::lint::StartsWith(tokenText, "//")) {
+        if (type == "comment" && tools::StartsWith(tokenText, "//")) {
             TrimLineCommentTerminator(tokenText);
         }
         AppendModelToken(context, {ClassifyTreeToken(type, tokenText), tokenText, start, end});
@@ -931,5 +929,3 @@ void AnnotateTokenIndexesAndGroups(std::vector<Token>& tokens) {
         tokens[index].matchingIndex = openIndex;
     }
 }
-
-}  // namespace tools::format

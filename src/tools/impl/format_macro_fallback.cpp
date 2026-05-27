@@ -1,12 +1,10 @@
-#include "tools/format_macro_fallback.h"
+#include "tools/impl/format_macro_fallback.h"
 
 #include <algorithm>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
-
-namespace tools::format {
 
 namespace {
 
@@ -1404,5 +1402,3 @@ private:
 LayoutTree BuildMacroFallbackLayoutTree(TokenSpan tokens) {
     return MacroFallbackLayoutParser{}.Build(tokens);
 }
-
-}  // namespace tools::format

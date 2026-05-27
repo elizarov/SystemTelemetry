@@ -10,25 +10,15 @@
 #include <tree_sitter/api.h>
 #include <tree_sitter_cpp.h>
 
-#include "tools/format_args.h"
-#include "tools/format_config.h"
-#include "tools/format_lexer.h"
-#include "tools/format_model.h"
-#include "tools/format_model_builder.h"
-#include "tools/format_pretty_printer.h"
-#include "tools/impl/lint_common.h"
+#include "tools/impl/format_args.h"
+#include "tools/impl/format_config.h"
+#include "tools/impl/format_lexer.h"
+#include "tools/impl/format_model.h"
+#include "tools/impl/format_model_builder.h"
+#include "tools/impl/format_pretty_printer.h"
+#include "tools/impl/tools_common.h"
 
 namespace {
-
-using tools::format::AdvanceNewline;
-using tools::format::BuildSourceLayoutRoot;
-using tools::format::FormatMode;
-using tools::format::FormatModel;
-using tools::format::FormatModelText;
-using tools::format::FormatOptions;
-using tools::format::FormatterConfig;
-using tools::format::IsNewlineByte;
-using tools::format::ParseTreeResult;
 
 struct FileFormatResult {
     bool ok = true;
@@ -156,7 +146,7 @@ FILE* SummaryStream(const FormatOptions& options) {
 }
 
 void PrintParseRecovery(const FileFormatResult& result, const std::string& path, const std::string& root) {
-    const std::string relative = tools::lint::NormalizeSeparators(tools::lint::RelativePath(path, root));
+    const std::string relative = tools::NormalizeSeparators(tools::RelativePath(path, root));
     std::fprintf(
         stderr,
         "%s:%d:%d: tree-sitter parse recovery at %s: %s\n",
@@ -207,22 +197,22 @@ void PrintFormatSummary(
 int RunFormat(int argc, char** argv) {
     const auto start = std::chrono::steady_clock::now();
     std::string optionsError;
-    std::optional<FormatOptions> parsed = tools::format::ParseFormatArgs(argc, argv, optionsError);
+    std::optional<FormatOptions> parsed = ParseFormatArgs(argc, argv, optionsError);
     if (!parsed) {
         if (!optionsError.empty()) {
             std::fprintf(stderr, "%s\n", optionsError.c_str());
         }
-        tools::format::PrintFormatUsage(stderr);
+        PrintFormatUsage(stderr);
         return 2;
     }
     const FormatOptions& options = *parsed;
     if (options.help) {
-        tools::format::PrintFormatUsage(stdout);
+        PrintFormatUsage(stdout);
         return 0;
     }
 
-    tools::format::FormatStyleCache styleCache(options.explicitStylePath);
-    const std::string currentDirectory = tools::lint::CurrentDirectoryAbsolute();
+    FormatStyleCache styleCache(options.explicitStylePath);
+    const std::string currentDirectory = tools::CurrentDirectoryAbsolute();
     FILE* summary = SummaryStream(options);
 
     if (options.files.empty() && !options.fileListProvided) {
@@ -269,7 +259,7 @@ int RunFormat(int argc, char** argv) {
     size_t previousProgressLength = 0;
 
     for (int index = 0; index < static_cast<int>(options.files.size()); ++index) {
-        const std::string file = tools::lint::AbsolutePath(options.files[static_cast<size_t>(index)]);
+        const std::string file = tools::AbsolutePath(options.files[static_cast<size_t>(index)]);
         std::string error;
         if (styleCache.IsIgnored(file, error)) {
             ++ignoredCount;
@@ -286,8 +276,7 @@ int RunFormat(int argc, char** argv) {
             return 2;
         }
         if (showProgress) {
-            const std::string relative =
-                tools::lint::NormalizeSeparators(tools::lint::RelativePath(file, currentDirectory));
+            const std::string relative = tools::NormalizeSeparators(tools::RelativePath(file, currentDirectory));
             std::string progress =
                 "[" + std::to_string(index + 1) + "/" + std::to_string(options.files.size()) + "] format " + relative;
             if (progress.size() > 119) {
@@ -302,7 +291,7 @@ int RunFormat(int argc, char** argv) {
             previousProgressLength = progress.size();
         }
 
-        std::optional<std::string> text = tools::lint::ReadFileText(file);
+        std::optional<std::string> text = tools::ReadFileText(file);
         if (!text) {
             std::fprintf(stderr, "Failed to read %s\n", file.c_str());
             failed = true;
@@ -326,7 +315,7 @@ int RunFormat(int argc, char** argv) {
         } else if (result.changed) {
             ++changedCount;
             if (options.mode == FormatMode::InPlace) {
-                if (!tools::lint::WriteFileText(file, ToFileLineEndings(result.formatted))) {
+                if (!tools::WriteFileText(file, ToFileLineEndings(result.formatted))) {
                     std::fprintf(stderr, "Failed to write %s\n", file.c_str());
                     failed = true;
                 }

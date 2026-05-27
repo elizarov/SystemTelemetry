@@ -1,9 +1,7 @@
-#include "tools/format_lexer.h"
+#include "tools/impl/format_lexer.h"
 
 #include <optional>
 #include <utility>
-
-namespace tools::format {
 
 namespace {
 
@@ -278,5 +276,3 @@ std::vector<Token> TokenizeCharacterStream(std::string_view text) {
     }
     return tokens;
 }
-
-}  // namespace tools::format
