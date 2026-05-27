@@ -1,8 +1,8 @@
 #include "tools/impl/format_model_builder.h"
 
-#include <algorithm>
 #include <array>
 #include <string_view>
+#include <unordered_map>
 
 #include "tools/impl/tools_common.h"
 
@@ -45,6 +45,7 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"preproc_elif", SyntaxTreeKind::PreprocElif},
     {"preproc_using", SyntaxTreeKind::PreprocUsing},
     {"preproc_params", SyntaxTreeKind::PreprocParams},
+    {"preproc_arg", SyntaxTreeKind::PreprocArg},
     {"preproc_if_in_field_declaration_list", SyntaxTreeKind::PreprocIf},
     {"preproc_ifdef_in_field_declaration_list", SyntaxTreeKind::PreprocIfdef},
     {"preproc_else_in_field_declaration_list", SyntaxTreeKind::PreprocElse},
@@ -53,6 +54,7 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"preproc_ifdef_in_enumerator_list", SyntaxTreeKind::PreprocIfdef},
     {"preproc_else_in_enumerator_list", SyntaxTreeKind::PreprocElse},
     {"preproc_elif_in_enumerator_list", SyntaxTreeKind::PreprocElif},
+    {"preproc_elifdef", SyntaxTreeKind::PreprocElif},
     {"binary_expression", SyntaxTreeKind::BinaryExpression},
     {"unary_expression", SyntaxTreeKind::UnaryExpression},
     {"conditional_expression", SyntaxTreeKind::ConditionalExpression},
@@ -82,34 +84,35 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"trailing_return_type", SyntaxTreeKind::TrailingReturnType},
     {"operator_name", SyntaxTreeKind::OperatorName},
     {"operator_cast", SyntaxTreeKind::OperatorCast},
+    {"ms_call_modifier", SyntaxTreeKind::MsCallModifier},
     {"raw_string_literal", SyntaxTreeKind::RawStringLiteral},
     {"string_literal", SyntaxTreeKind::StringLiteral},
+    {"system_lib_string", SyntaxTreeKind::SystemLibString},
     {"char_literal", SyntaxTreeKind::CharacterLiteral},
+    {"number_literal", SyntaxTreeKind::NumberLiteral},
+    {"identifier", SyntaxTreeKind::Identifier},
+    {"field_identifier", SyntaxTreeKind::Identifier},
+    {"namespace_identifier", SyntaxTreeKind::Identifier},
+    {"type_identifier", SyntaxTreeKind::Identifier},
+    {"qualified_identifier", SyntaxTreeKind::Identifier},
 });
 
-SyntaxTreeKind TreeKindFromType(std::string_view type) {
-    if (type == "identifier" || type == "field_identifier" || type == "namespace_identifier" ||
-        type == "type_identifier" || type == "qualified_identifier") {
-        return SyntaxTreeKind::Identifier;
-    }
-    if (type == "number_literal") {
-        return SyntaxTreeKind::NumberLiteral;
-    }
-    if (type == "string_literal") {
-        return SyntaxTreeKind::StringLiteral;
-    }
-    if (type == "raw_string_literal") {
-        return SyntaxTreeKind::RawStringLiteral;
-    }
-    if (type == "char_literal") {
-        return SyntaxTreeKind::CharacterLiteral;
-    }
-    for (const TreeMapping& mapping : kTreeKinds) {
-        if (mapping.text == type) {
-            return mapping.kind;
+const std::unordered_map<std::string_view, SyntaxTreeKind>& TreeKindByType() {
+    static const std::unordered_map<std::string_view, SyntaxTreeKind> treeKinds = [] {
+        std::unordered_map<std::string_view, SyntaxTreeKind> result;
+        result.reserve(kTreeKinds.size());
+        for (const TreeMapping& mapping : kTreeKinds) {
+            result.emplace(mapping.text, mapping.kind);
         }
-    }
-    return SyntaxTreeKind::Unknown;
+        return result;
+    }();
+    return treeKinds;
+}
+
+SyntaxTreeKind TreeKindFromType(std::string_view type) {
+    const auto& treeKinds = TreeKindByType();
+    const auto found = treeKinds.find(type);
+    return found == treeKinds.end() ? SyntaxTreeKind::Unknown : found->second;
 }
 
 TSPoint StartPoint(TSNode node) {
@@ -157,11 +160,11 @@ bool IsLiteralKind(SyntaxTreeKind kind) {
         kind == SyntaxTreeKind::NumberLiteral;
 }
 
-bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind, std::string_view type) {
+bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind) {
     return IsLiteralKind(kind) ||
-        type == "preproc_arg" ||
-        type == "system_lib_string" ||
-        type == "ms_call_modifier";
+        kind == SyntaxTreeKind::PreprocArg ||
+        kind == SyntaxTreeKind::SystemLibString ||
+        kind == SyntaxTreeKind::MsCallModifier;
 }
 
 bool IsAtomicPreprocessorNode(SyntaxTreeKind kind) {
@@ -227,7 +230,7 @@ std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
         return node;
     }
 
-    if (childCount == 0 || KeepWholeNodeAsFreeToken(treeKind, type)) {
+    if (childCount == 0 || KeepWholeNodeAsFreeToken(treeKind)) {
         node->kind = SyntaxNodeKind::FreeToken;
         node->treeKind = treeKind;
         node->text = text;
