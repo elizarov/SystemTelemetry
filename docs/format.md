@@ -209,7 +209,7 @@ Repeated `+` and repeated `*` are formatter-owned arithmetic chains. `-`, `/`, a
 
 ## Break Selection Algorithm
 
-For each parsed segment between mandatory line breaks, the formatter uses a tree-sitter-derived layout model built directly from the parsed syntax tree. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments. Macro replacement text and parse-recovered macro-shaped regions that have no reliable tree-sitter subtree may fall back to token-span structure discovery; regular parsed source does not rebuild syntax from a flat token stream.
+For each parsed segment between mandatory line breaks, the formatter uses a tree-sitter-derived layout model built directly from the parsed syntax tree. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments. The formatter rejects inputs whose tree-sitter parse contains errors or missing nodes; formatter-supported syntax is added to the grammar instead of falling back to token-span recovery.
 
 Each node exposes its legal compact and split layouts. The optimizer chooses which optional breaks to take with dynamic programming:
 
@@ -533,8 +533,8 @@ Outside the listed changes, the formatter changes only spaces and line breaks.
 ## Tooling Ownership
 
 - `format.cmd` owns repository source discovery for all, changed, and staged formatting runs, then delegates the discovered newline-separated file list to `CaseDashTools.exe format --files`.
-- `CaseDashTools.exe format` owns clang-format-like stdin, direct file arguments, newline file lists passed with `--files <path>` or `--files=<path>`, `-i`, `--dry-run`, `--style=file`, `--style=<path>`, and `--style=file:<path>` handling, parsing, checking, fixing, ignore-file filtering, and stdout rendering.
-- `src\tools\format.cpp` owns formatter command orchestration and model construction; the internal `src\tools\impl\format_*` formatter modules own the model definitions, tree-sitter model builder helpers, macro fallback parser, and pretty printer.
+- `CaseDashTools.exe format` owns clang-format-like stdin, direct file arguments, newline file lists passed with `--files <path>` or `--files=<path>`, `-i`, `--dry-run`, `--style=file`, `--style=<path>`, and `--style=file:<path>` handling, parsing, parse-error rejection, checking, fixing, ignore-file filtering, and stdout rendering.
+- `src\tools\format.cpp` owns formatter command orchestration and model construction; the internal `src\tools\impl\format_*` formatter modules own the model definitions, tree-sitter model builder helpers, preprocessor model helpers, and pretty printer.
 - `.cpp-format` owns only the formatter inputs that are intentionally configurable: `ColumnLimit`, `IndentWidth`, `TabWidth`, `IncludeCategories`, `MainIncludeChar`, `IncludeIsMainRegex`, `MacroCategories`, and `StreamShift`.
 - `.cpp-format-ignore` owns simple literal formatter exclusions. Entries are directory names, file names, or slash-separated relative paths. Glob patterns and negation are not supported.
 - `src\tools\vendor\tree-sitter\` owns vendored tree-sitter grammar inputs and generated parser sources.

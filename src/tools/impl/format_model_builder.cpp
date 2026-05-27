@@ -1,5 +1,460 @@
 #include "tools/impl/format_model_builder.h"
 
-FormatModel BuildFormatModel(TSNode root, std::string_view text) {
+#include <algorithm>
+#include <array>
+#include <string_view>
+
+namespace {
+
+struct TokenMapping {
+    std::string_view text;
+    KnownToken token;
+};
+
+constexpr auto kKnownTokens = std::to_array<TokenMapping>({
+    {"#", KnownToken::Hash},
+    {"(", KnownToken::LeftParen},
+    {")", KnownToken::RightParen},
+    {"[", KnownToken::LeftBracket},
+    {"]", KnownToken::RightBracket},
+    {"{", KnownToken::LeftBrace},
+    {"}", KnownToken::RightBrace},
+    {"<", KnownToken::Less},
+    {">", KnownToken::Greater},
+    {"<=", KnownToken::LessEqual},
+    {">=", KnownToken::GreaterEqual},
+    {"==", KnownToken::EqualEqual},
+    {"!=", KnownToken::BangEqual},
+    {"<=>", KnownToken::Spaceship},
+    {"+", KnownToken::Plus},
+    {"-", KnownToken::Minus},
+    {"*", KnownToken::Star},
+    {"/", KnownToken::Slash},
+    {"%", KnownToken::Percent},
+    {"^", KnownToken::Caret},
+    {"&", KnownToken::Ampersand},
+    {"|", KnownToken::Pipe},
+    {"!", KnownToken::Bang},
+    {"~", KnownToken::Tilde},
+    {"=", KnownToken::Equal},
+    {"+=", KnownToken::PlusEqual},
+    {"-=", KnownToken::MinusEqual},
+    {"*=", KnownToken::StarEqual},
+    {"/=", KnownToken::SlashEqual},
+    {"%=", KnownToken::PercentEqual},
+    {"^=", KnownToken::CaretEqual},
+    {"&=", KnownToken::AmpersandEqual},
+    {"|=", KnownToken::PipeEqual},
+    {"<<", KnownToken::LessLess},
+    {">>", KnownToken::GreaterGreater},
+    {"<<=", KnownToken::LessLessEqual},
+    {">>=", KnownToken::GreaterGreaterEqual},
+    {"&&", KnownToken::AmpersandAmpersand},
+    {"||", KnownToken::PipePipe},
+    {"++", KnownToken::PlusPlus},
+    {"--", KnownToken::MinusMinus},
+    {"->", KnownToken::Arrow},
+    {".", KnownToken::Dot},
+    {"->*", KnownToken::ArrowStar},
+    {".*", KnownToken::DotStar},
+    {"::", KnownToken::ColonColon},
+    {"?", KnownToken::Question},
+    {":", KnownToken::Colon},
+    {";", KnownToken::Semicolon},
+    {",", KnownToken::Comma},
+    {"...", KnownToken::Ellipsis},
+    {"alignas", KnownToken::KeywordAlignas},
+    {"alignof", KnownToken::KeywordAlignof},
+    {"asm", KnownToken::KeywordAsm},
+    {"auto", KnownToken::KeywordAuto},
+    {"bool", KnownToken::KeywordBool},
+    {"break", KnownToken::KeywordBreak},
+    {"case", KnownToken::KeywordCase},
+    {"catch", KnownToken::KeywordCatch},
+    {"char", KnownToken::KeywordChar},
+    {"char16_t", KnownToken::KeywordChar16T},
+    {"char32_t", KnownToken::KeywordChar32T},
+    {"class", KnownToken::KeywordClass},
+    {"concept", KnownToken::KeywordConcept},
+    {"const", KnownToken::KeywordConst},
+    {"consteval", KnownToken::KeywordConsteval},
+    {"constexpr", KnownToken::KeywordConstexpr},
+    {"constinit", KnownToken::KeywordConstinit},
+    {"const_cast", KnownToken::KeywordConstCast},
+    {"continue", KnownToken::KeywordContinue},
+    {"decltype", KnownToken::KeywordDecltype},
+    {"default", KnownToken::KeywordDefault},
+    {"delete", KnownToken::KeywordDelete},
+    {"do", KnownToken::KeywordDo},
+    {"double", KnownToken::KeywordDouble},
+    {"dynamic_cast", KnownToken::KeywordDynamicCast},
+    {"else", KnownToken::KeywordElse},
+    {"enum", KnownToken::KeywordEnum},
+    {"explicit", KnownToken::KeywordExplicit},
+    {"export", KnownToken::KeywordExport},
+    {"extern", KnownToken::KeywordExtern},
+    {"false", KnownToken::KeywordFalse},
+    {"final", KnownToken::KeywordFinal},
+    {"finally", KnownToken::KeywordFinally},
+    {"float", KnownToken::KeywordFloat},
+    {"for", KnownToken::KeywordFor},
+    {"friend", KnownToken::KeywordFriend},
+    {"goto", KnownToken::KeywordGoto},
+    {"if", KnownToken::KeywordIf},
+    {"inline", KnownToken::KeywordInline},
+    {"int", KnownToken::KeywordInt},
+    {"long", KnownToken::KeywordLong},
+    {"mutable", KnownToken::KeywordMutable},
+    {"namespace", KnownToken::KeywordNamespace},
+    {"new", KnownToken::KeywordNew},
+    {"noexcept", KnownToken::KeywordNoexcept},
+    {"nullptr", KnownToken::KeywordNullptr},
+    {"operator", KnownToken::KeywordOperator},
+    {"override", KnownToken::KeywordOverride},
+    {"private", KnownToken::KeywordPrivate},
+    {"protected", KnownToken::KeywordProtected},
+    {"public", KnownToken::KeywordPublic},
+    {"register", KnownToken::KeywordRegister},
+    {"reinterpret_cast", KnownToken::KeywordReinterpretCast},
+    {"requires", KnownToken::KeywordRequires},
+    {"return", KnownToken::KeywordReturn},
+    {"short", KnownToken::KeywordShort},
+    {"signed", KnownToken::KeywordSigned},
+    {"sizeof", KnownToken::KeywordSizeof},
+    {"static", KnownToken::KeywordStatic},
+    {"static_assert", KnownToken::KeywordStaticAssert},
+    {"static_cast", KnownToken::KeywordStaticCast},
+    {"struct", KnownToken::KeywordStruct},
+    {"switch", KnownToken::KeywordSwitch},
+    {"template", KnownToken::KeywordTemplate},
+    {"this", KnownToken::KeywordThis},
+    {"thread_local", KnownToken::KeywordThreadLocal},
+    {"throw", KnownToken::KeywordThrow},
+    {"true", KnownToken::KeywordTrue},
+    {"try", KnownToken::KeywordTry},
+    {"typedef", KnownToken::KeywordTypedef},
+    {"typeid", KnownToken::KeywordTypeid},
+    {"typename", KnownToken::KeywordTypename},
+    {"union", KnownToken::KeywordUnion},
+    {"unsigned", KnownToken::KeywordUnsigned},
+    {"using", KnownToken::KeywordUsing},
+    {"virtual", KnownToken::KeywordVirtual},
+    {"void", KnownToken::KeywordVoid},
+    {"volatile", KnownToken::KeywordVolatile},
+    {"wchar_t", KnownToken::KeywordWcharT},
+    {"while", KnownToken::KeywordWhile},
+    {"__cdecl", KnownToken::KeywordCdecl},
+    {"__declspec", KnownToken::KeywordDeclspec},
+    {"co_await", KnownToken::KeywordCoAwait},
+    {"co_return", KnownToken::KeywordCoReturn},
+    {"co_yield", KnownToken::KeywordCoYield},
+});
+
+struct TreeMapping {
+    std::string_view text;
+    SyntaxTreeKind kind;
+};
+
+constexpr auto kTreeKinds = std::to_array<TreeMapping>({
+    {"translation_unit", SyntaxTreeKind::TranslationUnit},
+    {"declaration", SyntaxTreeKind::Declaration},
+    {"field_declaration", SyntaxTreeKind::FieldDeclaration},
+    {"function_definition", SyntaxTreeKind::FunctionDefinition},
+    {"compound_statement", SyntaxTreeKind::CompoundStatement},
+    {"field_declaration_list", SyntaxTreeKind::FieldDeclarationList},
+    {"enumerator_list", SyntaxTreeKind::EnumeratorList},
+    {"initializer_list", SyntaxTreeKind::InitializerList},
+    {"declaration_list", SyntaxTreeKind::DeclarationList},
+    {"namespace_definition", SyntaxTreeKind::NamespaceDefinition},
+    {"enum_specifier", SyntaxTreeKind::EnumSpecifier},
+    {"class_specifier", SyntaxTreeKind::ClassSpecifier},
+    {"struct_specifier", SyntaxTreeKind::StructSpecifier},
+    {"if_statement", SyntaxTreeKind::IfStatement},
+    {"else_clause", SyntaxTreeKind::ElseClause},
+    {"for_statement", SyntaxTreeKind::ForStatement},
+    {"while_statement", SyntaxTreeKind::WhileStatement},
+    {"do_statement", SyntaxTreeKind::DoStatement},
+    {"switch_statement", SyntaxTreeKind::SwitchStatement},
+    {"case_statement", SyntaxTreeKind::CaseStatement},
+    {"preproc_call", SyntaxTreeKind::PreprocCall},
+    {"preproc_def", SyntaxTreeKind::PreprocDef},
+    {"preproc_function_def", SyntaxTreeKind::PreprocFunctionDef},
+    {"preproc_include", SyntaxTreeKind::PreprocInclude},
+    {"preproc_if", SyntaxTreeKind::PreprocIf},
+    {"preproc_ifdef", SyntaxTreeKind::PreprocIfdef},
+    {"preproc_else", SyntaxTreeKind::PreprocElse},
+    {"preproc_elif", SyntaxTreeKind::PreprocElif},
+    {"preproc_using", SyntaxTreeKind::PreprocUsing},
+    {"preproc_if_in_field_declaration_list", SyntaxTreeKind::PreprocIf},
+    {"preproc_ifdef_in_field_declaration_list", SyntaxTreeKind::PreprocIfdef},
+    {"preproc_else_in_field_declaration_list", SyntaxTreeKind::PreprocElse},
+    {"preproc_elif_in_field_declaration_list", SyntaxTreeKind::PreprocElif},
+    {"preproc_if_in_enumerator_list", SyntaxTreeKind::PreprocIf},
+    {"preproc_ifdef_in_enumerator_list", SyntaxTreeKind::PreprocIfdef},
+    {"preproc_else_in_enumerator_list", SyntaxTreeKind::PreprocElse},
+    {"preproc_elif_in_enumerator_list", SyntaxTreeKind::PreprocElif},
+    {"binary_expression", SyntaxTreeKind::BinaryExpression},
+    {"unary_expression", SyntaxTreeKind::UnaryExpression},
+    {"conditional_expression", SyntaxTreeKind::ConditionalExpression},
+    {"assignment_expression", SyntaxTreeKind::AssignmentExpression},
+    {"pointer_declarator", SyntaxTreeKind::PointerDeclarator},
+    {"reference_declarator", SyntaxTreeKind::ReferenceDeclarator},
+    {"function_declarator", SyntaxTreeKind::FunctionDeclarator},
+    {"parameter_list", SyntaxTreeKind::ParameterList},
+    {"argument_list", SyntaxTreeKind::ArgumentList},
+    {"template_parameter_list", SyntaxTreeKind::TemplateParameterList},
+    {"template_argument_list", SyntaxTreeKind::TemplateArgumentList},
+    {"lambda_expression", SyntaxTreeKind::LambdaExpression},
+    {"raw_string_literal", SyntaxTreeKind::RawStringLiteral},
+    {"string_literal", SyntaxTreeKind::StringLiteral},
+    {"char_literal", SyntaxTreeKind::CharacterLiteral},
+});
+
+KnownToken KnownTokenFromText(std::string_view text) {
+    for (const TokenMapping& mapping : kKnownTokens) {
+        if (mapping.text == text) {
+            return mapping.token;
+        }
+    }
+    return KnownToken::Unknown;
+}
+
+SyntaxTreeKind TreeKindFromType(std::string_view type) {
+    if (type == "identifier" || type == "field_identifier" || type == "namespace_identifier" ||
+        type == "type_identifier" || type == "qualified_identifier") {
+        return SyntaxTreeKind::Identifier;
+    }
+    if (type == "number_literal") {
+        return SyntaxTreeKind::NumberLiteral;
+    }
+    if (type == "string_literal") {
+        return SyntaxTreeKind::StringLiteral;
+    }
+    if (type == "raw_string_literal") {
+        return SyntaxTreeKind::RawStringLiteral;
+    }
+    if (type == "char_literal") {
+        return SyntaxTreeKind::CharacterLiteral;
+    }
+    for (const TreeMapping& mapping : kTreeKinds) {
+        if (mapping.text == type) {
+            return mapping.kind;
+        }
+    }
+    return SyntaxTreeKind::Unknown;
+}
+
+TSPoint StartPoint(TSNode node) {
+    return ts_node_start_point(node);
+}
+
+TSPoint EndPoint(TSNode node) {
+    return ts_node_end_point(node);
+}
+
+std::string_view NodeText(TSNode node, std::string_view source) {
+    const uint32_t start = ts_node_start_byte(node);
+    const uint32_t end = ts_node_end_byte(node);
+    if (start > end || end > source.size()) {
+        return {};
+    }
+    return source.substr(start, end - start);
+}
+
+std::string LineSnippet(std::string_view source, uint32_t byte) {
+    size_t start = std::min<size_t>(byte, source.size());
+    while (start > 0 && source[start - 1] != '\n' && source[start - 1] != '\r') {
+        --start;
+    }
+    size_t end = std::min<size_t>(byte, source.size());
+    while (end < source.size() && source[end] != '\n' && source[end] != '\r') {
+        ++end;
+    }
+    return std::string(source.substr(start, end - start));
+}
+
+bool ContainsBlankLine(std::string_view source, uint32_t firstEnd, uint32_t secondStart) {
+    if (firstEnd >= secondStart || secondStart > source.size()) {
+        return false;
+    }
+    int lineBreaks = 0;
+    bool sawNonWhitespace = false;
+    for (size_t index = firstEnd; index < secondStart; ++index) {
+        const char ch = source[index];
+        if (ch == '\r' || ch == '\n') {
+            ++lineBreaks;
+            if (ch == '\r' && index + 1 < secondStart && source[index + 1] == '\n') {
+                ++index;
+            }
+            if (lineBreaks >= 2 && !sawNonWhitespace) {
+                return true;
+            }
+            continue;
+        }
+        if (ch != ' ' && ch != '\t' && ch != '\v' && ch != '\f') {
+            sawNonWhitespace = true;
+        }
+    }
+    return lineBreaks >= 2 && !sawNonWhitespace;
+}
+
+bool IsLiteralKind(SyntaxTreeKind kind) {
+    return kind == SyntaxTreeKind::StringLiteral ||
+        kind == SyntaxTreeKind::RawStringLiteral ||
+        kind == SyntaxTreeKind::CharacterLiteral ||
+        kind == SyntaxTreeKind::NumberLiteral;
+}
+
+bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind, std::string_view type) {
+    return IsLiteralKind(kind) ||
+        type == "preproc_arg" ||
+        type == "system_lib_string" ||
+        type == "ms_call_modifier";
+}
+
+std::unique_ptr<SyntaxNode> MakeNodeBase(TSNode tsNode) {
+    auto node = std::make_unique<SyntaxNode>();
+    const TSPoint start = StartPoint(tsNode);
+    const TSPoint end = EndPoint(tsNode);
+    node->startByte = ts_node_start_byte(tsNode);
+    node->endByte = ts_node_end_byte(tsNode);
+    node->startRow = start.row;
+    node->startColumn = start.column;
+    node->endRow = end.row;
+    node->endColumn = end.column;
+    return node;
+}
+
+std::unique_ptr<SyntaxNode> MakeBlankLine(uint32_t byte, uint32_t row) {
+    auto node = std::make_unique<SyntaxNode>();
+    node->kind = SyntaxNodeKind::BlankLine;
+    node->startByte = byte;
+    node->endByte = byte;
+    node->startRow = row;
+    node->endRow = row;
+    return node;
+}
+
+std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
+    auto node = MakeNodeBase(tsNode);
+    const std::string_view type = ts_node_type(tsNode);
+    const std::string_view text = NodeText(tsNode, source);
+    const SyntaxTreeKind treeKind = TreeKindFromType(type);
+
+    if (type == "comment") {
+        node->kind = SyntaxNodeKind::Comment;
+        node->treeKind = SyntaxTreeKind::Unknown;
+        std::string_view commentText = text;
+        while (!commentText.empty() && (commentText.back() == '\r' || commentText.back() == '\n')) {
+            commentText.remove_suffix(1);
+        }
+        node->text = commentText;
+        return node;
+    }
+
+    const uint32_t childCount = ts_node_child_count(tsNode);
+    const KnownToken known = KnownTokenFromText(text);
+    if (known != KnownToken::Unknown) {
+        node->kind = SyntaxNodeKind::KnownToken;
+        node->known = known;
+        node->treeKind = treeKind;
+        return node;
+    }
+
+    if (childCount == 0 || KeepWholeNodeAsFreeToken(treeKind, type)) {
+        node->kind = SyntaxNodeKind::FreeToken;
+        node->treeKind = treeKind;
+        node->text = text;
+        return node;
+    }
+
+    node->kind = SyntaxNodeKind::Tree;
+    node->treeKind = treeKind;
+    node->children.reserve(childCount);
+    uint32_t previousEnd = node->startByte;
+    uint32_t previousEndRow = node->startRow;
+    for (uint32_t index = 0; index < childCount; ++index) {
+        TSNode child = ts_node_child(tsNode, index);
+        const uint32_t childStart = ts_node_start_byte(child);
+        if (!node->children.empty() && ContainsBlankLine(source, previousEnd, childStart)) {
+            node->children.push_back(MakeBlankLine(previousEnd, previousEndRow));
+        }
+        node->children.push_back(BuildNode(child, source));
+        previousEnd = ts_node_end_byte(child);
+        previousEndRow = ts_node_end_point(child).row;
+    }
+    return node;
+}
+
+struct ProblemNode {
+    bool found = false;
+    bool missing = false;
+    TSNode node = {};
+};
+
+ProblemNode FindFirstProblem(TSNode node) {
+    if (ts_node_is_missing(node)) {
+        return {.found = true, .missing = true, .node = node};
+    }
+    if (std::string_view(ts_node_type(node)) == "ERROR") {
+        return {.found = true, .missing = false, .node = node};
+    }
+
+    const uint32_t childCount = ts_node_child_count(node);
+    for (uint32_t index = 0; index < childCount; ++index) {
+        TSNode child = ts_node_child(node, index);
+        if (!ts_node_has_error(child) && !ts_node_is_missing(child)) {
+            continue;
+        }
+        ProblemNode problem = FindFirstProblem(child);
+        if (problem.found) {
+            return problem;
+        }
+    }
     return {};
+}
+
+ParseResult ParseFailure(TSNode root, std::string_view source) {
+    ProblemNode problem = FindFirstProblem(root);
+    if (!problem.found) {
+        problem = {.found = true, .missing = false, .node = root};
+    }
+    const TSPoint point = StartPoint(problem.node);
+    ParseResult parse;
+    parse.ok = false;
+    parse.hasErrors = !problem.missing;
+    parse.hasMissingNodes = problem.missing;
+    parse.errorNodeType = problem.missing ? "missing " + std::string(ts_node_type(problem.node)) :
+                                            std::string(ts_node_type(problem.node));
+    parse.errorLine = static_cast<int>(point.row) + 1;
+    parse.errorColumn = static_cast<int>(point.column) + 1;
+    parse.errorSnippet = LineSnippet(source, ts_node_start_byte(problem.node));
+    parse.error = "tree-sitter parse failed at " +
+        std::to_string(parse.errorLine) +
+        ":" +
+        std::to_string(parse.errorColumn) +
+        " near " +
+        parse.errorNodeType;
+    return parse;
+}
+
+}  // namespace
+
+FormatModel BuildFormatModel(TSNode root, std::unique_ptr<std::string> sourceText) {
+    FormatModel model;
+    model.sourceText = std::move(sourceText);
+    if (!model.sourceText) {
+        model.parse.error = "formatter source ownership setup failed";
+        return model;
+    }
+
+    const std::string_view source(*model.sourceText);
+    if (ts_node_has_error(root) || ts_node_is_missing(root)) {
+        model.parse = ParseFailure(root, source);
+        return model;
+    }
+
+    model.root = BuildNode(root, source);
+    model.parse.ok = true;
+    return model;
 }

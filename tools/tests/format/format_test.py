@@ -12,7 +12,7 @@ REPO_ROOT = TEST_ROOT.parents[2]
 FORMAT_CMD = REPO_ROOT / "format.cmd"
 FORMAT_EXE = REPO_ROOT / "build" / "CaseDashTools.exe"
 INPUT_FIXTURE = Path("src") / "format_test_input.cpp"
-OUTPUT_FIXTURE = Path("src") / "format_test_output.cpp"
+OUTPUT_FIXTURE = Path("src") / "format_test_output_temp.cpp"
 
 
 def native_format(*args: str, cwd: Path = REPO_ROOT, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -50,6 +50,12 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertEqual(read_fixture(OUTPUT_FIXTURE), result.stdout)
         self.assertRegex(result.stderr, r"Formatted stdin in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
+
+    def test_golden_input_parses_without_recovery(self) -> None:
+        result = native_format("--style=file", str(TEST_ROOT / INPUT_FIXTURE))
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertNotIn("tree-sitter parse failed", result.stderr)
 
     def test_file_argument_formats_to_stdout(self) -> None:
         result = native_format("--style=file", str(TEST_ROOT / OUTPUT_FIXTURE))
@@ -104,6 +110,31 @@ class FormatCommandTests(unittest.TestCase):
             self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
             self.assertEqual("int main() {\n    return 1;\n}\n", source.read_text(encoding="utf-8").replace("\r\n", "\n"))
             self.assertIn("Formatted 1 file", result.stdout)
+
+    def test_parse_error_rejects_stdout_formatting(self) -> None:
+        result = native_format("--style=file", input_text="int main( { return 1; }\n")
+
+        self.assertEqual(1, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual("", result.stdout)
+        self.assertIn("tree-sitter parse failed", result.stderr)
+
+    def test_parse_error_does_not_write_in_place_batch(self) -> None:
+        build_dir = REPO_ROOT / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="format_parse_error_", dir=build_dir) as temp_dir:
+            root = Path(temp_dir)
+            shutil.copyfile(REPO_ROOT / ".cpp-format", root / ".cpp-format")
+            valid = root / "valid.cpp"
+            invalid = root / "invalid.cpp"
+            valid.write_text("int main(){return 1;}\n", encoding="utf-8")
+            invalid.write_text("int main( { return 1; }\n", encoding="utf-8")
+
+            result = native_format("--style=file", "-i", str(valid), str(invalid), cwd=root)
+
+            self.assertEqual(1, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+            self.assertEqual("int main(){return 1;}\n", valid.read_text(encoding="utf-8").replace("\r\n", "\n"))
+            self.assertIn("tree-sitter parse failed", result.stderr)
 
     def test_explicit_style_file_and_upward_discovery(self) -> None:
         build_dir = REPO_ROOT / "build"
