@@ -99,6 +99,18 @@ module.exports = grammar(C, {
     [$._binary_fold_operator, $._fold_operator],
     [$._function_declarator_seq],
     [$.type_specifier, $.sized_type_specifier],
+    [$.type_specifier, $.sized_type_specifier, $.expression],
+    [$.type_specifier, $.expression, $.concatenated_string],
+    [$.expression, $.concatenated_string],
+    [$._declaration_specifiers, $.macro_replacement_list],
+    [$._string, $.concatenated_string],
+    [$.type_specifier, $.macro_template_declaration],
+    [$.template_type, $.template_method],
+    [$.enum_specifier, $.macro_enum_specifier],
+    [$.enumerator_list, $.macro_enumerator_list],
+    [$.enumerator, $.expression],
+    [$.expression_statement, $.macro_expression_item],
+    [$.comma_expression, $.macro_expression_item],
     [$.initializer_pair, $.comma_expression],
     [$.expression_statement, $._for_statement_body],
     [$.init_statement, $._for_statement_body],
@@ -191,6 +203,71 @@ module.exports = grammar(C, {
       'mutable',
       'constinit',
       'consteval',
+    ),
+
+    preproc_def: ($, original) => withStructuredMacroReplacementList($, original),
+    preproc_function_def: ($, original) => withStructuredMacroReplacementList($, original),
+
+    macro_replacement_list: $ => repeat1(choice(
+      alias($.macro_template_declaration, $.template_declaration),
+      alias($.macro_enum_declaration, $.declaration),
+      $.declaration,
+      $.static_assert_declaration,
+      $.type_specifier,
+      $.expression_statement,
+      $.macro_expression_item,
+    )),
+
+    macro_expression_item: $ => seq(
+      $.expression,
+      optional(','),
+    ),
+
+    macro_enum_declaration: $ => seq(
+      alias($.macro_enum_specifier, $.enum_specifier),
+      ';',
+    ),
+
+    macro_enum_specifier: $ => prec.right(seq(
+      'enum',
+      optional(choice('class', 'struct')),
+      choice(
+        seq(
+          field('name', $._class_name),
+          optional($._enum_base_clause),
+          optional(field('body', alias($.macro_enumerator_list, $.enumerator_list))),
+        ),
+        field('body', alias($.macro_enumerator_list, $.enumerator_list)),
+      ),
+      optional($.attribute_specifier),
+    )),
+
+    macro_enumerator_list: $ => seq(
+      '{',
+      commaSep(choice($.enumerator, $.expression)),
+      optional(','),
+      '}',
+    ),
+
+    macro_template_declaration: $ => seq(
+      'template',
+      field('parameters', $.template_parameter_list),
+      optional($.requires_clause),
+      choice(
+        $._empty_declaration,
+        $.alias_declaration,
+        $.declaration,
+        $.template_declaration,
+        $.function_definition,
+        $.concept_definition,
+        $.friend_declaration,
+        $.class_specifier,
+        $.struct_specifier,
+        alias($.constructor_or_destructor_declaration, $.declaration),
+        alias($.constructor_or_destructor_definition, $.function_definition),
+        alias($.operator_cast_declaration, $.declaration),
+        alias($.operator_cast_definition, $.function_definition),
+      ),
     ),
 
     preproc_using: _ => token(prec(1, /#[ \t]*using[^\n]*/)),
@@ -1553,4 +1630,16 @@ function commaSep(rule) {
  */
 function commaSep1(rule) {
   return seq(rule, repeat(seq(',', rule)));
+}
+
+function withStructuredMacroReplacementList($, original) {
+  return {
+    ...original,
+    members: original.members.map((member) => {
+      if (member.type === 'FIELD' && member.name === 'value') {
+        return field('value', optional($.macro_replacement_list));
+      }
+      return member;
+    }),
+  };
 }

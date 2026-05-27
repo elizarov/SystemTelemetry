@@ -2078,7 +2078,7 @@
     "fields": {
       "declarator": {
         "multiple": true,
-        "required": true,
+        "required": false,
         "types": [
           {
             "type": "_declarator",
@@ -2147,6 +2147,10 @@
         },
         {
           "type": "attribute_specifier",
+          "named": true
+        },
+        {
+          "type": "enum_specifier",
           "named": true
         },
         {
@@ -2503,6 +2507,10 @@
       "types": [
         {
           "type": "enumerator",
+          "named": true
+        },
+        {
+          "type": "expression",
           "named": true
         },
         {
@@ -4150,6 +4158,56 @@
     }
   },
   {
+    "type": "macro_expression_item",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": false,
+      "required": true,
+      "types": [
+        {
+          "type": "expression",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
+    "type": "macro_replacement_list",
+    "named": true,
+    "fields": {},
+    "children": {
+      "multiple": true,
+      "required": true,
+      "types": [
+        {
+          "type": "declaration",
+          "named": true
+        },
+        {
+          "type": "expression_statement",
+          "named": true
+        },
+        {
+          "type": "macro_expression_item",
+          "named": true
+        },
+        {
+          "type": "static_assert_declaration",
+          "named": true
+        },
+        {
+          "type": "template_declaration",
+          "named": true
+        },
+        {
+          "type": "type_specifier",
+          "named": true
+        }
+      ]
+    }
+  },
+  {
     "type": "member_pointer_declarator",
     "named": true,
     "fields": {
@@ -4992,7 +5050,7 @@
         "required": false,
         "types": [
           {
-            "type": "preproc_arg",
+            "type": "macro_replacement_list",
             "named": true
           }
         ]
@@ -5462,7 +5520,7 @@
         "required": false,
         "types": [
           {
-            "type": "preproc_arg",
+            "type": "macro_replacement_list",
             "named": true
           }
         ]

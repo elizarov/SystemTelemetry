@@ -50,6 +50,23 @@ def opening_include_block(text: str) -> str:
     return text
 
 
+def opening_preprocessor_block(text: str) -> str:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("namespace "):
+            return "\n".join(lines[:index]) + "\n"
+    return text
+
+
+def normalize_deferred_macro_wraps(text: str) -> str:
+    return text.replace(
+        "#define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) \\\n"
+        "    ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))",
+        "#define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) "
+        "((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))",
+    )
+
+
 class FormatCommandTests(unittest.TestCase):
     maxDiff = None
 
@@ -70,6 +87,12 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(
             opening_include_block(read_fixture(FULL_OUTPUT_FIXTURE)),
             opening_include_block(read_fixture(OUTPUT_FIXTURE)),
+        )
+
+    def test_temporary_golden_preprocessor_block_matches_full_golden_except_deferred_wrapping(self) -> None:
+        self.assertEqual(
+            normalize_deferred_macro_wraps(opening_preprocessor_block(read_fixture(FULL_OUTPUT_FIXTURE))),
+            opening_preprocessor_block(read_fixture(OUTPUT_FIXTURE)),
         )
 
     def test_file_argument_formats_to_stdout(self) -> None:

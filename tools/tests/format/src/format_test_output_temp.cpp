@@ -19,8 +19,19 @@
 #define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))
 #define FORMAT_FIXTURE_SHORT_MACRO(value) (value)
 #define FORMAT_FIXTURE_MUCH_LONGER_MACRO(value) (value)
-#define FORMAT_FIXTURE_ITEMS(X) X(Alpha, "alpha") X(Beta, "beta") X(Gamma, "gamma")
-#define ENUM_STRING_DECLARE(EnumType, ItemsMacro) enum class EnumType { ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR), }; template <> struct EnumStringTraits<EnumType> { static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)}); static_assert(enum_string_detail::ValidateCanonicalNames(names)); }
+#define FORMAT_FIXTURE_ITEMS(X) \
+    X(Alpha, "alpha") \
+    X(Beta, "beta") \
+    X(Gamma, "gamma")
+#define ENUM_STRING_DECLARE(EnumType, ItemsMacro) \
+    enum class EnumType { \
+        ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR), \
+    }; \
+    template <> \
+    struct EnumStringTraits<EnumType> { \
+        static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)}); \
+        static_assert(enum_string_detail::ValidateCanonicalNames(names)); \
+    }
 #define FORMAT_FIXTURE_TEMP_MACRO(value) (value)
 
 #undef FORMAT_FIXTURE_TEMP_MACRO

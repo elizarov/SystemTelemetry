@@ -15,6 +15,7 @@ struct TreeMapping {
 
 constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"translation_unit", SyntaxTreeKind::TranslationUnit},
+    {"macro_replacement_list", SyntaxTreeKind::MacroReplacementList},
     {"declaration", SyntaxTreeKind::Declaration},
     {"field_declaration", SyntaxTreeKind::FieldDeclaration},
     {"function_definition", SyntaxTreeKind::FunctionDefinition},
@@ -43,6 +44,7 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"preproc_else", SyntaxTreeKind::PreprocElse},
     {"preproc_elif", SyntaxTreeKind::PreprocElif},
     {"preproc_using", SyntaxTreeKind::PreprocUsing},
+    {"preproc_params", SyntaxTreeKind::PreprocParams},
     {"preproc_if_in_field_declaration_list", SyntaxTreeKind::PreprocIf},
     {"preproc_ifdef_in_field_declaration_list", SyntaxTreeKind::PreprocIfdef},
     {"preproc_else_in_field_declaration_list", SyntaxTreeKind::PreprocElse},
@@ -164,8 +166,6 @@ bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind, std::string_view type) {
 
 bool IsAtomicPreprocessorNode(SyntaxTreeKind kind) {
     return kind == SyntaxTreeKind::PreprocCall ||
-        kind == SyntaxTreeKind::PreprocDef ||
-        kind == SyntaxTreeKind::PreprocFunctionDef ||
         kind == SyntaxTreeKind::PreprocInclude ||
         kind == SyntaxTreeKind::PreprocUsing;
 }
