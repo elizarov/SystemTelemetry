@@ -51,7 +51,7 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(read_fixture(OUTPUT_FIXTURE), result.stdout)
         self.assertRegex(result.stderr, r"Formatted stdin in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
 
-    def test_golden_input_parses_without_recovery(self) -> None:
+    def test_golden_input_parses_without_errors(self) -> None:
         result = native_format("--style=file", str(TEST_ROOT / INPUT_FIXTURE))
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")

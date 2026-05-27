@@ -24,11 +24,6 @@ namespace {
 struct FileFormatResult {
     bool ok = true;
     bool changed = false;
-    bool parseHadErrors = false;
-    std::string parseErrorNodeType;
-    int parseErrorLine = 0;
-    int parseErrorColumn = 0;
-    std::string parseErrorSnippet;
     std::string formatted;
     std::string error;
 };
@@ -62,7 +57,7 @@ std::string ToFileLineEndings(std::string_view text) {
     return result;
 }
 
-FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
+FormatModel BuildFormatModel(std::string_view text) {
     auto sourceText = std::make_unique<std::string>(text);
     TSParser* parser = ts_parser_new();
     if (parser == nullptr) {
@@ -88,8 +83,6 @@ FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& confi
         return model;
     }
     const TSNode root = ts_tree_root_node(tree);
-    (void)config;
-    (void)sourcePath;
     FormatModel model = BuildFormatModel(root, std::move(sourceText));
     ts_tree_delete(tree);
     ts_parser_delete(parser);
@@ -136,24 +129,13 @@ bool TextMatchesFormattedOutput(std::string_view source, std::string_view format
 }
 
 FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
-    FormatModel model = BuildFormatModel(text, config, sourcePath);
+    FormatModel model = BuildFormatModel(text);
+    FileFormatResult result;
     if (!model.parse.ok) {
-        FileFormatResult result;
         result.ok = false;
-        result.parseHadErrors = model.parse.hasErrors || model.parse.hasMissingNodes;
-        result.parseErrorNodeType = model.parse.errorNodeType;
-        result.parseErrorLine = model.parse.errorLine;
-        result.parseErrorColumn = model.parse.errorColumn;
-        result.parseErrorSnippet = model.parse.errorSnippet;
         result.error = model.parse.error.empty() ? "tree-sitter parser setup failed" : model.parse.error;
         return result;
     }
-    FileFormatResult result;
-    result.parseHadErrors = model.parse.hasErrors;
-    result.parseErrorNodeType = model.parse.errorNodeType;
-    result.parseErrorLine = model.parse.errorLine;
-    result.parseErrorColumn = model.parse.errorColumn;
-    result.parseErrorSnippet = model.parse.errorSnippet;
     result.formatted = FormatModelText(config, model, sourcePath);
     result.changed = model.sourceText != nullptr && !TextMatchesFormattedOutput(*model.sourceText, result.formatted);
     return result;
@@ -176,19 +158,6 @@ std::string ReadStdinText() {
 
 FILE* SummaryStream(const FormatOptions& options) {
     return options.mode == FormatMode::Stdout ? stderr : stdout;
-}
-
-void PrintParseRecovery(const FileFormatResult& result, const std::string& path, const std::string& root) {
-    const std::string relative = tools::NormalizeSeparators(tools::RelativePath(path, root));
-    std::fprintf(
-        stderr,
-        "%s:%d:%d: tree-sitter parse recovery at %s: %s\n",
-        relative.c_str(),
-        result.parseErrorLine,
-        result.parseErrorColumn,
-        result.parseErrorNodeType.c_str(),
-        result.parseErrorSnippet.c_str()
-    );
 }
 
 void PrintFormatSummary(
@@ -259,9 +228,6 @@ int RunFormat(int argc, char** argv) {
         if (!result.ok) {
             std::fprintf(stderr, "<stdin>: %s\n", result.error.c_str());
             return 1;
-        }
-        if (options.verbose && result.parseHadErrors) {
-            PrintParseRecovery(result, "<stdin>", currentDirectory);
         }
         if (options.mode == FormatMode::DryRun && result.changed) {
             std::fprintf(
@@ -338,12 +304,6 @@ int RunFormat(int argc, char** argv) {
             ++parseErrorCount;
             failed = true;
             continue;
-        }
-        if (result.parseHadErrors) {
-            ++parseErrorCount;
-            if (options.verbose) {
-                PrintParseRecovery(result, file, currentDirectory);
-            }
         }
         if (result.changed) {
             ++changedCount;

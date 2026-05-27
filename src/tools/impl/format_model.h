@@ -8,12 +8,6 @@
 
 struct ParseResult {
     bool ok = false;
-    bool hasErrors = false;
-    bool hasMissingNodes = false;
-    std::string errorNodeType;
-    int errorLine = 0;
-    int errorColumn = 0;
-    std::string errorSnippet;
     std::string error;
 };
 

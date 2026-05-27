@@ -112,10 +112,6 @@ TSPoint StartPoint(TSNode node) {
     return ts_node_start_point(node);
 }
 
-TSPoint EndPoint(TSNode node) {
-    return ts_node_end_point(node);
-}
-
 std::string_view NodeText(TSNode node, std::string_view source) {
     const uint32_t start = ts_node_start_byte(node);
     const uint32_t end = ts_node_end_byte(node);
@@ -123,18 +119,6 @@ std::string_view NodeText(TSNode node, std::string_view source) {
         return {};
     }
     return source.substr(start, end - start);
-}
-
-std::string LineSnippet(std::string_view source, uint32_t byte) {
-    size_t start = std::min<size_t>(byte, source.size());
-    while (start > 0 && source[start - 1] != '\n' && source[start - 1] != '\r') {
-        --start;
-    }
-    size_t end = std::min<size_t>(byte, source.size());
-    while (end < source.size() && source[end] != '\n' && source[end] != '\r') {
-        ++end;
-    }
-    return std::string(source.substr(start, end - start));
 }
 
 bool ContainsBlankLine(std::string_view source, uint32_t firstEnd, uint32_t secondStart) {
@@ -282,27 +266,22 @@ ProblemNode FindFirstProblem(TSNode node) {
     return {};
 }
 
-ParseResult ParseFailure(TSNode root, std::string_view source) {
+ParseResult ParseFailure(TSNode root) {
     ProblemNode problem = FindFirstProblem(root);
     if (!problem.found) {
         problem = {.found = true, .missing = false, .node = root};
     }
     const TSPoint point = StartPoint(problem.node);
+    const std::string nodeType = problem.missing ? "missing " + std::string(ts_node_type(problem.node)) :
+                                                   std::string(ts_node_type(problem.node));
     ParseResult parse;
     parse.ok = false;
-    parse.hasErrors = !problem.missing;
-    parse.hasMissingNodes = problem.missing;
-    parse.errorNodeType = problem.missing ? "missing " + std::string(ts_node_type(problem.node)) :
-                                            std::string(ts_node_type(problem.node));
-    parse.errorLine = static_cast<int>(point.row) + 1;
-    parse.errorColumn = static_cast<int>(point.column) + 1;
-    parse.errorSnippet = LineSnippet(source, ts_node_start_byte(problem.node));
     parse.error = "tree-sitter parse failed at " +
-        std::to_string(parse.errorLine) +
+        std::to_string(static_cast<int>(point.row) + 1) +
         ":" +
-        std::to_string(parse.errorColumn) +
+        std::to_string(static_cast<int>(point.column) + 1) +
         " near " +
-        parse.errorNodeType;
+        nodeType;
     return parse;
 }
 
@@ -318,7 +297,7 @@ FormatModel BuildFormatModel(TSNode root, std::unique_ptr<std::string> sourceTex
 
     const std::string_view source(*model.sourceText);
     if (ts_node_has_error(root) || ts_node_is_missing(root)) {
-        model.parse = ParseFailure(root, source);
+        model.parse = ParseFailure(root);
         return model;
     }
 
