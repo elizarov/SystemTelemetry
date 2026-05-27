@@ -858,6 +858,9 @@ add_executable(CaseDashTools
     src/tools/format_args.cpp
     src/tools/format_config.cpp
     src/tools/format_lexer.cpp
+    src/tools/format_macro_fallback.cpp
+    src/tools/format_model_builder.cpp
+    src/tools/format_pretty_printer.cpp
     src/tools/lint_check.cpp
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp

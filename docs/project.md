@@ -27,7 +27,7 @@ See also: [docs/build.md](build.md) for setup and commands, [docs/glossary.md](g
 - `CMakeLists.txt` is the single maintained source of truth for native source lists, link libraries, and output-directory rules.
 - `installer\` is the single maintained source of truth for the WiX MSI package.
 - `web\` is the single maintained source of truth for the static website source and website build script.
-- `docs\format.md`, `src\tools\format.cpp`, `.cpp-format`, `.cpp-format-ignore`, and the vendored tree-sitter grammar under `src\tools\vendor\tree-sitter\` are the maintained source of truth for C++ formatting policy and parser support. The golden formatter fixture under `tools\tests\format\src` stays synchronized with formatter output produced through `CaseDashTools.exe format`.
+- `docs\format.md`, `src\tools\format.cpp`, adjacent `src\tools\format_*` formatter modules, `.cpp-format`, `.cpp-format-ignore`, and the vendored tree-sitter grammar under `src\tools\vendor\tree-sitter\` are the maintained source of truth for C++ formatting policy and parser support. The golden formatter fixture under `tools\tests\format\src` stays synchronized with formatter output produced through `CaseDashTools.exe format`.
 - `.github/workflows/validation.yml` is the single maintained source of truth for pull request, main-branch push, and manual build, test, format, lint, and unused-include automation.
 - `.github/workflows/size-map-artifacts.yml` is the single maintained source of truth for manually producing remote executable and linker-map artifacts for size investigation.
 - `.github/workflows/release.yml` and `.github/workflows/pages.yml` are the single maintained sources of truth for website deployment automation.
