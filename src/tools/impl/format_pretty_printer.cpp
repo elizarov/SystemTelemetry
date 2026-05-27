@@ -10,6 +10,7 @@ enum class PrintTokenKind {
     Known,
     Free,
     Comment,
+    TrailingComment,
     BlankLine,
     Preprocessor,
 };
@@ -40,6 +41,10 @@ bool IsPreprocessorNode(SyntaxTreeKind kind) {
         kind == SyntaxTreeKind::PreprocFunctionDef ||
         kind == SyntaxTreeKind::PreprocInclude ||
         kind == SyntaxTreeKind::PreprocUsing;
+}
+
+bool IsCommentToken(PrintTokenKind kind) {
+    return kind == PrintTokenKind::Comment || kind == PrintTokenKind::TrailingComment;
 }
 
 bool IsWordLike(const PrintToken& token) {
@@ -122,8 +127,10 @@ void AppendTokens(
         tokens.push_back({.kind = PrintTokenKind::BlankLine, .node = &node});
         return;
     case SyntaxNodeKind::Comment:
+    case SyntaxNodeKind::TrailingComment:
         tokens.push_back({
-            .kind = PrintTokenKind::Comment,
+            .kind = node.kind == SyntaxNodeKind::TrailingComment ? PrintTokenKind::TrailingComment :
+                                                                    PrintTokenKind::Comment,
             .text = node.text,
             .treeKind = node.treeKind,
             .parentKind = parentKind,
@@ -162,7 +169,7 @@ void AppendTokens(
         if (IsPreprocessorNode(node.treeKind)) {
             tokens.push_back({
                 .kind = PrintTokenKind::Preprocessor,
-                .text = {},
+                .text = node.text,
                 .treeKind = node.treeKind,
                 .parentKind = parentKind,
                 .grandParentKind = grandParentKind,
@@ -184,13 +191,6 @@ void AppendTokens(
         }
         return;
     }
-}
-
-std::string_view NodeSourceText(const FormatModel& model, const SyntaxNode& node) {
-    if (!model.sourceText || node.startByte > node.endByte || node.endByte > model.sourceText->size()) {
-        return {};
-    }
-    return std::string_view(*model.sourceText).substr(node.startByte, node.endByte - node.startByte);
 }
 
 bool IsNewline(char ch) {
@@ -246,10 +246,6 @@ bool StartsWith(std::string_view value, std::string_view prefix) {
     return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
 }
 
-bool IsSameSourceLine(const PrintToken& left, const PrintToken& right) {
-    return left.node != nullptr && right.node != nullptr && left.node->endRow == right.node->startRow;
-}
-
 bool IsAccessKeyword(const PrintToken& token) {
     return token.kind == PrintTokenKind::Known && KnownTokenHasClass(token.known, TokenClass::AccessKeyword);
 }
@@ -273,9 +269,8 @@ bool IsCompilerCallModifierStart(const PrintToken* token) {
 
 class Printer {
 public:
-    Printer(const FormatterConfig& config, const FormatModel& model) :
-        indentWidth_(std::max(1, config.indentWidth)),
-        model_(model) {}
+    explicit Printer(const FormatterConfig& config) :
+        indentWidth_(std::max(1, config.indentWidth)) {}
 
     std::string Print(const std::vector<PrintToken>& tokens) {
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -293,7 +288,6 @@ public:
 
 private:
     int indentWidth_ = 4;
-    const FormatModel& model_;
     std::string output_;
     int indentLevel_ = 0;
     bool atLineStart_ = true;
@@ -309,7 +303,7 @@ private:
     static const PrintToken* PreviousToken(const std::vector<PrintToken>& tokens, size_t index) {
         while (index > 0) {
             --index;
-            if (tokens[index].kind != PrintTokenKind::BlankLine && tokens[index].kind != PrintTokenKind::Comment) {
+            if (tokens[index].kind != PrintTokenKind::BlankLine && !IsCommentToken(tokens[index].kind)) {
                 return &tokens[index];
             }
         }
@@ -318,7 +312,7 @@ private:
 
     static const PrintToken* NextToken(const std::vector<PrintToken>& tokens, size_t index) {
         for (++index; index < tokens.size(); ++index) {
-            if (tokens[index].kind != PrintTokenKind::BlankLine && tokens[index].kind != PrintTokenKind::Comment) {
+            if (tokens[index].kind != PrintTokenKind::BlankLine && !IsCommentToken(tokens[index].kind)) {
                 return &tokens[index];
             }
         }
@@ -586,7 +580,7 @@ private:
             BlankLine();
             return;
         }
-        if (token.kind == PrintTokenKind::Comment) {
+        if (IsCommentToken(token.kind)) {
             PrintComment(token);
             return;
         }
@@ -617,7 +611,7 @@ private:
     }
 
     void PrintPreprocessor(const PrintToken& token, const PrintToken* next) {
-        const std::string line = CollapseSourceWhitespace(NodeSourceText(model_, *token.node));
+        const std::string line = CollapseSourceWhitespace(token.text);
         const bool isInclude = StartsWith(line, "#include");
         const bool isUndef = StartsWith(line, "#undef");
         if (isUndef) {
@@ -694,14 +688,14 @@ private:
         case KnownToken::Semicolon:
             Write(";");
             if (ShouldBreakAfterSemicolon() &&
-                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::Comment && IsSameSourceLine(token, *rawNext))) {
+                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)) {
                 NewLine();
             }
             return;
         case KnownToken::Comma:
             Write(",");
             if (InEnumBody() && parenDepth_ == 0 && bracketDepth_ == 0 &&
-                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::Comment && IsSameSourceLine(token, *rawNext))) {
+                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)) {
                 NewLine();
             }
             return;
@@ -855,5 +849,5 @@ std::string FormatModelText(const FormatterConfig& config, const FormatModel& mo
         false,
         tokens
     );
-    return Printer(config, model).Print(tokens);
+    return Printer(config).Print(tokens);
 }

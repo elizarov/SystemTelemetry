@@ -22,6 +22,7 @@ enum class SyntaxNodeKind : std::uint8_t {
     KnownToken,
     FreeToken,
     Comment,
+    TrailingComment,
     BlankLine,
 };
 
@@ -249,16 +250,11 @@ std::string_view KnownTokenText(KnownToken token);
 bool KnownTokenHasClass(KnownToken token, TokenClass tokenClass);
 
 struct SyntaxNode {
+    // Keep nodes maximally generic and space-efficient; avoid fields that only apply to one node kind.
     SyntaxNodeKind kind = SyntaxNodeKind::Tree;
     SyntaxTreeKind treeKind = SyntaxTreeKind::Unknown;
     KnownToken known = KnownToken::Unknown;
     std::string_view text;
-    std::uint32_t startByte = 0;
-    std::uint32_t endByte = 0;
-    std::uint32_t startRow = 0;
-    std::uint32_t startColumn = 0;
-    std::uint32_t endRow = 0;
-    std::uint32_t endColumn = 0;
     std::vector<std::unique_ptr<SyntaxNode>> children;
 };
 

@@ -176,31 +176,22 @@ bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind, std::string_view type) {
         type == "ms_call_modifier";
 }
 
-std::unique_ptr<SyntaxNode> MakeNodeBase(TSNode tsNode) {
-    auto node = std::make_unique<SyntaxNode>();
-    const TSPoint start = StartPoint(tsNode);
-    const TSPoint end = EndPoint(tsNode);
-    node->startByte = ts_node_start_byte(tsNode);
-    node->endByte = ts_node_end_byte(tsNode);
-    node->startRow = start.row;
-    node->startColumn = start.column;
-    node->endRow = end.row;
-    node->endColumn = end.column;
-    return node;
+bool IsAtomicPreprocessorNode(SyntaxTreeKind kind) {
+    return kind == SyntaxTreeKind::PreprocCall ||
+        kind == SyntaxTreeKind::PreprocDef ||
+        kind == SyntaxTreeKind::PreprocFunctionDef ||
+        kind == SyntaxTreeKind::PreprocInclude ||
+        kind == SyntaxTreeKind::PreprocUsing;
 }
 
-std::unique_ptr<SyntaxNode> MakeBlankLine(uint32_t byte, uint32_t row) {
+std::unique_ptr<SyntaxNode> MakeBlankLine() {
     auto node = std::make_unique<SyntaxNode>();
     node->kind = SyntaxNodeKind::BlankLine;
-    node->startByte = byte;
-    node->endByte = byte;
-    node->startRow = row;
-    node->endRow = row;
     return node;
 }
 
 std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
-    auto node = MakeNodeBase(tsNode);
+    auto node = std::make_unique<SyntaxNode>();
     const std::string_view type = ts_node_type(tsNode);
     const std::string_view text = NodeText(tsNode, source);
     const SyntaxTreeKind treeKind = TreeKindFromType(type);
@@ -232,18 +223,31 @@ std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
         return node;
     }
 
+    if (IsAtomicPreprocessorNode(treeKind)) {
+        node->kind = SyntaxNodeKind::Tree;
+        node->treeKind = treeKind;
+        node->text = text;
+        return node;
+    }
+
     node->kind = SyntaxNodeKind::Tree;
     node->treeKind = treeKind;
     node->children.reserve(childCount);
-    uint32_t previousEnd = node->startByte;
-    uint32_t previousEndRow = node->startRow;
+    uint32_t previousEnd = ts_node_start_byte(tsNode);
+    uint32_t previousEndRow = StartPoint(tsNode).row;
     for (uint32_t index = 0; index < childCount; ++index) {
         TSNode child = ts_node_child(tsNode, index);
         const uint32_t childStart = ts_node_start_byte(child);
         if (!node->children.empty() && ContainsBlankLine(source, previousEnd, childStart)) {
-            node->children.push_back(MakeBlankLine(previousEnd, previousEndRow));
+            node->children.push_back(MakeBlankLine());
         }
-        node->children.push_back(BuildNode(child, source));
+        std::unique_ptr<SyntaxNode> childNode = BuildNode(child, source);
+        if (childNode->kind == SyntaxNodeKind::Comment) {
+            if (!node->children.empty() && previousEndRow == StartPoint(child).row) {
+                childNode->kind = SyntaxNodeKind::TrailingComment;
+            }
+        }
+        node->children.push_back(std::move(childNode));
         previousEnd = ts_node_end_byte(child);
         previousEndRow = ts_node_end_point(child).row;
     }
