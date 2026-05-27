@@ -8,6 +8,8 @@
 
 namespace tools::format {
 
+inline constexpr size_t kNoTokenIndex = static_cast<size_t>(-1);
+
 enum class TokenKind {
     Word,
     Number,
@@ -23,6 +25,8 @@ enum class TokenKind {
 struct Token {
     TokenKind kind = TokenKind::Symbol;
     std::string text;
+    size_t modelIndex = kNoTokenIndex;
+    size_t matchingIndex = kNoTokenIndex;
 };
 
 using TokenSpan = std::span<const Token>;
