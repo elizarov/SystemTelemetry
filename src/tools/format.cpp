@@ -12,7 +12,6 @@
 
 #include "tools/impl/format_args.h"
 #include "tools/impl/format_config.h"
-#include "tools/impl/format_lexer.h"
 #include "tools/impl/format_model.h"
 #include "tools/impl/format_model_builder.h"
 #include "tools/impl/format_pretty_printer.h"
@@ -73,13 +72,21 @@ FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& confi
     const TSNode root = ts_tree_root_node(tree);
     (void)config;
     (void)sourcePath;
-    FormatModel model;
-    model.parse = ParseTreeResult(root, text);
-    model.layout = BuildSourceLayoutRoot(root, text, model.tokens);
-    AnnotateTokenIndexesAndGroups(model.tokens);
+    FormatModel model = BuildFormatModel(root, text);
     ts_tree_delete(tree);
     ts_parser_delete(parser);
     return model;
+}
+
+size_t AdvanceNewline(std::string_view text, size_t index) {
+    if (index < text.size() && text[index] == '\r' && index + 1 < text.size() && text[index + 1] == '\n') {
+        return index + 2;
+    }
+    return std::min(index + 1, text.size());
+}
+
+bool IsNewlineByte(char ch) {
+    return ch == '\r' || ch == '\n';
 }
 
 bool TextMatchesFormattedOutput(std::string_view source, std::string_view formatted) {
@@ -121,7 +128,7 @@ FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& con
     result.parseErrorLine = model.parse.errorLine;
     result.parseErrorColumn = model.parse.errorColumn;
     result.parseErrorSnippet = model.parse.errorSnippet;
-    result.formatted = FormatModelText(config, model, sourcePath);
+    result.formatted = FormatModelText(config, model.root, sourcePath);
     result.changed = !TextMatchesFormattedOutput(text, result.formatted);
     return result;
 }

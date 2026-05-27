@@ -6,4 +6,4 @@
 #include "tools/impl/format_config.h"
 #include "tools/impl/format_model.h"
 
-std::string FormatModelText(const FormatterConfig& config, const FormatModel& model, std::string_view sourcePath);
+std::string FormatModelText(const FormatterConfig& config, SyntaxNode* root, std::string_view sourcePath);
