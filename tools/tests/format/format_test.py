@@ -67,6 +67,48 @@ def normalize_deferred_macro_wraps(text: str) -> str:
     )
 
 
+def structure_without_wrapping(text: str) -> str:
+    text = normalize_deferred_macro_wraps(text)
+    result: list[str] = []
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char.isspace():
+            index += 1
+            continue
+        if text.startswith("//", index):
+            end = text.find("\n", index)
+            if end == -1:
+                end = len(text)
+            result.append(text[index:end])
+            index = end
+            continue
+        if text.startswith("/*", index):
+            end = text.find("*/", index + 2)
+            if end == -1:
+                end = len(text) - 2
+            result.append(text[index:end + 2])
+            index = end + 2
+            continue
+        if char in ("\"", "'"):
+            quote = char
+            end = index + 1
+            while end < len(text):
+                if text[end] == "\\":
+                    end += 2
+                    continue
+                if text[end] == quote:
+                    end += 1
+                    break
+                end += 1
+            result.append(text[index:end])
+            index = end
+            continue
+        result.append(char)
+        index += 1
+    return "".join(result)
+
+
 class FormatCommandTests(unittest.TestCase):
     maxDiff = None
 
@@ -93,6 +135,12 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(
             normalize_deferred_macro_wraps(opening_preprocessor_block(read_fixture(FULL_OUTPUT_FIXTURE))),
             opening_preprocessor_block(read_fixture(OUTPUT_FIXTURE)),
+        )
+
+    def test_temporary_golden_matches_full_golden_except_wrapping(self) -> None:
+        self.assertEqual(
+            structure_without_wrapping(read_fixture(FULL_OUTPUT_FIXTURE)),
+            structure_without_wrapping(read_fixture(OUTPUT_FIXTURE)),
         )
 
     def test_file_argument_formats_to_stdout(self) -> None:
@@ -158,6 +206,85 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertEqual(
             "void f(Object^ handle, Object% tracking, int&& moved, int* pointer) {}\n",
+            result.stdout,
+        )
+
+    def test_trailing_comma_normalization(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "enum E { A, B };\n"
+                "enum F { C, D, };\n"
+                "int values[] = {1, 2,};\n"
+                "void f(){ Use({1, 2,}); }\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "enum E {\n"
+            "    A,\n"
+            "    B,\n"
+            "};\n"
+            "enum F {\n"
+            "    C,\n"
+            "    D,\n"
+            "};\n"
+            "int values[] = {1, 2};\n"
+            "void f() {\n"
+            "    Use({1, 2});\n"
+            "}\n",
+            result.stdout,
+        )
+
+    def test_control_body_brace_normalization(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "void f(int* values,int count){\n"
+                "if(count) values[0]+=1;\n"
+                "else values[0]=0;\n"
+                "if(count==0) values[0]=0;\n"
+                "else if(count==1) values[0]=1;\n"
+                "else values[0]=2;\n"
+                "while(count) --count;\n"
+                "for(int i=0;i<count;++i) values[i]+=i;\n"
+                "do ++count; while(count<10);\n"
+                "if(count) { return; } else { if(count) return; }\n"
+                "}\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "void f(int* values, int count) {\n"
+            "    if (count) {\n"
+            "        values[0] += 1;\n"
+            "    } else {\n"
+            "        values[0] = 0;\n"
+            "    }\n"
+            "    if (count == 0) {\n"
+            "        values[0] = 0;\n"
+            "    } else if (count == 1) {\n"
+            "        values[0] = 1;\n"
+            "    } else {\n"
+            "        values[0] = 2;\n"
+            "    }\n"
+            "    while (count) {\n"
+            "        --count;\n"
+            "    }\n"
+            "    for (int i = 0; i < count; ++i) {\n"
+            "        values[i] += i;\n"
+            "    }\n"
+            "    do {\n"
+            "        ++count;\n"
+            "    } while (count < 10);\n"
+            "    if (count) {\n"
+            "        return;\n"
+            "    } else if (count) {\n"
+            "        return;\n"
+            "    }\n"
+            "}\n",
             result.stdout,
         )
 

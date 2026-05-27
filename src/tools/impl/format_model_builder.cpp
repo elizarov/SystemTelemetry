@@ -1,6 +1,7 @@
 #include "tools/impl/format_model_builder.h"
 
 #include <array>
+#include <optional>
 #include <string_view>
 #include <unordered_map>
 
@@ -204,6 +205,222 @@ std::unique_ptr<SyntaxNode> MakeBlankLine() {
     return node;
 }
 
+std::unique_ptr<SyntaxNode> MakeKnownToken(KnownToken token) {
+    auto node = std::make_unique<SyntaxNode>();
+    node->kind = SyntaxNodeKind::KnownToken;
+    node->known = token;
+    return node;
+}
+
+bool IsTriviaNode(const std::unique_ptr<SyntaxNode>& node) {
+    return node != nullptr &&
+        (node->kind == SyntaxNodeKind::BlankLine ||
+         node->kind == SyntaxNodeKind::Comment ||
+         node->kind == SyntaxNodeKind::TrailingComment);
+}
+
+bool IsCommentNode(const std::unique_ptr<SyntaxNode>& node) {
+    return node != nullptr &&
+        (node->kind == SyntaxNodeKind::Comment ||
+         node->kind == SyntaxNodeKind::TrailingComment);
+}
+
+bool IsKnownTokenNode(const std::unique_ptr<SyntaxNode>& node, KnownToken token) {
+    return node != nullptr &&
+        node->kind == SyntaxNodeKind::KnownToken &&
+        node->known == token;
+}
+
+bool IsTreeNode(const std::unique_ptr<SyntaxNode>& node, SyntaxTreeKind kind) {
+    return node != nullptr &&
+        node->kind == SyntaxNodeKind::Tree &&
+        node->treeKind == kind;
+}
+
+std::optional<size_t> PreviousNonTriviaChildIndex(
+    const std::vector<std::unique_ptr<SyntaxNode>>& children,
+    size_t before
+) {
+    while (before > 0) {
+        --before;
+        if (!IsTriviaNode(children[before])) {
+            return before;
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<size_t> NextNonTriviaChildIndex(
+    const std::vector<std::unique_ptr<SyntaxNode>>& children,
+    size_t after
+) {
+    for (size_t index = after; index < children.size(); ++index) {
+        if (!IsTriviaNode(children[index])) {
+            return index;
+        }
+    }
+    return std::nullopt;
+}
+
+void NormalizeTrailingCommas(SyntaxNode& node) {
+    std::vector<std::unique_ptr<SyntaxNode>>& children = node.children;
+    for (size_t index = 0; index < children.size(); ++index) {
+        if (!IsKnownTokenNode(children[index], KnownToken::RightBrace) &&
+            !IsKnownTokenNode(children[index], KnownToken::RightParen) &&
+            !IsKnownTokenNode(children[index], KnownToken::RightBracket) &&
+            !IsKnownTokenNode(children[index], KnownToken::Greater)) {
+            continue;
+        }
+        const std::optional<size_t> previous = PreviousNonTriviaChildIndex(children, index);
+        if (!previous) {
+            continue;
+        }
+        if (node.treeKind == SyntaxTreeKind::EnumeratorList) {
+            if (!IsKnownTokenNode(children[*previous], KnownToken::Comma) &&
+                !IsKnownTokenNode(children[*previous], KnownToken::LeftBrace)) {
+                children.insert(children.begin() + static_cast<std::ptrdiff_t>(*previous + 1), MakeKnownToken(KnownToken::Comma));
+                ++index;
+            }
+            continue;
+        }
+        if (IsKnownTokenNode(children[*previous], KnownToken::Comma)) {
+            children.erase(children.begin() + static_cast<std::ptrdiff_t>(*previous));
+            --index;
+        }
+    }
+}
+
+void WrapControlBody(SyntaxNode& node, size_t childIndex) {
+    if (childIndex >= node.children.size() ||
+        IsTreeNode(node.children[childIndex], SyntaxTreeKind::CompoundStatement)) {
+        return;
+    }
+    size_t firstBodyIndex = childIndex;
+    while (firstBodyIndex > 0 && IsCommentNode(node.children[firstBodyIndex - 1])) {
+        --firstBodyIndex;
+    }
+
+    auto compound = std::make_unique<SyntaxNode>();
+    compound->kind = SyntaxNodeKind::Tree;
+    compound->treeKind = SyntaxTreeKind::CompoundStatement;
+    compound->children.reserve(childIndex - firstBodyIndex + 3);
+    compound->children.push_back(MakeKnownToken(KnownToken::LeftBrace));
+    for (size_t index = firstBodyIndex; index <= childIndex; ++index) {
+        compound->children.push_back(std::move(node.children[index]));
+    }
+    compound->children.push_back(MakeKnownToken(KnownToken::RightBrace));
+
+    node.children.erase(
+        node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex),
+        node.children.begin() + static_cast<std::ptrdiff_t>(childIndex + 1)
+    );
+    node.children.insert(node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex), std::move(compound));
+}
+
+std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
+    if (node.kind != SyntaxNodeKind::Tree || node.treeKind != SyntaxTreeKind::CompoundStatement) {
+        return std::nullopt;
+    }
+    std::optional<size_t> ifIndex;
+    for (size_t index = 0; index < node.children.size(); ++index) {
+        if (IsKnownTokenNode(node.children[index], KnownToken::LeftBrace) ||
+            IsKnownTokenNode(node.children[index], KnownToken::RightBrace)) {
+            continue;
+        }
+        if (IsTreeNode(node.children[index], SyntaxTreeKind::IfStatement) && !ifIndex) {
+            ifIndex = index;
+            continue;
+        }
+        return std::nullopt;
+    }
+    return ifIndex;
+}
+
+void NormalizeElseClauseBody(SyntaxNode& node) {
+    for (size_t index = 0; index < node.children.size(); ++index) {
+        if (!IsKnownTokenNode(node.children[index], KnownToken::KeywordElse)) {
+            continue;
+        }
+        const std::optional<size_t> bodyIndex = NextNonTriviaChildIndex(node.children, index + 1);
+        if (!bodyIndex) {
+            return;
+        }
+        if (IsTreeNode(node.children[*bodyIndex], SyntaxTreeKind::IfStatement)) {
+            return;
+        }
+        if (IsTreeNode(node.children[*bodyIndex], SyntaxTreeKind::CompoundStatement)) {
+            std::optional<size_t> ifIndex = FindOnlyIfInBraceBlock(*node.children[*bodyIndex]);
+            if (ifIndex) {
+                node.children[*bodyIndex] = std::move(node.children[*bodyIndex]->children[*ifIndex]);
+                return;
+            }
+            return;
+        }
+        WrapControlBody(node, *bodyIndex);
+        return;
+    }
+}
+
+void NormalizeIfStatementBody(SyntaxNode& node) {
+    size_t before = node.children.size();
+    for (size_t index = 0; index < node.children.size(); ++index) {
+        if (IsTreeNode(node.children[index], SyntaxTreeKind::ElseClause)) {
+            before = index;
+            break;
+        }
+    }
+    const std::optional<size_t> consequenceIndex = PreviousNonTriviaChildIndex(node.children, before);
+    if (consequenceIndex) {
+        WrapControlBody(node, *consequenceIndex);
+    }
+}
+
+void NormalizeDoStatementBody(SyntaxNode& node) {
+    for (size_t index = 0; index < node.children.size(); ++index) {
+        if (!IsKnownTokenNode(node.children[index], KnownToken::KeywordWhile)) {
+            continue;
+        }
+        const std::optional<size_t> bodyIndex = PreviousNonTriviaChildIndex(node.children, index);
+        if (bodyIndex) {
+            WrapControlBody(node, *bodyIndex);
+        }
+        return;
+    }
+}
+
+void NormalizeLastControlBody(SyntaxNode& node) {
+    const std::optional<size_t> bodyIndex = PreviousNonTriviaChildIndex(node.children, node.children.size());
+    if (bodyIndex) {
+        WrapControlBody(node, *bodyIndex);
+    }
+}
+
+void NormalizeControlBodies(SyntaxNode& node) {
+    switch (node.treeKind) {
+    case SyntaxTreeKind::IfStatement:
+        NormalizeIfStatementBody(node);
+        return;
+    case SyntaxTreeKind::ElseClause:
+        NormalizeElseClauseBody(node);
+        return;
+    case SyntaxTreeKind::ForStatement:
+    case SyntaxTreeKind::WhileStatement:
+    case SyntaxTreeKind::SwitchStatement:
+        NormalizeLastControlBody(node);
+        return;
+    case SyntaxTreeKind::DoStatement:
+        NormalizeDoStatementBody(node);
+        return;
+    default:
+        return;
+    }
+}
+
+void NormalizeSyntaxNode(SyntaxNode& node) {
+    NormalizeTrailingCommas(node);
+    NormalizeControlBodies(node);
+}
+
 std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
     auto node = std::make_unique<SyntaxNode>();
     const std::string_view type = ts_node_type(tsNode);
@@ -265,6 +482,7 @@ std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
         previousEnd = ts_node_end_byte(child);
         previousEndRow = ts_node_end_point(child).row;
     }
+    NormalizeSyntaxNode(*node);
     return node;
 }
 
