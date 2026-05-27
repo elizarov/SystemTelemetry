@@ -215,6 +215,9 @@ enum class KnownToken : std::uint16_t {
     KeywordCoYield,
 };
 
+KnownToken KnownTokenFromText(std::string_view text);
+std::string_view KnownTokenText(KnownToken token);
+
 struct SyntaxNode {
     SyntaxNodeKind kind = SyntaxNodeKind::Tree;
     SyntaxTreeKind treeKind = SyntaxTreeKind::Unknown;
