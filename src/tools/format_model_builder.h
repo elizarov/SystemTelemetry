@@ -20,7 +20,6 @@ std::vector<Token> SortIncludeTokens(
     const FormatterConfig& config,
     std::string_view sourcePath
 );
-std::vector<Token> AddRequiredControlBraces(TokenSpan tokens);
 void AnnotateTokenIndexesAndGroups(std::vector<Token>& tokens);
 SourceLayoutNode BuildSourceLayoutRoot(TSNode root, const std::vector<Token>& tokens);
 

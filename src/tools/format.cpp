@@ -1,6 +1,7 @@
 #include "tools/format.h"
 
 #include <chrono>
+#include <cstddef>
 #include <cstdio>
 #include <cstdlib>
 #include <io.h>
@@ -9,6 +10,7 @@
 #include <string_view>
 #include <tree_sitter/api.h>
 #include <tree_sitter_cpp.h>
+#include <vector>
 
 #include "tools/format_args.h"
 #include "tools/format_config.h"
@@ -21,7 +23,6 @@
 namespace {
 
 using tools::format::AdvanceNewline;
-using tools::format::AddRequiredControlBraces;
 using tools::format::AppendSourceTrivia;
 using tools::format::AppendTreeChildTokens;
 using tools::format::BuildSourceLayoutRoot;
@@ -31,6 +32,11 @@ using tools::format::FormatModel;
 using tools::format::FormatModelText;
 using tools::format::FormatOptions;
 using tools::format::FormatterConfig;
+using tools::format::IsCommentOrNewline;
+using tools::format::kNoTokenIndex;
+using tools::format::Token;
+using tools::format::TokenKind;
+using tools::format::TokenSpan;
 using tools::format::IsNewlineByte;
 using tools::format::ParseTreeResult;
 using tools::format::SortIncludeTokens;
@@ -69,6 +75,358 @@ std::string ToFileLineEndings(std::string_view text) {
         }
     }
     return result;
+}
+
+bool IsControlBraceGroupOpen(std::string_view text) {
+    return text == "(" || text == "[" || text == "{";
+}
+
+std::string ControlBraceMatchingClose(std::string_view text) {
+    if (text == "(") {
+        return ")";
+    }
+    if (text == "[") {
+        return "]";
+    }
+    return "}";
+}
+
+size_t NextCodeIndex(TokenSpan tokens, size_t index, size_t end) {
+    while (index < end && IsCommentOrNewline(tokens[index])) {
+        ++index;
+    }
+    return index;
+}
+
+std::optional<size_t> AnnotatedMatchingIndex(TokenSpan tokens, size_t index) {
+    if (tokens.empty() || index >= tokens.size() || tokens[index].matchingIndex == kNoTokenIndex) {
+        return std::nullopt;
+    }
+    const size_t base = tokens.front().modelIndex;
+    if (base == kNoTokenIndex || tokens[index].matchingIndex < base) {
+        return std::nullopt;
+    }
+    const size_t relative = tokens[index].matchingIndex - base;
+    if (relative >= tokens.size() || tokens[relative].modelIndex != tokens[index].matchingIndex) {
+        return std::nullopt;
+    }
+    return relative;
+}
+
+std::optional<size_t> FindControlBraceMatchingClose(TokenSpan tokens, size_t openIndex, size_t end) {
+    if (openIndex >= end || !IsControlBraceGroupOpen(tokens[openIndex].text)) {
+        return std::nullopt;
+    }
+    if (std::optional<size_t> annotated = AnnotatedMatchingIndex(tokens, openIndex); annotated && *annotated < end) {
+        return annotated;
+    }
+    const std::string close = ControlBraceMatchingClose(tokens[openIndex].text);
+    int depth = 0;
+    for (size_t index = openIndex; index < end; ++index) {
+        if (tokens[index].text == tokens[openIndex].text) {
+            ++depth;
+        } else if (tokens[index].text == close) {
+            --depth;
+            if (depth == 0) {
+                return index;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void AppendTokenRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
+    if (begin >= end) {
+        return;
+    }
+    output.insert(
+        output.end(),
+        tokens.begin() + static_cast<std::ptrdiff_t>(begin),
+        tokens.begin() + static_cast<std::ptrdiff_t>(end)
+    );
+}
+
+bool IsBraceRequiredControlToken(const Token& token) {
+    return token.kind == TokenKind::Word && (
+        token.text == "if" ||
+        token.text == "else" ||
+        token.text == "for" ||
+        token.text == "while" ||
+        token.text == "do" ||
+        token.text == "switch"
+    );
+}
+
+std::optional<size_t> FindControlHeaderEnd(TokenSpan tokens, size_t controlIndex, size_t end) {
+    for (size_t index = controlIndex + 1; index < end; ++index) {
+        if (tokens[index].text != "(") {
+            continue;
+        }
+        if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, index, end)) {
+            return *close + 1;
+        }
+        return std::nullopt;
+    }
+    return std::nullopt;
+}
+
+void RewriteControlBracesRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output);
+
+size_t RewriteControlBracesStatement(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output);
+
+size_t RewriteIfControlStatement(TokenSpan tokens, size_t ifIndex, size_t end, std::vector<Token>& output);
+
+size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end);
+
+size_t RewriteBraceBlock(TokenSpan tokens, size_t openIndex, size_t end, std::vector<Token>& output) {
+    const std::optional<size_t> close = FindControlBraceMatchingClose(tokens, openIndex, end);
+    if (!close) {
+        output.push_back(tokens[openIndex]);
+        return openIndex + 1;
+    }
+    output.push_back(tokens[openIndex]);
+    RewriteControlBracesRange(tokens, openIndex + 1, *close, output);
+    output.push_back(tokens[*close]);
+    return *close + 1;
+}
+
+size_t FindSimpleControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    for (size_t index = begin; index < end; ++index) {
+        if (IsControlBraceGroupOpen(tokens[index].text)) {
+            if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, index, end)) {
+                index = *close;
+                continue;
+            }
+        }
+        if (tokens[index].text == ";") {
+            return index + 1;
+        }
+    }
+    return end;
+}
+
+size_t FindIfControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, begin, end);
+    if (!headerEnd) {
+        return FindSimpleControlBracesStatementEnd(tokens, begin, end);
+    }
+    size_t statementEnd = FindControlBracesStatementEnd(tokens, *headerEnd, end);
+    const size_t elseIndex = NextCodeIndex(tokens, statementEnd, end);
+    if (elseIndex < end && tokens[elseIndex].text == "else") {
+        statementEnd = FindControlBracesStatementEnd(tokens, elseIndex, end);
+    }
+    return statementEnd;
+}
+
+size_t FindElseControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    return FindControlBracesStatementEnd(tokens, begin + 1, end);
+}
+
+bool ContainsOnlyNewlines(TokenSpan tokens, size_t begin, size_t end) {
+    for (size_t index = begin; index < end; ++index) {
+        if (tokens[index].kind != TokenKind::Newline) {
+            return false;
+        }
+    }
+    return true;
+}
+
+size_t FindHeaderBodyControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, begin, end);
+    if (!headerEnd) {
+        return FindSimpleControlBracesStatementEnd(tokens, begin, end);
+    }
+    return FindControlBracesStatementEnd(tokens, *headerEnd, end);
+}
+
+size_t FindDoControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, begin + 1, end);
+    const size_t whileIndex = NextCodeIndex(tokens, bodyEnd, end);
+    if (whileIndex >= end || tokens[whileIndex].text != "while") {
+        return bodyEnd;
+    }
+    const std::optional<size_t> whileHeaderEnd = FindControlHeaderEnd(tokens, whileIndex, end);
+    if (!whileHeaderEnd) {
+        return FindSimpleControlBracesStatementEnd(tokens, whileIndex, end);
+    }
+    const size_t semicolon = NextCodeIndex(tokens, *whileHeaderEnd, end);
+    return semicolon < end && tokens[semicolon].text == ";" ? semicolon + 1 : *whileHeaderEnd;
+}
+
+size_t FindControlBracesStatementEnd(TokenSpan tokens, size_t begin, size_t end) {
+    const size_t statementStart = NextCodeIndex(tokens, begin, end);
+    if (statementStart >= end) {
+        return end;
+    }
+    if (tokens[statementStart].text == "{") {
+        if (std::optional<size_t> close = FindControlBraceMatchingClose(tokens, statementStart, end)) {
+            return *close + 1;
+        }
+        return end;
+    }
+    if (tokens[statementStart].text == "if") {
+        return FindIfControlBracesStatementEnd(tokens, statementStart, end);
+    }
+    if (tokens[statementStart].text == "else") {
+        return FindElseControlBracesStatementEnd(tokens, statementStart, end);
+    }
+    if (tokens[statementStart].text == "do") {
+        return FindDoControlBracesStatementEnd(tokens, statementStart, end);
+    }
+    if (
+        tokens[statementStart].text == "for" ||
+        tokens[statementStart].text == "while" ||
+        tokens[statementStart].text == "switch"
+    ) {
+        return FindHeaderBodyControlBracesStatementEnd(tokens, statementStart, end);
+    }
+    return FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
+}
+
+void AppendRewrittenControlBody(TokenSpan tokens, size_t bodyBegin, size_t bodyEnd, std::vector<Token>& output) {
+    output.push_back({TokenKind::Symbol, "{"});
+    RewriteControlBracesStatement(tokens, bodyBegin, bodyEnd, output);
+    output.push_back({TokenKind::Symbol, "}"});
+}
+
+size_t RewriteHeaderBodyControlStatement(
+    TokenSpan tokens,
+    size_t controlIndex,
+    size_t end,
+    std::vector<Token>& output
+) {
+    const std::optional<size_t> headerEnd = FindControlHeaderEnd(tokens, controlIndex, end);
+    if (!headerEnd) {
+        output.push_back(tokens[controlIndex]);
+        return controlIndex + 1;
+    }
+    AppendTokenRange(tokens, controlIndex, *headerEnd, output);
+    const size_t bodyBegin = *headerEnd;
+    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
+    if (bodyStart < end && tokens[bodyStart].text == "{") {
+        return RewriteControlBracesStatement(tokens, bodyBegin, end, output);
+    }
+    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
+    AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
+    return bodyEnd;
+}
+
+size_t RewriteElseControlStatement(TokenSpan tokens, size_t elseIndex, size_t end, std::vector<Token>& output) {
+    output.push_back(tokens[elseIndex]);
+    const size_t bodyBegin = elseIndex + 1;
+    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
+    if (bodyStart < end && tokens[bodyStart].text == "if") {
+        AppendTokenRange(tokens, bodyBegin, bodyStart, output);
+        return RewriteIfControlStatement(tokens, bodyStart, end, output);
+    }
+    if (bodyStart < end && tokens[bodyStart].text == "{") {
+        const std::optional<size_t> bodyClose = FindControlBraceMatchingClose(tokens, bodyStart, end);
+        if (bodyClose && ContainsOnlyNewlines(tokens, bodyBegin, bodyStart)) {
+            const size_t innerStart = NextCodeIndex(tokens, bodyStart + 1, *bodyClose);
+            if (innerStart < *bodyClose && tokens[innerStart].text == "if") {
+                const size_t innerEnd = FindIfControlBracesStatementEnd(tokens, innerStart, *bodyClose);
+                if (
+                    innerEnd <= *bodyClose &&
+                    ContainsOnlyNewlines(tokens, bodyStart + 1, innerStart) &&
+                    ContainsOnlyNewlines(tokens, innerEnd, *bodyClose)
+                ) {
+                    RewriteIfControlStatement(tokens, innerStart, *bodyClose, output);
+                    return *bodyClose + 1;
+                }
+            }
+        }
+        return RewriteControlBracesStatement(tokens, bodyBegin, end, output);
+    }
+    const size_t bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
+    AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
+    return bodyEnd;
+}
+
+size_t RewriteIfControlStatement(TokenSpan tokens, size_t ifIndex, size_t end, std::vector<Token>& output) {
+    size_t next = RewriteHeaderBodyControlStatement(tokens, ifIndex, end, output);
+    const size_t elseIndex = NextCodeIndex(tokens, next, end);
+    if (elseIndex < end && tokens[elseIndex].text == "else") {
+        AppendTokenRange(tokens, next, elseIndex, output);
+        next = RewriteElseControlStatement(tokens, elseIndex, end, output);
+    }
+    return next;
+}
+
+size_t RewriteDoControlStatement(TokenSpan tokens, size_t doIndex, size_t end, std::vector<Token>& output) {
+    output.push_back(tokens[doIndex]);
+    const size_t bodyBegin = doIndex + 1;
+    const size_t bodyStart = NextCodeIndex(tokens, bodyBegin, end);
+    size_t bodyEnd = bodyBegin;
+    if (bodyStart < end && tokens[bodyStart].text == "{") {
+        bodyEnd = RewriteControlBracesStatement(tokens, bodyBegin, end, output);
+    } else {
+        bodyEnd = FindControlBracesStatementEnd(tokens, bodyBegin, end);
+        AppendRewrittenControlBody(tokens, bodyBegin, bodyEnd, output);
+    }
+    const size_t whileIndex = NextCodeIndex(tokens, bodyEnd, end);
+    if (whileIndex < end && tokens[whileIndex].text == "while") {
+        AppendTokenRange(tokens, bodyEnd, FindDoControlBracesStatementEnd(tokens, doIndex, end), output);
+        return FindDoControlBracesStatementEnd(tokens, doIndex, end);
+    }
+    return bodyEnd;
+}
+
+size_t RewriteControlBracesStatement(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
+    const size_t statementStart = NextCodeIndex(tokens, begin, end);
+    AppendTokenRange(tokens, begin, statementStart, output);
+    if (statementStart >= end) {
+        return end;
+    }
+    if (tokens[statementStart].text == "{") {
+        return RewriteBraceBlock(tokens, statementStart, end, output);
+    }
+    if (tokens[statementStart].text == "if") {
+        return RewriteIfControlStatement(tokens, statementStart, end, output);
+    }
+    if (tokens[statementStart].text == "else") {
+        return RewriteElseControlStatement(tokens, statementStart, end, output);
+    }
+    if (tokens[statementStart].text == "do") {
+        return RewriteDoControlStatement(tokens, statementStart, end, output);
+    }
+    if (
+        tokens[statementStart].text == "for" ||
+        tokens[statementStart].text == "while" ||
+        tokens[statementStart].text == "switch"
+    ) {
+        return RewriteHeaderBodyControlStatement(tokens, statementStart, end, output);
+    }
+    const size_t statementEnd = FindSimpleControlBracesStatementEnd(tokens, statementStart, end);
+    RewriteControlBracesRange(tokens, statementStart, statementEnd, output);
+    return statementEnd;
+}
+
+void RewriteControlBracesRange(TokenSpan tokens, size_t begin, size_t end, std::vector<Token>& output) {
+    size_t index = begin;
+    while (index < end) {
+        const size_t codeIndex = NextCodeIndex(tokens, index, end);
+        AppendTokenRange(tokens, index, codeIndex, output);
+        if (codeIndex >= end) {
+            return;
+        }
+        if (IsBraceRequiredControlToken(tokens[codeIndex])) {
+            index = RewriteControlBracesStatement(tokens, codeIndex, end, output);
+            continue;
+        }
+        if (tokens[codeIndex].text == "{") {
+            index = RewriteBraceBlock(tokens, codeIndex, end, output);
+            continue;
+        }
+        output.push_back(tokens[codeIndex]);
+        index = codeIndex + 1;
+    }
+}
+
+std::vector<Token> AddRequiredControlBraces(TokenSpan tokens) {
+    std::vector<Token> output;
+    output.reserve(tokens.size());
+    RewriteControlBracesRange(tokens, 0, tokens.size(), output);
+    return output;
 }
 
 FormatModel BuildFormatModel(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
