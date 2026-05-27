@@ -4,6 +4,8 @@
 #include <string>
 #include <vector>
 
+#include "tools/impl/format_include_sort.h"
+
 namespace {
 
 enum class PrintTokenKind {
@@ -13,6 +15,7 @@ enum class PrintTokenKind {
     TrailingComment,
     BlankLine,
     Preprocessor,
+    IncludeRun,
 };
 
 enum class BraceRole {
@@ -41,6 +44,10 @@ bool IsPreprocessorNode(SyntaxTreeKind kind) {
         kind == SyntaxTreeKind::PreprocFunctionDef ||
         kind == SyntaxTreeKind::PreprocInclude ||
         kind == SyntaxTreeKind::PreprocUsing;
+}
+
+bool IsPreprocessorPrintToken(PrintTokenKind kind) {
+    return kind == PrintTokenKind::Preprocessor || kind == PrintTokenKind::IncludeRun;
 }
 
 bool IsCommentToken(PrintTokenKind kind) {
@@ -166,6 +173,18 @@ void AppendTokens(
         });
         return;
     case SyntaxNodeKind::Tree:
+        if (node.treeKind == SyntaxTreeKind::IncludeRun) {
+            tokens.push_back({
+                .kind = PrintTokenKind::IncludeRun,
+                .treeKind = node.treeKind,
+                .parentKind = parentKind,
+                .grandParentKind = grandParentKind,
+                .inTemplateDeclaration = childInTemplateDeclaration,
+                .inRequiresClause = childInRequiresClause,
+                .node = &node,
+            });
+            return;
+        }
         if (IsPreprocessorNode(node.treeKind)) {
             tokens.push_back({
                 .kind = PrintTokenKind::Preprocessor,
@@ -269,7 +288,9 @@ bool IsCompilerCallModifierStart(const PrintToken* token) {
 
 class Printer {
 public:
-    explicit Printer(const FormatterConfig& config) :
+    Printer(const FormatterConfig& config, std::string_view sourcePath) :
+        config_(config),
+        sourcePath_(sourcePath),
         indentWidth_(std::max(1, config.indentWidth)) {}
 
     std::string Print(const std::vector<PrintToken>& tokens) {
@@ -287,6 +308,8 @@ public:
     }
 
 private:
+    const FormatterConfig& config_;
+    std::string_view sourcePath_;
     int indentWidth_ = 4;
     std::string output_;
     int indentLevel_ = 0;
@@ -403,8 +426,8 @@ private:
     }
 
     bool ShouldSpaceBetween(const PrintToken* previous, const PrintToken& current) const {
-        if (previous == nullptr || previous->kind == PrintTokenKind::Preprocessor ||
-            current.kind == PrintTokenKind::Preprocessor) {
+        if (previous == nullptr || IsPreprocessorPrintToken(previous->kind) ||
+            IsPreprocessorPrintToken(current.kind)) {
             return false;
         }
         if (previous->kind != PrintTokenKind::Known && current.kind != PrintTokenKind::Known) {
@@ -588,6 +611,10 @@ private:
             PrintPreprocessor(token, next);
             return;
         }
+        if (token.kind == PrintTokenKind::IncludeRun) {
+            PrintIncludeRun(token, next);
+            return;
+        }
         if (token.kind == PrintTokenKind::Known) {
             PrintKnown(token, previous, next, rawNext);
             return;
@@ -610,6 +637,22 @@ private:
         NewLine();
     }
 
+    void PrintIncludeRun(const PrintToken& token, const PrintToken* next) {
+        if (token.node == nullptr) {
+            return;
+        }
+        if (lineHasText_) {
+            NewLine();
+        }
+        const std::string text = FormatIncludeRunText(config_, *token.node, sourcePath_);
+        output_.append(text);
+        atLineStart_ = true;
+        lineHasText_ = false;
+        if (!text.empty() && next != nullptr) {
+            BlankLine();
+        }
+    }
+
     void PrintPreprocessor(const PrintToken& token, const PrintToken* next) {
         const std::string line = CollapseSourceWhitespace(token.text);
         const bool isInclude = StartsWith(line, "#include");
@@ -625,7 +668,7 @@ private:
         atLineStart_ = false;
         NewLine();
         if (StartsWith(line, "#pragma once") || isUndef ||
-            (!isInclude && next != nullptr && next->kind != PrintTokenKind::Preprocessor)) {
+            (!isInclude && next != nullptr && !IsPreprocessorPrintToken(next->kind))) {
             BlankLine();
         }
     }
@@ -849,5 +892,5 @@ std::string FormatModelText(const FormatterConfig& config, const FormatModel& mo
         false,
         tokens
     );
-    return Printer(config).Print(tokens);
+    return Printer(config, sourcePath).Print(tokens);
 }

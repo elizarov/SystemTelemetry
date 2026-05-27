@@ -23,6 +23,7 @@ enum class SyntaxNodeKind : std::uint8_t {
 enum class SyntaxTreeKind : std::uint16_t {
     Unknown,
     TranslationUnit,
+    IncludeRun,
     Declaration,
     FieldDeclaration,
     FunctionDefinition,

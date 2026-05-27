@@ -4,6 +4,8 @@
 #include <array>
 #include <string_view>
 
+#include "tools/impl/tools_common.h"
+
 namespace {
 
 struct TreeMapping {
@@ -168,6 +170,31 @@ bool IsAtomicPreprocessorNode(SyntaxTreeKind kind) {
         kind == SyntaxTreeKind::PreprocUsing;
 }
 
+std::string_view TrimLeadingWhitespace(std::string_view value) {
+    while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) {
+        value.remove_prefix(1);
+    }
+    return value;
+}
+
+bool IsPragmaOnceNode(const SyntaxNode& node) {
+    return node.kind == SyntaxNodeKind::Tree &&
+        node.treeKind == SyntaxTreeKind::PreprocCall &&
+        tools::StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
+}
+
+bool IsIncludeNode(const std::unique_ptr<SyntaxNode>& node) {
+    return node != nullptr &&
+        node->kind == SyntaxNodeKind::Tree &&
+        node->treeKind == SyntaxTreeKind::PreprocInclude;
+}
+
+bool IsOpeningIncludeSpacer(const SyntaxNode& node) {
+    return node.kind == SyntaxNodeKind::BlankLine ||
+        node.kind == SyntaxNodeKind::Comment ||
+        node.kind == SyntaxNodeKind::TrailingComment;
+}
+
 std::unique_ptr<SyntaxNode> MakeBlankLine() {
     auto node = std::make_unique<SyntaxNode>();
     node->kind = SyntaxNodeKind::BlankLine;
@@ -266,6 +293,61 @@ ProblemNode FindFirstProblem(TSNode node) {
     return {};
 }
 
+void AppendIncludeRun(
+    std::vector<std::unique_ptr<SyntaxNode>>& sourceChildren,
+    size_t& index,
+    std::vector<std::unique_ptr<SyntaxNode>>& groupedChildren
+) {
+    auto includeRun = std::make_unique<SyntaxNode>();
+    includeRun->kind = SyntaxNodeKind::Tree;
+    includeRun->treeKind = SyntaxTreeKind::IncludeRun;
+
+    for (; index < sourceChildren.size(); ++index) {
+        if (IsIncludeNode(sourceChildren[index])) {
+            includeRun->children.push_back(std::move(sourceChildren[index]));
+            continue;
+        }
+        if (sourceChildren[index] != nullptr && sourceChildren[index]->kind == SyntaxNodeKind::BlankLine) {
+            continue;
+        }
+        break;
+    }
+
+    groupedChildren.push_back(std::move(includeRun));
+}
+
+void GroupOpeningIncludeRuns(SyntaxNode& root) {
+    if (root.kind != SyntaxNodeKind::Tree || root.treeKind != SyntaxTreeKind::TranslationUnit) {
+        return;
+    }
+
+    std::vector<std::unique_ptr<SyntaxNode>> groupedChildren;
+    groupedChildren.reserve(root.children.size());
+    bool sawInclude = false;
+    bool inOpeningArea = true;
+    for (size_t index = 0; index < root.children.size();) {
+        if (inOpeningArea && IsIncludeNode(root.children[index])) {
+            AppendIncludeRun(root.children, index, groupedChildren);
+            sawInclude = true;
+            continue;
+        }
+        const bool canRemainInOpeningArea = inOpeningArea &&
+            root.children[index] != nullptr &&
+            (IsOpeningIncludeSpacer(*root.children[index]) || (!sawInclude && IsPragmaOnceNode(*root.children[index])));
+        if (canRemainInOpeningArea) {
+            groupedChildren.push_back(std::move(root.children[index]));
+            ++index;
+            continue;
+        }
+
+        inOpeningArea = false;
+        groupedChildren.push_back(std::move(root.children[index]));
+        ++index;
+    }
+
+    root.children = std::move(groupedChildren);
+}
+
 ParseResult ParseFailure(TSNode root) {
     ProblemNode problem = FindFirstProblem(root);
     if (!problem.found) {
@@ -302,6 +384,7 @@ FormatModel BuildFormatModel(TSNode root, std::unique_ptr<std::string> sourceTex
     }
 
     model.root = BuildNode(root, source);
+    GroupOpeningIncludeRuns(*model.root);
     model.parse.ok = true;
     return model;
 }

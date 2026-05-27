@@ -13,6 +13,7 @@ FORMAT_CMD = REPO_ROOT / "format.cmd"
 FORMAT_EXE = REPO_ROOT / "build" / "CaseDashTools.exe"
 INPUT_FIXTURE = Path("src") / "format_test_input.cpp"
 OUTPUT_FIXTURE = Path("src") / "format_test_output_temp.cpp"
+FULL_OUTPUT_FIXTURE = Path("src") / "format_test_output.cpp"
 
 
 def native_format(*args: str, cwd: Path = REPO_ROOT, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -41,6 +42,14 @@ def read_fixture(path: Path) -> str:
     return (TEST_ROOT / path).read_text(encoding="utf-8")
 
 
+def opening_include_block(text: str) -> str:
+    lines = text.splitlines()
+    for index, line in enumerate(lines):
+        if line.startswith("#define"):
+            return "\n".join(lines[:index]) + "\n"
+    return text
+
+
 class FormatCommandTests(unittest.TestCase):
     maxDiff = None
 
@@ -56,6 +65,12 @@ class FormatCommandTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertNotIn("tree-sitter parse failed", result.stderr)
+
+    def test_temporary_golden_include_block_matches_full_golden(self) -> None:
+        self.assertEqual(
+            opening_include_block(read_fixture(FULL_OUTPUT_FIXTURE)),
+            opening_include_block(read_fixture(OUTPUT_FIXTURE)),
+        )
 
     def test_file_argument_formats_to_stdout(self) -> None:
         result = native_format("--style=file", str(TEST_ROOT / OUTPUT_FIXTURE))

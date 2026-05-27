@@ -2,15 +2,20 @@
 
 #include <winsock2.h>
 #include <ws2tcpip.h>
+
 #include <windows.h>
-#include <string_view>
+
 #include <algorithm>
-#include <vector>
 #include <string>
+#include <string_view>
+#include <vector>
+
 #include "vendor/library.h"
+
 #include "Alpha/thing.h"
 #include "format_test_fixture.h"
 #include "zeta/thing.h"
+
 #define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))
 #define FORMAT_FIXTURE_SHORT_MACRO(value) (value)
 #define FORMAT_FIXTURE_MUCH_LONGER_MACRO(value) (value)
