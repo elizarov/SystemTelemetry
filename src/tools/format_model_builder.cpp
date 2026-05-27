@@ -44,162 +44,6 @@ TSNode FindFirstErrorNode(TSNode node) {
     return node;
 }
 
-struct IncludeLine {
-    std::string line;
-    std::string spelling;
-    bool quoted = false;
-    int group = 0;
-};
-
-std::optional<IncludeLine> ParseIncludeLine(std::string_view line) {
-    const std::string trimmed = tools::lint::Trim(line);
-    constexpr std::string_view prefix = "#include";
-    if (!tools::lint::StartsWith(trimmed, prefix)) {
-        return std::nullopt;
-    }
-    size_t index = prefix.size();
-    while (index < trimmed.size() && IsSpaceButNotNewline(trimmed[index])) {
-        ++index;
-    }
-    if (index >= trimmed.size()) {
-        return std::nullopt;
-    }
-    const char open = trimmed[index];
-    const char close = open == '"' ? '"' : open == '<' ? '>' : '\0';
-    if (close == '\0') {
-        return std::nullopt;
-    }
-    const size_t end = trimmed.find(close, index + 1);
-    if (end == std::string::npos) {
-        return std::nullopt;
-    }
-    if (!tools::lint::Trim(std::string_view(trimmed).substr(end + 1)).empty()) {
-        return std::nullopt;
-    }
-    IncludeLine include;
-    include.line = "#include " + trimmed.substr(index, end - index + 1);
-    include.spelling = trimmed.substr(index, end - index + 1);
-    include.quoted = open == '"';
-    return include;
-}
-
-std::string Stem(std::string_view path) {
-    const std::string normalized = tools::lint::NormalizeSeparators(std::string(path));
-    const size_t slash = normalized.find_last_of('/');
-    const size_t start = slash == std::string::npos ? 0 : slash + 1;
-    const size_t dot = normalized.find_last_of('.');
-    if (dot == std::string::npos || dot < start) {
-        return normalized.substr(start);
-    }
-    return normalized.substr(start, dot - start);
-}
-
-bool IsMainInclude(const IncludeLine& include, const FormatterConfig& config, std::string_view sourcePath) {
-    if (!include.quoted || !config.mainIncludeQuote) {
-        return false;
-    }
-    std::string includeText = include.spelling.substr(1, include.spelling.size() - 2);
-    if (tools::lint::Extension(includeText) != ".h") {
-        return false;
-    }
-    const std::string includeStem = Stem(includeText);
-    const std::string sourceStem = Stem(sourcePath);
-    if (tools::lint::StartsWith(sourceStem, includeStem + ".")) {
-        return true;
-    }
-    if (!tools::lint::StartsWith(includeStem, sourceStem)) {
-        return false;
-    }
-    const std::string suffix = includeStem.substr(sourceStem.size());
-    return std::regex_match(suffix, std::regex(config.mainIncludeRegex));
-}
-
-int IncludeGroupIndex(const IncludeLine& include, const FormatterConfig& config, std::string_view sourcePath) {
-    if (IsMainInclude(include, config, sourcePath)) {
-        return 0;
-    }
-    for (size_t index = 0; index < config.includeGroups.size(); ++index) {
-        if (std::regex_match(include.spelling, config.includeGroups[index].regex)) {
-            return static_cast<int>(index + 1);
-        }
-    }
-    return static_cast<int>(config.includeGroups.size() + 1);
-}
-
-void SortIncludeRun(std::vector<IncludeLine>& includes, const FormatterConfig& config, std::string_view sourcePath) {
-    for (IncludeLine& include : includes) {
-        include.group = IncludeGroupIndex(include, config, sourcePath);
-    }
-    std::sort(includes.begin(), includes.end(), [](const IncludeLine& left, const IncludeLine& right) {
-        if (left.group != right.group) {
-            return left.group < right.group;
-        }
-        return tools::lint::ToLowerAscii(left.spelling) < tools::lint::ToLowerAscii(right.spelling);
-    });
-}
-
-std::optional<IncludeLine> ParseIncludeToken(const Token& token) {
-    if (token.kind != TokenKind::Preprocessor) {
-        return std::nullopt;
-    }
-    std::vector<std::string> lines = tools::lint::SplitLines(token.text);
-    if (lines.empty()) {
-        lines.push_back(token.text);
-    }
-    if (lines.size() != 1) {
-        return std::nullopt;
-    }
-    return ParseIncludeLine(lines.front());
-}
-
-void AppendSortedIncludeRun(
-    std::vector<Token>& output,
-    std::vector<IncludeLine>& includeRun,
-    const FormatterConfig& config,
-    std::string_view sourcePath,
-    bool hasFollowingToken
-) {
-    if (includeRun.empty()) {
-        return;
-    }
-    SortIncludeRun(includeRun, config, sourcePath);
-    int lastGroup = -1;
-    for (const IncludeLine& include : includeRun) {
-        if (lastGroup != -1 && include.group != lastGroup) {
-            output.push_back({TokenKind::Newline, "\n"});
-        }
-        output.push_back({TokenKind::Preprocessor, include.line});
-        lastGroup = include.group;
-    }
-    if (hasFollowingToken) {
-        output.push_back({TokenKind::Newline, "\n"});
-    }
-    includeRun.clear();
-}
-
-std::vector<Token> SortIncludeTokens(
-    std::vector<Token> tokens,
-    const FormatterConfig& config,
-    std::string_view sourcePath
-) {
-    std::vector<Token> output;
-    output.reserve(tokens.size());
-    std::vector<IncludeLine> includeRun;
-    for (size_t index = 0; index < tokens.size(); ++index) {
-        if (std::optional<IncludeLine> include = ParseIncludeToken(tokens[index])) {
-            includeRun.push_back(*include);
-            continue;
-        }
-        if (tokens[index].kind == TokenKind::Newline && !includeRun.empty()) {
-            continue;
-        }
-        AppendSortedIncludeRun(output, includeRun, config, sourcePath, true);
-        output.push_back(std::move(tokens[index]));
-    }
-    AppendSortedIncludeRun(output, includeRun, config, sourcePath, false);
-    return output;
-}
-
 bool IsNewlineByte(char ch) {
     return ch == '\r' || ch == '\n';
 }
@@ -262,25 +106,91 @@ std::string SourceText(std::string_view text, uint32_t begin, uint32_t end) {
     return std::string(text.substr(begin, end - begin));
 }
 
-void AppendPreprocessorDirective(std::string_view text, size_t& index, std::vector<Token>& tokens) {
-    const size_t start = index;
-    const size_t directiveEnd = PreprocessorLineEnd(text, index);
-    tokens.push_back(
-        {TokenKind::Preprocessor, std::string(text.substr(start, directiveEnd - start)), start, directiveEnd}
-    );
-    index = SkipFollowingNewline(text, directiveEnd);
+struct SourceTokenLookup {
+    std::map<size_t, size_t> byBegin;
+    const std::vector<Token>* tokens = nullptr;
+};
+
+struct SourceLayoutBuildContext {
+    std::string_view text;
+    std::vector<Token>& tokens;
+    SourceTokenLookup lookup;
+};
+
+bool IsGroupClose(std::string_view text) {
+    return text == ")" || text == "]" || text == "}";
 }
 
-size_t AppendSourceTrivia(std::string_view text, size_t begin, size_t end, std::vector<Token>& tokens) {
-    size_t index = begin;
-    while (index < end) {
-        if (IsPreprocessorLineStart(text, index)) {
-            AppendPreprocessorDirective(text, index, tokens);
+size_t SkipWhitespaceAndComments(std::string_view text, size_t index) {
+    while (index < text.size()) {
+        if (IsSpaceButNotNewline(text[index]) || IsNewlineByte(text[index])) {
+            ++index;
             continue;
         }
-        if (IsNewlineByte(text[index])) {
-            const size_t newlineEnd = AdvanceNewline(text, index);
-            tokens.push_back({TokenKind::Newline, "\n", index, newlineEnd});
+        if (index + 1 < text.size() && text[index] == '/' && text[index + 1] == '/') {
+            index += 2;
+            while (index < text.size() && !IsNewlineByte(text[index])) {
+                ++index;
+            }
+            continue;
+        }
+        if (index + 1 < text.size() && text[index] == '/' && text[index + 1] == '*') {
+            index += 2;
+            while (index + 1 < text.size() && (text[index] != '*' || text[index + 1] != '/')) {
+                ++index;
+            }
+            if (index + 1 < text.size()) {
+                index += 2;
+            }
+            continue;
+        }
+        break;
+    }
+    return index;
+}
+
+bool IsTrailingCommaToken(std::string_view text, const Token& token) {
+    if (token.text != "," || token.sourceEnd == kNoTokenIndex) {
+        return false;
+    }
+    const size_t next = SkipWhitespaceAndComments(text, token.sourceEnd);
+    return next < text.size() && IsGroupClose(std::string_view(text).substr(next, 1));
+}
+
+void AppendModelToken(SourceLayoutBuildContext& context, Token token) {
+    if (IsTrailingCommaToken(context.text, token)) {
+        return;
+    }
+    if (token.sourceBegin != kNoTokenIndex) {
+        context.lookup.byBegin.emplace(token.sourceBegin, context.tokens.size());
+    }
+    context.tokens.push_back(std::move(token));
+}
+
+void AppendSyntheticToken(SourceLayoutBuildContext& context, std::string text) {
+    AppendModelToken(context, {TokenKind::Symbol, std::move(text)});
+}
+
+void AppendPreprocessorDirective(SourceLayoutBuildContext& context, size_t& index) {
+    const size_t start = index;
+    const size_t directiveEnd = PreprocessorLineEnd(context.text, index);
+    AppendModelToken(
+        context,
+        {TokenKind::Preprocessor, std::string(context.text.substr(start, directiveEnd - start)), start, directiveEnd}
+    );
+    index = SkipFollowingNewline(context.text, directiveEnd);
+}
+
+size_t AppendSourceTrivia(SourceLayoutBuildContext& context, size_t begin, size_t end) {
+    size_t index = begin;
+    while (index < end) {
+        if (IsPreprocessorLineStart(context.text, index)) {
+            AppendPreprocessorDirective(context, index);
+            continue;
+        }
+        if (IsNewlineByte(context.text[index])) {
+            const size_t newlineEnd = AdvanceNewline(context.text, index);
+            AppendModelToken(context, {TokenKind::Newline, "\n", index, newlineEnd});
             index = newlineEnd;
             continue;
         }
@@ -331,59 +241,32 @@ void TrimLineCommentTerminator(std::string& text) {
     }
 }
 
-void AppendTreeTokens(TSNode node, std::string_view text, std::vector<Token>& tokens);
-
-void AppendTreeChildTokens(TSNode node, std::string_view text, std::vector<Token>& tokens) {
-    const uint32_t childCount = ts_node_child_count(node);
-    size_t cursor = ts_node_start_byte(node);
-    const size_t nodeEnd = ts_node_end_byte(node);
-    for (uint32_t index = 0; index < childCount; ++index) {
-        const TSNode child = ts_node_child(node, index);
-        const size_t childStart = ts_node_start_byte(child);
-        const size_t childEnd = ts_node_end_byte(child);
-        if (childEnd <= cursor) {
-            continue;
-        }
-        if (childStart > cursor) {
-            cursor = AppendSourceTrivia(text, cursor, childStart, tokens);
-        }
-        if (childStart < cursor) {
-            continue;
-        }
-        AppendTreeTokens(child, text, tokens);
-        cursor = std::max(cursor, childEnd);
-    }
-    if (cursor < nodeEnd) {
-        (void)AppendSourceTrivia(text, cursor, nodeEnd, tokens);
-    }
-}
-
-void AppendTreeTokens(TSNode node, std::string_view text, std::vector<Token>& tokens) {
+bool TryAppendTreeToken(TSNode node, SourceLayoutBuildContext& context) {
     const std::string_view type = ts_node_type(node);
     const uint32_t childCount = ts_node_child_count(node);
     const uint32_t start = ts_node_start_byte(node);
     const uint32_t end = ts_node_end_byte(node);
     if (start >= end) {
-        return;
+        return true;
     }
-    if (IsPreprocessorLineStart(text, start)) {
+    if (IsPreprocessorLineStart(context.text, start)) {
         size_t index = start;
-        AppendPreprocessorDirective(text, index, tokens);
-        return;
+        AppendPreprocessorDirective(context, index);
+        return true;
     }
     if (IsSimplePreprocessorNode(type)) {
-        tokens.push_back({TokenKind::Preprocessor, SourceText(text, start, end), start, end});
-        return;
+        AppendModelToken(context, {TokenKind::Preprocessor, SourceText(context.text, start, end), start, end});
+        return true;
     }
     if (IsAtomicTreeNode(type, childCount)) {
-        std::string tokenText = SourceText(text, start, end);
+        std::string tokenText = SourceText(context.text, start, end);
         if (type == "comment" && tools::lint::StartsWith(tokenText, "//")) {
             TrimLineCommentTerminator(tokenText);
         }
-        tokens.push_back({ClassifyTreeToken(type, tokenText), tokenText, start, end});
-        return;
+        AppendModelToken(context, {ClassifyTreeToken(type, tokenText), tokenText, start, end});
+        return true;
     }
-    AppendTreeChildTokens(node, text, tokens);
+    return false;
 }
 
 ParseResult ParseTreeResult(TSNode root, std::string_view text) {
@@ -400,11 +283,6 @@ ParseResult ParseTreeResult(TSNode root, std::string_view text) {
     }
     return result;
 }
-
-struct SourceTokenLookup {
-    std::map<size_t, size_t> byBegin;
-    const std::vector<Token>* tokens = nullptr;
-};
 
 SourceTokenLookup BuildSourceTokenLookup(const std::vector<Token>& tokens) {
     SourceTokenLookup lookup;
@@ -684,7 +562,41 @@ bool HasDirectBinaryChildWithOperator(TSNode node, const SourceTokenLookup& look
     return false;
 }
 
-std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTokenLookup& lookup, size_t order) {
+std::optional<size_t> FindMatchingSourceCloseToken(const SourceTokenLookup& lookup, size_t openIndex, size_t endByte) {
+    if (lookup.tokens == nullptr || openIndex >= lookup.tokens->size()) {
+        return std::nullopt;
+    }
+    const std::string& openText = (*lookup.tokens)[openIndex].text;
+    std::string closeText;
+    if (openText == "(") {
+        closeText = ")";
+    } else if (openText == "[") {
+        closeText = "]";
+    } else if (openText == "{") {
+        closeText = "}";
+    } else {
+        return std::nullopt;
+    }
+    int depth = 0;
+    for (
+        auto current = lookup.byBegin.lower_bound((*lookup.tokens)[openIndex].sourceBegin);
+        current != lookup.byBegin.end() && current->first < endByte;
+        ++current
+    ) {
+        const Token& token = (*lookup.tokens)[current->second];
+        if (token.text == openText) {
+            ++depth;
+        } else if (token.text == closeText) {
+            --depth;
+            if (depth == 0) {
+                return current->second;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTokenLookup& lookup) {
     const std::string_view type = ts_node_type(node);
     const size_t nodeBegin = ts_node_start_byte(node);
     const size_t nodeEnd = ts_node_end_byte(node);
@@ -696,7 +608,6 @@ std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTo
     SourceLayoutNode source;
     source.begin = span->first;
     source.end = span->second;
-    source.order = order;
 
     if (type == "template_declaration" || type == "requires_clause") {
         source.kind = SourceLayoutKind::TemplateDeclaration;
@@ -765,15 +676,15 @@ std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTo
         if (!open || lookup.tokens == nullptr) {
             return std::nullopt;
         }
-        const size_t close = (*lookup.tokens)[*open].matchingIndex;
-        if (close == kNoTokenIndex || close <= *open || close >= lookup.tokens->size()) {
+        const std::optional<size_t> close = FindMatchingSourceCloseToken(lookup, *open, nodeEnd);
+        if (!close || *close <= *open || *close >= lookup.tokens->size()) {
             return std::nullopt;
         }
         source.kind = SourceLayoutKind::Group;
         source.begin = *open;
-        source.end = close + 1;
+        source.end = *close + 1;
         source.groupOpen = *open;
-        source.groupClose = close;
+        source.groupClose = *close;
         return source;
     }
     if (IsTreeGroupNodeType(type)) {
@@ -815,41 +726,180 @@ std::optional<SourceLayoutNode> MakeSourceLayoutNode(TSNode node, const SourceTo
     return std::nullopt;
 }
 
-void AppendSourceLayoutNodes(
-    TSNode node,
-    const SourceTokenLookup& lookup,
-    SourceLayoutNode& parent,
-    int depth,
-    size_t& order
-) {
-    SourceLayoutNode* childParent = &parent;
-    std::optional<SourceLayoutNode> source = MakeSourceLayoutNode(node, lookup, order);
-    if (source) {
-        source->depth = depth;
-        source->order = order++;
-        parent.children.push_back(std::move(*source));
-        childParent = &parent.children.back();
-        ++depth;
+std::optional<TSNode> ChildByFieldName(TSNode node, const char* fieldName) {
+    TSNode child = ts_node_child_by_field_name(node, fieldName, static_cast<uint32_t>(std::strlen(fieldName)));
+    if (ts_node_is_null(child)) {
+        return std::nullopt;
     }
+    return child;
+}
 
+bool IsNodeEqual(TSNode left, TSNode right) {
+    return ts_node_eq(left, right);
+}
+
+bool IsCompoundStatement(TSNode node) {
+    return std::string_view(ts_node_type(node)) == "compound_statement";
+}
+
+bool ShouldSynthesizeControlBodyBraces(TSNode parent, TSNode child) {
+    const std::string_view parentType = ts_node_type(parent);
+    const std::string_view childType = ts_node_type(child);
+    if (IsCompoundStatement(child)) {
+        return false;
+    }
+    if (parentType == "if_statement") {
+        const std::optional<TSNode> consequence = ChildByFieldName(parent, "consequence");
+        return consequence && IsNodeEqual(*consequence, child);
+    }
+    if (parentType == "else_clause") {
+        const std::optional<TSNode> body = ChildByFieldName(parent, "body");
+        return body && IsNodeEqual(*body, child) && childType != "if_statement";
+    }
+    if (
+        parentType == "while_statement" ||
+        parentType == "for_statement" ||
+        parentType == "for_range_loop" ||
+        parentType == "switch_statement" ||
+        parentType == "do_statement"
+    ) {
+        const std::optional<TSNode> body = ChildByFieldName(parent, "body");
+        return body && IsNodeEqual(*body, child);
+    }
+    return false;
+}
+
+void AppendLayoutChildren(SourceLayoutNode& parent, std::vector<SourceLayoutNode> children) {
+    parent.children.insert(
+        parent.children.end(),
+        std::make_move_iterator(children.begin()),
+        std::make_move_iterator(children.end())
+    );
+}
+
+void BuildSourceLayoutForNode(TSNode node, SourceLayoutBuildContext& context, SourceLayoutNode& parent);
+
+void BuildSourceLayoutForChildren(TSNode node, SourceLayoutBuildContext& context, SourceLayoutNode& parent) {
     const uint32_t childCount = ts_node_child_count(node);
+    size_t cursor = ts_node_start_byte(node);
+    const size_t nodeEnd = ts_node_end_byte(node);
     for (uint32_t index = 0; index < childCount; ++index) {
         const TSNode child = ts_node_child(node, index);
-        if (ts_node_start_byte(child) == ts_node_end_byte(child)) {
+        const size_t childStart = ts_node_start_byte(child);
+        const size_t childEnd = ts_node_end_byte(child);
+        if (childEnd <= cursor) {
             continue;
         }
-        AppendSourceLayoutNodes(child, lookup, *childParent, depth, order);
+        const bool synthesizeBraces = ShouldSynthesizeControlBodyBraces(node, child);
+        if (synthesizeBraces) {
+            AppendSyntheticToken(context, "{");
+        }
+        if (childStart > cursor) {
+            cursor = AppendSourceTrivia(context, cursor, childStart);
+        }
+        if (childStart >= cursor) {
+            BuildSourceLayoutForNode(child, context, parent);
+            cursor = std::max(cursor, childEnd);
+        }
+        if (synthesizeBraces) {
+            AppendSyntheticToken(context, "}");
+        }
+    }
+    if (cursor < nodeEnd) {
+        (void)AppendSourceTrivia(context, cursor, nodeEnd);
     }
 }
 
-SourceLayoutNode BuildSourceLayoutRoot(TSNode root, const std::vector<Token>& tokens) {
+void BuildSourceLayoutForNode(TSNode node, SourceLayoutBuildContext& context, SourceLayoutNode& parent) {
+    if (ts_node_start_byte(node) == ts_node_end_byte(node)) {
+        return;
+    }
+    SourceLayoutNode childContainer;
+    if (!TryAppendTreeToken(node, context)) {
+        BuildSourceLayoutForChildren(node, context, childContainer);
+    }
+    std::optional<SourceLayoutNode> source = MakeSourceLayoutNode(node, context.lookup);
+    if (source) {
+        source->children = std::move(childContainer.children);
+        parent.children.push_back(std::move(*source));
+        return;
+    }
+    AppendLayoutChildren(parent, std::move(childContainer.children));
+}
+
+bool IsTopLevelIncludeNode(TSNode node) {
+    return std::string_view(ts_node_type(node)) == "preproc_include";
+}
+
+void CloseIncludeRun(SourceLayoutNode& root, std::optional<size_t>& begin, size_t end) {
+    if (!begin || *begin >= end) {
+        begin.reset();
+        return;
+    }
+    SourceLayoutNode includeRun;
+    includeRun.kind = SourceLayoutKind::IncludeRun;
+    includeRun.begin = *begin;
+    includeRun.end = end;
+    root.children.push_back(std::move(includeRun));
+    begin.reset();
+}
+
+void BuildSourceLayoutRootChildren(TSNode root, SourceLayoutBuildContext& context, SourceLayoutNode& treeRoot) {
+    const uint32_t childCount = ts_node_child_count(root);
+    size_t cursor = ts_node_start_byte(root);
+    const size_t rootEnd = ts_node_end_byte(root);
+    std::optional<size_t> includeRunBegin;
+    size_t includeRunEnd = 0;
+    for (uint32_t index = 0; index < childCount; ++index) {
+        const TSNode child = ts_node_child(root, index);
+        const size_t childStart = ts_node_start_byte(child);
+        const size_t childEnd = ts_node_end_byte(child);
+        if (childEnd <= cursor) {
+            continue;
+        }
+        const bool isInclude = IsTopLevelIncludeNode(child);
+        if (!isInclude) {
+            CloseIncludeRun(treeRoot, includeRunBegin, includeRunEnd);
+        }
+        if (childStart > cursor) {
+            cursor = AppendSourceTrivia(context, cursor, childStart);
+        }
+        if (childStart < cursor) {
+            continue;
+        }
+        if (isInclude && !includeRunBegin) {
+            includeRunBegin = context.tokens.size();
+        }
+        BuildSourceLayoutForNode(child, context, treeRoot);
+        cursor = std::max(cursor, childEnd);
+        if (isInclude) {
+            includeRunEnd = context.tokens.size();
+        }
+    }
+    CloseIncludeRun(treeRoot, includeRunBegin, includeRunEnd);
+    if (cursor < rootEnd) {
+        (void)AppendSourceTrivia(context, cursor, rootEnd);
+    }
+}
+
+void AssignSourceLayoutMetadata(SourceLayoutNode& parent, int depth, size_t& order) {
+    for (SourceLayoutNode& child : parent.children) {
+        child.depth = depth;
+        child.order = order++;
+        AssignSourceLayoutMetadata(child, depth + 1, order);
+    }
+}
+
+SourceLayoutNode BuildSourceLayoutRoot(TSNode root, std::string_view text, std::vector<Token>& tokens) {
     SourceLayoutNode treeRoot;
     treeRoot.kind = SourceLayoutKind::Root;
     treeRoot.begin = 0;
+    SourceLayoutBuildContext context{text, tokens, {}};
+    context.lookup.tokens = &tokens;
+    BuildSourceLayoutRootChildren(root, context, treeRoot);
     treeRoot.end = tokens.size();
-    const SourceTokenLookup lookup = BuildSourceTokenLookup(tokens);
     size_t order = 0;
-    AppendSourceLayoutNodes(root, lookup, treeRoot, 0, order);
+    AssignSourceLayoutMetadata(treeRoot, 0, order);
     return treeRoot;
 }
 

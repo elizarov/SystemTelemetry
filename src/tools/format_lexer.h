@@ -54,7 +54,6 @@ bool IsOctalDigit(char ch);
 bool IsSpaceButNotNewline(char ch);
 bool IsCommentOrNewline(const Token& token);
 
-std::vector<Token> DropTrailingCommas(std::vector<Token> tokens);
 std::vector<Token> TokenizeCharacterStream(std::string_view text);
 
 }  // namespace tools::format

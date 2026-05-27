@@ -26,6 +26,7 @@ enum class SourceLayoutKind {
     ConstructorInitializer,
     OperatorChain,
     StringLiteralSequence,
+    IncludeRun,
     Group,
 };
 

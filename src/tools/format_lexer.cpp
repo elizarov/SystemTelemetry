@@ -11,19 +11,6 @@ bool IsGroupClose(std::string_view text) {
     return text == ")" || text == "]" || text == "}";
 }
 
-bool IsTrailingComma(TokenSpan tokens, size_t index) {
-    if (index >= tokens.size() || tokens[index].text != ",") {
-        return false;
-    }
-    for (size_t next = index + 1; next < tokens.size(); ++next) {
-        if (IsCommentOrNewline(tokens[next])) {
-            continue;
-        }
-        return IsGroupClose(tokens[next].text);
-    }
-    return false;
-}
-
 bool IsAtPreprocessorStart(std::string_view text, size_t index) {
     if (index > text.size() || index != 0 && text[index - 1] != '\n') {
         return false;
@@ -54,6 +41,42 @@ std::string ReadPreprocessor(std::string_view text, size_t& index) {
         }
     }
     return std::string(text.substr(start, index - start));
+}
+
+size_t SkipWhitespaceAndComments(std::string_view text, size_t index) {
+    while (index < text.size()) {
+        if (IsSpaceButNotNewline(text[index]) || text[index] == '\n') {
+            ++index;
+            continue;
+        }
+        if (index + 1 < text.size() && text[index] == '/' && text[index + 1] == '/') {
+            index += 2;
+            while (index < text.size() && text[index] != '\n') {
+                ++index;
+            }
+            continue;
+        }
+        if (index + 1 < text.size() && text[index] == '/' && text[index + 1] == '*') {
+            index += 2;
+            while (index + 1 < text.size() && (text[index] != '*' || text[index + 1] != '/')) {
+                ++index;
+            }
+            if (index + 1 < text.size()) {
+                index += 2;
+            }
+            continue;
+        }
+        break;
+    }
+    return index;
+}
+
+bool IsTrailingComma(std::string_view text, size_t commaIndex) {
+    if (commaIndex >= text.size() || text[commaIndex] != ',') {
+        return false;
+    }
+    const size_t next = SkipWhitespaceAndComments(text, commaIndex + 1);
+    return next < text.size() && IsGroupClose(std::string_view(text).substr(next, 1));
 }
 
 std::string ReadQuoted(std::string_view text, size_t& index, char quote) {
@@ -128,17 +151,6 @@ bool IsCommentOrNewline(const Token& token) {
         token.kind == TokenKind::BlockComment;
 }
 
-std::vector<Token> DropTrailingCommas(std::vector<Token> tokens) {
-    std::vector<Token> result;
-    result.reserve(tokens.size());
-    for (size_t index = 0; index < tokens.size(); ++index) {
-        if (!IsTrailingComma(tokens, index)) {
-            result.push_back(std::move(tokens[index]));
-        }
-    }
-    return result;
-}
-
 std::vector<Token> TokenizeCharacterStream(std::string_view text) {
     std::vector<Token> tokens;
     size_t index = 0;
@@ -210,6 +222,10 @@ std::vector<Token> TokenizeCharacterStream(std::string_view text) {
             tokens.push_back({TokenKind::Number, std::string(text.substr(start, index - start))});
             continue;
         }
+        if (ch == ',' && IsTrailingComma(text, index)) {
+            ++index;
+            continue;
+        }
         static constexpr std::string_view kThreeCharOps[] = {"<<=", ">>=", "<=>", "...", "->*"};
         bool matched = false;
         for (std::string_view op : kThreeCharOps) {
@@ -260,7 +276,7 @@ std::vector<Token> TokenizeCharacterStream(std::string_view text) {
             ++index;
         }
     }
-    return DropTrailingCommas(std::move(tokens));
+    return tokens;
 }
 
 }  // namespace tools::format

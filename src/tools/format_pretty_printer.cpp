@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "tools/format_include_sorter.h"
 #include "tools/format_lexer.h"
 #include "tools/format_macro_fallback.h"
 #include "tools/impl/lint_common.h"
@@ -149,9 +150,11 @@ public:
     explicit PrettyFormatter(
         const FormatterConfig& config,
         const SourceLayoutNode& sourceLayout,
+        std::string_view sourcePath,
         int initialIndentLevel = 0,
         bool executableBodyContext = false
-    ) : config_(config), sourceLayout_(sourceLayout), indentLevel_(initialIndentLevel) {
+    ) : config_(config), sourceLayout_(sourceLayout), sourcePath_(sourcePath), indentLevel_(initialIndentLevel) {
+        CollectIncludeRuns(sourceLayout_);
         if (executableBodyContext) {
             blockStack_.push_back({BlockKind::FunctionDefinition, true, DeclarationKind::None, false, -1});
         }
@@ -159,6 +162,11 @@ public:
 
     std::string Format(TokenSpan tokens) {
         for (size_t index = 0; index < tokens.size(); ++index) {
+            if (std::optional<size_t> includeRunEnd = IncludeRunEnd(tokens, index)) {
+                EmitSortedIncludeRun(TokenSubspan(tokens, index, *includeRunEnd));
+                index = *includeRunEnd - 1;
+                continue;
+            }
             const Token& token = tokens[index];
             switch (token.kind) {
                 case TokenKind::Newline:
@@ -196,6 +204,34 @@ private:
         TypeDeclaration,
         FunctionDefinition,
     };
+
+    void CollectIncludeRuns(const SourceLayoutNode& node) {
+        if (node.kind == SourceLayoutKind::IncludeRun && node.begin < node.end) {
+            includeRuns_.emplace(node.begin, node.end);
+        }
+        for (const SourceLayoutNode& child : node.children) {
+            CollectIncludeRuns(child);
+        }
+    }
+
+    std::optional<size_t> IncludeRunEnd(TokenSpan tokens, size_t index) const {
+        if (index >= tokens.size() || tokens[index].modelIndex == kNoTokenIndex) {
+            return std::nullopt;
+        }
+        const auto includeRun = includeRuns_.find(tokens[index].modelIndex);
+        if (includeRun == includeRuns_.end()) {
+            return std::nullopt;
+        }
+        size_t end = index + 1;
+        while (
+            end < tokens.size() &&
+            tokens[end].modelIndex != kNoTokenIndex &&
+            tokens[end].modelIndex < includeRun->second
+        ) {
+            ++end;
+        }
+        return end;
+    }
 
     enum class DeclarationKind {
         None,
@@ -591,6 +627,16 @@ private:
         pendingPreprocessorBlank_ = true;
     }
 
+    void EmitSortedIncludeRun(TokenSpan tokens) {
+        for (const std::optional<std::string>& line : SortedIncludeRunLines(tokens, config_, sourcePath_)) {
+            if (!line) {
+                EmitRequiredBlankLine();
+                continue;
+            }
+            EmitPreprocessor(*line);
+        }
+    }
+
     bool IsPragmaOnceDirective(const std::vector<std::string>& lines) const {
         return !lines.empty() && tools::lint::Trim(lines.front()) == "#pragma once";
     }
@@ -683,7 +729,7 @@ private:
         if (!IsStructuredMacroReplacement(replacementTokens)) {
             return std::nullopt;
         }
-        PrettyFormatter formatter(config_, sourceLayout_, 1);
+        PrettyFormatter formatter(config_, sourceLayout_, sourcePath_, 1);
         std::vector<std::string> lines = tools::lint::SplitLines(formatter.Format(replacementTokens));
         lines.erase(std::remove(lines.begin(), lines.end(), std::string{}), lines.end());
         if (lines.empty()) {
@@ -1534,6 +1580,8 @@ private:
                     return false;
                 }
                 return addNode({LayoutNodeKind::StringLiteralSequence, 0, {}, source.depth, 0});
+            case SourceLayoutKind::IncludeRun:
+                return false;
             case SourceLayoutKind::Group: {
                 if (
                     source.groupOpen < spanBegin ||
@@ -2495,7 +2543,7 @@ private:
         TokenSpan body = TokenSubspan(tokens, bodyOpen + 1, *bodyClose);
         TokenSpan after = TokenSubspan(tokens, *bodyClose + 1, tokens.size());
         std::vector<std::string> lines = FormatLambdaHeaderWithLeadingTokens(header, indentLevel, std::move(prefix));
-        PrettyFormatter bodyFormatter(config_, sourceLayout_, indentLevel + 1, true);
+        PrettyFormatter bodyFormatter(config_, sourceLayout_, sourcePath_, indentLevel + 1, true);
         std::vector<std::string> bodyLines = tools::lint::SplitLines(bodyFormatter.Format(body));
         while (!bodyLines.empty() && bodyLines.back().empty()) {
             bodyLines.pop_back();
@@ -6608,9 +6656,11 @@ private:
     std::vector<Token> pendingTokens_;
     std::string pendingPrefix_;
     std::vector<BlockState> blockStack_;
+    std::map<size_t, size_t> includeRuns_;
     mutable std::map<std::string, LayoutResult> layoutCache_;
     const FormatterConfig& config_;
     const SourceLayoutNode& sourceLayout_;
+    std::string_view sourcePath_;
     int indentLevel_ = 0;
     int groupDepth_ = 0;
     int caseBodyIndentLevel_ = -1;
@@ -6626,8 +6676,8 @@ private:
 
 }  // namespace
 
-std::string FormatModelText(const FormatterConfig& config, const FormatModel& model) {
-    PrettyFormatter formatter(config, model.layout);
+std::string FormatModelText(const FormatterConfig& config, const FormatModel& model, std::string_view sourcePath) {
+    PrettyFormatter formatter(config, model.layout, sourcePath);
     return formatter.Format(model.tokens);
 }
 
