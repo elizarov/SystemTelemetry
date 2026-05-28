@@ -866,6 +866,7 @@ target_compile_options(CaseDashTreeSitterCppGrammar PRIVATE
 add_executable(CaseDashTools
     src/tools/tools_main.cpp
     src/tools/format.cpp
+    src/tools/format_model_dump.cpp
     src/tools/impl/format_args.cpp
     src/tools/impl/format_break_model.cpp
     src/tools/impl/format_break_model_builder.cpp
@@ -874,6 +875,7 @@ add_executable(CaseDashTools
     src/tools/impl/format_include_sort.cpp
     src/tools/impl/format_model.cpp
     src/tools/impl/format_model_builder.cpp
+    src/tools/impl/format_model_parse.cpp
     src/tools/impl/format_pretty_printer.cpp
     src/tools/impl/format_spacing.cpp
     src/tools/lint_check.cpp
@@ -1142,6 +1144,7 @@ add_executable(CaseDashBenchmarks
     src/tools/impl/format_include_sort.cpp
     src/tools/impl/format_model.cpp
     src/tools/impl/format_model_builder.cpp
+    src/tools/impl/format_model_parse.cpp
     src/tools/impl/format_pretty_printer.cpp
     src/tools/impl/format_spacing.cpp
     src/tools/impl/tools_common.cpp

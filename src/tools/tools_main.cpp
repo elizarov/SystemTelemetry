@@ -4,6 +4,7 @@
 #include <string>
 
 #include "tools/format.h"
+#include "tools/format_model_dump.h"
 #include "tools/lint_check.h"
 
 namespace {
@@ -15,6 +16,7 @@ void PrintUsage() {
         "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-i|-n|--dry-run] "
             "[-v|--verbose] [--files <path>|--files=<path>] [file...]\n"
     );
+    std::fprintf(stderr, "  CaseDashTools.exe format_model_dump <source-file>\n");
     std::fprintf(
         stderr,
         "  CaseDashTools.exe lint_check [--config <path>] [--check] [--no-progress] [--report-json <path>] "
@@ -32,6 +34,9 @@ int RunToolsMain(int argc, char** argv) {
     const std::string tool = argv[1];
     if (tool == "format") {
         return RunFormat(argc - 2, argv + 2);
+    }
+    if (tool == "format_model_dump") {
+        return RunFormatModelDump(argc - 2, argv + 2);
     }
     if (tool == "lint_check") {
         return RunLintCheck(argc - 2, argv + 2);

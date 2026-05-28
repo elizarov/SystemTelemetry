@@ -269,6 +269,7 @@ enum class TokenClass : std::uint64_t {
 
 SyntaxNodeKind SyntaxNodeKindFromTreeType(std::string_view type);
 SyntaxNodeKind SyntaxNodeKindFromTokenText(std::string_view text);
+std::string_view SyntaxNodeKindName(SyntaxNodeKind kind);
 std::string_view SyntaxNodeKindTokenText(SyntaxNodeKind kind);
 bool SyntaxNodeKindHasClass(SyntaxNodeKind kind, TokenClass tokenClass);
 

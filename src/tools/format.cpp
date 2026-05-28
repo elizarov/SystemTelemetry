@@ -4,18 +4,15 @@
 #include <cstdio>
 #include <cstdlib>
 #include <io.h>
-#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <tree_sitter/api.h>
-#include <tree_sitter_cpp.h>
 #include <vector>
 
 #include "tools/impl/format_args.h"
 #include "tools/impl/format_config.h"
 #include "tools/impl/format_model.h"
-#include "tools/impl/format_model_builder.h"
+#include "tools/impl/format_model_parse.h"
 #include "tools/impl/format_pretty_printer.h"
 #include "tools/impl/tools_common.h"
 
@@ -48,38 +45,6 @@ std::string ToFileLineEndings(std::string_view text) {
         }
     }
     return result;
-}
-
-FormatModel BuildFormatModel(std::string_view text) {
-    auto sourceText = std::make_unique<std::string>(text);
-    TSParser* parser = ts_parser_new();
-    if (parser == nullptr) {
-        FormatModel model;
-        model.sourceText = std::move(sourceText);
-        model.parse.error = "tree-sitter parser setup failed";
-        return model;
-    }
-    if (!ts_parser_set_language(parser, tree_sitter_cpp())) {
-        ts_parser_delete(parser);
-        FormatModel model;
-        model.sourceText = std::move(sourceText);
-        model.parse.error = "tree-sitter parser setup failed";
-        return model;
-    }
-    TSTree* tree =
-        ts_parser_parse_string(parser, nullptr, sourceText->data(), static_cast<uint32_t>(sourceText->size()));
-    if (tree == nullptr) {
-        ts_parser_delete(parser);
-        FormatModel model;
-        model.sourceText = std::move(sourceText);
-        model.parse.error = "tree-sitter parse setup failed";
-        return model;
-    }
-    const TSNode root = ts_tree_root_node(tree);
-    FormatModel model = BuildFormatModel(root, std::move(sourceText));
-    ts_tree_delete(tree);
-    ts_parser_delete(parser);
-    return model;
 }
 
 size_t AdvanceNewline(std::string_view text, size_t index) {
@@ -124,7 +89,7 @@ bool TextMatchesFormattedOutput(std::string_view source, std::string_view format
 }  // namespace
 
 SourceFormatResult FormatSourceText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
-    FormatModel model = BuildFormatModel(text);
+    FormatModel model = ParseFormatModel(text);
     SourceFormatResult result;
     if (!model.parse.ok) {
         result.ok = false;
