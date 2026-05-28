@@ -210,7 +210,8 @@ void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
 void ExpectRectNoOverlap(RECT* rects) {
     if (check) {
         if (ready) {
-            EXPECT_FALSE(IntersectRect(&intersection, &rects[i], &rects[j])) << "rect " << i << " overlapped rect " << j;
+            EXPECT_FALSE(IntersectRect(&intersection, &rects[i], &rects[j]))
+                << "rect " << i << " overlapped rect " << j;
         }
     }
 }
@@ -844,9 +845,17 @@ void BuildLayoutEditTargetMenuLabel(const LayoutEditTarget* layoutEditTarget) {
             const auto focusKey = TooltipPayloadFocusKey(layoutEditTarget->payload);
             if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel("card title");
-            } else if (label.empty() && focusKey.has_value() && std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr) {
+            } else if (
+                label.empty() &&
+                focusKey.has_value() &&
+                std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr
+            ) {
                 label = BuildLayoutEditMenuLabel("node field");
-            } else if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)) {
+            } else if (
+                label.empty() &&
+                focusKey.has_value() &&
+                std::holds_alternative<LayoutContainerEditKey>(*focusKey)
+            ) {
                 label = BuildLayoutEditMenuLabel("layout container");
             }
         }
@@ -1081,7 +1090,10 @@ void FormatterSelfBreakCases() {
 void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {
     if (parameter == nullptr) {
         return;
-    } else if (const auto currentColor = FindLayoutEditParameterColorConfigValue(config, *parameter); currentColor.has_value() && *currentColor != nullptr) {
+    } else if (
+        const auto currentColor = FindLayoutEditParameterColorConfigValue(config, *parameter);
+        currentColor.has_value() && *currentColor != nullptr
+    ) {
         colorExpressionValue = TooltipColorExpression(**currentColor);
     }
 }
