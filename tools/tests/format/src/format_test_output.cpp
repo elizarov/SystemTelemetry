@@ -707,32 +707,32 @@ const auto ensureSection = [&lines, &findSectionIndex, shape](const std::string&
     return lines.size();
 };
 
-const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape]
-    (const std::string& sectionName, const std::string& key, const std::string& value)
-{
+const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectionEnd, shape](
+    const std::string& sectionName,
+    const std::string& key,
+    const std::string& value
+) {
     Use(sectionName, key, value);
 };
 
-const auto ensureSectionAfter = [&lines, &findSectionIndex, shape]
-    (const std::string& sectionName, const std::string& afterSectionName) -> size_t
-{
-    const size_t existingIndex = findSectionIndex(sectionName);
-    if (existingIndex < lines.size()) {
-        return existingIndex;
-    }
+const auto ensureSectionAfter =
+    [&lines, &findSectionIndex, shape](const std::string& sectionName, const std::string& afterSectionName) -> size_t {
+        const size_t existingIndex = findSectionIndex(sectionName);
+        if (existingIndex < lines.size()) {
+            return existingIndex;
+        }
 
-    const size_t afterIndex = findSectionIndex(afterSectionName);
-    return afterIndex;
-};
+        const size_t afterIndex = findSectionIndex(afterSectionName);
+        return afterIndex;
+    };
 
-const auto guideSheetLookup = [&config, activeTheme, &colorsSection]
-    (std::string_view name) -> std::optional<ColorConfig>
-{
-    if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
-        return themeColor;
-    }
-    return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
-};
+const auto guideSheetLookup =
+    [&config, activeTheme, &colorsSection](std::string_view name) -> std::optional<ColorConfig> {
+        if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
+            return themeColor;
+        }
+        return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
+    };
 
 constexpr int kPrimaryFlag = 1;
 constexpr int kSecondaryFlag = 2;
@@ -846,15 +846,11 @@ void BuildLayoutEditTargetMenuLabel(const LayoutEditTarget* layoutEditTarget) {
             if (label.empty() && focusKey.has_value() && std::holds_alternative<LayoutCardTitleEditKey>(*focusKey)) {
                 label = BuildLayoutEditMenuLabel("card title");
             } else if (
-                label.empty() &&
-                focusKey.has_value() &&
-                std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr
+                label.empty() && focusKey.has_value() && std::get_if<LayoutNodeFieldEditKey>(&*focusKey) != nullptr
             ) {
                 label = BuildLayoutEditMenuLabel("node field");
             } else if (
-                label.empty() &&
-                focusKey.has_value() &&
-                std::holds_alternative<LayoutContainerEditKey>(*focusKey)
+                label.empty() && focusKey.has_value() && std::holds_alternative<LayoutContainerEditKey>(*focusKey)
             ) {
                 label = BuildLayoutEditMenuLabel("layout container");
             }
@@ -1037,8 +1033,7 @@ void UniversalBreakSelectionCases() {
         SecondTemplateArgumentWithLongName,
         ThirdTemplateArgumentWithLongName
     >();
-    AppConfig config = extraTemplate.empty() ?
-        LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context) :
+    AppConfig config = extraTemplate.empty() ? LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context) :
         LoadConfigWithExtraTemplate(GetRuntimeConfigPath(), !options.defaultConfig, context, extraTemplate);
 }
 
@@ -1069,12 +1064,15 @@ void FormatterSelfBreakCases() {
     ) {
         return;
     }
-    if (next < tokens.size() && tokens[next].kind == TokenKind::Word && (
-        tokens[next].text == "else" ||
-        tokens[next].text == "catch" ||
-        tokens[next].text == "finally" ||
-        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
-    )) {
+    if (
+        next < tokens.size() &&
+        tokens[next].kind == TokenKind::Word && (
+            tokens[next].text == "else" ||
+            tokens[next].text == "catch" ||
+            tokens[next].text == "finally" ||
+            (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+        )
+    ) {
         return;
     }
     if (
@@ -1177,9 +1175,8 @@ double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double 
 }
 
 double SampleSupersampledX(int x, int sx, int iconSize) {
-    const double sampleX = (
-        static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample
-    ) * 256.0 / static_cast<double>(iconSize);
+    const double sampleX = (static_cast<double>(x) +
+        (static_cast<double>(sx) + 0.5) / kSupersample) * 256.0 / static_cast<double>(iconSize);
     return sampleX;
 }
 
