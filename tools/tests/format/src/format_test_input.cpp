@@ -1,40 +1,32 @@
 #pragma once
-
+#include <windows.h>
+#include "zeta/thing.h"
+#include <vector>
+#include <string_view>
+#include "format_test_fixture.h"
+#include "vendor/library.h"
 #include <winsock2.h>
+#include <string>
+#include "Alpha/thing.h"
+#include <algorithm>
 #include <ws2tcpip.h>
 
-#include <windows.h>
-
-#include <string_view>
-#include <algorithm>
-#include <vector>
-#include <string>
-
-#include "vendor/library.h"
-
-#include "Alpha/thing.h"
-#include "format_test_fixture.h"
-#include "zeta/thing.h"
-
 #define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) \
-    ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))
+    ((firstValue) + \
+        (secondValue) + \
+        (thirdValue) + \
+        (firstValue) + \
+        (secondValue) + \
+        (thirdValue))
 #define FORMAT_FIXTURE_SHORT_MACRO(value) (value)
 #define FORMAT_FIXTURE_MUCH_LONGER_MACRO(value) (value)
 #define FORMAT_FIXTURE_ITEMS(X) \
-    X(Alpha, "alpha") \
-    X(Beta, "beta") \
-    X(Gamma, "gamma")
+X(Alpha,"alpha") X(Beta,"beta") X(Gamma,"gamma")
 #define ENUM_STRING_DECLARE(EnumType, ItemsMacro) \
-    enum class EnumType { \
-        ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR), \
-    }; \
-    template <> \
-    struct EnumStringTraits<EnumType> { \
-        static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)}); \
-        static_assert(enum_string_detail::ValidateCanonicalNames(names)); \
-    }
+    enum class EnumType{ItemsMacro( \
+        ENUM_STRING_DECLARE_ENUMERATOR \
+    )}; template <> struct EnumStringTraits<EnumType>{static constexpr auto names = std::to_array<std::string_view>({ItemsMacro(ENUM_STRING_DECLARE_NAME)}); static_assert(enum_string_detail::ValidateCanonicalNames(names)); }
 #define FORMAT_FIXTURE_TEMP_MACRO(value) (value)
-
 #undef FORMAT_FIXTURE_TEMP_MACRO
 
 namespace format_fixture {
@@ -71,9 +63,9 @@ constexpr auto kFixtureCommentedSyntaxKindMappings =
 
 Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"), Tree(SyntaxNodeKind::IncludeRun, "include_run")});
 
-class FormattingExample {
-public:
-    int* pointer;
+class FormattingExample{
+	public:
+	int * pointer;
 
     int& reference;
     mutable ID2D1RenderTarget* cachedD2DBitmapTarget_ = nullptr;
@@ -85,7 +77,7 @@ private:
     int value;
 };
 
-class MacroSeparatedMethodHost {
+class MacroSeparatedMethodHost{
 #define FORMAT_FIXTURE_METHOD_MARKER(value) (value)
 
     void MethodAfterMacro() {}
@@ -93,49 +85,42 @@ class MacroSeparatedMethodHost {
     int fieldAfterMethod;
 };
 
-class DashboardShellHost {
+class DashboardShellHost{
 public:
-    virtual ~DashboardShellHost() = default;
-    virtual std::optional<FilePath> PromptDiagnosticsSavePath(
-        std::string_view defaultFileName,
-        std::string_view filter,
-        std::string_view defaultExtension
-    ) const = 0;
-    virtual ::Renderer& Renderer() = 0;
-    virtual const ::Renderer& Renderer() const = 0;
-    virtual DashboardOverlayState& LayoutDashboardOverlayState() = 0;
-    virtual void Draw(::Renderer& renderer, const WidgetAnimationState& state) const = 0;
-    virtual void ResolveLayoutState(const WidgetHost& renderer, const RenderRect& rect);
-    virtual void Draw(WidgetHost& renderer, const struct WidgetLayout& widget, const MetricSource& metrics) const;
+virtual~DashboardShellHost()=default;
+virtual std::optional<FilePath> PromptDiagnosticsSavePath(std::string_view defaultFileName,std::string_view filter,std::string_view defaultExtension) const=0;
+virtual::Renderer& Renderer()=0;
+virtual const::Renderer& Renderer() const=0;
+virtual DashboardOverlayState & LayoutDashboardOverlayState()=0;
+virtual void Draw(::Renderer & renderer,const WidgetAnimationState & state) const=0;
+virtual void ResolveLayoutState(const WidgetHost& renderer,const RenderRect& rect);
+virtual void Draw(WidgetHost& renderer,const struct WidgetLayout& widget,const MetricSource& metrics) const;
 };
 
-class DialogRedrawScope {
+class DialogRedrawScope{
 public:
-    DialogRedrawScope(const DialogRedrawScope&) = delete;
-    DialogRedrawScope& operator=(const DialogRedrawScope&) = delete;
+DialogRedrawScope(const DialogRedrawScope &)=delete;
+DialogRedrawScope& operator=(const DialogRedrawScope &)=delete;
 };
 
-__declspec(noinline) bool DashboardController::FinishConfigMutation(
-    DashboardShellHost& shell,
-    bool refreshThemedIcons
-) {
-    return refreshThemedIcons;
+__declspec(noinline) bool DashboardController::FinishConfigMutation(DashboardShellHost& shell,bool refreshThemedIcons){
+return refreshThemedIcons;
 }
 
-struct FormatTableRow {
-    const char* name;
-    int labelControl;
-    int editControl;
-    int flags;
+struct FormatTableRow{
+const char * name;
+int labelControl;
+int editControl;
+int flags;
 };
 
-struct FormatBitFields {
-    unsigned shortBits : 1;
-    unsigned muchLongerBits : 2;
+struct FormatBitFields{
+unsigned shortBits : 1;
+unsigned muchLongerBits : 2;
 };
 
-struct AlignedStorage {
-    alignas(void*) unsigned char storage_[sizeof(void*)]{};
+struct AlignedStorage{
+alignas(void*)unsigned char storage_[sizeof(void*)] {};
 };
 
 // Defaulted operator fixture.
@@ -146,15 +131,15 @@ struct ColorMixExpression {
     bool operator==(const ColorMixExpression& other) const = default;
 };
 
-void FormatAlphaNibble(char* text, unsigned int alpha) {
-    constexpr char kHex[] = "0123456789ABCDEF";
-    text[2] = kHex[(alpha >> 4) & 0x0Fu];
-    text[3] = kHex[alpha & 0x0Fu];
+void FormatAlphaNibble(char* text,unsigned int alpha){
+constexpr char kHex[]="0123456789ABCDEF";
+text[2]=kHex[(alpha >> 4)&0x0Fu];
+text[3]=kHex[alpha&0x0Fu];
 }
 
-void IncrementSnapshotVersion(FrameState& frame) {
-    frame.versions.snapshotVersion = ++snapshotVersion_;
-    frame.versions.previousVersion = --snapshotVersion_;
+void IncrementSnapshotVersion(FrameState& frame){
+frame.versions.snapshotVersion=++snapshotVersion_;
+frame.versions.previousVersion=--snapshotVersion_;
 }
 
 void WriteTraceStringFragments(TraceLog& trace) {
@@ -209,45 +194,22 @@ std::string FormatLayoutEditTraceText(const LayoutEditTraceState& state, const c
     return trace;
 }
 
-void ReportUnknownBenchmark(const std::string& firstArg, std::istream& input) {
-    std::cerr
-        << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames() << "\n";
-    input
-        >> firstBenchmarkName
-        >> secondBenchmarkNameWithLongName
-        >> thirdBenchmarkNameWithLongName
-        >> fourthBenchmarkNameWithLongName;
-    std::cout
-        << std::left << std::setw(18) << name
-        << " total_ms="
-        << std::fixed << std::setprecision(2) << result.total.count()
-        << " per_iter_ms="
-        << result.perIteration.count()
-        << "\n";
+void ReportUnknownBenchmark(const std::string& firstArg,std::istream& input){
+std::cerr<<"unknown benchmark \""<<firstArg<<"\"; supported benchmarks: "<<SupportedBenchmarkNames()<<"\n";
+input>>firstBenchmarkName>>secondBenchmarkNameWithLongName>>thirdBenchmarkNameWithLongName>>fourthBenchmarkNameWithLongName;
+std::cout<<std::left<<std::setw(18)<<name<<" total_ms="<<std::fixed<<std::setprecision(2)<<result.total.count()<<" per_iter_ms="<<result.perIteration.count()<<"\n";
 }
 
-void ExpectRectNoOverlap(RECT* rects) {
-    if (check) {
-        if (ready) {
-            EXPECT_FALSE(IntersectRect(&intersection, &rects[i], &rects[j])) << "rect " << i << " overlapped rect " << j;
-        }
-    }
+void ExpectRectNoOverlap(RECT* rects){
+if(check){
+if(ready){
+EXPECT_FALSE(IntersectRect(&intersection,&rects[i],&rects[j]))<<"rect "<<i<<" overlapped rect "<<j;
+}
+}
 }
 
-void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
-    regions.Reserve(
-        layoutResolver_->resolvedLayout_.cards.size() * 4 +
-            layoutResolver_->layoutEditGuides_.size() +
-            containerChildTargetCount +
-            layoutResolver_->gapEditAnchors_.size() +
-            layoutResolver_->widgetEditGuides_.size() +
-            (
-                layoutResolver_->staticEditableAnchorRegions_.size() +
-                layoutResolver_->dynamicEditableAnchorRegions_.size()
-            ) * 2 +
-            layoutResolver_->staticColorEditRegions_.size() +
-            layoutResolver_->dynamicColorEditRegions_.size()
-    );
+void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions){
+regions.Reserve(layoutResolver_->resolvedLayout_.cards.size()*4+layoutResolver_->layoutEditGuides_.size()+containerChildTargetCount+layoutResolver_->gapEditAnchors_.size()+layoutResolver_->widgetEditGuides_.size()+(layoutResolver_->staticEditableAnchorRegions_.size()+layoutResolver_->dynamicEditableAnchorRegions_.size())*2+layoutResolver_->staticColorEditRegions_.size()+layoutResolver_->dynamicColorEditRegions_.size());
 }
 
 void WriteMetricConfig() {
@@ -271,43 +233,32 @@ void WriteInitialConfigText() {
         "drives = C\r\n";
 }
 
-struct OklabColor {
-    double l;
-    double a;
-    double b;
+struct OklabColor{
+double l;
+double a;
+double b;
 };
 
-OklabColor MixOklab(OklabColor from, OklabColor to, double amount) {
-    return OklabColor{
-        from.l + (to.l - from.l) * amount,
-        from.a + (to.a - from.a) * amount,
-        from.b + (to.b - from.b) * amount
-    };
-}
-
-OklchColor NormalizeOklch(
-    const double* lightnessOverrideWithLongName,
-    const double* chromaOverrideWithLongName,
-    const double* hueOverrideWithLongName
-) {
-    return OklchColor{
-        std::clamp(*lightnessOverrideWithLongName, 0.0, 1.0),
-        std::max(0.0, *chromaOverrideWithLongName),
-        std::clamp(*hueOverrideWithLongName, 0.0, 360.0)
-    };
-}
-
-enum class RuntimeConfigFieldValueKind {
-    HexColor,
-    Integer,
+OklabColor MixOklab(OklabColor from,OklabColor to,double amount){
+return OklabColor{
+from.l + (to.l - from.l)* amount,
+from.a + (to.a - from.a)* amount,
+from.b + (to.b - from.b)* amount
 };
+}
+
+OklchColor NormalizeOklch(const double* lightnessOverrideWithLongName,const double* chromaOverrideWithLongName,const double* hueOverrideWithLongName){
+return OklchColor{
+std::clamp(*lightnessOverrideWithLongName,0.0,1.0),
+std::max(0.0,*chromaOverrideWithLongName),
+std::clamp(*hueOverrideWithLongName,0.0,360.0),
+};
+}
+
+enum class RuntimeConfigFieldValueKind{HexColor,Integer};
 
 enum class ValueFormat : std::uint8_t {
-    String,
-    Integer,
-    FloatingPoint,
-    ColorHex,
-    FontSpec,  // text values
+    String, Integer, FloatingPoint, ColorHex, FontSpec, // text values
     FontSmall,
     FontFooter,
     FontClockTime,
@@ -318,17 +269,15 @@ enum class ValueFormat : std::uint8_t {
     CardBorder,
 };
 
-enum RuntimeMode {
-    Default,
-};
+enum RuntimeMode{Default};
 
-struct RuntimeConfigFieldDescriptor {
-    RuntimeConfigFieldValueKind kind;
-    const char* key;
-    int keyLength;
-};
+struct RuntimeConfigFieldDescriptor{RuntimeConfigFieldValueKind kind;const char* key;int keyLength;};
 
-bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const void* owner, const void* compareOwner);
+bool RuntimeConfigFieldEquals(
+    const RuntimeConfigFieldDescriptor& field,
+    const void* owner,
+    const void* compareOwner
+);
 // Implemented by generated file build/cmake/generated/config/config_meta.generated.cpp.
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
 
@@ -373,29 +322,17 @@ void SaveBoardSectionDifferences(
     updateKey(board, compareBoard, sectionName);
 }
 
-template <
-    typename FirstTemplateParameter,
-    typename SecondTemplateParameter,
-    typename ThirdTemplateParameter,
-    typename FourthTemplateParameter
->
-struct LongTemplateParameterHost {};
+template <typename FirstTemplateParameter,typename SecondTemplateParameter,typename ThirdTemplateParameter,typename FourthTemplateParameter> struct LongTemplateParameterHost{};
 
-template <typename Result, typename... Args>
+template <typename Result, typename...Args>
 class FunctionRef<Result(Args...)> {
 public:
     template <typename Callable>
-        requires(
-            !std::is_same_v<std::remove_cvref_t<Callable>, FunctionRef> &&
-            std::is_invocable_r_v<Result, Callable&&, Args...>
-        )
-    FunctionRef(Callable&& callable) :
-        context_(const_cast<void*>(static_cast<const void*>(std::addressof(callable)))),
-        invoke_([](void* context, Args... args) -> Result {
-            return (*static_cast<std::remove_reference_t<Callable>*>(context))(std::forward<Args>(args)...);
-        }) {}
+    requires(!std::is_same_v<std::remove_cvref_t<Callable>, FunctionRef>&& std::is_invocable_r_v < Result, Callable&&, Args... >) FunctionRef(Callable&& callable) : context_(const_cast<void*>(static_cast<const void*>(std::addressof(callable)))), invoke_([](void* context, Args...args) -> Result {
+        return(*static_cast<std::remove_reference_t<Callable>*>(context))(std::forward<Args>(args)...);
+    }) {}
 
-    Result operator()(Args... args) const {
+    Result operator()(Args...args) const {
         return invoke_(context_, std::forward<Args>(args)...);
     }
 
@@ -404,8 +341,8 @@ private:
     Result (*invoke_)(void*, Args...) = nullptr;
 };
 
-template <typename T> requires(HasValue<T>)
-void UseShortRequires(T& value) {
+template <typename T>
+requires(HasValue<T>) void UseShortRequires(T& value) {
     value.Use();
 }
 
@@ -1093,371 +1030,127 @@ bool EqualStringVectors(const void* address, const void* compareAddress) {
     return *reinterpret_cast<const std::vector<std::string>*>(address)==*reinterpret_cast<const std::vector<std::string>*>(compareAddress);
 }
 
-void FormatterSelfBreakCases() {
-    if (
-        tokens[statementStart].text == "for" ||
-        tokens[statementStart].text == "while" ||
-        tokens[statementStart].text == "switch"
-    ) {
-        return;
-    }
-    if (next < tokens.size() && tokens[next].kind == TokenKind::Word && (
-        tokens[next].text == "else" ||
-        tokens[next].text == "catch" ||
-        tokens[next].text == "finally" ||
-        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
-    )) {
-        return;
-    }
-    if (
-        pendingTokens_.empty() &&
-        pendingPrefix_.empty() &&
-        IsTrailingCommentAfterEmittedClose(tokens, index) &&
-        !outputLines_.empty()
-    ) {
-        return;
-    }
+
+void FormatterSelfBreakCases(){
+if(tokens[statementStart].text=="for"||tokens[statementStart].text=="while"||tokens[statementStart].text=="switch"){return;}
+if(next<tokens.size()&&tokens[next].kind==TokenKind::Word&&(tokens[next].text=="else"||tokens[next].text=="catch"||tokens[next].text=="finally"||(tokens[next].text=="while"&&closedBlock.kind==BlockKind::DoStatement))){return;}
+if(pendingTokens_.empty()&&pendingPrefix_.empty()&&IsTrailingCommentAfterEmittedClose(tokens,index)&&!outputLines_.empty()){return;}
 }
 
-void ApplyLayoutEditColorExpression(AppConfig& config, const LayoutEditParameter* parameter) {
-    if (parameter == nullptr) {
-        return;
-    } else if (const auto currentColor = FindLayoutEditParameterColorConfigValue(config, *parameter); currentColor.has_value() && *currentColor != nullptr) {
-        colorExpressionValue = TooltipColorExpression(**currentColor);
-    }
+void ApplyLayoutEditColorExpression(AppConfig& config,const LayoutEditParameter* parameter){
+if(parameter==nullptr){return;}else if(const auto currentColor=FindLayoutEditParameterColorConfigValue(config,*parameter);currentColor.has_value() && *currentColor!=nullptr){colorExpressionValue=TooltipColorExpression(**currentColor);}
 }
 
-bool ConfigureDisplayGuard(
-    DisplayState& state,
-    DisplayOption option,
-    DashboardShellHost& shell,
-    UpdatedConfig updatedConfig
-) {
-    if (!::ConfigureDisplay(
-        updatedConfig,
-        state.telemetryUpdate.dump,
-        option.fittedScale,
-        shell.TraceLog(),
-        shell.WindowHandle()
-    )) {
-        return true;
-    }
-    return false;
+bool ConfigureDisplayGuard(DisplayState& state,DisplayOption option,DashboardShellHost& shell,UpdatedConfig updatedConfig){
+if(!::ConfigureDisplay(updatedConfig,state.telemetryUpdate.dump,option.fittedScale,shell.TraceLog(),shell.WindowHandle())){return true;}
+return false;
 }
 
-int MeasureHexLabelWidth(HWND hwnd) {
-    const int hexLabelWidth = MeasureTextWidthForControl(
-        hwnd,
-        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
-        ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)
-    ) + 8;
-    return hexLabelWidth;
+int MeasureHexLabelWidth(HWND hwnd){
+const int hexLabelWidth=MeasureTextWidthForControl(hwnd,IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,ReadDialogControlText(hwnd,IDC_LAYOUT_EDIT_COLOR_HEX_LABEL))+8;
+return hexLabelWidth;
 }
 
-int MeasureTextBlockRight(const RenderRect& measureRect, const std::wstring& wideText, const TextStyle& style) {
-    const int width = std::max(
-        0,
-        static_cast<int>(
-            MeasureTextBlockD2D(
-                measureRect,
-                wideText,
-                style,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                nullptr
-            ).textRect.right
-        )
-    );
-    return width;
+int MeasureTextBlockRight(const RenderRect& measureRect,const std::wstring& wideText,const TextStyle& style){
+const int width=std::max(0,static_cast<int>(MeasureTextBlockD2D(measureRect,wideText,style,TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading,TextVerticalAlign::Center),nullptr).textRect.right));
+return width;
 }
 
-size_t CountLeftCards(
-    const std::vector<int>& cardPlanned,
-    const std::vector<Callout>& plannedCalloutDetails,
-    const std::vector<CardPlacement>& cardPlacements,
-    size_t cardIndex
-) {
-    const size_t leftCount = cardPlanned.size() == 1 ? (
-        plannedCalloutDetails[cardPlanned.front()].target.Center().x < cardPlacements[cardIndex].sourceRect.Center().x ?
-            1 : 0
-    ) : cardPlanned.size() / 2;
-    return leftCount;
+size_t CountLeftCards(const std::vector<int>& cardPlanned,const std::vector<Callout>& plannedCalloutDetails,const std::vector<CardPlacement>& cardPlacements,size_t cardIndex){
+const size_t leftCount=cardPlanned.size()==1?(plannedCalloutDetails[cardPlanned.front()].target.Center().x<cardPlacements[cardIndex].sourceRect.Center().x?1:0):cardPlanned.size()/2;
+return leftCount;
 }
 
-RenderRect BuildGuideSheetTargetRect(
-    const PlannedCallout& planned,
-    const std::vector<CardPlacement>& cardPlacements,
-    double dx,
-    double dy
-) {
-    const RenderRect targetRect = cardPlacements[planned.cardIndex].overview ? TransformRect(
-        planned.target,
-        cardPlacements[planned.cardIndex].sourceRect,
-        cardPlacements[planned.cardIndex].destRect
-    ) : OffsetRenderRect(planned.target, dx, dy);
-    return targetRect;
+RenderRect BuildGuideSheetTargetRect(const PlannedCallout& planned,const std::vector<CardPlacement>& cardPlacements,double dx,double dy){
+const RenderRect targetRect=cardPlacements[planned.cardIndex].overview?TransformRect(planned.target,cardPlacements[planned.cardIndex].sourceRect,cardPlacements[planned.cardIndex].destRect):OffsetRenderRect(planned.target,dx,dy);
+return targetRect;
 }
 
-double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double sampleY, double denom) {
-    const double backgroundWeight = (
-        (geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-        (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
-    ) / denom;
-    return backgroundWeight;
+double ComputeBackgroundWeight(const Geometry& geometry,double sampleX,double sampleY,double denom){
+const double backgroundWeight=((geometry.topY - geometry.bottomY)*(sampleX - geometry.bottomX)+(geometry.bottomX - geometry.rightX)*(sampleY - geometry.bottomY))/denom;
+return backgroundWeight;
 }
 
-double SampleSupersampledX(int x, int sx, int iconSize) {
-    const double sampleX = (
-        static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample
-    ) * 256.0 / static_cast<double>(iconSize);
-    return sampleX;
+double SampleSupersampledX(int x,int sx,int iconSize){
+const double sampleX=(static_cast<double>(x)+(static_cast<double>(sx)+0.5)/kSupersample)*256.0/static_cast<double>(iconSize);
+return sampleX;
 }
 
-void BuildTrianglePoints(const RECT& rect, const Geometry& geometry) {
-    POINT points[] = {
-        {
-            rect.left + static_cast<LONG>(std::lround(geometry.leftX)),
-            rect.top + static_cast<LONG>(std::lround(geometry.topY))
-        }, {
-            rect.left + static_cast<LONG>(std::lround(geometry.rightX)),
-            rect.top + static_cast<LONG>(std::lround(geometry.topY))
-        }, {
-            rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),
-            rect.top + static_cast<LONG>(std::lround(geometry.bottomY))
-        }
-    };
-    Use(points);
+void BuildTrianglePoints(const RECT& rect,const Geometry& geometry){
+POINT points[]={{rect.left + static_cast<LONG>(std::lround(geometry.leftX)),rect.top + static_cast<LONG>(std::lround(geometry.topY))},{rect.left + static_cast<LONG>(std::lround(geometry.rightX)),rect.top + static_cast<LONG>(std::lround(geometry.topY))},{rect.left + static_cast<LONG>(std::lround(geometry.bottomX)),rect.top + static_cast<LONG>(std::lround(geometry.bottomY))}};
+Use(points);
 }
 
-void AddWidgetAnimation(PresentationAnimation animation, TargetState targetState) {
-    WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(
-        DashboardPresentationAnimation{std::move(animation), std::move(targetState), currentWidgetAnimationTranslation_}
-    );
+void AddWidgetAnimation(PresentationAnimation animation,TargetState targetState){
+WidgetAnimationsForLayer(currentWidgetAnimationLayer_).push_back(DashboardPresentationAnimation{std::move(animation),std::move(targetState),currentWidgetAnimationTranslation_});
 }
 
-void AddMetricDefinition(MetricsConfig& metrics) {
-    metrics.definitions.push_back(
-        MetricDefinitionConfig{"gpu.load", MetricDisplayStyle::Percent, true, 0.0, "%", "Load"}
-    );
+void AddMetricDefinition(MetricsConfig& metrics){
+metrics.definitions.push_back(MetricDefinitionConfig{"gpu.load",MetricDisplayStyle::Percent,true,0.0,"%","Load"});
 }
 
-int BracedReceiverChain(
-    int firstCoordinateWithLongName,
-    int secondCoordinateWithLongName,
-    int thirdCoordinateWithLongName,
-    int y,
-    int deltaX,
-    int deltaY
-) {
-    return RenderPoint{
-        firstCoordinateWithLongName + secondCoordinateWithLongName + thirdCoordinateWithLongName,
-        y
-    }.OffsetBy(deltaX, deltaY).x;
+int BracedReceiverChain(int firstCoordinateWithLongName,int secondCoordinateWithLongName,int thirdCoordinateWithLongName,int y,int deltaX,int deltaY){
+return RenderPoint{firstCoordinateWithLongName+secondCoordinateWithLongName+thirdCoordinateWithLongName,y}.OffsetBy(deltaX,deltaY).x;
 }
 
-void DrawGuideDot(RenderHost& renderer, int x, int y, int dotLength, int right, int strokeWidth) {
-    renderer.Renderer().FillSolidRect(
-        RenderRect{x, y, std::min(x + dotLength, right), y + strokeWidth},
-        RenderColorId::LayoutGuide
-    );
+void DrawGuideDot(RenderHost& renderer,int x,int y,int dotLength,int right,int strokeWidth){
+renderer.Renderer().FillSolidRect(RenderRect{x,y,std::min(x+dotLength,right),y+strokeWidth},RenderColorId::LayoutGuide);
 }
 
-void DrawGuideDotFromAdapter(
-    RenderHost& renderer,
-    RenderState& state,
-    int x,
-    int y,
-    int dotLength,
-    int right,
-    int strokeWidth
-) {
-    RenderHostAdapter{renderer, state}.Renderer().FillSolidRect(
-        RenderRect{x, y, std::min(x + dotLength, right), y + strokeWidth},
-        RenderColorId::LayoutGuide
-    );
+void DrawGuideDotFromAdapter(RenderHost& renderer,RenderState& state,int x,int y,int dotLength,int right,int strokeWidth){
+RenderHostAdapter{renderer,state}.Renderer().FillSolidRect(RenderRect{x,y,std::min(x+dotLength,right),y+strokeWidth},RenderColorId::LayoutGuide);
 }
 
-void RegisterStaticEditAnchor(
-    RenderHost& renderer,
-    Widget& widget,
-    const RenderRect& barRect,
-    const RenderRect& anchorRect,
-    const Config& config,
-    int rowIndex,
-    int anchorCenterX,
-    int anchorCenterY
-) {
-    renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{
-        .key = LayoutEditAnchorKey{
-            LayoutEditWidgetIdentity{widget.cardId, widget.editCardId, widget.nodePath},
-            WidgetHost::LayoutEditParameter::MetricListBarHeight,
-            rowIndex
-        },
-        .targetRect = barRect,
-        .anchorRect = anchorRect,
-        .shape = AnchorShape::Circle,
-        .value = config.barHeight,
-        .drag = LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Horizontal, RenderPoint{anchorCenterX, anchorCenterY})
-    });
+void RegisterStaticEditAnchor(RenderHost& renderer,Widget& widget,const RenderRect& barRect,const RenderRect& anchorRect,const Config& config,int rowIndex,int anchorCenterX,int anchorCenterY){
+renderer.EditArtifacts().RegisterStaticEditAnchor(LayoutEditAnchorRegistration{.key=LayoutEditAnchorKey{LayoutEditWidgetIdentity{widget.cardId,widget.editCardId,widget.nodePath},WidgetHost::LayoutEditParameter::MetricListBarHeight,rowIndex},.targetRect=barRect,.anchorRect=anchorRect,.shape=AnchorShape::Circle,.value=config.barHeight,.drag=LayoutEditAnchorDrag::AxisDelta(AnchorDragAxis::Horizontal,RenderPoint{anchorCenterX,anchorCenterY})});
 }
 
-void AddThemeColorLeaf(
-    Theme* theme,
-    std::string token,
-    LayoutEditTreeNode& leafNode,
-    const LayoutEditTreeNode& sectionNode
-) {
-    leafNode.leaf.emplace(LayoutEditTreeLeaf{
-        ThemeColorEditKey{theme->name, token},
-        sectionNode.label,
-        token,
-        leafNode.descriptionKey,
-        configschema::ValueFormat::ColorHex
-    });
+void AddThemeColorLeaf(Theme* theme,std::string token,LayoutEditTreeNode& leafNode,const LayoutEditTreeNode& sectionNode){
+leafNode.leaf.emplace(LayoutEditTreeLeaf{ThemeColorEditKey{theme->name,token},sectionNode.label,token,leafNode.descriptionKey,configschema::ValueFormat::ColorHex,});
 }
 
-void AssignCompactBracedConstructor(LayoutEditGapAnchor& outerMarginAnchor) {
-    outerMarginAnchor.key.widget =
-        LayoutEditWidgetIdentity{"", "", {}, LayoutEditWidgetIdentity::Kind::DashboardChrome};
+void AssignCompactBracedConstructor(LayoutEditGapAnchor& outerMarginAnchor){
+outerMarginAnchor.key.widget=LayoutEditWidgetIdentity{"","",{},LayoutEditWidgetIdentity::Kind::DashboardChrome};
 }
 
-void PlaceEmptyLambdaCallout() {
-    const LayoutGuideSheetPlacementResult result = PlaceLayoutGuideSheetCallouts(
-        cardPlacements,
-        callouts,
-        LayoutGuideSheetPlacementStyle{10, 12, 4, 20, 0, 1},
-        [](LayoutGuideSheetPlacementCallout&, int) {},
-        nullptr
-    );
+void PlaceEmptyLambdaCallout(){
+const LayoutGuideSheetPlacementResult result=PlaceLayoutGuideSheetCallouts(cardPlacements,callouts,LayoutGuideSheetPlacementStyle{10,12,4,20,0,1},[](LayoutGuideSheetPlacementCallout&,int){
+},nullptr);
 }
 
-void SnapGaugeWidth() {
-    const bool snapped = layout_snap_solver::FindNearestSnapWeight(
-        kCurrentGaugeWeight,
-        kCombinedWeight,
-        kThreshold,
-        {layout_snap_solver::SnapCandidate{targetExtent, targetExtent - startExtent, 0}},
-        [](int firstWeight, int& extent) -> bool {
-            extent = ComputeCpuGaugeWidth(firstWeight);
-            return true;
-        },
-        snappedWeight
-    );
+void SnapGaugeWidth(){
+const bool snapped=layout_snap_solver::FindNearestSnapWeight(kCurrentGaugeWeight,kCombinedWeight,kThreshold,{layout_snap_solver::SnapCandidate{targetExtent,targetExtent-startExtent,0}},[](int firstWeight,int& extent)->bool{extent=ComputeCpuGaugeWidth(firstWeight);return true;},snappedWeight);
 }
 
-int CountPlusAnchors(RenderHost& renderer) {
-    return static_cast<int>(std::count_if(
-        renderer.editArtifacts.staticAnchors.begin(),
-        renderer.editArtifacts.staticAnchors.end(),
-        [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }
-    ));
+int CountPlusAnchors(RenderHost& renderer){
+return static_cast<int>(std::count_if(renderer.editArtifacts.staticAnchors.begin(),renderer.editArtifacts.staticAnchors.end(),[](const LayoutEditAnchorRegion& region){return region.shape==AnchorShape::Plus;}));
 }
 
-void TraceCaptureChanged(HWND hwnd, LPARAM lParam, bool handled) {
-    TraceLayoutEditUiEventFmt(
-        TracePrefix::LayoutEditUi,
-        "wm_capturechanged",
-        "new_owner=\"%s\" handled=\"%s\"",
-        reinterpret_cast<HWND>(lParam) == nullptr ?
-            "none" : (reinterpret_cast<HWND>(lParam) == hwnd ? "dashboard" : "other"),
-        firstValueWithLongName +
-            secondValueWithLongName +
-            thirdValueWithLongName +
-            fourthValueWithLongName +
-            fifthValueWithLongName,
-        handled ? "true" : "false"
-    );
+void TraceCaptureChanged(HWND hwnd,LPARAM lParam,bool handled){
+TraceLayoutEditUiEventFmt(TracePrefix::LayoutEditUi,"wm_capturechanged","new_owner=\"%s\" handled=\"%s\"",reinterpret_cast<HWND>(lParam)==nullptr?"none":(reinterpret_cast<HWND>(lParam)==hwnd?"dashboard":"other"),firstValueWithLongName+secondValueWithLongName+thirdValueWithLongName+fourthValueWithLongName+fifthValueWithLongName,handled?"true":"false");
 }
 
-int ManyParameters(
-    int* firstPointerWithLongName,
-    int& firstReferenceWithLongName,
-    int secondValueWithLongName,
-    int thirdValueWithLongName,
-    int fourthValueWithLongName,
-    int fifthValueWithLongName,
-    int sixthValueWithLongName
-) {
-    int localValueWithLongName = firstPointerWithLongName ? *firstPointerWithLongName : 0;  // trailing
-    bool combinedValue = firstReferenceWithLongName > 0 &&
-        secondValueWithLongName > 0 &&
-        thirdValueWithLongName > 0 &&
-        fourthValueWithLongName > 0 &&
-        fifthValueWithLongName > 0 &&
-        sixthValueWithLongName > 0;
-    if (localValueWithLongName) {
-        return firstReferenceWithLongName;
-    }
-    while (localValueWithLongName < secondValueWithLongName) {
-        ++localValueWithLongName;
-    }
-    for (int index = 0; index < thirdValueWithLongName; ++index) {
-        localValueWithLongName += index;
-    }
-    switch (localValueWithLongName) {
-        case 1: {
-            int scopedValue = localValueWithLongName + fourthValueWithLongName;
-            localValueWithLongName = scopedValue;
-            break;
-        }
-        case 2:
-            return fourthValueWithLongName;
-        default:
-            break;
-    }
-    return VeryLongFunctionCall(
-        firstReferenceWithLongName,
-        secondValueWithLongName,
-        thirdValueWithLongName,
-        fourthValueWithLongName,
-        fifthValueWithLongName,
-        sixthValueWithLongName,
-        localValueWithLongName,
-        123456789,
-        987654321
-    );
+int ManyParameters(int * firstPointerWithLongName,int & firstReferenceWithLongName,int secondValueWithLongName,int thirdValueWithLongName,int fourthValueWithLongName,int fifthValueWithLongName,int sixthValueWithLongName){
+int localValueWithLongName=firstPointerWithLongName ? *firstPointerWithLongName:0;// trailing
+bool combinedValue=firstReferenceWithLongName > 0 && secondValueWithLongName > 0 && thirdValueWithLongName > 0 && fourthValueWithLongName > 0 && fifthValueWithLongName > 0 && sixthValueWithLongName > 0;
+if(localValueWithLongName)return firstReferenceWithLongName;
+while(localValueWithLongName<secondValueWithLongName)++localValueWithLongName;
+for(int index=0;index<thirdValueWithLongName;++index){localValueWithLongName+=index;}
+switch(localValueWithLongName){case 1:{int scopedValue=localValueWithLongName+fourthValueWithLongName; localValueWithLongName=scopedValue; break;} case 2: return fourthValueWithLongName; default: break;}
+return VeryLongFunctionCall(firstReferenceWithLongName,secondValueWithLongName,thirdValueWithLongName,fourthValueWithLongName,fifthValueWithLongName,sixthValueWithLongName,localValueWithLongName,123456789,987654321);
 }
 
-int NestedSwitchIndent(int message, int wParam) {
-    switch (message) {
-        case WM_WTSSESSION_CHANGE:
-            switch (wParam) {
-                case WTS_SESSION_LOCK:
-                    return 1;
-                default:
-                    return 0;
-            }
-        case WM_ERASEBKGND:
-            return 1;
-        default:
-            return 0;
-    }
+int NestedSwitchIndent(int message,int wParam){
+switch(message){case WM_WTSSESSION_CHANGE:switch(wParam){case WTS_SESSION_LOCK:return 1;default:return 0;}case WM_ERASEBKGND:return 1;default:return 0;}
 }
 
-void LongForCondition() {
-    for (
-        int rowIndex = 0;
-        rowIndex < layoutState_.visibleRows &&
-            rowIndex < static_cast<int>(layoutState_.rowBarRects.size()) &&
-            rowIndex < static_cast<int>(layoutState_.rowBarAnchorRects.size());
-        ++rowIndex
-    ) {
-        Use(rowIndex);
-    }
+void LongForCondition(){
+for(int rowIndex=0;rowIndex<layoutState_.visibleRows&&rowIndex<static_cast<int>(layoutState_.rowBarRects.size())&&rowIndex<static_cast<int>(layoutState_.rowBarAnchorRects.size());++rowIndex){Use(rowIndex);}
 }
 
-void ControlFlowVariety(int* values, int count) {
-    if (count > 0) {
-        values[0] += 1;
-    } else {
-        values[0] = 0;
-    }
-    if (count == 0) {
-        values[0] = 0;
-    } else if (count == 1) {
-        values[0] = 1;
-    } else if (count == 2) {
-        values[0] = 2;
-    }
+void ControlFlowVariety(int * values,int count){
+if(count>0){values[0]+=1;}else values[0]=0;
+if(count==0)values[0]=0;else if(count==1)values[0]=1;else{if(count==2){values[0]=2;}}
 
     if (values != nullptr) {
         values[0] = count;
@@ -1496,13 +1189,13 @@ void ControlFlowVariety(int* values, int count) {
     } while (index > 0);
 }
 
-void TryFinallyCleanup() {
-    const auto originalDirectory = Environment::CurrentDirectory;
-    try {
-        RunWithTemporaryDirectory();
-    } finally {
-        Environment::CurrentDirectory = originalDirectory;
-    }
+void TryFinallyCleanup(){
+const auto originalDirectory=Environment::CurrentDirectory;
+try{
+RunWithTemporaryDirectory();
+}finally{
+Environment::CurrentDirectory=originalDirectory;
+}
 }
 
 namespace trailing_comment_fixture {

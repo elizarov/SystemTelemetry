@@ -4,6 +4,7 @@ import shutil
 import subprocess
 import tempfile
 import unittest
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -41,6 +42,21 @@ def read_fixture(path: Path) -> str:
     return (TEST_ROOT / path).read_text(encoding="utf-8")
 
 
+@contextmanager
+def copied_fixtures(*paths: Path):
+    build_dir = REPO_ROOT / "build"
+    build_dir.mkdir(exist_ok=True)
+
+    with tempfile.TemporaryDirectory(prefix="format_fixtures_", dir=build_dir) as temp_dir:
+        root = Path(temp_dir)
+        copies = {}
+        for path in paths:
+            copied_path = root / path.name
+            shutil.copyfile(TEST_ROOT / path, copied_path)
+            copies[path] = copied_path
+        yield copies
+
+
 class FormatCommandTests(unittest.TestCase):
     maxDiff = None
 
@@ -52,13 +68,15 @@ class FormatCommandTests(unittest.TestCase):
         self.assertRegex(result.stderr, r"Formatted stdin in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
 
     def test_golden_input_parses_without_errors(self) -> None:
-        result = native_format("--style=file", str(TEST_ROOT / INPUT_FIXTURE))
+        with copied_fixtures(INPUT_FIXTURE) as fixtures:
+            result = native_format("--style=file", str(fixtures[INPUT_FIXTURE]))
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertNotIn("tree-sitter parse failed", result.stderr)
 
     def test_file_argument_formats_to_stdout(self) -> None:
-        result = native_format("--style=file", str(TEST_ROOT / OUTPUT_FIXTURE))
+        with copied_fixtures(OUTPUT_FIXTURE) as fixtures:
+            result = native_format("--style=file", str(fixtures[OUTPUT_FIXTURE]))
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertEqual(read_fixture(OUTPUT_FIXTURE), result.stdout)
@@ -68,18 +86,19 @@ class FormatCommandTests(unittest.TestCase):
         )
 
     def test_dry_run_accepts_idempotent_file_and_rejects_unformatted_file(self) -> None:
-        ok_result = native_format("--style=file", "--dry-run", str(TEST_ROOT / OUTPUT_FIXTURE))
+        with copied_fixtures(INPUT_FIXTURE, OUTPUT_FIXTURE) as fixtures:
+            ok_result = native_format("--style=file", "--dry-run", str(fixtures[OUTPUT_FIXTURE]))
 
-        self.assertEqual(0, ok_result.returncode, msg=f"stdout:\n{ok_result.stdout}\n\nstderr:\n{ok_result.stderr}")
-        self.assertRegex(
-            ok_result.stdout,
-            r"Checked 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
-        )
+            self.assertEqual(0, ok_result.returncode, msg=f"stdout:\n{ok_result.stdout}\n\nstderr:\n{ok_result.stderr}")
+            self.assertRegex(
+                ok_result.stdout,
+                r"Checked 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$",
+            )
 
-        bad_result = native_format("--style=file", "--dry-run", str(TEST_ROOT / INPUT_FIXTURE))
+            bad_result = native_format("--style=file", "--dry-run", str(fixtures[INPUT_FIXTURE]))
 
-        self.assertEqual(1, bad_result.returncode, msg=f"stdout:\n{bad_result.stdout}\n\nstderr:\n{bad_result.stderr}")
-        self.assertIn("Formatting is required for 1 file", bad_result.stdout)
+            self.assertEqual(1, bad_result.returncode, msg=f"stdout:\n{bad_result.stdout}\n\nstderr:\n{bad_result.stderr}")
+            self.assertIn("Formatting is required for 1 file", bad_result.stdout)
 
     def test_files_option_reads_newline_file_list(self) -> None:
         build_dir = REPO_ROOT / "build"
@@ -87,8 +106,10 @@ class FormatCommandTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory(prefix="format_files_", dir=build_dir) as temp_dir:
             root = Path(temp_dir)
+            source = root / OUTPUT_FIXTURE.name
+            shutil.copyfile(TEST_ROOT / OUTPUT_FIXTURE, source)
             file_list = root / "files.txt"
-            file_list.write_text(f"{TEST_ROOT / OUTPUT_FIXTURE}\n\n", encoding="utf-8")
+            file_list.write_text(f"{source}\n\n", encoding="utf-8")
 
             result = native_format("--style=file", "--dry-run", "--files", str(file_list))
 
