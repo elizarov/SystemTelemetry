@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <limits>
+#include <optional>
 #include <tuple>
 
 namespace {
@@ -37,6 +38,11 @@ struct NodeResult {
     int deepestBreakDepth = -1;
     int bestOperatorBreakPriority = std::numeric_limits<int>::max();
     std::map<int, FormatBreakChoice> choices;
+};
+
+struct DelimiterStackView {
+    std::vector<const FormatBreakNode*> delimiters;
+    const FormatBreakNode* leaf = nullptr;
 };
 
 class Solver {
@@ -399,6 +405,63 @@ private:
         return compact.endLineHasText && compact.endColumn > config_.columnLimit;
     }
 
+    static bool HasRealSeparators(const FormatBreakNode& node) {
+        return std::any_of(
+            node.separators.begin(),
+            node.separators.end(),
+            [](const FormatBreakToken& separator) { return separator.token.kind == PrintTokenKind::Known; }
+        );
+    }
+
+    static bool IsDelimiterStackItem(const FormatBreakNode& node) {
+        return node.kind == FormatBreakNodeKind::Delimited && node.items.size() == 1 && !HasRealSeparators(node);
+    }
+
+    static std::optional<DelimiterStackView> CollectDelimiterStack(const FormatBreakNode& node) {
+        if (!IsDelimiterStackItem(node) || node.children.size() < 2 || node.forceSplit) {
+            return std::nullopt;
+        }
+        DelimiterStackView stack;
+        const FormatBreakNode* current = &node;
+        while (current != nullptr) {
+            stack.delimiters.push_back(current);
+            const FormatBreakNode* item = current->items.front().get();
+            if (
+                item == nullptr ||
+                !IsDelimiterStackItem(*item) ||
+                item->delimiterKind != node.delimiterKind ||
+                item->children.size() < 2 ||
+                item->forceSplit
+            ) {
+                stack.leaf = item;
+                break;
+            }
+            current = item;
+        }
+        return stack.leaf != nullptr && stack.delimiters.size() >= 8 ? std::optional(stack) : std::nullopt;
+    }
+
+    int TokenColumnAdvance(const FormatBreakToken& token, bool lineHasText) const {
+        return (token.spaceBefore && lineHasText ? 1 : 0) + FormatTokenWidth(token.token);
+    }
+
+    bool TokenWouldOverflow(const NodeResult& result, const FormatBreakToken& token) const {
+        return result.endLineHasText &&
+            result.endColumn + TokenColumnAdvance(token, result.endLineHasText) > config_.columnLimit;
+    }
+
+    std::vector<NodeResult> SolveDelimitedCompactItemAlternatives(
+        const FormatBreakNode& item,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
+        if (IsDelimiterStackItem(item)) {
+            return {Solve(item, column, indentLevel, lineHasText)};
+        }
+        return SolveAlternatives(item, column, indentLevel, lineHasText);
+    }
+
     std::vector<
         NodeResult
     > SolveDelimitedCompactAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
@@ -412,7 +475,7 @@ private:
                 alternatives.push_back(AddToken(current, node.children[1]->token));
                 return;
             }
-            for (const NodeResult& item : SolveAlternatives(
+            for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
                 *node.items[index],
                 current.endColumn,
                 current.endIndentLevel,
@@ -466,6 +529,9 @@ private:
     }
 
     NodeResult SolveDelimited(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
+        if (std::optional<DelimiterStackView> stack = CollectDelimiterStack(node)) {
+            return SolveDelimiterStack(node, *stack, column, indentLevel, lineHasText);
+        }
         NodeResult compact = SolveDelimitedCompact(node, column, indentLevel, lineHasText);
         NodeResult split = SolveDelimitedSplit(node, column, indentLevel, lineHasText);
         if (node.forceSplit && split.valid) {
@@ -487,6 +553,44 @@ private:
             return split;
         }
         return Better(split, compact) ? split : compact;
+    }
+
+    NodeResult SolveDelimiterStack(
+        const FormatBreakNode& node,
+        const DelimiterStackView& stack,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
+        NodeResult
+            result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
+        result.choices.emplace(node.id, FormatBreakChoice::SplitDelimiterStack);
+
+        const int continuationIndent = indentLevel + 1;
+        for (const FormatBreakNode* delimiter : stack.delimiters) {
+            const FormatBreakToken& open = delimiter->children.front()->token;
+            if (TokenWouldOverflow(result, open)) {
+                result = AddBreak(result, continuationIndent, node.structuralDepth);
+            }
+            result = AddToken(result, open);
+        }
+
+        NodeResult leaf = Solve(*stack.leaf, result.endColumn, result.endIndentLevel, result.endLineHasText);
+        if (leaf.valid && leaf.maxOverflow > 0 && result.endLineHasText) {
+            NodeResult broken = AddBreak(result, continuationIndent, node.structuralDepth);
+            leaf = Solve(*stack.leaf, broken.endColumn, broken.endIndentLevel, broken.endLineHasText);
+            result = broken;
+        }
+        Merge(result, leaf);
+
+        for (auto it = stack.delimiters.rbegin(); it != stack.delimiters.rend(); ++it) {
+            const FormatBreakToken& close = (*it)->children.back()->token;
+            if (TokenWouldOverflow(result, close)) {
+                result = AddBreak(result, indentLevel, node.structuralDepth);
+            }
+            result = AddToken(result, close);
+        }
+        return result;
     }
 
     static bool IsControlDelimiter(const FormatBreakNode& node) {

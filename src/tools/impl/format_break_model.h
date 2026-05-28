@@ -34,6 +34,7 @@ enum class FormatBreakChoice {
     Compact,
     Split,
     SplitAttachedOpen,
+    SplitDelimiterStack,
     StreamCompactTail,
     TernaryBreakAfterQuestion,
     TernaryBreakAfterColon,

@@ -757,7 +757,9 @@ private:
     }
 
     static bool IsSplitChoice(FormatBreakChoice choice) {
-        return choice == FormatBreakChoice::Split || choice == FormatBreakChoice::SplitAttachedOpen;
+        return choice == FormatBreakChoice::Split ||
+            choice == FormatBreakChoice::SplitAttachedOpen ||
+            choice == FormatBreakChoice::SplitDelimiterStack;
     }
 
     void WriteBreakToken(const FormatBreakToken& token) {
@@ -817,8 +819,76 @@ private:
             IsSplitChoice(ChoiceFor(solution, node.items[index + 1]->id));
     }
 
+    struct DelimiterStackEmitView {
+        std::vector<const FormatBreakNode*> delimiters;
+        const FormatBreakNode* leaf = nullptr;
+    };
+
+    static bool HasRealSeparators(const FormatBreakNode& node) {
+        return std::any_of(
+            node.separators.begin(),
+            node.separators.end(),
+            [](const FormatBreakToken& separator) { return separator.token.kind == PrintTokenKind::Known; }
+        );
+    }
+
+    static bool IsDelimiterStackItem(const FormatBreakNode& node) {
+        return node.kind == FormatBreakNodeKind::Delimited && node.items.size() == 1 && !HasRealSeparators(node);
+    }
+
+    static std::optional<DelimiterStackEmitView> CollectDelimiterStack(const FormatBreakNode& node) {
+        if (!IsDelimiterStackItem(node) || node.children.size() < 2 || node.forceSplit) {
+            return std::nullopt;
+        }
+        DelimiterStackEmitView stack;
+        const FormatBreakNode* current = &node;
+        while (current != nullptr) {
+            stack.delimiters.push_back(current);
+            const FormatBreakNode* item = current->items.front().get();
+            if (
+                item == nullptr ||
+                !IsDelimiterStackItem(*item) ||
+                item->delimiterKind != node.delimiterKind ||
+                item->children.size() < 2 ||
+                item->forceSplit
+            ) {
+                stack.leaf = item;
+                break;
+            }
+            current = item;
+        }
+        return stack.leaf != nullptr ? std::optional(stack) : std::nullopt;
+    }
+
+    void WritePackedBreakToken(const FormatBreakToken& token, int overflowIndent) {
+        const int space = token.spaceBefore && !atLineStart_ ? 1 : 0;
+        if (!atLineStart_ && CurrentColumn() + space + FormatTokenWidth(token.token) > config_.columnLimit) {
+            NewLineWithIndent(overflowIndent);
+        }
+        WriteBreakToken(token);
+    }
+
+    void EmitDelimiterStackNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const std::optional<DelimiterStackEmitView> stack = CollectDelimiterStack(node);
+        if (!stack) {
+            return;
+        }
+        const int continuationIndent = baseIndent + 1;
+        for (const FormatBreakNode* delimiter : stack->delimiters) {
+            WritePackedBreakToken(delimiter->children.front()->token, continuationIndent);
+        }
+        EmitBreakNode(*stack->leaf, solution, continuationIndent);
+        for (auto it = stack->delimiters.rbegin(); it != stack->delimiters.rend(); ++it) {
+            WritePackedBreakToken((*it)->children.back()->token, baseIndent);
+        }
+    }
+
     void EmitDelimitedNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
         const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice == FormatBreakChoice::SplitDelimiterStack) {
+            EmitDelimiterStackNode(node, solution, baseIndent);
+            return;
+        }
         if (!IsSplitChoice(choice) || node.items.empty()) {
             EmitBreakNode(*node.children[0], solution, baseIndent);
             for (size_t index = 0; index < node.items.size(); ++index) {

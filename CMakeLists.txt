@@ -890,6 +890,7 @@ target_compile_options(CaseDashTools PRIVATE
     $<$<CONFIG:Release>:/O2>
 )
 target_link_options(CaseDashTools PRIVATE
+    /STACK:16777216
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/OPT:REF>
