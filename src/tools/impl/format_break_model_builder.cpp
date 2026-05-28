@@ -221,6 +221,12 @@ bool UsesFlatLogicalContinuation(const FormatBreakToken& open, const FormatBreak
     return IsFlatLogicalHeaderKind(open.token.parentKind) || IsFlatLogicalHeaderKind(open.token.grandParentKind);
 }
 
+bool IsListForceSplitMarker(SyntaxNodeKind kind) {
+    return kind == SyntaxNodeKind::BlankLine ||
+        kind == SyntaxNodeKind::Comment ||
+        kind == SyntaxNodeKind::TrailingComment;
+}
+
 class BreakModelBuilder {
 public:
     BreakModelBuilder(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) : context_(context)
@@ -358,11 +364,29 @@ private:
             item->flatSplitIndent = true;
         }
         delimited.items.push_back(std::move(item));
+        delimited.trailingComments.push_back({});
         itemChildren.clear();
     }
 
     void AppendEmptyDelimitedItem(FormatBreakNode& delimited, int depth) {
         delimited.items.push_back(MakeNode(FormatBreakNodeKind::Sequence, depth + 1));
+        delimited.trailingComments.push_back({});
+    }
+
+    void AppendStandaloneCommentItem(FormatBreakNode& list, const FormatBreakToken& comment, int depth) {
+        list.items.push_back(BuildToken(comment, depth + 1));
+        list.separators.push_back({});
+        list.trailingComments.push_back({});
+    }
+
+    void AttachTrailingCommentToPreviousItem(FormatBreakNode& list, const FormatBreakToken& comment) {
+        if (list.items.empty()) {
+            return;
+        }
+        while (list.trailingComments.size() < list.items.size()) {
+            list.trailingComments.push_back({});
+        }
+        list.trailingComments[list.items.size() - 1] = comment;
     }
 
     void GroupAdjacentStrings(FormatBreakNode& sequence, int depth) {
@@ -790,7 +814,38 @@ private:
         SyntaxChildList itemChildren;
         for (size_t index = *prefixIndex + 1; index < node.children.size(); ++index) {
             const SyntaxNode* child = node.children[index].get();
-            if (child == nullptr || !ContainsSelected(*child)) {
+            if (child == nullptr) {
+                continue;
+            }
+            if (IsListForceSplitMarker(child->kind)) {
+                list->forceSplit = true;
+                if (child->kind == SyntaxNodeKind::BlankLine) {
+                    continue;
+                }
+                const FormatBreakToken* comment = TokenForNode(*child);
+                if (comment == nullptr) {
+                    continue;
+                }
+                if (child->kind == SyntaxNodeKind::TrailingComment) {
+                    if (!itemChildren.empty()) {
+                        list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
+                        list->trailingComments.push_back({});
+                        list->separators.push_back({});
+                        itemChildren.clear();
+                    }
+                    AttachTrailingCommentToPreviousItem(*list, *comment);
+                } else {
+                    if (!itemChildren.empty()) {
+                        list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
+                        list->trailingComments.push_back({});
+                        list->separators.push_back({});
+                        itemChildren.clear();
+                    }
+                    AppendStandaloneCommentItem(*list, *comment, depth + 1);
+                }
+                continue;
+            }
+            if (!ContainsSelected(*child)) {
                 continue;
             }
             const FormatBreakToken* token = TokenForNode(*child);
@@ -801,6 +856,7 @@ private:
             ) {
                 if (!itemChildren.empty()) {
                     list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
+                    list->trailingComments.push_back({});
                     itemChildren.clear();
                 }
                 list->separators.push_back(*token);
@@ -810,6 +866,7 @@ private:
         }
         if (!itemChildren.empty()) {
             list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
+            list->trailingComments.push_back({});
             list->separators.push_back({});
         }
         return list->items.empty() ? nullptr : std::move(list);
@@ -872,7 +929,34 @@ private:
         SyntaxChildList itemChildren;
         for (size_t index = openIndex + 1; index < closeIndex; ++index) {
             const SyntaxNode* child = children[index].get();
-            if (child == nullptr || !ContainsSelected(*child)) {
+            if (child == nullptr) {
+                continue;
+            }
+            if (IsListForceSplitMarker(child->kind)) {
+                delimited->forceSplit = true;
+                if (child->kind == SyntaxNodeKind::BlankLine) {
+                    continue;
+                }
+                const FormatBreakToken* comment = TokenForNode(*child);
+                if (comment == nullptr) {
+                    continue;
+                }
+                if (child->kind == SyntaxNodeKind::TrailingComment) {
+                    if (!itemChildren.empty()) {
+                        AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                        delimited->separators.push_back({});
+                    }
+                    AttachTrailingCommentToPreviousItem(*delimited, *comment);
+                } else {
+                    if (!itemChildren.empty()) {
+                        AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                        delimited->separators.push_back({});
+                    }
+                    AppendStandaloneCommentItem(*delimited, *comment, depth);
+                }
+                continue;
+            }
+            if (!ContainsSelected(*child)) {
                 continue;
             }
             const FormatBreakToken* token = TokenForNode(*child);
@@ -912,10 +996,11 @@ private:
         if (delimited->items.empty() && !delimited->separators.empty()) {
             return nullptr;
         }
-        if (!delimited->items.empty()) {
+        while (delimited->separators.size() < delimited->items.size()) {
             delimited->separators.push_back({});
         }
-        delimited->forceSplit = (IsConstructorParameterListWithInitializerList(*open) && delimited->items.size() > 1) ||
+        delimited->forceSplit = delimited->forceSplit ||
+            (IsConstructorParameterListWithInitializerList(*open) && delimited->items.size() > 1) ||
             (hasVirtualClose && context_.forceSplitVirtualDelimiter);
         afterDelimited = hasVirtualClose ? end : closeIndex + 1;
         return delimited;

@@ -52,6 +52,22 @@ class string {};
 
 constexpr wchar_t kFilterCueText[] = L"Filter settings";
 
+constexpr auto kFixtureSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
+    Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
+    Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"),
+    Tree(SyntaxNodeKind::IncludeRun, "include_run"),
+    Tree(SyntaxNodeKind::MacroReplacementList, "macro_replacement_list"),
+    Tree(SyntaxNodeKind::Declaration, "declaration", Bit(TokenClass::MacroDeclarationFragment)),
+    Tree(SyntaxNodeKind::FieldDeclaration, "field_declaration", Bit(TokenClass::MacroDeclarationFragment))
+});
+
+constexpr auto kFixtureCommentedSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
+    Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
+    // tree nodes
+    Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"),
+    Tree(SyntaxNodeKind::IncludeRun, "include_run")
+});
+
 class FormattingExample {
 public:
     int* pointer;
@@ -290,7 +306,6 @@ enum class ValueFormat : std::uint8_t {
     FontFooter,
     FontClockTime,
     FontClockDate,
-
     // Card style anchors
     CardRadius,
     CardBorder,

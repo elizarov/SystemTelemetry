@@ -80,6 +80,33 @@ bool RequiresMacroValueBreak(const SyntaxNode& node) {
     return false;
 }
 
+bool PreservesBlankLineToken(SyntaxNodeKind parentKind) {
+    return parentKind == SyntaxNodeKind::TranslationUnit ||
+        parentKind == SyntaxNodeKind::DeclarationList ||
+        parentKind == SyntaxNodeKind::CompoundStatement ||
+        parentKind == SyntaxNodeKind::FieldDeclarationList;
+}
+
+bool KeepsListCommentInBreakModel(const PrintToken& token) {
+    if (!IsCommentToken(token.kind)) {
+        return false;
+    }
+    // Keep list comments in the same optimization segment so they can force all comma breaks together.
+    switch (token.parentKind) {
+        case SyntaxNodeKind::InitializerList:
+        case SyntaxNodeKind::FieldInitializerList:
+        case SyntaxNodeKind::ParameterList:
+        case SyntaxNodeKind::ArgumentList:
+        case SyntaxNodeKind::TemplateParameterList:
+        case SyntaxNodeKind::TemplateArgumentList:
+        case SyntaxNodeKind::LambdaCaptureSpecifier:
+        case SyntaxNodeKind::PreprocParams:
+            return true;
+        default:
+            return false;
+    }
+}
+
 bool ContainsLogicalOperator(const SyntaxNode& node) {
     if (node.kind == SyntaxNodeKind::AmpersandAmpersand || node.kind == SyntaxNodeKind::PipePipe) {
         return true;
@@ -235,115 +262,118 @@ void AppendTokens(
         breakBeforeMacroValue || (nodeKind == SyntaxNodeKind::MacroReplacementList && RequiresMacroValueBreak(node));
 
     if (nodeKind == SyntaxNodeKind::BlankLine) {
+        if (!PreservesBlankLineToken(parentKind)) {
+            return;
+        }
         tokens.push_back({
-                .kind = PrintTokenKind::BlankLine,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = PrintTokenKind::BlankLine,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (nodeKind == SyntaxNodeKind::Comment || nodeKind == SyntaxNodeKind::TrailingComment) {
         tokens.push_back({
-                .kind = nodeKind == SyntaxNodeKind::TrailingComment ? PrintTokenKind::TrailingComment :
-                    PrintTokenKind::Comment,
-                .syntaxKind = nodeKind,
-                .text = node.text,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .splitRequiresClause = childSplitRequiresClause,
-                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = nodeKind == SyntaxNodeKind::TrailingComment ? PrintTokenKind::TrailingComment :
+                PrintTokenKind::Comment,
+            .syntaxKind = nodeKind,
+            .text = node.text,
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .splitRequiresClause = childSplitRequiresClause,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (SyntaxNodeKindHasClass(nodeKind, TokenClass::Known)) {
         tokens.push_back({
-                .kind = PrintTokenKind::Known,
-                .syntaxKind = nodeKind,
-                .text = SyntaxNodeKindTokenText(nodeKind),
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .splitRequiresClause = childSplitRequiresClause,
-                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = PrintTokenKind::Known,
+            .syntaxKind = nodeKind,
+            .text = SyntaxNodeKindTokenText(nodeKind),
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .splitRequiresClause = childSplitRequiresClause,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (nodeKind == SyntaxNodeKind::IncludeRun) {
         tokens.push_back({
-                .kind = PrintTokenKind::IncludeRun,
-                .syntaxKind = nodeKind,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .splitRequiresClause = childSplitRequiresClause,
-                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = PrintTokenKind::IncludeRun,
+            .syntaxKind = nodeKind,
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .splitRequiresClause = childSplitRequiresClause,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (IsPreprocessorNode(nodeKind)) {
         tokens.push_back({
-                .kind = PrintTokenKind::Preprocessor,
-                .syntaxKind = nodeKind,
-                .text = node.text,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .splitRequiresClause = childSplitRequiresClause,
-                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = PrintTokenKind::Preprocessor,
+            .syntaxKind = nodeKind,
+            .text = node.text,
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .splitRequiresClause = childSplitRequiresClause,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (nodeKind == SyntaxNodeKind::FreeToken || node.children.empty()) {
         tokens.push_back({
-                .kind = PrintTokenKind::Free,
-                .syntaxKind = nodeKind,
-                .text = node.text,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .splitRequiresClause = childSplitRequiresClause,
-                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .syntaxPath = syntaxPath,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement
-            });
+            .kind = PrintTokenKind::Free,
+            .syntaxKind = nodeKind,
+            .text = node.text,
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .splitRequiresClause = childSplitRequiresClause,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .syntaxPath = syntaxPath,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
         return;
     }
     if (nodeKind == SyntaxNodeKind::MacroReplacementList) {
@@ -762,6 +792,14 @@ private:
             forceColumnZeroLine_ = true;
             pendingIndentLevel_.reset();
         }
+        if (IsCommentToken(token.token.kind)) {
+            if (!atLineStart_) {
+                Space();
+                output_.push_back(' ');
+            }
+            Write(FormatTokenText(token.token));
+            return;
+        }
         if (token.spaceBefore && !atLineStart_) {
             Space();
         }
@@ -808,7 +846,8 @@ private:
             IsSplitChoice(ChoiceFor(solution, node.items[index]->id)) &&
             node.items[index + 1]->kind == FormatBreakNodeKind::Delimited &&
             node.items[index + 1]->delimiterKind == FormatBreakDelimiterKind::Brace &&
-            IsSplitChoice(ChoiceFor(solution, node.items[index + 1]->id));
+            IsSplitChoice(ChoiceFor(solution, node.items[index + 1]->id)) &&
+            !HasTrailingComment(node, index);
     }
 
     struct DelimiterStackEmitView {
@@ -822,6 +861,10 @@ private:
             node.separators.end(),
             [](const FormatBreakToken& separator) { return separator.token.kind == PrintTokenKind::Known; }
         );
+    }
+
+    static bool HasTrailingComment(const FormatBreakNode& node, size_t index) {
+        return index < node.trailingComments.size() && IsCommentToken(node.trailingComments[index].token.kind);
     }
 
     static bool IsDelimiterStackItem(const FormatBreakNode& node) {
@@ -895,12 +938,12 @@ private:
         if (!IsSplitChoice(choice) || node.items.empty()) {
             EmitBreakNode(*node.children[0], solution, baseIndent);
             for (size_t index = 0; index < node.items.size(); ++index) {
-                const FormatBreakChoice itemChoice = ChoiceFor(solution, node.items[index]->id);
-                const bool compactParenContainsSplit =
-                    node.delimiterKind == FormatBreakDelimiterKind::Paren && itemChoice != FormatBreakChoice::Compact;
-                EmitBreakNode(*node.items[index], solution, compactParenContainsSplit ? baseIndent + 1 : baseIndent);
+                EmitBreakNode(*node.items[index], solution, baseIndent);
                 if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                     WriteBreakToken(node.separators[index]);
+                }
+                if (HasTrailingComment(node, index)) {
+                    WriteBreakToken(node.trailingComments[index]);
                 }
             }
             EmitBreakNode(*node.children[1], solution, baseIndent);
@@ -916,6 +959,9 @@ private:
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 WriteBreakToken(node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                WriteBreakToken(node.trailingComments[index]);
             }
             if (ShouldCombineSplitBracedItemBoundary(node, solution, index)) {
                 Space();
@@ -937,6 +983,9 @@ private:
                 if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                     WriteBreakToken(node.separators[index]);
                 }
+                if (HasTrailingComment(node, index)) {
+                    WriteBreakToken(node.trailingComments[index]);
+                }
             }
             return;
         }
@@ -947,6 +996,9 @@ private:
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 WriteBreakToken(node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                WriteBreakToken(node.trailingComments[index]);
             }
             if (index + 1 < node.items.size()) {
                 NewLineWithIndent(baseIndent + 1);
@@ -968,6 +1020,9 @@ private:
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 WriteBreakToken(node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                WriteBreakToken(node.trailingComments[index]);
             }
             if (ShouldCombineSplitBracedItemBoundary(node, solution, index)) {
                 Space();
@@ -1310,6 +1365,10 @@ private:
             return;
         }
         if (IsCommentToken(token.kind)) {
+            if (KeepsListCommentInBreakModel(token)) {
+                BufferToken(token);
+                return;
+            }
             FlushPendingTokens();
             PrintComment(token);
             return;

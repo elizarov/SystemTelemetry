@@ -268,7 +268,7 @@ Do not split inside empty delimiter pairs, function-pointer declarator groups, p
 
 Defaulted, deleted, and pure-virtual method markers stay with the declaration tail.
 
-An end-of-line comment attached to one element forces the owning list or chain into split form.
+An end-of-line comment attached to one element forces the owning list or chain into split form. A source blank line or standalone comment between list elements also forces the owning list into split form. Lists still split all top-level comma opportunities together.
 
 ```cpp
 update(

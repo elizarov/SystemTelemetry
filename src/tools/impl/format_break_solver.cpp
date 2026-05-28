@@ -106,8 +106,22 @@ private:
         return std::max(0, indentLevel) * indentWidth_;
     }
 
+    static bool HasTrailingComment(const FormatBreakNode& node, size_t index) {
+        return index < node.trailingComments.size() && IsCommentToken(node.trailingComments[index].token.kind);
+    }
+
+    static int SpaceBeforeToken(const FormatBreakToken& token, bool lineHasText) {
+        if (!lineHasText) {
+            return 0;
+        }
+        if (IsCommentToken(token.token.kind)) {
+            return 2;
+        }
+        return token.spaceBefore ? 1 : 0;
+    }
+
     NodeResult SolveToken(const FormatBreakToken& token, int column, int indentLevel, bool lineHasText) const {
-        const int space = token.spaceBefore && lineHasText ? 1 : 0;
+        const int space = SpaceBeforeToken(token, lineHasText);
         const int endColumn = column + space + FormatTokenWidth(token.token);
         return {
             .valid = true,
@@ -452,7 +466,7 @@ private:
     }
 
     int TokenColumnAdvance(const FormatBreakToken& token, bool lineHasText) const {
-        return (token.spaceBefore && lineHasText ? 1 : 0) + FormatTokenWidth(token.token);
+        return SpaceBeforeToken(token, lineHasText) + FormatTokenWidth(token.token);
     }
 
     bool TokenWouldOverflow(const NodeResult& result, const FormatBreakToken& token) const {
@@ -501,6 +515,9 @@ private:
                     if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                         next = AddToken(next, node.separators[index]);
                     }
+                    if (HasTrailingComment(node, index)) {
+                        next = AddToken(next, node.trailingComments[index]);
+                    }
                     AddPrunedResult(nextByState, std::move(next));
                 }
             }
@@ -538,6 +555,9 @@ private:
             Merge(result, item);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 result = AddToken(result, node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                result = AddToken(result, node.trailingComments[index]);
             }
             result =
                 AddBreak(result, index + 1 < node.items.size() ? indentLevel + 1 : indentLevel, node.structuralDepth);
@@ -810,6 +830,9 @@ private:
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 result = AddToken(result, node.separators[index]);
             }
+            if (HasTrailingComment(node, index)) {
+                result = AddToken(result, node.trailingComments[index]);
+            }
         }
         return result;
     }
@@ -825,6 +848,9 @@ private:
             Merge(result, item);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 result = AddToken(result, node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                result = AddToken(result, node.trailingComments[index]);
             }
             if (index + 1 < node.items.size()) {
                 result = AddBreak(result, indentLevel + 1, node.structuralDepth);
@@ -902,6 +928,9 @@ private:
             Merge(result, item);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
                 result = AddToken(result, node.separators[index]);
+            }
+            if (HasTrailingComment(node, index)) {
+                result = AddToken(result, node.trailingComments[index]);
             }
             result =
                 AddBreak(result, index + 1 < node.items.size() ? baseIndent + 1 : baseIndent, node.structuralDepth);
