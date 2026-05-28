@@ -6,7 +6,7 @@ namespace {
 
 bool IsLeadingNameToken(const FormatBreakToken& token) {
     return token.token.kind == PrintTokenKind::Free ||
-        (token.token.kind == PrintTokenKind::Known && token.token.known == KnownToken::ColonColon);
+        (token.token.kind == PrintTokenKind::Known && token.token.syntaxKind == SyntaxNodeKind::ColonColon);
 }
 
 bool ConsumeLeadingName(const FormatBreakNode& node, std::string_view candidate, size_t& position) {

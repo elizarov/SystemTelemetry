@@ -17,11 +17,10 @@ enum class PrintTokenKind {
 
 struct PrintToken {
     PrintTokenKind kind = PrintTokenKind::Free;
-    KnownToken known = KnownToken::Unknown;
+    SyntaxNodeKind syntaxKind = SyntaxNodeKind::Unknown;
     std::string_view text;
-    SyntaxTreeKind treeKind = SyntaxTreeKind::Unknown;
-    SyntaxTreeKind parentKind = SyntaxTreeKind::Unknown;
-    SyntaxTreeKind grandParentKind = SyntaxTreeKind::Unknown;
+    SyntaxNodeKind parentKind = SyntaxNodeKind::Unknown;
+    SyntaxNodeKind grandParentKind = SyntaxNodeKind::Unknown;
     bool inTemplateDeclaration = false;
     bool inRequiresClause = false;
     bool splitRequiresClause = false;

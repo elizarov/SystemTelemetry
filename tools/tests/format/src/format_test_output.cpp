@@ -148,13 +148,8 @@ void WriteTraceStringFragments(TraceLog& trace) {
 }
 
 void ExpectJoinedHexEscapeFragment() {
-    EXPECT_THAT(
-        output,
-        testing::HasSubstr(
-            "gpu.temp = 100,\xC2\xB0"
-                "C,Core Temp\r\n"
-        )
-    );
+    EXPECT_THAT(output, testing::HasSubstr("gpu.temp = 100,\xC2\xB0"
+                "C,Core Temp\r\n"));
 }
 
 void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
@@ -225,7 +220,7 @@ void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
             layoutResolver_->widgetEditGuides_.size() +
             (
                 layoutResolver_->staticEditableAnchorRegions_.size() +
-                layoutResolver_->dynamicEditableAnchorRegions_.size()
+                    layoutResolver_->dynamicEditableAnchorRegions_.size()
             ) * 2 +
             layoutResolver_->staticColorEditRegions_.size() +
             layoutResolver_->dynamicColorEditRegions_.size()
@@ -241,7 +236,8 @@ void WriteMetricConfig() {
 }
 
 void WriteInitialConfigText() {
-    const std::string initialText = "[display]\r\n"
+    const std::string initialText =
+        "[display]\r\n"
         "monitor_name = TL160ADMP03-0\r\n"
         "position = 258,117\r\n"
         "scale = 2\r\n"
@@ -577,7 +573,7 @@ void AttachCalloutBubble(Callout& callout, LayoutGuideSheetExitSide side) {
 double MaxSegmentGap(double totalSweep, double minSegmentSweep, int segmentCount) {
     const double maxSegmentGap = (std::max)(
         0.0,
-        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1)
+            (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1)
     );
     return maxSegmentGap;
 }
@@ -943,9 +939,9 @@ void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState, cons
     const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
     if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) || (
         special != nullptr &&
-        *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
-        LayoutEditAnchorParameter(region.key).has_value() &&
-        IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
+            *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
+            LayoutEditAnchorParameter(region.key).has_value() &&
+            IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
     )) {
         appendHighlight(region, true);
     }
@@ -1068,9 +1064,9 @@ void FormatterSelfBreakCases() {
         next < tokens.size() &&
         tokens[next].kind == TokenKind::Word && (
             tokens[next].text == "else" ||
-            tokens[next].text == "catch" ||
-            tokens[next].text == "finally" ||
-            (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+                tokens[next].text == "catch" ||
+                tokens[next].text == "finally" ||
+                (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
         )
     ) {
         return;
@@ -1169,14 +1165,14 @@ RenderRect BuildGuideSheetTargetRect(
 double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double sampleY, double denom) {
     const double backgroundWeight = (
         (geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-        (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
+            (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
     ) / denom;
     return backgroundWeight;
 }
 
 double SampleSupersampledX(int x, int sx, int iconSize) {
-    const double sampleX = (static_cast<double>(x) +
-        (static_cast<double>(sx) + 0.5) / kSupersample) * 256.0 / static_cast<double>(iconSize);
+    const double sampleX = (static_cast<double>(x) + (static_cast<double>(sx) + 0.5) / kSupersample) * 256.0 /
+        static_cast<double>(iconSize);
     return sampleX;
 }
 
@@ -1510,9 +1506,9 @@ bool AttachedOpenChainKeepsFollowingOperator(const PrintToken* previous, KnownTo
     if (
         previous->kind == PrintTokenKind::Known && (
             prev == KnownToken::RightParen ||
-            prev == KnownToken::RightBracket ||
-            prev == KnownToken::RightBrace ||
-            prev == KnownToken::Greater
+                prev == KnownToken::RightBracket ||
+                prev == KnownToken::RightBrace ||
+                prev == KnownToken::Greater
         ) &&
         IsWordLike(current)
     ) {

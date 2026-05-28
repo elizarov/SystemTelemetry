@@ -11,17 +11,16 @@ struct ParseResult {
     std::string error;
 };
 
-enum class SyntaxNodeKind : std::uint8_t {
+enum class SyntaxNodeKind : std::uint16_t {
+    // Structural nodes.
+    Unknown,
     Tree,
-    KnownToken,
     FreeToken,
     Comment,
     TrailingComment,
     BlankLine,
-};
 
-enum class SyntaxTreeKind : std::uint16_t {
-    Unknown,
+    // Tree-sitter syntax nodes.
     TranslationUnit,
     IncludeRun,
     MacroReplacementList,
@@ -103,10 +102,8 @@ enum class SyntaxTreeKind : std::uint16_t {
     CharacterLiteral,
     NumberLiteral,
     Identifier,
-};
 
-enum class KnownToken : std::uint16_t {
-    Unknown,
+    // Known tokens.
     Hash,
     LeftParen,
     RightParen,
@@ -245,27 +242,39 @@ enum class KnownToken : std::uint16_t {
     KeywordCoYield,
 };
 
-enum class TokenClass : std::uint32_t {
-    Keyword = 1u << 0,
-    ControlKeyword = 1u << 1,
-    AttachAfterBlockKeyword = 1u << 2,
-    AccessKeyword = 1u << 3,
-    MemberOperator = 1u << 4,
-    AssignmentOperator = 1u << 5,
-    BinaryOperator = 1u << 6,
-    UnaryOperator = 1u << 7,
-    DeclaratorReferenceToken = 1u << 8,
+enum class TokenClass : std::uint64_t {
+    Keyword = 1ull << 0,
+    ControlKeyword = 1ull << 1,
+    AttachAfterBlockKeyword = 1ull << 2,
+    AccessKeyword = 1ull << 3,
+    MemberOperator = 1ull << 4,
+    AssignmentOperator = 1ull << 5,
+    BinaryOperator = 1ull << 6,
+    UnaryOperator = 1ull << 7,
+    DeclaratorReferenceToken = 1ull << 8,
+    Known = 1ull << 9,
+    Tree = 1ull << 10,
+    Literal = 1ull << 11,
+    StringLike = 1ull << 12,
+    WholeNodeAsFreeToken = 1ull << 13,
+    AtomicPreprocessor = 1ull << 14,
+    MacroDefinition = 1ull << 15,
+    MacroDeclarationFragment = 1ull << 16,
+    DeclaratorReferenceParent = 1ull << 17,
+    ParenthesizedDeclarator = 1ull << 18,
+    CompoundBlock = 1ull << 19,
+    ControlHeader = 1ull << 20,
+    FlatLogicalHeader = 1ull << 21,
 };
 
-KnownToken KnownTokenFromText(std::string_view text);
-std::string_view KnownTokenText(KnownToken token);
-bool KnownTokenHasClass(KnownToken token, TokenClass tokenClass);
+SyntaxNodeKind SyntaxNodeKindFromTreeType(std::string_view type);
+SyntaxNodeKind SyntaxNodeKindFromTokenText(std::string_view text);
+std::string_view SyntaxNodeKindTokenText(SyntaxNodeKind kind);
+bool SyntaxNodeKindHasClass(SyntaxNodeKind kind, TokenClass tokenClass);
 
 struct SyntaxNode {
     // Keep nodes maximally generic and space-efficient; avoid fields that only apply to one node kind.
-    SyntaxNodeKind kind = SyntaxNodeKind::Tree;
-    SyntaxTreeKind treeKind = SyntaxTreeKind::Unknown;
-    KnownToken known = KnownToken::Unknown;
+    SyntaxNodeKind kind = SyntaxNodeKind::Unknown;
     std::string_view text;
     std::vector<std::unique_ptr<SyntaxNode>> children;
 };

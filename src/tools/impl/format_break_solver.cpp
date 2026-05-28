@@ -172,8 +172,8 @@ private:
                     const bool compactKeepsSplitChild = compact.valid &&
                         compact.extraLines > 0 && (
                             IsCommaChain(node) ||
-                            (node.chainKind != FormatBreakChainKind::Ternary && node.operators.size() > 1) ||
-                            (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() > 2)
+                                (node.chainKind != FormatBreakChainKind::Ternary && node.operators.size() > 1) ||
+                                (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() > 2)
                         );
                     if (!compactKeepsSplitChild) {
                         alternatives.push_back(std::move(compact));
@@ -289,51 +289,51 @@ private:
         }
     }
 
-    static int OperatorBreakPriority(KnownToken token) {
+    static int OperatorBreakPriority(SyntaxNodeKind token) {
         switch (token) {
-            case KnownToken::Equal:
-            case KnownToken::PlusEqual:
-            case KnownToken::MinusEqual:
-            case KnownToken::StarEqual:
-            case KnownToken::SlashEqual:
-            case KnownToken::PercentEqual:
-            case KnownToken::CaretEqual:
-            case KnownToken::AmpersandEqual:
-            case KnownToken::PipeEqual:
-            case KnownToken::LessLessEqual:
-            case KnownToken::GreaterGreaterEqual:
+            case SyntaxNodeKind::Equal:
+            case SyntaxNodeKind::PlusEqual:
+            case SyntaxNodeKind::MinusEqual:
+            case SyntaxNodeKind::StarEqual:
+            case SyntaxNodeKind::SlashEqual:
+            case SyntaxNodeKind::PercentEqual:
+            case SyntaxNodeKind::CaretEqual:
+            case SyntaxNodeKind::AmpersandEqual:
+            case SyntaxNodeKind::PipeEqual:
+            case SyntaxNodeKind::LessLessEqual:
+            case SyntaxNodeKind::GreaterGreaterEqual:
                 return 1;
-            case KnownToken::Question:
-            case KnownToken::Colon:
+            case SyntaxNodeKind::Question:
+            case SyntaxNodeKind::Colon:
                 return 2;
-            case KnownToken::PipePipe:
+            case SyntaxNodeKind::PipePipe:
                 return 3;
-            case KnownToken::AmpersandAmpersand:
+            case SyntaxNodeKind::AmpersandAmpersand:
                 return 4;
-            case KnownToken::Pipe:
+            case SyntaxNodeKind::Pipe:
                 return 5;
-            case KnownToken::Caret:
+            case SyntaxNodeKind::Caret:
                 return 6;
-            case KnownToken::Ampersand:
+            case SyntaxNodeKind::Ampersand:
                 return 7;
-            case KnownToken::EqualEqual:
-            case KnownToken::BangEqual:
+            case SyntaxNodeKind::EqualEqual:
+            case SyntaxNodeKind::BangEqual:
                 return 8;
-            case KnownToken::Less:
-            case KnownToken::Greater:
-            case KnownToken::LessEqual:
-            case KnownToken::GreaterEqual:
-            case KnownToken::Spaceship:
+            case SyntaxNodeKind::Less:
+            case SyntaxNodeKind::Greater:
+            case SyntaxNodeKind::LessEqual:
+            case SyntaxNodeKind::GreaterEqual:
+            case SyntaxNodeKind::Spaceship:
                 return 9;
-            case KnownToken::LessLess:
-            case KnownToken::GreaterGreater:
+            case SyntaxNodeKind::LessLess:
+            case SyntaxNodeKind::GreaterGreater:
                 return 10;
-            case KnownToken::Plus:
-            case KnownToken::Minus:
+            case SyntaxNodeKind::Plus:
+            case SyntaxNodeKind::Minus:
                 return 11;
-            case KnownToken::Star:
-            case KnownToken::Slash:
-            case KnownToken::Percent:
+            case SyntaxNodeKind::Star:
+            case SyntaxNodeKind::Slash:
+            case SyntaxNodeKind::Percent:
                 return 12;
             default:
                 return std::numeric_limits<int>::max();
@@ -622,12 +622,12 @@ private:
             return false;
         }
         const PrintToken& open = node.children.front()->token.token;
-        return open.parentKind == SyntaxTreeKind::ConditionClause ||
-            open.parentKind == SyntaxTreeKind::ForStatement ||
-            open.grandParentKind == SyntaxTreeKind::IfStatement ||
-            open.grandParentKind == SyntaxTreeKind::WhileStatement ||
-            open.grandParentKind == SyntaxTreeKind::SwitchStatement ||
-            open.grandParentKind == SyntaxTreeKind::ForStatement;
+        return open.parentKind == SyntaxNodeKind::ConditionClause ||
+            open.parentKind == SyntaxNodeKind::ForStatement ||
+            open.grandParentKind == SyntaxNodeKind::IfStatement ||
+            open.grandParentKind == SyntaxNodeKind::WhileStatement ||
+            open.grandParentKind == SyntaxNodeKind::SwitchStatement ||
+            open.grandParentKind == SyntaxNodeKind::ForStatement;
     }
 
     static FormatBreakChoice ChoiceFor(const NodeResult& result, const FormatBreakNode& node) {
@@ -665,7 +665,7 @@ private:
             return false;
         }
         const PrintToken& open = node.children.front()->token.token;
-        if (open.parentKind == SyntaxTreeKind::ForStatement || open.grandParentKind == SyntaxTreeKind::ForStatement) {
+        if (open.parentKind == SyntaxNodeKind::ForStatement || open.grandParentKind == SyntaxNodeKind::ForStatement) {
             return false;
         }
         if (CanKeepParenthesizedArithmeticSplitCompact(node, compact)) {
@@ -686,7 +686,7 @@ private:
             node.operators.begin(),
             node.operators.end(),
             [](const FormatBreakToken& token) {
-                return token.token.kind == PrintTokenKind::Known && token.token.known == KnownToken::Comma;
+                return token.token.kind == PrintTokenKind::Known && token.token.syntaxKind == SyntaxNodeKind::Comma;
             }
         );
     }
@@ -701,7 +701,7 @@ private:
             item.chainKind != FormatBreakChainKind::AfterOperator ||
             item.operands.empty() ||
             item.operands.front()->kind == FormatBreakNodeKind::Chain ||
-            !HasLaterOperandWithOperator(item, KnownToken::Slash) ||
+            !HasLaterOperandWithOperator(item, SyntaxNodeKind::Slash) ||
             ChoiceFor(compact, item) != FormatBreakChoice::Split
         ) {
             return false;
@@ -711,12 +711,12 @@ private:
             item.operators.end(),
             [](const FormatBreakToken& token) {
                 return token.token.kind == PrintTokenKind::Known &&
-                    (token.token.known == KnownToken::Plus || token.token.known == KnownToken::Minus);
+                    (token.token.syntaxKind == SyntaxNodeKind::Plus || token.token.syntaxKind == SyntaxNodeKind::Minus);
             }
         );
     }
 
-    static bool HasLaterOperandWithOperator(const FormatBreakNode& node, KnownToken token) {
+    static bool HasLaterOperandWithOperator(const FormatBreakNode& node, SyntaxNodeKind token) {
         for (size_t index = 1; index < node.operands.size(); ++index) {
             if (ContainsOperator(*node.operands[index], token)) {
                 return true;
@@ -725,13 +725,13 @@ private:
         return false;
     }
 
-    static bool ContainsOperator(const FormatBreakNode& node, KnownToken token) {
+    static bool ContainsOperator(const FormatBreakNode& node, SyntaxNodeKind token) {
         if (node.kind == FormatBreakNodeKind::Chain) {
             if (std::any_of(
                 node.operators.begin(),
                 node.operators.end(),
                 [token](const FormatBreakToken& op) {
-                    return op.token.kind == PrintTokenKind::Known && op.token.known == token;
+                    return op.token.kind == PrintTokenKind::Known && op.token.syntaxKind == token;
                 }
             )) {
                 return true;
@@ -791,12 +791,12 @@ private:
         const FormatBreakToken& op = node.operators.front();
         if (
             op.token.kind != PrintTokenKind::Known ||
-            op.token.parentKind != SyntaxTreeKind::BinaryExpression ||
-            !KnownTokenHasClass(op.token.known, TokenClass::BinaryOperator)
+            op.token.parentKind != SyntaxNodeKind::BinaryExpression ||
+            !SyntaxNodeKindHasClass(op.token.syntaxKind, TokenClass::BinaryOperator)
         ) {
             return false;
         }
-        return compact.bestOperatorBreakPriority < OperatorBreakPriority(op.token.known);
+        return compact.bestOperatorBreakPriority < OperatorBreakPriority(op.token.syntaxKind);
     }
 
     NodeResult SolvePrefixListCompact(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
@@ -912,8 +912,8 @@ private:
 
     static bool CanAttachSplitOpenAfterOperator(const FormatBreakToken& op, const FormatBreakNode& operand) {
         return op.token.kind == PrintTokenKind::Known &&
-            op.token.parentKind == SyntaxTreeKind::BinaryExpression &&
-            KnownTokenHasClass(op.token.known, TokenClass::BinaryOperator) &&
+            op.token.parentKind == SyntaxNodeKind::BinaryExpression &&
+            SyntaxNodeKindHasClass(op.token.syntaxKind, TokenClass::BinaryOperator) &&
             operand.kind == FormatBreakNodeKind::Delimited &&
             operand.delimiterKind == FormatBreakDelimiterKind::Paren;
     }
@@ -940,7 +940,7 @@ private:
                 result,
                 continuationIndent,
                 node.structuralDepth,
-                OperatorBreakPriority(node.operators[index].token.known)
+                OperatorBreakPriority(node.operators[index].token.syntaxKind)
             );
             NodeResult operand =
                 Solve(*node.operands[index + 1], normal.endColumn, normal.endIndentLevel, normal.endLineHasText);
@@ -951,7 +951,7 @@ private:
                 attached = SolveDelimitedSplitAttachedOpen(*node.operands[index + 1], result, continuationIndent);
                 attached.bestOperatorBreakPriority = std::min(
                     attached.bestOperatorBreakPriority,
-                    OperatorBreakPriority(node.operators[index].token.known)
+                    OperatorBreakPriority(node.operators[index].token.syntaxKind)
                 );
             }
             result = Better(attached, normal) ? attached : normal;
@@ -1004,7 +1004,7 @@ private:
                 result = AddToken(result, node.operators[index]);
                 if (
                     node.operators[index].token.kind == PrintTokenKind::Known &&
-                    node.operators[index].token.known == KnownToken::Colon
+                    node.operators[index].token.syntaxKind == SyntaxNodeKind::Colon
                 ) {
                     result = AddBreak(result, indentLevel + 1, node.structuralDepth);
                 }

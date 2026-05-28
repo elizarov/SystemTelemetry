@@ -109,8 +109,9 @@ bool HasHeaderDelimiter(std::string_view target, bool quote) {
 }
 
 std::string StripHeaderDelimiter(std::string_view target) {
-    if (target.size() >= 2 &&
-        ((target.front() == '"' && target.back() == '"') || (target.front() == '<' && target.back() == '>'))) {
+    if (target.size() >= 2 && (
+        (target.front() == '"' && target.back() == '"') || (target.front() == '<' && target.back() == '>')
+    )) {
         target.remove_prefix(1);
         target.remove_suffix(1);
     }
@@ -134,24 +135,24 @@ std::string EscapeRegexLiteral(std::string_view text) {
     escaped.reserve(text.size());
     for (const char ch : text) {
         switch (ch) {
-        case '\\':
-        case '^':
-        case '$':
-        case '.':
-        case '|':
-        case '?':
-        case '*':
-        case '+':
-        case '(':
-        case ')':
-        case '[':
-        case ']':
-        case '{':
-        case '}':
-            escaped.push_back('\\');
-            break;
-        default:
-            break;
+            case'\\':
+            case'^':
+            case'$':
+            case'.':
+            case'|':
+            case'?':
+            case'*':
+            case'+':
+            case'(':
+            case')':
+            case'[':
+            case']':
+            case'{':
+            case'}':
+                escaped.push_back('\\');
+                break;
+            default:
+                break;
         }
         escaped.push_back(ch);
     }
@@ -199,7 +200,7 @@ int IncludePriority(const IncludeSortContext& context, std::string_view target) 
 }
 
 bool IsIncludeNode(const SyntaxNode& node) {
-    return node.kind == SyntaxNodeKind::Tree && node.treeKind == SyntaxTreeKind::PreprocInclude;
+    return node.kind == SyntaxNodeKind::PreprocInclude;
 }
 
 }  // namespace
@@ -209,10 +210,7 @@ std::string FormatIncludeRunText(
     const SyntaxNode& includeRun,
     std::string_view sourcePath
 ) {
-    const IncludeSortContext context{
-        .config = config,
-        .mainIncludeRegex = BuildMainIncludeRegex(config, sourcePath),
-    };
+    const IncludeSortContext context{.config = config, .mainIncludeRegex = BuildMainIncludeRegex(config, sourcePath)};
     std::vector<IncludeEntry> includes;
     includes.reserve(includeRun.children.size());
     for (const std::unique_ptr<SyntaxNode>& child : includeRun.children) {
@@ -221,23 +219,27 @@ std::string FormatIncludeRunText(
         }
         IncludeText include = ParseIncludeText(child->text);
         includes.push_back({
-            .line = std::move(include.line),
-            .target = include.target,
-            .sortKey = tools::ToLowerAscii(include.target),
-            .priority = IncludePriority(context, include.target),
-            .originalIndex = includes.size(),
-        });
+                .line = std::move(include.line),
+                .target = include.target,
+                .sortKey = tools::ToLowerAscii(include.target),
+                .priority = IncludePriority(context, include.target),
+                .originalIndex = includes.size()
+            });
     }
 
-    std::stable_sort(includes.begin(), includes.end(), [](const IncludeEntry& left, const IncludeEntry& right) {
-        if (left.priority != right.priority) {
-            return left.priority < right.priority;
+    std::stable_sort(
+        includes.begin(),
+        includes.end(),
+        [](const IncludeEntry& left, const IncludeEntry& right) {
+            if (left.priority != right.priority) {
+                return left.priority < right.priority;
+            }
+            if (left.sortKey != right.sortKey) {
+                return left.sortKey < right.sortKey;
+            }
+            return left.originalIndex < right.originalIndex;
         }
-        if (left.sortKey != right.sortKey) {
-            return left.sortKey < right.sortKey;
-        }
-        return left.originalIndex < right.originalIndex;
-    });
+    );
 
     std::string result;
     int previousPriority = 0;
