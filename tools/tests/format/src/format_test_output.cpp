@@ -63,7 +63,9 @@ constexpr auto kFixtureSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
 
 constexpr auto kFixtureCommentedSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
+
     // tree nodes
+
     Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"),
     Tree(SyntaxNodeKind::IncludeRun, "include_run")
 });
@@ -306,6 +308,7 @@ enum class ValueFormat : std::uint8_t {
     FontFooter,
     FontClockTime,
     FontClockDate,
+
     // Card style anchors
     CardRadius,
     CardBorder,

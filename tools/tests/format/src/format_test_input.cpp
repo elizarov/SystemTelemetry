@@ -66,7 +66,9 @@ Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"), Tree(SyntaxNodeKind::
 
 constexpr auto kFixtureCommentedSyntaxKindMappings =
     std::to_array<SyntaxKindMapping>({Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
+
 // tree nodes
+
 Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"), Tree(SyntaxNodeKind::IncludeRun, "include_run")});
 
 class FormattingExample {

@@ -110,6 +110,10 @@ private:
         return index < node.trailingComments.size() && IsCommentToken(node.trailingComments[index].token.kind);
     }
 
+    static bool HasBlankLineBeforeItem(const FormatBreakNode& node, size_t index) {
+        return index < node.blankLinesBeforeItems.size() && node.blankLinesBeforeItems[index];
+    }
+
     static int SpaceBeforeToken(const FormatBreakToken& token, bool lineHasText) {
         if (!lineHasText) {
             return 0;
@@ -171,7 +175,7 @@ private:
             case FormatBreakNodeKind::PrefixList: {
                 std::vector<NodeResult> alternatives;
                 NodeResult compact = SolvePrefixListCompact(node, column, indentLevel, lineHasText);
-                if (!(compact.valid && compact.extraLines > 0)) {
+                if (!node.forceSplit && !(compact.valid && compact.extraLines > 0)) {
                     alternatives.push_back(compact);
                 }
                 NodeResult split = SolvePrefixListSplit(node, column, indentLevel, lineHasText);
@@ -370,6 +374,14 @@ private:
         return result;
     }
 
+    NodeResult AddListBreak(NodeResult result, int indentLevel, int structuralDepth, bool blankLine) const {
+        result = AddBreak(result, indentLevel, structuralDepth);
+        if (blankLine) {
+            result = AddBreak(result, indentLevel, structuralDepth);
+        }
+        return result;
+    }
+
     NodeResult AddToken(NodeResult result, const FormatBreakToken& token) const {
         NodeResult tokenResult = SolveToken(token, result.endColumn, result.endIndentLevel, result.endLineHasText);
         Merge(result, tokenResult);
@@ -549,7 +561,7 @@ private:
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         result.choices.emplace(node.id, FormatBreakChoice::Split);
         result = AddToken(result, node.children[0]->token);
-        result = AddBreak(result, indentLevel + 1, node.structuralDepth);
+        result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
@@ -559,8 +571,13 @@ private:
             if (HasTrailingComment(node, index)) {
                 result = AddToken(result, node.trailingComments[index]);
             }
-            result =
-                AddBreak(result, index + 1 < node.items.size() ? indentLevel + 1 : indentLevel, node.structuralDepth);
+            const bool hasNextItem = index + 1 < node.items.size();
+            result = AddListBreak(
+                result,
+                hasNextItem ? indentLevel + 1 : indentLevel,
+                node.structuralDepth,
+                hasNextItem && HasBlankLineBeforeItem(node, index + 1)
+            );
         }
         result = AddToken(result, node.children[1]->token);
         return result;
@@ -842,7 +859,7 @@ private:
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         result.choices.emplace(node.id, FormatBreakChoice::Split);
         result = AddToken(result, node.children[0]->token);
-        result = AddBreak(result, indentLevel + 1, node.structuralDepth);
+        result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
@@ -853,7 +870,12 @@ private:
                 result = AddToken(result, node.trailingComments[index]);
             }
             if (index + 1 < node.items.size()) {
-                result = AddBreak(result, indentLevel + 1, node.structuralDepth);
+                result = AddListBreak(
+                    result,
+                    indentLevel + 1,
+                    node.structuralDepth,
+                    HasBlankLineBeforeItem(node, index + 1)
+                );
             }
         }
         return result;
@@ -862,6 +884,9 @@ private:
     NodeResult SolvePrefixList(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
         NodeResult compact = SolvePrefixListCompact(node, column, indentLevel, lineHasText);
         NodeResult split = SolvePrefixListSplit(node, column, indentLevel, lineHasText);
+        if (node.forceSplit && split.valid) {
+            return split;
+        }
         if (compact.valid && split.valid && compact.extraLines > 0) {
             return split;
         }
@@ -922,7 +947,7 @@ private:
         }
         result.choices.emplace(node.id, FormatBreakChoice::SplitAttachedOpen);
         result = AddToken(result, node.children[0]->token);
-        result = AddBreak(result, baseIndent + 1, node.structuralDepth);
+        result = AddListBreak(result, baseIndent + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
@@ -932,8 +957,13 @@ private:
             if (HasTrailingComment(node, index)) {
                 result = AddToken(result, node.trailingComments[index]);
             }
-            result =
-                AddBreak(result, index + 1 < node.items.size() ? baseIndent + 1 : baseIndent, node.structuralDepth);
+            const bool hasNextItem = index + 1 < node.items.size();
+            result = AddListBreak(
+                result,
+                hasNextItem ? baseIndent + 1 : baseIndent,
+                node.structuralDepth,
+                hasNextItem && HasBlankLineBeforeItem(node, index + 1)
+            );
         }
         result = AddToken(result, node.children[1]->token);
         return result;

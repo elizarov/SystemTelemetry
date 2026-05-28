@@ -344,11 +344,30 @@ private:
         return token != nullptr && IsStringLike(token->token);
     }
 
+    static bool IsStandaloneCommentItem(const FormatBreakNode& node, size_t index) {
+        if (index >= node.items.size()) {
+            return false;
+        }
+        const FormatBreakToken* token = TokenChild(node.items[index]);
+        return token != nullptr && token->token.kind == PrintTokenKind::Comment;
+    }
+
+    static bool ShouldPreservePendingBlankLine(const FormatBreakNode& list, bool pendingBlankLine, bool beforeComment) {
+        return pendingBlankLine && (beforeComment || IsStandaloneCommentItem(list, list.items.size() - 1));
+    }
+
+    void AppendListItem(FormatBreakNode& list, std::unique_ptr<FormatBreakNode> item, bool blankLineBefore) {
+        list.items.push_back(std::move(item));
+        list.trailingComments.push_back({});
+        list.blankLinesBeforeItems.push_back(blankLineBefore);
+    }
+
     void AppendDelimitedItem(
         FormatBreakNode& delimited,
         SyntaxChildList& itemChildren,
         const FormatBreakToken& open,
-        int depth
+        int depth,
+        bool blankLineBefore = false
     ) {
         if (itemChildren.empty()) {
             return;
@@ -363,20 +382,22 @@ private:
         ) {
             item->flatSplitIndent = true;
         }
-        delimited.items.push_back(std::move(item));
-        delimited.trailingComments.push_back({});
+        AppendListItem(delimited, std::move(item), blankLineBefore);
         itemChildren.clear();
     }
 
-    void AppendEmptyDelimitedItem(FormatBreakNode& delimited, int depth) {
-        delimited.items.push_back(MakeNode(FormatBreakNodeKind::Sequence, depth + 1));
-        delimited.trailingComments.push_back({});
+    void AppendEmptyDelimitedItem(FormatBreakNode& delimited, int depth, bool blankLineBefore = false) {
+        AppendListItem(delimited, MakeNode(FormatBreakNodeKind::Sequence, depth + 1), blankLineBefore);
     }
 
-    void AppendStandaloneCommentItem(FormatBreakNode& list, const FormatBreakToken& comment, int depth) {
-        list.items.push_back(BuildToken(comment, depth + 1));
+    void AppendStandaloneCommentItem(
+        FormatBreakNode& list,
+        const FormatBreakToken& comment,
+        int depth,
+        bool blankLineBefore = false
+    ) {
+        AppendListItem(list, BuildToken(comment, depth + 1), blankLineBefore);
         list.separators.push_back({});
-        list.trailingComments.push_back({});
     }
 
     void AttachTrailingCommentToPreviousItem(FormatBreakNode& list, const FormatBreakToken& comment) {
@@ -812,6 +833,7 @@ private:
         list->children.push_back(BuildToken(*prefix, depth + 1));
 
         SyntaxChildList itemChildren;
+        bool pendingBlankLine = false;
         for (size_t index = *prefixIndex + 1; index < node.children.size(); ++index) {
             const SyntaxNode* child = node.children[index].get();
             if (child == nullptr) {
@@ -820,6 +842,7 @@ private:
             if (IsListForceSplitMarker(child->kind)) {
                 list->forceSplit = true;
                 if (child->kind == SyntaxNodeKind::BlankLine) {
+                    pendingBlankLine = true;
                     continue;
                 }
                 const FormatBreakToken* comment = TokenForNode(*child);
@@ -828,21 +851,24 @@ private:
                 }
                 if (child->kind == SyntaxNodeKind::TrailingComment) {
                     if (!itemChildren.empty()) {
-                        list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
-                        list->trailingComments.push_back({});
+                        const bool blankLineBefore = ShouldPreservePendingBlankLine(*list, pendingBlankLine, false);
+                        AppendListItem(*list, BuildSequenceFromPointers(itemChildren, depth + 1), blankLineBefore);
                         list->separators.push_back({});
                         itemChildren.clear();
                     }
                     AttachTrailingCommentToPreviousItem(*list, *comment);
                 } else {
                     if (!itemChildren.empty()) {
-                        list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
-                        list->trailingComments.push_back({});
+                        const bool blankLineBefore = ShouldPreservePendingBlankLine(*list, pendingBlankLine, false);
+                        AppendListItem(*list, BuildSequenceFromPointers(itemChildren, depth + 1), blankLineBefore);
                         list->separators.push_back({});
                         itemChildren.clear();
+                        pendingBlankLine = false;
                     }
-                    AppendStandaloneCommentItem(*list, *comment, depth + 1);
+                    const bool blankLineBefore = ShouldPreservePendingBlankLine(*list, pendingBlankLine, true);
+                    AppendStandaloneCommentItem(*list, *comment, depth + 1, blankLineBefore);
                 }
+                pendingBlankLine = false;
                 continue;
             }
             if (!ContainsSelected(*child)) {
@@ -855,9 +881,10 @@ private:
                 token->token.syntaxKind == SyntaxNodeKind::Comma
             ) {
                 if (!itemChildren.empty()) {
-                    list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
-                    list->trailingComments.push_back({});
+                    const bool blankLineBefore = ShouldPreservePendingBlankLine(*list, pendingBlankLine, false);
+                    AppendListItem(*list, BuildSequenceFromPointers(itemChildren, depth + 1), blankLineBefore);
                     itemChildren.clear();
+                    pendingBlankLine = false;
                 }
                 list->separators.push_back(*token);
                 continue;
@@ -865,8 +892,8 @@ private:
             itemChildren.push_back(child);
         }
         if (!itemChildren.empty()) {
-            list->items.push_back(BuildSequenceFromPointers(itemChildren, depth + 1));
-            list->trailingComments.push_back({});
+            const bool blankLineBefore = ShouldPreservePendingBlankLine(*list, pendingBlankLine, false);
+            AppendListItem(*list, BuildSequenceFromPointers(itemChildren, depth + 1), blankLineBefore);
             list->separators.push_back({});
         }
         return list->items.empty() ? nullptr : std::move(list);
@@ -927,6 +954,7 @@ private:
         delimited->children.push_back(BuildToken(*close, depth + 1));
 
         SyntaxChildList itemChildren;
+        bool pendingBlankLine = false;
         for (size_t index = openIndex + 1; index < closeIndex; ++index) {
             const SyntaxNode* child = children[index].get();
             if (child == nullptr) {
@@ -935,6 +963,7 @@ private:
             if (IsListForceSplitMarker(child->kind)) {
                 delimited->forceSplit = true;
                 if (child->kind == SyntaxNodeKind::BlankLine) {
+                    pendingBlankLine = true;
                     continue;
                 }
                 const FormatBreakToken* comment = TokenForNode(*child);
@@ -943,17 +972,24 @@ private:
                 }
                 if (child->kind == SyntaxNodeKind::TrailingComment) {
                     if (!itemChildren.empty()) {
-                        AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                        const bool blankLineBefore =
+                            ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+                        AppendDelimitedItem(*delimited, itemChildren, *open, depth, blankLineBefore);
                         delimited->separators.push_back({});
                     }
                     AttachTrailingCommentToPreviousItem(*delimited, *comment);
                 } else {
                     if (!itemChildren.empty()) {
-                        AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                        const bool blankLineBefore =
+                            ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+                        AppendDelimitedItem(*delimited, itemChildren, *open, depth, blankLineBefore);
                         delimited->separators.push_back({});
+                        pendingBlankLine = false;
                     }
-                    AppendStandaloneCommentItem(*delimited, *comment, depth);
+                    const bool blankLineBefore = ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, true);
+                    AppendStandaloneCommentItem(*delimited, *comment, depth, blankLineBefore);
                 }
+                pendingBlankLine = false;
                 continue;
             }
             if (!ContainsSelected(*child)) {
@@ -967,10 +1003,13 @@ private:
                     token->token.kind == PrintTokenKind::Known &&
                     token->token.syntaxKind == SyntaxNodeKind::Semicolon
                 ) {
-                    AppendEmptyDelimitedItem(*delimited, depth);
+                    const bool blankLineBefore = ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+                    AppendEmptyDelimitedItem(*delimited, depth, blankLineBefore);
                 } else {
-                    AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                    const bool blankLineBefore = ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+                    AppendDelimitedItem(*delimited, itemChildren, *open, depth, blankLineBefore);
                 }
+                pendingBlankLine = false;
                 delimited->separators.push_back(*token);
                 continue;
             }
@@ -980,11 +1019,14 @@ private:
                 itemChildren.size() == 1 &&
                 (child->kind == SyntaxNodeKind::Declaration || child->kind == SyntaxNodeKind::InitStatement)
             ) {
-                AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+                const bool blankLineBefore = ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+                AppendDelimitedItem(*delimited, itemChildren, *open, depth, blankLineBefore);
+                pendingBlankLine = false;
                 delimited->separators.push_back({});
             }
         }
-        AppendDelimitedItem(*delimited, itemChildren, *open, depth);
+        const bool blankLineBefore = ShouldPreservePendingBlankLine(*delimited, pendingBlankLine, false);
+        AppendDelimitedItem(*delimited, itemChildren, *open, depth, blankLineBefore);
         if (
             itemChildren.empty() &&
             IsForHeaderDelimiter(*open) &&

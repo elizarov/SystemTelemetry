@@ -59,6 +59,7 @@ struct FormatBreakNode {
     std::vector<std::unique_ptr<FormatBreakNode>> items;
     std::vector<FormatBreakToken> separators;
     std::vector<FormatBreakToken> trailingComments;
+    std::vector<bool> blankLinesBeforeItems;
     std::vector<std::unique_ptr<FormatBreakNode>> operands;
     std::vector<FormatBreakToken> operators;
 };

@@ -84,7 +84,8 @@ bool PreservesBlankLineToken(SyntaxNodeKind parentKind) {
     return parentKind == SyntaxNodeKind::TranslationUnit ||
         parentKind == SyntaxNodeKind::DeclarationList ||
         parentKind == SyntaxNodeKind::CompoundStatement ||
-        parentKind == SyntaxNodeKind::FieldDeclarationList;
+        parentKind == SyntaxNodeKind::FieldDeclarationList ||
+        parentKind == SyntaxNodeKind::EnumeratorList;
 }
 
 bool KeepsListCommentInBreakModel(const PrintToken& token) {
@@ -670,6 +671,19 @@ private:
         pendingIndentLevel_ = std::max(0, indentLevel);
     }
 
+    void BlankLineWithIndent(int indentLevel) {
+        BlankLine();
+        pendingIndentLevel_ = std::max(0, indentLevel);
+    }
+
+    void BreakListLine(int indentLevel, bool blankLine) {
+        if (blankLine) {
+            BlankLineWithIndent(indentLevel);
+            return;
+        }
+        NewLineWithIndent(indentLevel);
+    }
+
     void BlankLine() {
         NewLine(false);
         if (output_.size() < 2 || output_[output_.size() - 2] != '\n') {
@@ -847,7 +861,8 @@ private:
             node.items[index + 1]->kind == FormatBreakNodeKind::Delimited &&
             node.items[index + 1]->delimiterKind == FormatBreakDelimiterKind::Brace &&
             IsSplitChoice(ChoiceFor(solution, node.items[index + 1]->id)) &&
-            !HasTrailingComment(node, index);
+            !HasTrailingComment(node, index) &&
+            !HasBlankLineBeforeItem(node, index + 1);
     }
 
     struct DelimiterStackEmitView {
@@ -865,6 +880,10 @@ private:
 
     static bool HasTrailingComment(const FormatBreakNode& node, size_t index) {
         return index < node.trailingComments.size() && IsCommentToken(node.trailingComments[index].token.kind);
+    }
+
+    static bool HasBlankLineBeforeItem(const FormatBreakNode& node, size_t index) {
+        return index < node.blankLinesBeforeItems.size() && node.blankLinesBeforeItems[index];
     }
 
     static bool IsDelimiterStackItem(const FormatBreakNode& node) {
@@ -954,7 +973,7 @@ private:
         const bool closesInContext = node.children.size() > 1 &&
             node.children[1]->kind == FormatBreakNodeKind::Token &&
             node.children[1]->token.contextOnly;
-        NewLineWithIndent(baseIndent + 1);
+        BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
@@ -968,7 +987,11 @@ private:
             } else if (closesInContext && index + 1 == node.items.size()) {
                 continue;
             } else {
-                NewLineWithIndent(index + 1 < node.items.size() ? baseIndent + 1 : baseIndent);
+                const bool hasNextItem = index + 1 < node.items.size();
+                BreakListLine(
+                    hasNextItem ? baseIndent + 1 : baseIndent,
+                    hasNextItem && HasBlankLineBeforeItem(node, index + 1)
+                );
             }
         }
         EmitBreakNode(*node.children[1], solution, baseIndent);
@@ -991,7 +1014,7 @@ private:
         }
 
         EmitBreakNode(*node.children[0], solution, baseIndent);
-        NewLineWithIndent(baseIndent + 1);
+        BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
@@ -1001,7 +1024,7 @@ private:
                 WriteBreakToken(node.trailingComments[index]);
             }
             if (index + 1 < node.items.size()) {
-                NewLineWithIndent(baseIndent + 1);
+                BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, index + 1));
             }
         }
     }
@@ -1015,7 +1038,7 @@ private:
         const bool closesInContext = node.children.size() > 1 &&
             node.children[1]->kind == FormatBreakNodeKind::Token &&
             node.children[1]->token.contextOnly;
-        NewLineWithIndent(baseIndent + 1);
+        BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
             if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
@@ -1029,7 +1052,11 @@ private:
             } else if (closesInContext && index + 1 == node.items.size()) {
                 continue;
             } else {
-                NewLineWithIndent(index + 1 < node.items.size() ? baseIndent + 1 : baseIndent);
+                const bool hasNextItem = index + 1 < node.items.size();
+                BreakListLine(
+                    hasNextItem ? baseIndent + 1 : baseIndent,
+                    hasNextItem && HasBlankLineBeforeItem(node, index + 1)
+                );
             }
         }
         EmitBreakNode(*node.children[1], solution, baseIndent);
