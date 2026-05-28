@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -43,10 +44,23 @@ enum class FormatBreakChoice {
 };
 
 struct FormatBreakToken {
-    PrintToken token;
+    const PrintToken* token = nullptr;
     bool spaceBefore = false;
     bool contextOnly = false;
 };
+
+inline const PrintToken& FormatBreakTokenValue(const FormatBreakToken& token) {
+    static const PrintToken kEmptyToken;
+    return token.token == nullptr ? kEmptyToken : *token.token;
+}
+
+inline PrintTokenKind FormatBreakTokenKind(const FormatBreakToken& token) {
+    return token.token == nullptr ? PrintTokenKind::Free : token.token->kind;
+}
+
+inline SyntaxNodeKind FormatBreakTokenSyntaxKind(const FormatBreakToken& token) {
+    return token.token == nullptr ? SyntaxNodeKind::Unknown : token.token->syntaxKind;
+}
 
 struct FormatBreakNode {
     int id = 0;
@@ -58,17 +72,18 @@ struct FormatBreakNode {
     bool forceSplit = false;
     bool flatSplitIndent = false;
     bool functionSignatureHasBody = false;
-    std::vector<std::unique_ptr<FormatBreakNode>> children;
-    std::vector<std::unique_ptr<FormatBreakNode>> items;
+    std::vector<FormatBreakNode*> children;
+    std::vector<FormatBreakNode*> items;
     std::vector<FormatBreakToken> separators;
     std::vector<FormatBreakToken> trailingComments;
     std::vector<bool> blankLinesBeforeItems;
-    std::vector<std::unique_ptr<FormatBreakNode>> operands;
+    std::vector<FormatBreakNode*> operands;
     std::vector<FormatBreakToken> operators;
 };
 
 struct FormatBreakModel {
-    std::unique_ptr<FormatBreakNode> root;
+    std::unique_ptr<std::deque<FormatBreakNode>> nodes;
+    FormatBreakNode* root = nullptr;
 };
 
 struct FormatBreakModelContext {

@@ -1,6 +1,7 @@
 #include "tools/impl/format_pretty_printer.h"
 
 #include <algorithm>
+#include <chrono>
 #include <optional>
 #include <string>
 #include <vector>
@@ -232,6 +233,28 @@ bool IsSingleStatementLambdaBody(const SyntaxNode& node, SyntaxNodeKind parentKi
     return statementCount == 1;
 }
 
+struct SyntaxPathScope {
+    SyntaxPathScope(std::vector<const SyntaxNode*>& syntaxPath, const SyntaxNode& node) : syntaxPath(syntaxPath)
+    {
+        syntaxPath.push_back(&node);
+    }
+
+    ~SyntaxPathScope() {
+        syntaxPath.pop_back();
+    }
+
+    std::vector<const SyntaxNode*>& syntaxPath;
+};
+
+PrintTokenSyntaxPath StoreSyntaxPath(
+    const std::vector<const SyntaxNode*>& syntaxPath,
+    std::vector<const SyntaxNode*>& syntaxPathStorage
+) {
+    const size_t offset = syntaxPathStorage.size();
+    syntaxPathStorage.insert(syntaxPathStorage.end(), syntaxPath.begin(), syntaxPath.end());
+    return PrintTokenSyntaxPath{.storage = &syntaxPathStorage, .offset = offset, .length = syntaxPath.size()};
+}
+
 void AppendTokens(
     const SyntaxNode& node,
     SyntaxNodeKind parentKind,
@@ -244,10 +267,11 @@ void AppendTokens(
     const SyntaxNode* macroValueElement,
     bool inMacroValue,
     bool breakBeforeMacroValue,
-    std::vector<const SyntaxNode*> syntaxPath,
+    std::vector<const SyntaxNode*>& syntaxPathStorage,
+    std::vector<const SyntaxNode*>& syntaxPath,
     std::vector<PrintToken>& tokens
 ) {
-    syntaxPath.push_back(&node);
+    SyntaxPathScope syntaxPathScope(syntaxPath, node);
     const SyntaxNode* parentNode = syntaxPath.size() >= 2 ? syntaxPath[syntaxPath.size() - 2] : nullptr;
     const SyntaxNodeKind nodeKind = node.kind;
     const bool childInTemplateDeclaration = inTemplateDeclaration || nodeKind == SyntaxNodeKind::TemplateDeclaration;
@@ -271,7 +295,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -292,7 +316,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -312,7 +336,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -331,7 +355,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -351,7 +375,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -371,7 +395,7 @@ void AppendTokens(
             .inMacroValue = childInMacroValue,
             .breakBeforeMacroValue = childBreakBeforeMacroValue,
             .node = &node,
-            .syntaxPath = syntaxPath,
+            .syntaxPath = StoreSyntaxPath(syntaxPath, syntaxPathStorage),
             .macroDefinition = childMacroDefinition,
             .macroValueElement = macroValueElement
         });
@@ -391,6 +415,7 @@ void AppendTokens(
                 child.get(),
                 true,
                 childBreakBeforeMacroValue,
+                syntaxPathStorage,
                 syntaxPath,
                 tokens
             );
@@ -411,6 +436,7 @@ void AppendTokens(
                 macroValueElement,
                 childInMacroValue,
                 childBreakBeforeMacroValue,
+                syntaxPathStorage,
                 syntaxPath,
                 tokens
             );
@@ -506,8 +532,9 @@ class Printer {
 public:
     Printer(
         const FormatterConfig& config,
-        std::string_view sourcePath
-    ) : config_(config), sourcePath_(sourcePath), indentWidth_(std::max(1, config.indentWidth)) {}
+        std::string_view sourcePath,
+        FormatModelTextStats* stats
+    ) : config_(config), sourcePath_(sourcePath), stats_(stats), indentWidth_(std::max(1, config.indentWidth)) {}
 
     std::string Print(const std::vector<PrintToken>& tokens) {
         activeTokens_ = &tokens;
@@ -530,6 +557,7 @@ public:
 private:
     const FormatterConfig& config_;
     std::string_view sourcePath_;
+    FormatModelTextStats* stats_ = nullptr;
     int indentWidth_ = 4;
     std::string output_;
     std::vector<PrintToken> pendingTokens_;
@@ -802,22 +830,23 @@ private:
         if (token.contextOnly) {
             return;
         }
-        if (token.token.macroDefinition != nullptr && !token.token.inMacroValue && atLineStart_) {
+        const PrintToken& printToken = FormatBreakTokenValue(token);
+        if (printToken.macroDefinition != nullptr && !printToken.inMacroValue && atLineStart_) {
             forceColumnZeroLine_ = true;
             pendingIndentLevel_.reset();
         }
-        if (IsCommentToken(token.token.kind)) {
+        if (IsCommentToken(printToken.kind)) {
             if (!atLineStart_) {
                 Space();
                 output_.push_back(' ');
             }
-            Write(FormatTokenText(token.token));
+            Write(FormatTokenText(printToken));
             return;
         }
         if (token.spaceBefore && !atLineStart_) {
             Space();
         }
-        Write(FormatTokenText(token.token));
+        Write(FormatTokenText(printToken));
     }
 
     void EmitBreakNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
@@ -826,7 +855,7 @@ private:
                 WriteBreakToken(node.token);
                 return;
             case FormatBreakNodeKind::Sequence:
-                for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+                for (const FormatBreakNode* child : node.children) {
                     EmitBreakNode(*child, solution, baseIndent);
                 }
                 return;
@@ -859,8 +888,8 @@ private:
         return node.delimiterKind == FormatBreakDelimiterKind::Brace &&
             index + 1 < node.items.size() &&
             index < node.separators.size() &&
-            node.separators[index].token.kind == PrintTokenKind::Known &&
-            node.separators[index].token.syntaxKind == SyntaxNodeKind::Comma &&
+            FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known &&
+            FormatBreakTokenSyntaxKind(node.separators[index]) == SyntaxNodeKind::Comma &&
             node.items[index]->kind == FormatBreakNodeKind::Delimited &&
             node.items[index]->delimiterKind == FormatBreakDelimiterKind::Brace &&
             IsSplitChoice(ChoiceFor(solution, node.items[index]->id)) &&
@@ -880,12 +909,13 @@ private:
         return std::any_of(
             node.separators.begin(),
             node.separators.end(),
-            [](const FormatBreakToken& separator) { return separator.token.kind == PrintTokenKind::Known; }
+            [](const FormatBreakToken& separator) { return FormatBreakTokenKind(separator) == PrintTokenKind::Known; }
         );
     }
 
     static bool HasTrailingComment(const FormatBreakNode& node, size_t index) {
-        return index < node.trailingComments.size() && IsCommentToken(node.trailingComments[index].token.kind);
+        return index < node.trailingComments.size() &&
+            IsCommentToken(FormatBreakTokenKind(node.trailingComments[index]));
     }
 
     static bool HasBlankLineBeforeItem(const FormatBreakNode& node, size_t index) {
@@ -904,7 +934,7 @@ private:
         const FormatBreakNode* current = &node;
         while (current != nullptr) {
             stack.delimiters.push_back(current);
-            const FormatBreakNode* item = current->items.front().get();
+            const FormatBreakNode* item = current->items.front();
             if (
                 item == nullptr ||
                 !IsDelimiterStackItem(*item) ||
@@ -922,7 +952,10 @@ private:
 
     void WritePackedBreakToken(const FormatBreakToken& token, int overflowIndent) {
         const int space = token.spaceBefore && !atLineStart_ ? 1 : 0;
-        if (!atLineStart_ && CurrentColumn() + space + FormatTokenWidth(token.token) > config_.columnLimit) {
+        if (
+            !atLineStart_ &&
+            CurrentColumn() + space + FormatTokenWidth(FormatBreakTokenValue(token)) > config_.columnLimit
+        ) {
             NewLineWithIndent(overflowIndent);
         }
         WriteBreakToken(token);
@@ -940,7 +973,10 @@ private:
         for (const FormatBreakNode* delimiter : stack->delimiters) {
             const FormatBreakToken& open = delimiter->children.front()->token;
             const int space = open.spaceBefore && !atLineStart_ ? 1 : 0;
-            if (!atLineStart_ && CurrentColumn() + space + FormatTokenWidth(open.token) > config_.columnLimit) {
+            if (
+                !atLineStart_ &&
+                CurrentColumn() + space + FormatTokenWidth(FormatBreakTokenValue(open)) > config_.columnLimit
+            ) {
                 currentLineIndent = nextOpenIndent;
                 NewLineWithIndent(currentLineIndent);
                 ++nextOpenIndent;
@@ -964,7 +1000,10 @@ private:
             EmitBreakNode(*node.children[0], solution, baseIndent);
             for (size_t index = 0; index < node.items.size(); ++index) {
                 EmitBreakNode(*node.items[index], solution, baseIndent);
-                if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                if (
+                    index < node.separators.size() &&
+                    FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
+                ) {
                     WriteBreakToken(node.separators[index]);
                 }
                 if (HasTrailingComment(node, index)) {
@@ -982,7 +1021,9 @@ private:
         BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
-            if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+            if (
+                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
+            ) {
                 WriteBreakToken(node.separators[index]);
             }
             if (HasTrailingComment(node, index)) {
@@ -1009,7 +1050,10 @@ private:
             EmitBreakNode(*node.children[0], solution, baseIndent);
             for (size_t index = 0; index < node.items.size(); ++index) {
                 EmitBreakNode(*node.items[index], solution, baseIndent);
-                if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                if (
+                    index < node.separators.size() &&
+                    FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
+                ) {
                     WriteBreakToken(node.separators[index]);
                 }
                 if (HasTrailingComment(node, index)) {
@@ -1023,7 +1067,9 @@ private:
         BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
-            if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+            if (
+                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
+            ) {
                 WriteBreakToken(node.separators[index]);
             }
             if (HasTrailingComment(node, index)) {
@@ -1047,7 +1093,9 @@ private:
         BreakListLine(baseIndent + 1, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             EmitBreakNode(*node.items[index], solution, baseIndent + 1);
-            if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+            if (
+                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
+            ) {
                 WriteBreakToken(node.separators[index]);
             }
             if (HasTrailingComment(node, index)) {
@@ -1071,7 +1119,7 @@ private:
     void EmitFunctionSignatureNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
         const FormatBreakChoice choice = ChoiceFor(solution, node.id);
         if (choice != FormatBreakChoice::Split || node.children.size() < 2) {
-            for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+            for (const FormatBreakNode* child : node.children) {
                 EmitBreakNode(*child, solution, baseIndent);
             }
             return;
@@ -1092,7 +1140,7 @@ private:
     void EmitBodyHeaderNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
         const FormatBreakChoice choice = ChoiceFor(solution, node.id);
         if (choice != FormatBreakChoice::Split || node.children.size() < 2) {
-            for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+            for (const FormatBreakNode* child : node.children) {
                 EmitBreakNode(*child, solution, baseIndent);
             }
             return;
@@ -1140,8 +1188,8 @@ private:
                 if (index < node.operators.size()) {
                     WriteBreakToken(node.operators[index]);
                     if (
-                        node.operators[index].token.kind == PrintTokenKind::Known &&
-                        node.operators[index].token.syntaxKind == SyntaxNodeKind::Colon
+                        FormatBreakTokenKind(node.operators[index]) == PrintTokenKind::Known &&
+                        FormatBreakTokenSyntaxKind(node.operators[index]) == SyntaxNodeKind::Colon
                     ) {
                         NewLineWithIndent(baseIndent + 1);
                     }
@@ -1216,17 +1264,17 @@ private:
         ) {
             return true;
         }
-        for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+        for (const FormatBreakNode* child : node.children) {
             if (child && UsesSplitContextClose(*child, solution)) {
                 return true;
             }
         }
-        for (const std::unique_ptr<FormatBreakNode>& item : node.items) {
+        for (const FormatBreakNode* item : node.items) {
             if (item && UsesSplitContextClose(*item, solution)) {
                 return true;
             }
         }
-        for (const std::unique_ptr<FormatBreakNode>& operand : node.operands) {
+        for (const FormatBreakNode* operand : node.operands) {
             if (operand && UsesSplitContextClose(*operand, solution)) {
                 return true;
             }
@@ -1238,7 +1286,11 @@ private:
         if (pendingTokens_.empty()) {
             return false;
         }
+        const auto modelStart = std::chrono::steady_clock::now();
         FormatBreakModel model = BuildFormatBreakModel(pendingTokens_, context);
+        if (stats_ != nullptr) {
+            stats_->breakModel += std::chrono::steady_clock::now() - modelStart;
+        }
         const bool previousEmittingMacroValue = emittingMacroValue_;
         emittingMacroValue_ = std::any_of(
             pendingTokens_.begin(),
@@ -1249,12 +1301,20 @@ private:
             pendingIndentLevel_ = std::max(pendingIndentLevel_.value_or(0), indentLevel_ + 1);
         }
         const int baseIndentLevel = pendingIndentLevel_.value_or(indentLevel_);
+        const auto solveStart = std::chrono::steady_clock::now();
         FormatBreakSolution solution =
             SolveFormatBreaks(config_, model, CurrentColumn(), baseIndentLevel, indentWidth_);
+        if (stats_ != nullptr) {
+            stats_->solve += std::chrono::steady_clock::now() - solveStart;
+        }
         bool splitContextClose = false;
         if (model.root) {
             splitContextClose = UsesSplitContextClose(*model.root, solution);
+            const auto emitStart = std::chrono::steady_clock::now();
             EmitBreakNode(*model.root, solution, baseIndentLevel);
+            if (stats_ != nullptr) {
+                stats_->emit += std::chrono::steady_clock::now() - emitStart;
+            }
         }
         emittingMacroValue_ = previousEmittingMacroValue;
         pendingTokens_.clear();
@@ -1306,7 +1366,7 @@ private:
             return std::nullopt;
         }
 
-        FormatBreakToken virtualClose{(*activeTokens_)[*closeIndex], false, true};
+        FormatBreakToken virtualClose{&(*activeTokens_)[*closeIndex], false, true};
         const int baseIndentLevel = pendingIndentLevel_.value_or(indentLevel_);
         bool hasCommaAfterLambda = false;
         for (size_t index = *lambdaCloseIndex + 1; index < *closeIndex; ++index) {
@@ -1869,10 +1929,23 @@ private:
 }  // namespace
 
 std::string FormatModelText(const FormatterConfig& config, const FormatModel& model, std::string_view sourcePath) {
+    FormatModelTextStats stats;
+    return FormatModelText(config, model, sourcePath, stats);
+}
+
+std::string FormatModelText(
+    const FormatterConfig& config,
+    const FormatModel& model,
+    std::string_view sourcePath,
+    FormatModelTextStats& stats
+) {
     if (!model.root) {
         return {};
     }
+    const auto tokenizeStart = std::chrono::steady_clock::now();
     std::vector<PrintToken> tokens;
+    std::vector<const SyntaxNode*> syntaxPathStorage;
+    std::vector<const SyntaxNode*> syntaxPath;
     AppendTokens(
         *model.root,
         SyntaxNodeKind::Unknown,
@@ -1885,9 +1958,16 @@ std::string FormatModelText(const FormatterConfig& config, const FormatModel& mo
         nullptr,
         false,
         false,
-        {},
+        syntaxPathStorage,
+        syntaxPath,
         tokens
     );
+    stats.tokenize += std::chrono::steady_clock::now() - tokenizeStart;
+    const auto annotateStart = std::chrono::steady_clock::now();
     AnnotateMacroValueWidths(tokens);
-    return Printer(config, sourcePath).Print(tokens);
+    stats.annotate += std::chrono::steady_clock::now() - annotateStart;
+    const auto printStart = std::chrono::steady_clock::now();
+    std::string result = Printer(config, sourcePath, &stats).Print(tokens);
+    stats.print += std::chrono::steady_clock::now() - printStart;
+    return result;
 }

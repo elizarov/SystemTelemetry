@@ -5,8 +5,10 @@
 namespace {
 
 bool IsLeadingNameToken(const FormatBreakToken& token) {
-    return token.token.kind == PrintTokenKind::Free ||
-        (token.token.kind == PrintTokenKind::Known && token.token.syntaxKind == SyntaxNodeKind::ColonColon);
+    return FormatBreakTokenKind(token) == PrintTokenKind::Free || (
+        FormatBreakTokenKind(token) == PrintTokenKind::Known &&
+            FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::ColonColon
+    );
 }
 
 bool ConsumeLeadingName(const FormatBreakNode& node, std::string_view candidate, size_t& position) {
@@ -15,7 +17,7 @@ bool ConsumeLeadingName(const FormatBreakNode& node, std::string_view candidate,
             if (!IsLeadingNameToken(node.token)) {
                 return true;
             }
-            const std::string_view text = FormatTokenText(node.token.token);
+            const std::string_view text = FormatTokenText(FormatBreakTokenValue(node.token));
             if (position + text.size() > candidate.size() || candidate.substr(position, text.size()) != text) {
                 return false;
             }
@@ -25,7 +27,7 @@ bool ConsumeLeadingName(const FormatBreakNode& node, std::string_view candidate,
         case FormatBreakNodeKind::Sequence:
         case FormatBreakNodeKind::FunctionSignature:
         case FormatBreakNodeKind::BodyHeader:
-            for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+            for (const FormatBreakNode* child : node.children) {
                 if (child->kind == FormatBreakNodeKind::Delimited) {
                     return true;
                 }

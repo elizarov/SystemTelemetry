@@ -1316,6 +1316,7 @@ target_compile_options(CaseDashBenchmarks PRIVATE
     $<$<CONFIG:Release>:/GL>
 )
 target_link_options(CaseDashBenchmarks PRIVATE
+    /STACK:16777216
     $<$<CONFIG:Debug>:/DEBUG>
     $<$<CONFIG:Debug>:/INCREMENTAL>
     $<$<CONFIG:Release>:/DEBUG:FULL>

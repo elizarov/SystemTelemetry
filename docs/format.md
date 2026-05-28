@@ -246,7 +246,7 @@ value = first + BuildValue(
 Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
 
-Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. When a continued function signature is followed by a body, the body `{` starts on its own line at the declaration indentation.
+Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. When the return type is split away from a function definition, the body `{` starts on its own line at the declaration indentation. A definition whose only continuation is a split parameter list may keep `) {` together.
 
 ```cpp
 std::vector<std::string>
@@ -467,7 +467,7 @@ Nested switches restore the enclosing switch case indentation after the inner sw
 
 ## Lambdas
 
-Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement on its own line, and close on their own line.
+Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement on its own line, and close on their own line. A lambda argument with a compact header may keep the containing call arguments compact even though the lambda body itself spans lines.
 
 When a wrapped lambda is assigned to a variable, the assignment prefix is part of the lambda header context, so the optimizer may keep the prefix and lambda opener on the same line.
 

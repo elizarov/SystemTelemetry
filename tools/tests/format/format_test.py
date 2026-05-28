@@ -202,6 +202,46 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_multiline_lambda_argument_and_split_function_parameters_are_allowed(self) -> None:
+        input_text = (
+            "struct IncludeGroup { int priority; };\n"
+            "void SortIncludeGroups(std::vector<IncludeGroup>& groups) {\n"
+            "    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {\n"
+            "        return left.priority < right.priority;\n"
+            "    });\n"
+            "}\n"
+            "\n"
+            "std::set<std::string> RequireSuffixGroup(\n"
+            "    const std::map<std::string, std::set<std::string>>& suffixGroups,\n"
+            "    std::string_view configPath,\n"
+            "    std::string_view groupName\n"
+            ") {\n"
+            "   return {};\n"
+            "}\n"
+        )
+        result = native_format("--style=file", input_text=input_text)
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "struct IncludeGroup {\n"
+            "    int priority;\n"
+            "};\n"
+            "void SortIncludeGroups(std::vector<IncludeGroup>& groups) {\n"
+            "    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {\n"
+            "        return left.priority < right.priority;\n"
+            "    });\n"
+            "}\n"
+            "\n"
+            "std::set<std::string> RequireSuffixGroup(\n"
+            "    const std::map<std::string, std::set<std::string>>& suffixGroups,\n"
+            "    std::string_view configPath,\n"
+            "    std::string_view groupName\n"
+            ") {\n"
+            "    return {};\n"
+            "}\n",
+            result.stdout,
+        )
+
     def test_parse_error_rejects_stdout_formatting(self) -> None:
         result = native_format("--style=file", input_text="int main( { return 1; }\n")
 

@@ -32,6 +32,8 @@
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
 #include "tools/format.h"
+#include "tools/impl/format_model_parse.h"
+#include "tools/impl/format_pretty_printer.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
@@ -272,20 +274,16 @@ std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& render
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
     const auto regions = renderer.CollectLayoutEditActiveRegions(overlayState);
-    const auto it = std::find_if(
-        regions.begin(),
-        regions.end(),
-        [](const auto& region) {
-            if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
-                return false;
-            }
-            const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
-            return guide != nullptr &&
-                guide->editCardId.empty() &&
-                guide->nodePath.size() <= 1 &&
-                guide->childExtents.size() >= 2;
+    const auto it = std::find_if(regions.begin(), regions.end(), [](const auto& region) {
+        if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
+            return false;
         }
-    );
+        const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
+        return guide != nullptr &&
+            guide->editCardId.empty() &&
+            guide->nodePath.size() <= 1 &&
+            guide->childExtents.size() >= 2;
+    });
     const auto* guide = it != regions.end() ? LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(*it) : nullptr;
     return guide != nullptr ? std::optional<LayoutEditGuide>(*guide) : std::nullopt;
 }
@@ -908,6 +906,50 @@ void PrintBenchLoopResult(const char* name, const BenchResult& result) {
         << "\n";
 }
 
+size_t AdvanceBenchmarkNewline(std::string_view text, size_t index) {
+    if (index < text.size() && text[index] == '\r' && index + 1 < text.size() && text[index + 1] == '\n') {
+        return index + 2;
+    }
+    return std::min(index + 1, text.size());
+}
+
+bool IsBenchmarkNewlineByte(char ch) {
+    return ch == '\r' || ch == '\n';
+}
+
+bool BenchmarkTextMatchesFormattedOutput(std::string_view source, std::string_view formatted) {
+    size_t sourceIndex = 0;
+    size_t formattedIndex = 0;
+    while (sourceIndex < source.size() || formattedIndex < formatted.size()) {
+        if (sourceIndex >= source.size() || formattedIndex >= formatted.size()) {
+            return false;
+        }
+        char sourceChar = source[sourceIndex];
+        char formattedChar = formatted[formattedIndex];
+        if (IsBenchmarkNewlineByte(sourceChar)) {
+            sourceChar = '\n';
+            sourceIndex = AdvanceBenchmarkNewline(source, sourceIndex);
+        } else {
+            ++sourceIndex;
+        }
+        if (IsBenchmarkNewlineByte(formattedChar)) {
+            formattedChar = '\n';
+            formattedIndex = AdvanceBenchmarkNewline(formatted, formattedIndex);
+        } else {
+            ++formattedIndex;
+        }
+        if (sourceChar != formattedChar) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void PrintFormatPhaseResult(const char* name, const PhaseStats& stats, size_t iterations) {
+    const Duration total = stats.total;
+    PrintBenchLoopResult(name, BenchResult{total, Duration(total.count() / static_cast<double>(iterations))});
+}
+
 int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
     const FilePath inputPath = SourceFormatGoldenInputPath();
     std::optional<std::string> input = ReadFileBinary(inputPath);
@@ -926,17 +968,43 @@ int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
 
     size_t changedIterations = 0;
     size_t formattedBytes = 0;
+    PhaseStats parseStats;
+    PhaseStats printStats;
+    PhaseStats tokenizeStats;
+    PhaseStats annotateStats;
+    PhaseStats emitStats;
+    PhaseStats breakModelStats;
+    PhaseStats solveStats;
+    PhaseStats writeStats;
+    PhaseStats compareStats;
     const auto loopStart = Clock::now();
     for (size_t iteration = 0; iteration < iterations; ++iteration) {
-        SourceFormatResult result = FormatSourceText(*input, *config, inputPath.string());
-        if (!result.ok) {
-            std::cerr << inputPath.string() << ": " << result.error << "\n";
+        const auto parseStart = Clock::now();
+        FormatModel model = ParseFormatModel(*input);
+        RecordPhase(parseStats, Clock::now() - parseStart);
+        if (!model.parse.ok) {
+            const std::string error = model.parse.error.empty() ? "tree-sitter parser setup failed" : model.parse.error;
+            std::cerr << inputPath.string() << ": " << error << "\n";
             return 1;
         }
-        if (result.changed) {
+        const auto printStart = Clock::now();
+        FormatModelTextStats formatStats;
+        std::string formatted = FormatModelText(*config, model, inputPath.string(), formatStats);
+        RecordPhase(printStats, Clock::now() - printStart);
+        RecordPhase(tokenizeStats, formatStats.tokenize);
+        RecordPhase(annotateStats, formatStats.annotate);
+        RecordPhase(emitStats, formatStats.print);
+        RecordPhase(breakModelStats, formatStats.breakModel);
+        RecordPhase(solveStats, formatStats.solve);
+        RecordPhase(writeStats, formatStats.emit);
+        const auto compareStart = Clock::now();
+        const bool changed =
+            model.sourceText != nullptr && !BenchmarkTextMatchesFormattedOutput(*model.sourceText, formatted);
+        RecordPhase(compareStats, Clock::now() - compareStart);
+        if (changed) {
             ++changedIterations;
         }
-        formattedBytes = result.formatted.size();
+        formattedBytes = formatted.size();
     }
     const Duration total = Clock::now() - loopStart;
 
@@ -951,6 +1019,15 @@ int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
         << input->size()
         << "\n";
     PrintBenchLoopResult("format_loop", BenchResult{total, Duration(total.count() / static_cast<double>(iterations))});
+    PrintFormatPhaseResult("format_parse", parseStats, iterations);
+    PrintFormatPhaseResult("format_print", printStats, iterations);
+    PrintFormatPhaseResult("format_tokenize", tokenizeStats, iterations);
+    PrintFormatPhaseResult("format_annotate", annotateStats, iterations);
+    PrintFormatPhaseResult("format_emit", emitStats, iterations);
+    PrintFormatPhaseResult("format_model", breakModelStats, iterations);
+    PrintFormatPhaseResult("format_solve", solveStats, iterations);
+    PrintFormatPhaseResult("format_write", writeStats, iterations);
+    PrintFormatPhaseResult("format_compare", compareStats, iterations);
     std::cout
         << std::left << std::setw(18) << "format_result"
         << " changed_iterations="
