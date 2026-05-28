@@ -11,7 +11,7 @@ set "BENCHMARK_NAME="
 set "BENCHMARK_STEM="
 set "BENCHMARK_EXTRA_ARGS="
 set "ARGUMENT_ERROR="
-set "SUPPORTED_BENCHMARKS=animation, edit-layout, layout-guide-sheet, layout-switch, mouse-hover, snapshot-handoff, telemetry-init, theme-change, update-telemetry"
+set "SUPPORTED_BENCHMARKS=animation, edit-layout, format-golden, layout-guide-sheet, layout-switch, mouse-hover, snapshot-handoff, telemetry-init, theme-change, update-telemetry"
 set "COMMAND=run"
 set "REQUEST_PROFILE=1"
 set "REQUEST_ELEVATION=0"
@@ -66,6 +66,11 @@ if /i "%~1"=="/elevated" (
 )
 if not defined BENCHMARK_NAME if /i "%~1"=="edit-layout" (
     set "BENCHMARK_NAME=edit-layout"
+    shift
+    goto parse_args
+)
+if not defined BENCHMARK_NAME if /i "%~1"=="format-golden" (
+    set "BENCHMARK_NAME=format-golden"
     shift
     goto parse_args
 )
@@ -136,6 +141,8 @@ if defined ARGUMENT_ERROR (
 if not defined ITERATIONS (
     if /i "%BENCHMARK_NAME%"=="telemetry-init" (
         set "ITERATIONS=2"
+    ) else if /i "%BENCHMARK_NAME%"=="format-golden" (
+        set "ITERATIONS=20"
     ) else (
         set "ITERATIONS=600"
     )

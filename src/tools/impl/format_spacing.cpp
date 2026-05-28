@@ -131,10 +131,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
     const KnownToken prev = previous->kind == PrintTokenKind::Known ? previous->known : KnownToken::Unknown;
     const KnownToken cur = current.kind == PrintTokenKind::Known ? current.known : KnownToken::Unknown;
 
-    if (
-        (cur == KnownToken::Arrow && current.parentKind == SyntaxTreeKind::TrailingReturnType) ||
-        (prev == KnownToken::Arrow && previous->parentKind == SyntaxTreeKind::TrailingReturnType)
-    ) {
+    if ((cur == KnownToken::Arrow && current.parentKind == SyntaxTreeKind::TrailingReturnType) || (
+        prev == KnownToken::Arrow && previous->parentKind == SyntaxTreeKind::TrailingReturnType
+    )) {
         return true;
     }
     if (cur == KnownToken::Dot && current.parentKind == SyntaxTreeKind::FieldDesignator && prev == KnownToken::Comma) {
@@ -182,6 +181,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return false;
     }
     if (prev == KnownToken::KeywordVirtual && cur == KnownToken::Tilde) {
+        return true;
+    }
+    if (IsAccessKeyword(*previous) && IsWordLike(current)) {
         return true;
     }
     if (cur == KnownToken::LeftParen) {
@@ -255,6 +257,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return false;
     }
     if (prev == KnownToken::Comma || prev == KnownToken::Semicolon || prev == KnownToken::Question) {
+        return true;
+    }
+    if (prev == KnownToken::KeywordReturn) {
         return true;
     }
     if (prev == KnownToken::Ellipsis && IsWordLike(current)) {
@@ -331,8 +336,7 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return true;
     }
     if (
-        previous->kind == PrintTokenKind::Known &&
-        (
+        previous->kind == PrintTokenKind::Known && (
             prev == KnownToken::RightParen ||
             prev == KnownToken::RightBracket ||
             prev == KnownToken::RightBrace ||

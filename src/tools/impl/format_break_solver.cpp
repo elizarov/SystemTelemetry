@@ -27,6 +27,22 @@ struct SolveKey {
     }
 };
 
+struct ResultStateKey {
+    int column = 0;
+    int indentLevel = 0;
+    bool lineHasText = false;
+
+    friend bool operator<(const ResultStateKey& left, const ResultStateKey& right) {
+        if (left.column != right.column) {
+            return left.column < right.column;
+        }
+        if (left.indentLevel != right.indentLevel) {
+            return left.indentLevel < right.indentLevel;
+        }
+        return left.lineHasText < right.lineHasText;
+    }
+};
+
 struct NodeResult {
     bool valid = false;
     int endColumn = 0;
@@ -233,58 +249,28 @@ private:
     ) {
         std::vector<const FormatBreakNode*> sequenceChildren;
         AppendSequenceChildren(children, sequenceChildren);
-        using SequenceKey = std::tuple<size_t, int, int, bool>;
-        std::map<SequenceKey, std::vector<NodeResult>> memo;
-        const auto solveFrom = [
-            &,
-            this
-        ](auto&& self, size_t index, int currentColumn, int currentIndent, bool currentLineHasText) -> std::vector<
-            NodeResult
-        > {
-            if (index == sequenceChildren.size()) {
-                return {{
-                    .valid = true,
-                    .endColumn = currentColumn,
-                    .endIndentLevel = currentIndent,
-                    .endLineHasText = currentLineHasText
-                }};
-            }
-            const SequenceKey key{index, currentColumn, currentIndent, currentLineHasText};
-            const auto found = memo.find(key);
-            if (found != memo.end()) {
-                return found->second;
-            }
-
-            std::vector<NodeResult> results;
-            for (const NodeResult& childResult : SolveAlternatives(
-                *sequenceChildren[index],
-                currentColumn,
-                currentIndent,
-                currentLineHasText
-            )) {
-                if (!childResult.valid) {
-                    continue;
-                }
-                std::vector<NodeResult> tails = self(
-                    self,
-                    index + 1,
-                    childResult.endColumn,
-                    childResult.endIndentLevel,
-                    childResult.endLineHasText
-                );
-                for (const NodeResult& tail : tails) {
-                    if (!tail.valid) {
+        std::vector<NodeResult>
+            current{{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText}};
+        for (const FormatBreakNode* child : sequenceChildren) {
+            std::map<ResultStateKey, NodeResult> next;
+            for (const NodeResult& prefix : current) {
+                for (const NodeResult& childResult : SolveAlternatives(
+                    *child,
+                    prefix.endColumn,
+                    prefix.endIndentLevel,
+                    prefix.endLineHasText
+                )) {
+                    if (!childResult.valid) {
                         continue;
                     }
-                    NodeResult candidate = childResult;
-                    Merge(candidate, tail);
-                    results.push_back(std::move(candidate));
+                    NodeResult candidate = prefix;
+                    Merge(candidate, childResult);
+                    AddPrunedResult(next, std::move(candidate));
                 }
             }
-            memo.emplace(key, results);
-            return results;
-        };
-        return solveFrom(solveFrom, 0, column, indentLevel, lineHasText);
+            current = PrunedResults(next);
+        }
+        return current;
     }
 
     static void AppendSequenceChildren(
@@ -401,6 +387,30 @@ private:
         return false;
     }
 
+    void AddPrunedResult(std::map<ResultStateKey, NodeResult>& results, NodeResult candidate) const {
+        if (!candidate.valid) {
+            return;
+        }
+        const ResultStateKey key{candidate.endColumn, candidate.endIndentLevel, candidate.endLineHasText};
+        auto found = results.find(key);
+        if (found == results.end()) {
+            results.emplace(key, std::move(candidate));
+            return;
+        }
+        if (Better(candidate, found->second)) {
+            found->second = std::move(candidate);
+        }
+    }
+
+    std::vector<NodeResult> PrunedResults(std::map<ResultStateKey, NodeResult>& results) const {
+        std::vector<NodeResult> output;
+        output.reserve(results.size());
+        for (auto& entry : results) {
+            output.push_back(std::move(entry.second));
+        }
+        return output;
+    }
+
     bool CompactLineEndsOverLimit(const NodeResult& compact) const {
         return compact.endLineHasText && compact.endColumn > config_.columnLimit;
     }
@@ -469,31 +479,39 @@ private:
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         result.choices.emplace(node.id, FormatBreakChoice::Compact);
         result = AddToken(result, node.children[0]->token);
-        std::vector<NodeResult> alternatives;
-        const auto solveFrom = [&, this](auto&& self, size_t index, const NodeResult& current) -> void {
-            if (index == node.items.size()) {
-                alternatives.push_back(AddToken(current, node.children[1]->token));
-                return;
-            }
-            for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
-                *node.items[index],
-                current.endColumn,
-                current.endIndentLevel,
-                current.endLineHasText
-            )) {
-                if (!item.valid) {
-                    continue;
+        std::vector<NodeResult> current{result};
+        const bool canKeepMultilineItem = node.items.size() == 1;
+        for (size_t index = 0; index < node.items.size(); ++index) {
+            std::map<ResultStateKey, NodeResult> nextByState;
+            for (const NodeResult& prefix : current) {
+                for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
+                    *node.items[index],
+                    prefix.endColumn,
+                    prefix.endIndentLevel,
+                    prefix.endLineHasText
+                )) {
+                    if (!item.valid) {
+                        continue;
+                    }
+                    if (!canKeepMultilineItem && item.extraLines > 0) {
+                        continue;
+                    }
+                    NodeResult next = prefix;
+                    Merge(next, item);
+                    if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                        next = AddToken(next, node.separators[index]);
+                    }
+                    AddPrunedResult(nextByState, std::move(next));
                 }
-                NodeResult next = current;
-                Merge(next, item);
-                if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
-                    next = AddToken(next, node.separators[index]);
-                }
-                self(self, index + 1, next);
             }
-        };
-        solveFrom(solveFrom, 0, result);
-        return alternatives;
+            current = PrunedResults(nextByState);
+        }
+
+        std::map<ResultStateKey, NodeResult> alternatives;
+        for (const NodeResult& candidate : current) {
+            AddPrunedResult(alternatives, AddToken(candidate, node.children[1]->token));
+        }
+        return PrunedResults(alternatives);
     }
 
     NodeResult SolveDelimitedCompact(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
@@ -846,31 +864,30 @@ private:
         NodeResult
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         result.choices.emplace(node.id, FormatBreakChoice::Compact);
-        std::vector<NodeResult> candidates;
-        const auto solveFrom = [&, this](auto&& self, size_t index, const NodeResult& current) -> void {
-            if (index == node.operands.size()) {
-                candidates.push_back(current);
-                return;
-            }
-            for (const NodeResult& operand : SolveAlternatives(
-                *node.operands[index],
-                current.endColumn,
-                current.endIndentLevel,
-                current.endLineHasText
-            )) {
-                if (!operand.valid) {
-                    continue;
+        std::vector<NodeResult> current{result};
+        for (size_t index = 0; index < node.operands.size(); ++index) {
+            std::map<ResultStateKey, NodeResult> nextByState;
+            for (const NodeResult& prefix : current) {
+                for (const NodeResult& operand : SolveAlternatives(
+                    *node.operands[index],
+                    prefix.endColumn,
+                    prefix.endIndentLevel,
+                    prefix.endLineHasText
+                )) {
+                    if (!operand.valid) {
+                        continue;
+                    }
+                    NodeResult next = prefix;
+                    Merge(next, operand);
+                    if (index < node.operators.size()) {
+                        next = AddToken(next, node.operators[index]);
+                    }
+                    AddPrunedResult(nextByState, std::move(next));
                 }
-                NodeResult next = current;
-                Merge(next, operand);
-                if (index < node.operators.size()) {
-                    next = AddToken(next, node.operators[index]);
-                }
-                self(self, index + 1, next);
             }
-        };
-        solveFrom(solveFrom, 0, result);
-        return candidates;
+            current = PrunedResults(nextByState);
+        }
+        return current;
     }
 
     NodeResult SolveDelimitedSplitAttachedOpen(const FormatBreakNode& node, NodeResult result, int baseIndent) {

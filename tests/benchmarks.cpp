@@ -31,20 +31,22 @@
 #include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
+#include "tools/format.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
 #include "util/trace.h"
 
-#define CASEDASH_BENCHMARK_ITEMS(X)                                                                                    \
-    X(Animation, "animation")                                                                                          \
-    X(EditLayout, "edit-layout")                                                                                       \
-    X(LayoutGuideSheet, "layout-guide-sheet")                                                                          \
-    X(LayoutSwitch, "layout-switch")                                                                                   \
-    X(MouseHover, "mouse-hover")                                                                                       \
-    X(SnapshotHandoff, "snapshot-handoff")                                                                             \
-    X(TelemetryInit, "telemetry-init")                                                                                 \
-    X(ThemeChange, "theme-change")                                                                                     \
+#define CASEDASH_BENCHMARK_ITEMS(X) \
+    X(Animation, "animation") \
+    X(EditLayout, "edit-layout") \
+    X(FormatGolden, "format-golden") \
+    X(LayoutGuideSheet, "layout-guide-sheet") \
+    X(LayoutSwitch, "layout-switch") \
+    X(MouseHover, "mouse-hover") \
+    X(SnapshotHandoff, "snapshot-handoff") \
+    X(TelemetryInit, "telemetry-init") \
+    X(ThemeChange, "theme-change") \
     X(UpdateTelemetry, "update-telemetry")
 
 ENUM_STRING_DECLARE(Benchmark, CASEDASH_BENCHMARK_ITEMS);
@@ -95,6 +97,10 @@ struct BenchmarkCommandLine {
 
 FilePath SourceConfigPath() {
     return FilePath(CASEDASH_SOURCE_DIR) / "resources" / "config.ini";
+}
+
+FilePath SourceFormatGoldenInputPath() {
+    return FilePath(CASEDASH_SOURCE_DIR) / "tools" / "tests" / "format" / "src" / "format_test_input.cpp";
 }
 
 ConfigParseContext BenchmarkConfigParseContext() {
@@ -199,14 +205,16 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     const std::string_view firstArg = argv[1];
     const std::optional<Benchmark> parsedBenchmark = ParseBenchmarkName(firstArg);
     if (!parsedBenchmark.has_value()) {
-        std::cerr << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames()
-                  << "\n";
+        std::cerr
+            << "unknown benchmark \"" << firstArg << "\"; supported benchmarks: " << SupportedBenchmarkNames() << "\n";
         return std::nullopt;
     }
 
     BenchmarkCommandLine commandLine{*parsedBenchmark};
     if (commandLine.benchmark == Benchmark::TelemetryInit) {
         commandLine.iterations = 2;
+    } else if (commandLine.benchmark == Benchmark::FormatGolden) {
+        commandLine.iterations = 20;
     }
     int nextArgument = 2;
     if (argc > nextArgument) {
@@ -264,14 +272,20 @@ std::optional<LayoutEditGuide> FindTopLevelGuide(const DashboardRenderer& render
     DashboardOverlayState overlayState;
     overlayState.showLayoutEditGuides = true;
     const auto regions = renderer.CollectLayoutEditActiveRegions(overlayState);
-    const auto it = std::find_if(regions.begin(), regions.end(), [](const auto& region) {
-        if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
-            return false;
+    const auto it = std::find_if(
+        regions.begin(),
+        regions.end(),
+        [](const auto& region) {
+            if (region.kind != LayoutEditActiveRegionKind::LayoutWeightGuide) {
+                return false;
+            }
+            const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
+            return guide != nullptr &&
+                guide->editCardId.empty() &&
+                guide->nodePath.size() <= 1 &&
+                guide->childExtents.size() >= 2;
         }
-        const auto* guide = LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(region);
-        return guide != nullptr && guide->editCardId.empty() && guide->nodePath.size() <= 1 &&
-               guide->childExtents.size() >= 2;
-    });
+    );
     const auto* guide = it != regions.end() ? LayoutEditActiveRegionPayloadAs<LayoutEditGuide>(*it) : nullptr;
     return guide != nullptr ? std::optional<LayoutEditGuide>(*guide) : std::nullopt;
 }
@@ -304,7 +318,10 @@ RenderPoint GuideDragStartPoint(const LayoutEditGuide& guide) {
 }
 
 RenderPoint DragPointForWeights(
-    const LayoutEditGuide& guide, const std::vector<int>& initialWeights, const std::vector<int>& targetWeights) {
+    const LayoutEditGuide& guide,
+    const std::vector<int>& initialWeights,
+    const std::vector<int>& targetWeights
+) {
     RenderPoint dragPoint = GuideDragStartPoint(guide);
     if (guide.separatorIndex < initialWeights.size() && guide.separatorIndex < targetWeights.size()) {
         const int delta = targetWeights[guide.separatorIndex] - initialWeights[guide.separatorIndex];
@@ -329,8 +346,10 @@ std::vector<RenderPoint> BuildMouseHoverPath(int width, int height, size_t itera
     const double denominator = static_cast<double>((std::max)(size_t{1}, iterations - 1));
     for (size_t index = 0; index < iterations; ++index) {
         const double t = static_cast<double>(index) / denominator;
-        path.push_back(RenderPoint{static_cast<int>(std::lround(t * static_cast<double>(maxX))),
-            static_cast<int>(std::lround(t * static_cast<double>(maxY)))});
+        path.push_back(RenderPoint{
+            static_cast<int>(std::lround(t * static_cast<double>(maxX))),
+            static_cast<int>(std::lround(t * static_cast<double>(maxY)))
+        });
     }
     return path;
 }
@@ -356,7 +375,8 @@ void PumpBenchmarkMessagesUntil(Clock::time_point deadline) {
 
 HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
     const std::string windowTitle(title);
-    return CreateWindowExA(WS_EX_TOOLWINDOW,
+    return CreateWindowExA(
+        WS_EX_TOOLWINDOW,
         "STATIC",
         windowTitle.c_str(),
         WS_POPUP,
@@ -367,13 +387,18 @@ HWND CreateBenchmarkWindow(int width, int height, std::string_view title) {
         nullptr,
         nullptr,
         GetModuleHandleA(nullptr),
-        nullptr);
+        nullptr
+    );
 }
 
 class BenchmarkHost : private LayoutEditHost {
 public:
-    BenchmarkHost(const AppConfig& config, double renderScale, Trace& trace)
-        : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this) {
+    BenchmarkHost(
+        const AppConfig& config,
+        double renderScale,
+        Trace& trace
+    ) : config_(config), trace_(trace), renderer_(trace_), renderScale_(renderScale), layoutEditController_(*this)
+    {
         renderer_.SetConfig(config_);
         renderer_.SetRenderScale(renderScale_);
         renderer_.SetImmediatePresent(true);
@@ -532,7 +557,9 @@ private:
     }
 
     bool ApplyMetricListOrder(
-        const LayoutEditWidgetIdentity& widget, const std::vector<std::string>& metricRefs) override {
+        const LayoutEditWidgetIdentity& widget,
+        const std::vector<std::string>& metricRefs
+    ) override {
         const auto start = Clock::now();
         const bool applied = ::ApplyMetricListOrder(config_, widget, metricRefs);
         if (applied) {
@@ -552,10 +579,12 @@ private:
         return applied;
     }
 
-    std::optional<int> EvaluateLayoutWidgetExtentForWeights(const LayoutEditLayoutTarget& target,
+    std::optional<int> EvaluateLayoutWidgetExtentForWeights(
+        const LayoutEditLayoutTarget& target,
         const std::vector<int>& weights,
         const LayoutEditWidgetIdentity& widget,
-        LayoutGuideAxis axis) override {
+        LayoutGuideAxis axis
+    ) override {
         if (!renderer_.ApplyLayoutGuideWeightsPreview(target.editCardId, target.nodePath, weights)) {
             return std::nullopt;
         }
@@ -700,9 +729,10 @@ struct TelemetryInitBenchTotals {
 
 class AnimationBenchmarkRenderWorker {
 public:
-    explicit AnimationBenchmarkRenderWorker(HWND hwnd)
-        : hwnd_(hwnd), requestEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
-          responseEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
+    explicit AnimationBenchmarkRenderWorker(HWND hwnd) :
+        hwnd_(hwnd),
+        requestEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)),
+        responseEvent_(CreateEventA(nullptr, TRUE, FALSE, nullptr)) {}
 
     ~AnimationBenchmarkRenderWorker() {
         Shutdown();
@@ -869,12 +899,73 @@ void RecordPhase(PhaseStats& stats, std::chrono::nanoseconds elapsed) {
 }
 
 void PrintBenchLoopResult(const char* name, const BenchResult& result) {
-    std::cout << std::left << std::setw(18) << name << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(18) << name
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << result.total.count()
+        << " per_iter_ms="
+        << result.perIteration.count()
+        << "\n";
+}
+
+int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
+    const FilePath inputPath = SourceFormatGoldenInputPath();
+    std::optional<std::string> input = ReadFileBinary(inputPath);
+    if (!input.has_value()) {
+        std::cerr << "failed to read format golden input: " << inputPath.string() << "\n";
+        return 1;
+    }
+
+    FormatStyleCache styleCache(std::nullopt);
+    std::string configError;
+    const FormatterConfig* config = styleCache.ConfigForPath(inputPath.string(), configError);
+    if (config == nullptr) {
+        std::cerr << configError << "\n";
+        return 1;
+    }
+
+    size_t changedIterations = 0;
+    size_t formattedBytes = 0;
+    const auto loopStart = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        SourceFormatResult result = FormatSourceText(*input, *config, inputPath.string());
+        if (!result.ok) {
+            std::cerr << inputPath.string() << ": " << result.error << "\n";
+            return 1;
+        }
+        if (result.changed) {
+            ++changedIterations;
+        }
+        formattedBytes = result.formatted.size();
+    }
+    const Duration total = Clock::now() - loopStart;
+
+    std::cout
+        << "format_golden_benchmark iterations="
+        << iterations
+        << " render_scale_ignored="
+        << renderScale
+        << " input=\""
+        << inputPath.string()
+        << "\" input_bytes="
+        << input->size()
+        << "\n";
+    PrintBenchLoopResult("format_loop", BenchResult{total, Duration(total.count() / static_cast<double>(iterations))});
+    std::cout
+        << std::left << std::setw(18) << "format_result"
+        << " changed_iterations="
+        << changedIterations
+        << " formatted_bytes="
+        << formattedBytes
+        << "\n";
+    return 0;
 }
 
 LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
-    BenchmarkHost& host, const std::vector<std::string>& layoutNames, size_t iterations) {
+    BenchmarkHost& host,
+    const std::vector<std::string>& layoutNames,
+    size_t iterations
+) {
     LayoutSwitchBenchTotals totals{};
     if (layoutNames.empty() || iterations == 0) {
         return totals;
@@ -895,7 +986,7 @@ LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
         RecordPhase(totals.phases.switchApply, switchApplyEnd - switchApplyStart);
 
         const auto dialogRefreshStart = Clock::now();
-        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        [[maybe_unused]]const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
         const auto dialogRefreshEnd = Clock::now();
         RecordPhase(totals.phases.dialogRefresh, dialogRefreshEnd - dialogRefreshStart);
 
@@ -955,7 +1046,10 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
 }
 
 SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
-    DashboardRenderer& renderer, TelemetryCollector& telemetry, size_t iterations) {
+    DashboardRenderer& renderer,
+    TelemetryCollector& telemetry,
+    size_t iterations
+) {
     SnapshotHandoffBenchTotals totals{};
     if (iterations == 0) {
         return totals;
@@ -963,8 +1057,10 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
 
     telemetry.UpdateSnapshot();
     DashboardPresentationFrame warmupFrame;
-    if (!DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), warmupFrame) ||
-        !DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(warmupFrame))) {
+    if (
+        !DashboardRendererBenchmarkAccess::BuildSnapshotHandoffFrame(renderer, telemetry.Snapshot(), warmupFrame) ||
+        !DashboardRendererBenchmarkAccess::PublishSnapshotHandoffFrame(renderer, std::move(warmupFrame))
+    ) {
         totals.succeeded = false;
         totals.errorText = "snapshot handoff warmup failed: " + renderer.LastError();
         return totals;
@@ -999,7 +1095,10 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
 }
 
 ThemeChangeBenchTotals RunThemeChangeBenchmark(
-    BenchmarkHost& host, const std::vector<std::string>& themeNames, size_t iterations) {
+    BenchmarkHost& host,
+    const std::vector<std::string>& themeNames,
+    size_t iterations
+) {
     ThemeChangeBenchTotals totals{};
     if (themeNames.empty() || iterations == 0) {
         return totals;
@@ -1047,7 +1146,7 @@ ThemeChangeBenchTotals RunThemeChangeBenchmark(
         RecordPhase(totals.phases.dashboardReconfigure, dashboardReconfigureEnd - dashboardReconfigureStart);
 
         const auto dialogTreeRebuildStart = Clock::now();
-        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        [[maybe_unused]]const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
         const auto dialogTreeRebuildEnd = Clock::now();
         RecordPhase(totals.phases.dialogTreeRebuild, dialogTreeRebuildEnd - dialogTreeRebuildStart);
 
@@ -1072,10 +1171,12 @@ ThemeChangeBenchTotals RunThemeChangeBenchmark(
     return totals;
 }
 
-BenchResult RunDragBenchmark(BenchmarkHost& host,
+BenchResult RunDragBenchmark(
+    BenchmarkHost& host,
     const LayoutEditGuide& guide,
     const std::vector<int>& initialWeights,
-    const std::vector<std::vector<int>>& weightSequence) {
+    const std::vector<std::vector<int>>& weightSequence
+) {
     LayoutEditController& controller = host.Controller();
     controller.StartSession();
 
@@ -1126,13 +1227,23 @@ BenchResult RunMouseHoverBenchmark(BenchmarkHost& host, const std::vector<Render
 }
 
 void PrintBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "drag_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "drag_loop"
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << result.total.count()
+        << " per_iter_ms="
+        << result.perIteration.count()
+        << "\n";
 }
 
 void PrintMouseHoverBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "hover_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "hover_loop"
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << result.total.count()
+        << " per_iter_ms="
+        << result.perIteration.count()
+        << "\n";
 }
 
 BenchResult RunTelemetryUpdateBenchmark(BenchmarkHost& host, TelemetryCollector& telemetry, size_t iterations) {
@@ -1149,8 +1260,13 @@ BenchResult RunTelemetryUpdateBenchmark(BenchmarkHost& host, TelemetryCollector&
 }
 
 void PrintTelemetryBenchResult(const BenchResult& result) {
-    std::cout << std::left << std::setw(14) << "update_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << result.total.count() << " per_iter_ms=" << result.perIteration.count() << "\n";
+    std::cout
+        << std::left << std::setw(14) << "update_loop"
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << result.total.count()
+        << " per_iter_ms="
+        << result.perIteration.count()
+        << "\n";
 }
 
 void PrintPhaseResult(const char* name, const PhaseStats& stats);
@@ -1206,10 +1322,12 @@ void PrintTelemetryInitBenchResult(const TelemetryInitBenchTotals& totals) {
     PrintPhaseResult("collector_destroy", totals.collectorDestroy);
 }
 
-LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(DashboardRenderer& renderer,
+LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(
+    DashboardRenderer& renderer,
     const SystemSnapshot& snapshot,
     const LayoutGuideSheetConfig& guideSheet,
-    size_t iterations) {
+    size_t iterations
+) {
     LayoutGuideSheetBenchTotals totals{};
     if (iterations == 0) {
         return totals;
@@ -1240,9 +1358,13 @@ LayoutGuideSheetBenchTotals RunLayoutGuideSheetGenerationBenchmark(DashboardRend
 }
 
 void PrintLayoutGuideSheetBenchResult(const LayoutGuideSheetBenchTotals& totals) {
-    std::cout << std::left << std::setw(14) << "sheet_loop" << " total_ms=" << std::fixed << std::setprecision(2)
-              << totals.generationLoop.total.count() << " per_iter_ms=" << totals.generationLoop.perIteration.count()
-              << "\n";
+    std::cout
+        << std::left << std::setw(14) << "sheet_loop"
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << totals.generationLoop.total.count()
+        << " per_iter_ms="
+        << totals.generationLoop.perIteration.count()
+        << "\n";
     for (const std::string& detail : totals.traceDetails) {
         std::cout << std::left << std::setw(14) << "sheet_trace" << " " << detail << "\n";
     }
@@ -1255,8 +1377,15 @@ void PrintPhaseResult(const char* name, const PhaseStats& stats) {
 
     const double totalMs = DurationMilliseconds(stats.total);
     const double averageMs = totalMs / static_cast<double>(stats.samples);
-    std::cout << std::left << std::setw(14) << name << " total_ms=" << std::fixed << std::setprecision(2) << totalMs
-              << " avg_ms=" << averageMs << " samples=" << stats.samples << "\n";
+    std::cout
+        << std::left << std::setw(14) << name
+        << " total_ms="
+        << std::fixed << std::setprecision(2) << totalMs
+        << " avg_ms="
+        << averageMs
+        << " samples="
+        << stats.samples
+        << "\n";
 }
 
 int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& trace) {
@@ -1290,9 +1419,16 @@ int RunEditLayoutBenchmarkCommand(size_t iterations, double renderScale, Trace& 
         return 1;
     }
 
-    std::cout << "layout_edit_drag_benchmark guide_children=" << initialWeights.size()
-              << " separator_index=" << guide->separatorIndex << " iterations=" << weightSequence.size()
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "layout_edit_drag_benchmark guide_children="
+        << initialWeights.size()
+        << " separator_index="
+        << guide->separatorIndex
+        << " iterations="
+        << weightSequence.size()
+        << " render_scale="
+        << renderScale
+        << "\n";
 
     const BenchResult result = RunDragBenchmark(host, *guide, initialWeights, weightSequence);
     PrintBenchResult(result);
@@ -1338,11 +1474,22 @@ int RunAnimationBenchmarkCommand(size_t iterations, double renderScale, Trace& t
         return 1;
     }
 
-    std::cout << "animation_benchmark iterations=" << iterations << " render_scale=" << renderScale
-              << " window=" << frame.width << "x" << frame.height
-              << " snapshot_animations=" << frame.snapshotAnimations.size()
-              << " overlay_animations=" << frame.overlayAnimations.size()
-              << " active_chunk_frames=" << kAnimationBenchmarkActiveTransitionChunkFrames << "\n";
+    std::cout
+        << "animation_benchmark iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << " window="
+        << frame.width
+        << "x"
+        << frame.height
+        << " snapshot_animations="
+        << frame.snapshotAnimations.size()
+        << " overlay_animations="
+        << frame.overlayAnimations.size()
+        << " active_chunk_frames="
+        << kAnimationBenchmarkActiveTransitionChunkFrames
+        << "\n";
     const AnimationBenchTotals totals = RunAnimationFrameBenchmark(std::move(frame), hwnd, iterations);
     DestroyWindow(hwnd);
     renderer.Shutdown();
@@ -1385,10 +1532,18 @@ int RunSnapshotHandoffBenchmarkCommand(size_t iterations, double renderScale, Tr
         return 1;
     }
 
-    std::cout << "snapshot_handoff_benchmark mode=threaded_vsync telemetry_cadence_ms="
-              << kSnapshotHandoffBenchmarkCadence.count() << " iterations=" << iterations
-              << " render_scale=" << renderScale << " window=" << renderer.WindowWidth() << "x"
-              << renderer.WindowHeight() << "\n";
+    std::cout
+        << "snapshot_handoff_benchmark mode=threaded_vsync telemetry_cadence_ms="
+        << kSnapshotHandoffBenchmarkCadence.count()
+        << " iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << " window="
+        << renderer.WindowWidth()
+        << "x"
+        << renderer.WindowHeight()
+        << "\n";
     const SnapshotHandoffBenchTotals totals = RunSnapshotHandoffBenchmark(renderer, *telemetry, iterations);
     renderer.Shutdown();
     DestroyWindow(hwnd);
@@ -1425,8 +1580,14 @@ int RunLayoutSwitchBenchmarkCommand(size_t iterations, double renderScale, Trace
         return 1;
     }
 
-    std::cout << "layout_switch_benchmark layouts=" << layoutNames.size() << " iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "layout_switch_benchmark layouts="
+        << layoutNames.size()
+        << " iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << "\n";
     const LayoutSwitchBenchTotals totals = RunLayoutSwitchBenchmark(host, layoutNames, iterations);
     PrintBenchLoopResult("switch_loop", totals.switchLoop);
     PrintPhaseResult("switch_apply", totals.phases.switchApply);
@@ -1457,8 +1618,14 @@ int RunThemeChangeBenchmarkCommand(size_t iterations, double renderScale, Trace&
         return 1;
     }
 
-    std::cout << "theme_change_benchmark themes=" << themeNames.size() << " iterations=" << iterations
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "theme_change_benchmark themes="
+        << themeNames.size()
+        << " iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << "\n";
     const ThemeChangeBenchTotals totals = RunThemeChangeBenchmark(host, themeNames, iterations);
     PrintBenchLoopResult("theme_loop", totals.changeLoop);
     PrintPhaseResult("config_copy", totals.phases.configCopy);
@@ -1497,16 +1664,30 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
         std::cerr << totals.errorText << "\n";
         return 1;
     }
-    std::cout << "layout_guide_sheet_benchmark iterations=" << iterations << " render_scale=" << renderScale
-              << " selected_cards=" << totals.selectedCards << " callouts=" << totals.callouts << "\n";
+    std::cout
+        << "layout_guide_sheet_benchmark iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << " selected_cards="
+        << totals.selectedCards
+        << " callouts="
+        << totals.callouts
+        << "\n";
     PrintLayoutGuideSheetBenchResult(totals);
-    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideActiveRegions),
-        totals.phases[PhaseIndex(BenchPhase::LayoutGuideActiveRegions)]);
+    PrintPhaseResult(
+        PhaseName(BenchPhase::LayoutGuideActiveRegions),
+        totals.phases[PhaseIndex(BenchPhase::LayoutGuideActiveRegions)]
+    );
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuidePlan), totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlan)]);
     PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuideMeasure), totals.phases[PhaseIndex(BenchPhase::LayoutGuideMeasure)]);
+        PhaseName(BenchPhase::LayoutGuideMeasure),
+        totals.phases[PhaseIndex(BenchPhase::LayoutGuideMeasure)]
+    );
     PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuidePlacement), totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlacement)]);
+        PhaseName(BenchPhase::LayoutGuidePlacement),
+        totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlacement)]
+    );
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideDraw), totals.phases[PhaseIndex(BenchPhase::LayoutGuideDraw)]);
     return 0;
 }
@@ -1534,9 +1715,16 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
         return 1;
     }
 
-    std::cout << "mouse_hover_benchmark path_points=" << path.size()
-              << " window=" << host.LayoutRenderer().WindowWidth() << "x" << host.LayoutRenderer().WindowHeight()
-              << " render_scale=" << renderScale << "\n";
+    std::cout
+        << "mouse_hover_benchmark path_points="
+        << path.size()
+        << " window="
+        << host.LayoutRenderer().WindowWidth()
+        << "x"
+        << host.LayoutRenderer().WindowHeight()
+        << " render_scale="
+        << renderScale
+        << "\n";
     const BenchResult result = RunMouseHoverBenchmark(host, path);
     PrintMouseHoverBenchResult(result);
 
@@ -1548,7 +1736,11 @@ int RunMouseHoverBenchmarkCommand(size_t iterations, double renderScale, Trace& 
 }
 
 int RunUpdateTelemetryBenchmarkCommand(
-    size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
+    size_t iterations,
+    double renderScale,
+    const std::optional<FilePath>& configPath,
+    Trace& trace
+) {
     const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
     const bool includeOverlay = configPath.has_value();
     const AppConfig config = LoadConfig(resolvedConfigPath, includeOverlay, BenchmarkConfigParseContext());
@@ -1566,9 +1758,16 @@ int RunUpdateTelemetryBenchmarkCommand(
         return 1;
     }
 
-    std::cout << "update_telemetry_benchmark mode=sync_collector sync_provider_samples=yes iterations=" << iterations
-              << " render_scale=" << renderScale << " config=\"" << resolvedConfigPath.string()
-              << "\" include_overlay=" << (includeOverlay ? "yes" : "no") << "\n";
+    std::cout
+        << "update_telemetry_benchmark mode=sync_collector sync_provider_samples=yes iterations="
+        << iterations
+        << " render_scale="
+        << renderScale
+        << " config=\""
+        << resolvedConfigPath.string()
+        << "\" include_overlay="
+        << (includeOverlay ? "yes" : "no")
+        << "\n";
     const BenchResult result = RunTelemetryUpdateBenchmark(host, *telemetry, iterations);
     PrintTelemetryBenchResult(result);
 
@@ -1580,15 +1779,26 @@ int RunUpdateTelemetryBenchmarkCommand(
 }
 
 int RunTelemetryInitBenchmarkCommand(
-    size_t iterations, double renderScale, const std::optional<FilePath>& configPath, Trace& trace) {
+    size_t iterations,
+    double renderScale,
+    const std::optional<FilePath>& configPath,
+    Trace& trace
+) {
     const FilePath resolvedConfigPath = configPath.value_or(SourceConfigPath());
     const bool includeOverlay = configPath.has_value();
     const AppConfig config = LoadConfig(resolvedConfigPath, includeOverlay, BenchmarkConfigParseContext());
     const TelemetrySettings settings = ExtractTelemetrySettings(config);
 
-    std::cout << "telemetry_init_benchmark mode=sync_collector sync_provider_samples=yes iterations=" << iterations
-              << " render_scale_ignored=" << renderScale << " config=\"" << resolvedConfigPath.string()
-              << "\" include_overlay=" << (includeOverlay ? "yes" : "no") << "\n";
+    std::cout
+        << "telemetry_init_benchmark mode=sync_collector sync_provider_samples=yes iterations="
+        << iterations
+        << " render_scale_ignored="
+        << renderScale
+        << " config=\""
+        << resolvedConfigPath.string()
+        << "\" include_overlay="
+        << (includeOverlay ? "yes" : "no")
+        << "\n";
     const TelemetryInitBenchTotals totals = RunTelemetryInitBenchmark(settings, iterations, trace);
     if (!totals.succeeded) {
         std::cerr << totals.errorText << "\n";
@@ -1596,13 +1806,23 @@ int RunTelemetryInitBenchmarkCommand(
     }
 
     PrintTelemetryInitBenchResult(totals);
-    std::cout << std::left << std::setw(14) << "init_result" << " revision=" << totals.lastRevision << " gpu_adapter=\""
-              << totals.lastResolvedSelections.gpuAdapterName << "\" network_adapter=\""
-              << totals.lastResolvedSelections.adapterName
-              << "\" drives=" << totals.lastResolvedSelections.drives.size()
-              << " gpu_candidates=" << totals.lastGpuAdapterCandidates
-              << " network_candidates=" << totals.lastNetworkAdapterCandidates
-              << " storage_candidates=" << totals.lastStorageDriveCandidates << "\n";
+    std::cout
+        << std::left << std::setw(14) << "init_result"
+        << " revision="
+        << totals.lastRevision
+        << " gpu_adapter=\""
+        << totals.lastResolvedSelections.gpuAdapterName
+        << "\" network_adapter=\""
+        << totals.lastResolvedSelections.adapterName
+        << "\" drives="
+        << totals.lastResolvedSelections.drives.size()
+        << " gpu_candidates="
+        << totals.lastGpuAdapterCandidates
+        << " network_candidates="
+        << totals.lastNetworkAdapterCandidates
+        << " storage_candidates="
+        << totals.lastStorageDriveCandidates
+        << "\n";
     return 0;
 }
 
@@ -1612,6 +1832,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunAnimationBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::EditLayout:
             return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::FormatGolden:
+            return RunFormatGoldenBenchmarkCommand(commandLine.iterations, commandLine.renderScale);
         case Benchmark::LayoutGuideSheet:
             return RunLayoutGuideSheetBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::LayoutSwitch:
@@ -1622,12 +1844,20 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunSnapshotHandoffBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::TelemetryInit:
             return RunTelemetryInitBenchmarkCommand(
-                commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
+                commandLine.iterations,
+                commandLine.renderScale,
+                commandLine.configPath,
+                trace
+            );
         case Benchmark::ThemeChange:
             return RunThemeChangeBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::UpdateTelemetry:
             return RunUpdateTelemetryBenchmarkCommand(
-                commandLine.iterations, commandLine.renderScale, commandLine.configPath, trace);
+                commandLine.iterations,
+                commandLine.renderScale,
+                commandLine.configPath,
+                trace
+            );
     }
     std::cerr << "unknown benchmark \"" << EnumToString(commandLine.benchmark) << "\"\n";
     return 1;

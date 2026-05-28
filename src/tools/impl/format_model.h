@@ -40,6 +40,8 @@ enum class SyntaxTreeKind : std::uint16_t {
     EnumSpecifier,
     ClassSpecifier,
     StructSpecifier,
+    BaseClassClause,
+    AccessSpecifier,
     IfStatement,
     ElseClause,
     ForStatement,

@@ -888,8 +888,8 @@ std::string SelectCurrentSensorName(const BoardConfig& board, const std::string&
 }
 
 const char* LayoutGuideAxisSizingKey(const LayoutGuide* guide) {
-    return guide->axis == LayoutGuideAxis::Horizontal ?
-        "overview_horizontal_sizing_guide" : "overview_vertical_sizing_guide";
+    return guide->axis == LayoutGuideAxis::Horizontal ? "overview_horizontal_sizing_guide" :
+        "overview_vertical_sizing_guide";
 }
 
 std::optional<double> LayoutEditAnchorValue(const LayoutEditAnchor* anchor) {
@@ -1497,6 +1497,56 @@ int SplitSubtractionOperator() {
     return firstReallyLongMinuendValueForOrdinarySubtractionOperatorSplit -
         secondReallyLongSubtrahendValueForOrdinarySubtractionOperatorSplit;
 }
+
+class BaseClassSpacingRoot {};
+
+class BaseClassSpacingPublic : public BaseClassSpacingRoot {};
+
+class BaseClassSpacingPrivate : private BaseClassSpacingRoot {};
+
+class BaseClassSpacingProtected : protected BaseClassSpacingRoot {};
+
+bool AttachedOpenChainKeepsFollowingOperator(const PrintToken* previous, KnownToken prev, const PrintToken& current) {
+    if (
+        previous->kind == PrintTokenKind::Known && (
+            prev == KnownToken::RightParen ||
+            prev == KnownToken::RightBracket ||
+            prev == KnownToken::RightBrace ||
+            prev == KnownToken::Greater
+        ) &&
+        IsWordLike(current)
+    ) {
+        return true;
+    }
+    return false;
+}
+
+struct BracedMacroInitializerStressEntry {};
+
+enum class BracedMacroInitializerStressKind {
+    Value,
+};
+
+constexpr BracedMacroInitializerStressEntry BracedMacroInitializerStressValues[] = {
+    BRACED_MACRO_INITIALIZER_STRESS("field1", BracedMacroInitializerStressKind::Value, source.path1),
+    BRACED_MACRO_INITIALIZER_STRESS("field2", BracedMacroInitializerStressKind::Value, source.path2),
+    BRACED_MACRO_INITIALIZER_STRESS("field3", BracedMacroInitializerStressKind::Value, source.path3),
+    BRACED_MACRO_INITIALIZER_STRESS("field4", BracedMacroInitializerStressKind::Value, source.path4),
+    BRACED_MACRO_INITIALIZER_STRESS("field5", BracedMacroInitializerStressKind::Value, source.path5),
+    BRACED_MACRO_INITIALIZER_STRESS("field6", BracedMacroInitializerStressKind::Value, source.path6),
+    BRACED_MACRO_INITIALIZER_STRESS("field7", BracedMacroInitializerStressKind::Value, source.path7),
+    BRACED_MACRO_INITIALIZER_STRESS("field8", BracedMacroInitializerStressKind::Value, source.path8),
+    BRACED_MACRO_INITIALIZER_STRESS("field9", BracedMacroInitializerStressKind::Value, source.path9),
+    BRACED_MACRO_INITIALIZER_STRESS("field10", BracedMacroInitializerStressKind::Value, source.path10),
+    BRACED_MACRO_INITIALIZER_STRESS("field11", BracedMacroInitializerStressKind::Value, source.path11),
+    BRACED_MACRO_INITIALIZER_STRESS("field12", BracedMacroInitializerStressKind::Value, source.path12),
+    BRACED_MACRO_INITIALIZER_STRESS("field13", BracedMacroInitializerStressKind::Value, source.path13),
+    BRACED_MACRO_INITIALIZER_STRESS("field14", BracedMacroInitializerStressKind::Value, source.path14),
+    BRACED_MACRO_INITIALIZER_STRESS("field15", BracedMacroInitializerStressKind::Value, source.path15),
+    BRACED_MACRO_INITIALIZER_STRESS("field16", BracedMacroInitializerStressKind::Value, source.path16),
+    BRACED_MACRO_INITIALIZER_STRESS("field17", BracedMacroInitializerStressKind::Value, source.path17),
+    BRACED_MACRO_INITIALIZER_STRESS("field18", BracedMacroInitializerStressKind::Value, source.path18)
+};
 
 int DeepDelimiterStressCase(int y) {
     int x =

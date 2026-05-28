@@ -246,6 +246,11 @@ add_executable(CaseDash WIN32
     src/util/win32_format.cpp
     src/dashboard/dashboard_controller.cpp
     src/dashboard/dashboard_app.cpp
+    src/dashboard/dashboard_window_chrome.cpp
+    src/dashboard/dashboard_titlebar.cpp
+    src/dashboard/dashboard_tooltip.cpp
+    src/dashboard/display_placement_menu_bitmap.cpp
+    src/dashboard/native_theme_colors.cpp
     src/dashboard/dashboard_menu_format.cpp
     src/dashboard/dashboard_shell_ui.cpp
     src/layout_edit_dialog/layout_edit_dialog.cpp
@@ -306,6 +311,7 @@ add_executable(CaseDash WIN32
     src/telemetry/impl/collector_fake.cpp
     src/diagnostics/snapshot_dump.cpp
     src/telemetry/fps_provider.cpp
+    src/telemetry/board_service_sample.cpp
     src/telemetry/fps/impl/gpu_raw_counter_map.cpp
     src/telemetry/fps/fps_etw_provider.cpp
     src/telemetry/fps/fps_service_client_provider.cpp
@@ -319,6 +325,7 @@ add_executable(CaseDash WIN32
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/telemetry/metrics.cpp
     src/layout_model/dashboard_overlay_state.cpp
@@ -607,12 +614,16 @@ target_link_libraries(CaseDash PRIVATE
     d3d11
     d2d1
     dwrite
+    dwmapi
     pdh
     iphlpapi
     dxgi
     comctl32
+    uxtheme
     ws2_32
     ole32
+    oleaut32
+    wbemuuid
     advapi32
     dbghelp
     wtsapi32
@@ -998,6 +1009,7 @@ add_executable(CaseDashTests
     src/util/strings.cpp
     src/util/numeric_format.cpp
     src/util/text_format.cpp
+    src/util/scale.cpp
     src/util/localization_catalog.cpp
     src/util/resource_strings.cpp
     src/util/lightweight_mutex.cpp
@@ -1121,10 +1133,24 @@ add_executable(CaseDashBenchmarks
     ${CASEDASH_LAYOUT_EDIT_META_CPP}
     ${CASEDASH_BENCHMARKS_VERSION_RC}
     tests/benchmarks.cpp
+    src/tools/format.cpp
+    src/tools/impl/format_args.cpp
+    src/tools/impl/format_break_model.cpp
+    src/tools/impl/format_break_model_builder.cpp
+    src/tools/impl/format_break_solver.cpp
+    src/tools/impl/format_config.cpp
+    src/tools/impl/format_include_sort.cpp
+    src/tools/impl/format_model.cpp
+    src/tools/impl/format_model_builder.cpp
+    src/tools/impl/format_pretty_printer.cpp
+    src/tools/impl/format_spacing.cpp
+    src/tools/impl/tools_common.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp
     src/util/text_format.cpp
     src/util/win32_format.cpp
+    src/util/elevated_process.cpp
+    src/util/paths.cpp
     src/util/scale.cpp
     src/config/config_telemetry.cpp
     src/config/config_primitives.cpp
@@ -1167,6 +1193,7 @@ add_executable(CaseDashBenchmarks
     src/telemetry/board/board_vendor_selection.cpp
     src/telemetry/board/asus/board_asus_armoury_crate.cpp
     src/telemetry/board/gigabyte/board_gigabyte_siv.cpp
+    src/telemetry/board/lenovo/board_lenovo_vantage.cpp
     src/telemetry/board/msi/board_msi_center.cpp
     src/layout_model/layout_edit_active_region.cpp
     src/layout_model/layout_edit_helpers.cpp
@@ -1298,6 +1325,7 @@ target_link_options(CaseDashBenchmarks PRIVATE
     /MANIFEST:NO
 )
 target_link_libraries(CaseDashBenchmarks PRIVATE
+    CaseDashTreeSitterCppGrammar
     user32
     gdi32
     d3d11
@@ -1308,6 +1336,8 @@ target_link_libraries(CaseDashBenchmarks PRIVATE
     dxgi
     ws2_32
     ole32
+    oleaut32
+    wbemuuid
     advapi32
     ${MSCOREE_LIB}
 )

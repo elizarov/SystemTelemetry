@@ -264,8 +264,8 @@ void AppendTokens(
         case SyntaxNodeKind::Comment:
         case SyntaxNodeKind::TrailingComment:
             tokens.push_back({
-                    .kind = node.kind == SyntaxNodeKind::TrailingComment ?
-                        PrintTokenKind::TrailingComment : PrintTokenKind::Comment,
+                    .kind = node.kind == SyntaxNodeKind::TrailingComment ? PrintTokenKind::TrailingComment :
+                        PrintTokenKind::Comment,
                     .text = node.text,
                     .treeKind = node.treeKind,
                     .parentKind = parentKind,
@@ -604,6 +604,13 @@ private:
             }
         }
         return nullptr;
+    }
+
+    static bool IsAccessLabel(const PrintToken& token, const PrintToken* next) {
+        return IsAccessKeyword(token) &&
+            next != nullptr &&
+            next->kind == PrintTokenKind::Known &&
+            next->known == KnownToken::Colon;
     }
 
     std::optional<size_t> FindTokenIndex(const SyntaxNode* node, size_t begin) const {
@@ -1064,7 +1071,16 @@ private:
                     node.operands[index + 1]->kind == FormatBreakNodeKind::Delimited &&
                     ChoiceFor(solution, node.operands[index + 1]->id) == FormatBreakChoice::SplitAttachedOpen
                 ) {
-                    EmitDelimitedNodeAfterAttachedOpen(*node.operands[index + 1], solution, continuationIndent);
+                    const size_t attachedOperandIndex = index + 1;
+                    EmitDelimitedNodeAfterAttachedOpen(
+                        *node.operands[attachedOperandIndex],
+                        solution,
+                        continuationIndent
+                    );
+                    if (attachedOperandIndex < node.operators.size()) {
+                        WriteBreakToken(node.operators[attachedOperandIndex]);
+                        NewLineWithIndent(continuationIndent);
+                    }
                     ++index;
                     continue;
                 }
@@ -1500,7 +1516,7 @@ private:
                 if (IsCaseLabelKeyword(token) && atLineStart_) {
                     CloseCaseBodyIndentIfNeeded();
                 }
-                if (IsAccessKeyword(token)) {
+                if (IsAccessLabel(token, next)) {
                     FlushPendingTokens();
                     WriteWithIndentOffset(KnownTokenText(token.known), -1);
                     return;

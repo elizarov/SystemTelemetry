@@ -21,16 +21,9 @@
 
 namespace {
 
-struct FileFormatResult {
-    bool ok = true;
-    bool changed = false;
-    std::string formatted;
-    std::string error;
-};
-
 struct PendingFileFormat {
     std::string file;
-    FileFormatResult result;
+    SourceFormatResult result;
 };
 
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
@@ -128,9 +121,11 @@ bool TextMatchesFormattedOutput(std::string_view source, std::string_view format
     return true;
 }
 
-FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
+}  // namespace
+
+SourceFormatResult FormatSourceText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
     FormatModel model = BuildFormatModel(text);
-    FileFormatResult result;
+    SourceFormatResult result;
     if (!model.parse.ok) {
         result.ok = false;
         result.error = model.parse.error.empty() ? "tree-sitter parser setup failed" : model.parse.error;
@@ -140,6 +135,8 @@ FileFormatResult FormatOneText(std::string_view text, const FormatterConfig& con
     result.changed = model.sourceText != nullptr && !TextMatchesFormattedOutput(*model.sourceText, result.formatted);
     return result;
 }
+
+namespace {
 
 std::string ReadStdinText() {
     std::string text;
@@ -224,7 +221,7 @@ int RunFormat(int argc, char** argv) {
             std::fprintf(stderr, "%s\n", error.c_str());
             return 2;
         }
-        FileFormatResult result = FormatOneText(ReadStdinText(), *config, "<stdin>");
+        SourceFormatResult result = FormatSourceText(ReadStdinText(), *config, "<stdin>");
         if (!result.ok) {
             std::fprintf(stderr, "<stdin>: %s\n", result.error.c_str());
             return 1;
@@ -298,7 +295,7 @@ int RunFormat(int argc, char** argv) {
             continue;
         }
         ++processedCount;
-        FileFormatResult result = FormatOneText(*text, *config, file);
+        SourceFormatResult result = FormatSourceText(*text, *config, file);
         if (!result.ok) {
             std::fprintf(stderr, "%s: %s\n", file.c_str(), result.error.c_str());
             ++parseErrorCount;
