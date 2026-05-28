@@ -807,7 +807,7 @@ bool ContainsAnyBreakableContent(std::string_view text) {
     if (ContainsAdjacentStringLiteralSequence(text)) {
         return true;
     }
-    static constexpr std::string_view operators[] = {"&&", "||", "<<", ">>", "+", "|"};
+    static constexpr std::string_view operators[] = {"&&", "||", "==", "<<", ">>", "+", "|"};
     for (std::string_view op : operators) {
         if (ContainsTopLevelOperator(text, op)) {
             return true;
@@ -1516,6 +1516,14 @@ private:
                     continuationIndent + combinedBranches,
                 }};
             }
+            if (trueBranch.find('(') != std::string::npos) {
+                std::vector<std::string> lines{baseIndent + prefix};
+                LineLayout branch = FormatContent(trueBranch + " :", indent + indentWidth_, depth + 1, true);
+                lines.insert(lines.end(), branch.lines.begin(), branch.lines.end());
+                LineLayout fallback = FormatContent(falseBranch, indent + indentWidth_, depth + 1);
+                lines.insert(lines.end(), fallback.lines.begin(), fallback.lines.end());
+                return LineLayout{std::move(lines)};
+            }
             if (falseBranch.find('(') != std::string::npos) {
                 return std::nullopt;
             }
@@ -1810,7 +1818,7 @@ private:
         int depth,
         int continuationIndent
     ) {
-        static constexpr std::string_view operators[] = {"&&", "||", "+", "|"};
+        static constexpr std::string_view operators[] = {"&&", "||", "==", "+", "|"};
         for (std::string_view op : operators) {
             std::vector<std::string> parts = SplitTopLevelOperator(content, op);
             if (parts.size() <= 1) {
@@ -2117,10 +2125,46 @@ std::string CollapseSingleStatementLambdas(const FormatterConfig& config, std::s
     const size_t columnLimit = static_cast<size_t>(std::max(1, config.columnLimit));
     for (size_t index = 0; index < lines.size();) {
         const std::string currentTrimmed = TrimCopy(lines[index]);
+        if (tools::StartsWith(currentTrimmed, "} ")) {
+            const std::string suffix = TrimCopy(std::string_view(currentTrimmed).substr(1));
+            const size_t suffixAssignment = suffix.find('=');
+            const size_t suffixDot = suffix.find('.');
+            const bool isDeclaration =
+                StartsWithWord(suffix, "auto") ||
+                StartsWithWord(suffix, "bool") ||
+                StartsWithWord(suffix, "char") ||
+                StartsWithWord(suffix, "const") ||
+                StartsWithWord(suffix, "double") ||
+                StartsWithWord(suffix, "float") ||
+                StartsWithWord(suffix, "int") ||
+                StartsWithWord(suffix, "long") ||
+                StartsWithWord(suffix, "short") ||
+                StartsWithWord(suffix, "signed") ||
+                StartsWithWord(suffix, "std") ||
+                StartsWithWord(suffix, "unsigned");
+            const bool isMemberAssignment =
+                suffixAssignment != std::string::npos &&
+                suffixDot != std::string::npos &&
+                suffixDot < suffixAssignment;
+            if (!StartsWithWord(suffix, "else") &&
+                !StartsWithWord(suffix, "catch") &&
+                !StartsWithWord(suffix, "finally") &&
+                !StartsWithWord(suffix, "while") &&
+                (isDeclaration || isMemberAssignment)) {
+                const std::string base(static_cast<size_t>(LeadingSpaceCount(lines[index])), ' ');
+                output.push_back(base + "}");
+                output.push_back(base + suffix);
+                ++index;
+                continue;
+            }
+        }
         if (index + 1 < lines.size() && currentTrimmed == "}") {
             const std::string nextTrimmed = TrimCopy(lines[index + 1]);
             const size_t nextBrace = nextTrimmed.find('{');
+            const size_t nextBracket = nextTrimmed.find('[');
             const size_t nextParen = nextTrimmed.find('(');
+            const size_t nextDeclaratorMarker = std::min(nextBrace, nextBracket);
+            const size_t nextDot = nextTrimmed.find('.');
             if (!nextTrimmed.empty() &&
                 !StartsWithWord(nextTrimmed, "if") &&
                 !StartsWithWord(nextTrimmed, "while") &&
@@ -2131,7 +2175,8 @@ std::string CollapseSingleStatementLambdas(const FormatterConfig& config, std::s
                 !StartsWithWord(nextTrimmed, "catch") &&
                 !StartsWithWord(nextTrimmed, "finally") &&
                 !StartsWithWord(nextTrimmed, "return") &&
-                (nextTrimmed.find('[') != std::string::npos ||
+                (nextDot == std::string::npos || nextDot > nextDeclaratorMarker) &&
+                (nextBracket != std::string::npos ||
                  (nextBrace != std::string::npos && (nextParen == std::string::npos || nextBrace < nextParen))) &&
                 (std::isalpha(static_cast<unsigned char>(nextTrimmed.front())) != 0 || nextTrimmed.front() == '_')) {
                 output.push_back(lines[index] + " " + nextTrimmed);
@@ -2824,11 +2869,10 @@ private:
             PrintLeftBrace(token, previous, rawNext);
             return;
         case KnownToken::RightBrace:
-            PrintRightBrace(token, next);
+            PrintRightBrace(token, next, rawNext);
             return;
         case KnownToken::Semicolon:
-            W
-            rite(";");
+            Write(";");
             if (ShouldBreakAfterSemicolon() &&
                 !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)) {
                 NewLine(ShouldContinueMacroLine(token, next));
@@ -2917,12 +2961,13 @@ private:
         }
     }
 
-    void PrintRightBrace(const PrintToken& token, const PrintToken* next) {
+    void PrintRightBrace(const PrintToken& token, const PrintToken* next, const PrintToken* rawNext) {
         if (compactRightBraceSkips_ > 0) {
             --compactRightBraceSkips_;
             return;
         }
         const BraceRole role = braceStack_.empty() ? RoleForBrace(token) : braceStack_.back();
+        const bool keepTrailingComment = rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment;
         if (!braceStack_.empty()) {
             braceStack_.pop_back();
             braceParenDepthStack_.pop_back();
@@ -2933,7 +2978,9 @@ private:
             }
             BlankLine();
             Write("}");
-            NewLine(ShouldContinueMacroLine(token, next));
+            if (!keepTrailingComment) {
+                NewLine(ShouldContinueMacroLine(token, next));
+            }
             return;
         }
         if (role == BraceRole::CaseBlock) {
@@ -2941,7 +2988,9 @@ private:
                 NewLine(token.inMacroValue);
             }
             WriteWithIndentOffset("}", -1);
-            NewLine(ShouldContinueMacroLine(token, next));
+            if (!keepTrailingComment) {
+                NewLine(ShouldContinueMacroLine(token, next));
+            }
             return;
         }
         if (role != BraceRole::Compact) {
@@ -2968,7 +3017,9 @@ private:
                  (next->known == KnownToken::KeywordWhile && next->parentKind == SyntaxTreeKind::DoStatement))) {
                 return;
             }
-            NewLine(ShouldContinueMacroLine(token, next));
+            if (!keepTrailingComment) {
+                NewLine(ShouldContinueMacroLine(token, next));
+            }
             return;
         }
         Write(KnownTokenText(token.known));

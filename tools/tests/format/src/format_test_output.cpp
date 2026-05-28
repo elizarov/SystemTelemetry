@@ -1028,6 +1028,28 @@ void UniversalBreakSelectionCases() {
         SecondTemplateArgumentWithLongName,
         ThirdTemplateArgumentWithLongName
     >();
+    AppConfig config = extraTemplate.empty() ?
+        LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context) :
+        LoadConfigWithExtraTemplate(GetRuntimeConfigPath(), !options.defaultConfig, context, extraTemplate);
+}
+
+ColorMixParseResult ParseColorMixParts(const std::vector<std::string>& parts) {
+    ColorMixParseResult parsed{};
+    if (parts.size() != 2) {
+        return std::nullopt;
+    }
+    const double amount = ParseDoubleOrDefault(parts[0], std::numeric_limits<double>::quiet_NaN());
+
+    if (!std::isfinite(amount) || amount < 0.0 || amount > 1.0) {
+        return std::nullopt;
+    }
+    parsed.mix = ColorMixExpression{parts[1], amount};
+    return parsed;
+}
+
+bool EqualStringVectors(const void* address, const void* compareAddress) {
+    return *reinterpret_cast<const std::vector<std::string>*>(address) ==
+        *reinterpret_cast<const std::vector<std::string>*>(compareAddress);
 }
 
 void FormatterSelfBreakCases() {
@@ -1441,6 +1463,12 @@ void TryFinallyCleanup() {
         Environment::CurrentDirectory = originalDirectory;
     }
 }
+
+namespace trailing_comment_fixture {
+
+void UseNamespaceTrailingComment() {}
+
+}  // namespace trailing_comment_fixture
 
 void LongComment() {
     // This deliberately long comment should remain as one physical line because ReflowComments is false even though it is beyond the configured column limit for the fixture.
