@@ -164,8 +164,7 @@ Formatter-owned same-operator chains use compact or split form. A single binary 
 ```cpp
 int value = a + b + c;
 
-int value =
-    first +
+int value = first +
     second +
     third;
 ```
@@ -173,8 +172,7 @@ int value =
 Ternary chains are one flat chain.
 
 ```cpp
-const char* key =
-    firstCondition ? firstKey :
+const char* key = firstCondition ? firstKey :
     secondCondition ? secondKey :
     fallbackKey;
 ```
