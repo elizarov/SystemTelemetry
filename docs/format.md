@@ -246,7 +246,21 @@ value = first + BuildValue(
 Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
 
+Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. When a continued function signature is followed by a body, the body `{` starts on its own line at the declaration indentation.
+
 ```cpp
+std::vector<std::string>
+    ParseItems(const std::vector<ConfigLine>& lines, size_t& index);
+
+std::vector<std::string>
+    ParseItems(
+        const std::vector<ConfigLine>& lines,
+        size_t& index
+    )
+{
+    return {};
+}
+
 render(
     first,
     transform(
@@ -449,16 +463,17 @@ Single-statement lambda bodies may stay on one line when the complete lambda fit
 
 When a wrapped lambda is assigned to a variable, the assignment prefix is part of the lambda header context, so the optimizer may keep the prefix and lambda opener on the same line.
 
-Lambda captures and lambda parameters are separate break opportunities. Captures, parameters, and the body opener use the same compact-or-split optimization as other delimiter groups.
+Lambda captures and lambda parameters are separate break opportunities. Captures and parameters use the same compact-or-split optimization as other delimiter groups.
 
-When the lambda parameter list splits, keep the body `{` on the closing-parameter line.
+When the lambda parameter list splits, put the body `{` on the next line at the lambda header indentation.
 
 ```cpp
 const auto updateKey = [&](
     const std::string& sectionName,
     const std::string& key,
     const std::string& value
-) {
+)
+{
     Update(sectionName, key, value);
 };
 ```

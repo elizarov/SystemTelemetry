@@ -23,6 +23,8 @@ bool ConsumeLeadingName(const FormatBreakNode& node, std::string_view candidate,
             return true;
         }
         case FormatBreakNodeKind::Sequence:
+        case FormatBreakNodeKind::FunctionSignature:
+        case FormatBreakNodeKind::BodyHeader:
             for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
                 if (child->kind == FormatBreakNodeKind::Delimited) {
                     return true;

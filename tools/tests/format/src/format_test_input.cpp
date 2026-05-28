@@ -332,6 +332,16 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
 // Implemented by generated file build/cmake/generated/config/config_meta.generated.cpp.
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
 
+std::vector<std::string> ParseIndentedStringList(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent) {
+    return {};
+}
+
+std::vector<std::string> ParseIndentedStringListDeclaration(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent);
+
+std::vector<std::string> ParseIndentedStringListWithSplitParameters(const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture, size_t& indexWithLongNameForFormatterFixture, int parentIndentWithLongNameForFormatterFixture) {
+    return {};
+}
+
 struct ColorConfig {};
 
 template <typename UpdateKeyFn>

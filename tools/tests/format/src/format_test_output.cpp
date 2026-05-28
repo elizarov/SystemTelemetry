@@ -328,6 +328,25 @@ bool RuntimeConfigFieldEquals(const RuntimeConfigFieldDescriptor& field, const v
 // Implemented by generated file build/cmake/generated/config/config_meta.generated.cpp.
 std::span<const RuntimeConfigSectionDescriptor> RuntimeConfigSectionDescriptors();
 
+std::vector<std::string>
+    ParseIndentedStringList(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent)
+{
+    return {};
+}
+
+std::vector<std::string>
+    ParseIndentedStringListDeclaration(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent);
+
+std::vector<std::string>
+    ParseIndentedStringListWithSplitParameters(
+        const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture,
+        size_t& indexWithLongNameForFormatterFixture,
+        int parentIndentWithLongNameForFormatterFixture
+    )
+{
+    return {};
+}
+
 struct ColorConfig {};
 
 template <typename UpdateKeyFn>
@@ -424,7 +443,8 @@ std::variant<
     LayoutCardTitleEditKey,
     LayoutNodeFieldEditKey,
     LayoutContainerChildOrderEditKey
-> DefaultLayoutEditSubject();
+>
+    DefaultLayoutEditSubject();
 void UseLayoutEditSubject(
     std::variant<
         LayoutEditParameter,
@@ -683,7 +703,8 @@ const auto appendTrialLeaders = [&](
     LayoutGuideSheetExitSide side,
     const LayoutGuideSheetCardPlacement& placement,
     const BlockLayout& block
-) {
+)
+{
     Use(leaders, plannedIndexes, side, placement, block);
 };
 
@@ -691,7 +712,8 @@ const auto appendEmbeddedRect = [&](
     const RenderRect& rect,
     const std::vector<LayoutEditOverlayOwner>* owners,
     LayoutEditOverlayAffordanceLayer artifactLayer
-) {
+)
+{
     if (rect.IsEmpty()) {
         return;
     }
@@ -725,7 +747,8 @@ const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectio
     const std::string& sectionName,
     const std::string& key,
     const std::string& value
-) {
+)
+{
     Use(sectionName, key, value);
 };
 

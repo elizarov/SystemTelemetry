@@ -836,6 +836,12 @@ private:
             case FormatBreakNodeKind::PrefixList:
                 EmitPrefixListNode(node, solution, baseIndent);
                 return;
+            case FormatBreakNodeKind::FunctionSignature:
+                EmitFunctionSignatureNode(node, solution, baseIndent);
+                return;
+            case FormatBreakNodeKind::BodyHeader:
+                EmitBodyHeaderNode(node, solution, baseIndent);
+                return;
             case FormatBreakNodeKind::Chain:
                 EmitChainNode(node, solution, baseIndent);
                 return;
@@ -1059,6 +1065,40 @@ private:
                 );
             }
         }
+        EmitBreakNode(*node.children[1], solution, baseIndent);
+    }
+
+    void EmitFunctionSignatureNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice != FormatBreakChoice::Split || node.children.size() < 2) {
+            for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+                EmitBreakNode(*child, solution, baseIndent);
+            }
+            return;
+        }
+        EmitBreakNode(*node.children[0], solution, baseIndent);
+        NewLineWithIndent(baseIndent + 1);
+        EmitBreakNode(*node.children[1], solution, baseIndent + 1);
+        if (node.children.size() > 2) {
+            if (node.functionSignatureHasBody) {
+                NewLineWithIndent(baseIndent);
+                EmitBreakNode(*node.children[2], solution, baseIndent);
+            } else {
+                EmitBreakNode(*node.children[2], solution, baseIndent + 1);
+            }
+        }
+    }
+
+    void EmitBodyHeaderNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice != FormatBreakChoice::Split || node.children.size() < 2) {
+            for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+                EmitBreakNode(*child, solution, baseIndent);
+            }
+            return;
+        }
+        EmitBreakNode(*node.children[0], solution, baseIndent);
+        NewLineWithIndent(baseIndent);
         EmitBreakNode(*node.children[1], solution, baseIndent);
     }
 
@@ -1643,17 +1683,21 @@ private:
             ++compactRightBraceSkips_;
             return;
         }
+        const std::optional<LambdaSplitCallPlan> splitCallPlan = BuildLambdaSplitCallPlan(token);
         BufferToken(token);
         if (role == BraceRole::Compact) {
             return;
         }
-        const std::optional<LambdaSplitCallPlan> splitCallPlan = BuildLambdaSplitCallPlan(token);
         FlushPendingTokens(splitCallPlan ? splitCallPlan->breakContext : FormatBreakModelContext{});
         if (splitCallPlan) {
             deferredSplitCallContexts_.push_back(splitCallPlan->deferredContext);
         }
-        const int openLineIndent = splitCallPlan ? splitCallPlan->deferredContext.argumentIndent :
-            (token.inMacroValue ? indentLevel_ : (lineHasText_ ? CurrentLineIndentLevel() : indentLevel_));
+        const bool functionBlock = token.parentKind == SyntaxNodeKind::CompoundStatement &&
+            token.grandParentKind == SyntaxNodeKind::FunctionDefinition;
+        const int openLineIndent = splitCallPlan ? splitCallPlan->deferredContext.argumentIndent : (
+            token.inMacroValue || functionBlock ?
+                indentLevel_ : (lineHasText_ ? CurrentLineIndentLevel() : indentLevel_)
+        );
         braceStack_.push_back(role);
         braceParenDepthStack_.push_back(parenDepth_);
         braceIndentRestoreStack_.push_back(indentLevel_);

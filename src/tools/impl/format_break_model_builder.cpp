@@ -162,9 +162,8 @@ size_t CountFieldInitializers(const SyntaxNode& node) {
         return static_cast<size_t>(std::count_if(
             node.children.begin(),
             node.children.end(),
-            [](const std::unique_ptr<SyntaxNode>& child) {
-                return child && child->kind == SyntaxNodeKind::FieldInitializer;
-            }
+            [](const std::unique_ptr<SyntaxNode>& child)
+            { return child && child->kind == SyntaxNodeKind::FieldInitializer; }
         ));
     }
     size_t count = 0;
@@ -227,6 +226,18 @@ bool IsListForceSplitMarker(SyntaxNodeKind kind) {
         kind == SyntaxNodeKind::TrailingComment;
 }
 
+bool ContainsSyntaxKind(const SyntaxNode& node, SyntaxNodeKind kind) {
+    if (node.kind == kind) {
+        return true;
+    }
+    return std::any_of(
+        node.children.begin(),
+        node.children.end(),
+        [kind](const std::unique_ptr<SyntaxNode>& child)
+        { return child != nullptr && ContainsSyntaxKind(*child, kind); }
+    );
+}
+
 class BreakModelBuilder {
 public:
     BreakModelBuilder(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) : context_(context)
@@ -252,6 +263,13 @@ public:
                     selectedNodes_.insert(ancestor);
                 }
             }
+            for (size_t pathIndex = 1; pathIndex < token.syntaxPath.size(); ++pathIndex) {
+                const SyntaxNode* parent = token.syntaxPath[pathIndex - 1];
+                const SyntaxNode* child = token.syntaxPath[pathIndex];
+                if (parent != nullptr && child != nullptr) {
+                    parentByNode_.emplace(child, parent);
+                }
+            }
             previous = &token;
         }
         root_ = CommonRoot(tokens);
@@ -271,6 +289,7 @@ public:
 private:
     const FormatBreakModelContext& context_;
     std::unordered_map<const SyntaxNode*, FormatBreakToken> tokensByNode_;
+    std::unordered_map<const SyntaxNode*, const SyntaxNode*> parentByNode_;
     std::unordered_set<const SyntaxNode*> selectedNodes_;
     const SyntaxNode* root_ = nullptr;
     int nextId_ = 1;
@@ -293,6 +312,11 @@ private:
 
     bool ContainsSelected(const SyntaxNode& node) const {
         return selectedNodes_.find(&node) != selectedNodes_.end();
+    }
+
+    SyntaxNodeKind ParentKind(const SyntaxNode& node) const {
+        const auto found = parentByNode_.find(&node);
+        return found == parentByNode_.end() ? SyntaxNodeKind::Unknown : found->second->kind;
     }
 
     const FormatBreakToken* TokenForNode(const SyntaxNode& node) const {
@@ -459,6 +483,16 @@ private:
                 return declaration;
             }
         }
+        if (node.kind == SyntaxNodeKind::Declaration || node.kind == SyntaxNodeKind::FunctionDefinition) {
+            if (auto signature = BuildFunctionSignature(node, depth)) {
+                return signature;
+            }
+        }
+        if (node.kind == SyntaxNodeKind::LambdaExpression) {
+            if (auto header = BuildBodyHeader(node, depth)) {
+                return header;
+            }
+        }
         if (
             node.kind == SyntaxNodeKind::BinaryExpression ||
             node.kind == SyntaxNodeKind::AssignmentExpression ||
@@ -478,6 +512,82 @@ private:
             }
         }
         return BuildSequenceFromChildren(node.children, 0, node.children.size(), depth);
+    }
+
+    std::unique_ptr<FormatBreakNode> BuildBodyHeader(const SyntaxNode& node, int depth) {
+        std::optional<size_t> bodyIndex;
+        for (size_t index = 0; index < node.children.size(); ++index) {
+            if (node.children[index] && node.children[index]->kind == SyntaxNodeKind::CompoundStatement) {
+                bodyIndex = index;
+                break;
+            }
+        }
+        if (!bodyIndex || *bodyIndex == 0 || !ContainsSelected(*node.children[*bodyIndex])) {
+            return nullptr;
+        }
+        std::unique_ptr<FormatBreakNode> header = BuildSequenceFromChildren(node.children, 0, *bodyIndex, depth + 1);
+        std::unique_ptr<FormatBreakNode> body =
+            BuildSequenceFromChildren(node.children, *bodyIndex, node.children.size(), depth + 1);
+        if (!header || !body) {
+            return nullptr;
+        }
+
+        auto result = MakeNode(FormatBreakNodeKind::BodyHeader, depth);
+        result->children.push_back(std::move(header));
+        result->children.push_back(std::move(body));
+        return result;
+    }
+
+    std::unique_ptr<FormatBreakNode> BuildFunctionSignature(const SyntaxNode& node, int depth) {
+        if (node.kind == SyntaxNodeKind::Declaration && ParentKind(node) == SyntaxNodeKind::CompoundStatement) {
+            return nullptr;
+        }
+        std::optional<size_t> declaratorIndex;
+        for (size_t index = 0; index < node.children.size(); ++index) {
+            if (node.children[index] && node.children[index]->kind == SyntaxNodeKind::FunctionDeclarator) {
+                declaratorIndex = index;
+                break;
+            }
+        }
+        if (!declaratorIndex || *declaratorIndex == 0) {
+            return nullptr;
+        }
+        if (!ContainsSelected(*node.children[*declaratorIndex])) {
+            return nullptr;
+        }
+        bool hasTemplateReturnType = false;
+        for (size_t index = 0; index < *declaratorIndex; ++index) {
+            if (
+                node.children[index] && ContainsSyntaxKind(*node.children[index], SyntaxNodeKind::TemplateArgumentList)
+            ) {
+                hasTemplateReturnType = true;
+                break;
+            }
+        }
+        if (!hasTemplateReturnType) {
+            return nullptr;
+        }
+
+        std::unique_ptr<FormatBreakNode> returnType =
+            BuildSequenceFromChildren(node.children, 0, *declaratorIndex, depth + 1);
+        std::unique_ptr<FormatBreakNode> declarator =
+            BuildSequenceFromChildren(node.children, *declaratorIndex, *declaratorIndex + 1, depth + 1);
+        if (!returnType || !declarator) {
+            return nullptr;
+        }
+
+        auto signature = MakeNode(FormatBreakNodeKind::FunctionSignature, depth);
+        signature->functionSignatureHasBody = node.kind == SyntaxNodeKind::FunctionDefinition;
+        signature->children.push_back(std::move(returnType));
+        signature->children.push_back(std::move(declarator));
+        if (*declaratorIndex + 1 < node.children.size()) {
+            std::unique_ptr<FormatBreakNode> tail =
+                BuildSequenceFromChildren(node.children, *declaratorIndex + 1, node.children.size(), depth + 1);
+            if (tail) {
+                signature->children.push_back(std::move(tail));
+            }
+        }
+        return signature;
     }
 
     static bool IsDirectInitializedDeclarator(const SyntaxNode& node) {
@@ -598,12 +708,14 @@ private:
         return sequence;
     }
 
-    std::unique_ptr<FormatBreakNode> BuildSequenceFromChildren(
-        const std::vector<std::unique_ptr<SyntaxNode>>& children,
-        size_t begin,
-        size_t end,
-        int depth
-    ) {
+    std::unique_ptr<FormatBreakNode>
+        BuildSequenceFromChildren(
+            const std::vector<std::unique_ptr<SyntaxNode>>& children,
+            size_t begin,
+            size_t end,
+            int depth
+        )
+    {
         std::vector<std::unique_ptr<FormatBreakNode>> builtChildren;
         builtChildren.reserve(end - begin);
         for (size_t index = begin; index < end;) {
@@ -899,12 +1011,14 @@ private:
         return list->items.empty() ? nullptr : std::move(list);
     }
 
-    std::optional<std::pair<size_t, FormatBreakDelimiterKind>> FindDirectClose(
-        const std::vector<std::unique_ptr<SyntaxNode>>& children,
-        size_t openIndex,
-        size_t end,
-        FormatBreakDelimiterKind delimiter
-    ) const {
+    std::optional<std::pair<size_t, FormatBreakDelimiterKind>>
+        FindDirectClose(
+            const std::vector<std::unique_ptr<SyntaxNode>>& children,
+            size_t openIndex,
+            size_t end,
+            FormatBreakDelimiterKind delimiter
+        ) const
+    {
         for (size_t index = openIndex + 1; index < end; ++index) {
             if (!children[index]) {
                 continue;
@@ -917,13 +1031,15 @@ private:
         return std::nullopt;
     }
 
-    std::unique_ptr<FormatBreakNode> BuildDirectDelimited(
-        const std::vector<std::unique_ptr<SyntaxNode>>& children,
-        size_t openIndex,
-        size_t end,
-        int depth,
-        size_t& afterDelimited
-    ) {
+    std::unique_ptr<FormatBreakNode>
+        BuildDirectDelimited(
+            const std::vector<std::unique_ptr<SyntaxNode>>& children,
+            size_t openIndex,
+            size_t end,
+            int depth,
+            size_t& afterDelimited
+        )
+    {
         afterDelimited = openIndex + 1;
         if (!children[openIndex]) {
             return nullptr;

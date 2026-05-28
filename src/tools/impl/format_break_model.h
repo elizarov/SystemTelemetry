@@ -12,6 +12,8 @@ enum class FormatBreakNodeKind {
     Sequence,
     Delimited,
     PrefixList,
+    FunctionSignature,
+    BodyHeader,
     Chain,
     AdjacentStrings,
 };
@@ -55,6 +57,7 @@ struct FormatBreakNode {
     FormatBreakChainKind chainKind = FormatBreakChainKind::AfterOperator;
     bool forceSplit = false;
     bool flatSplitIndent = false;
+    bool functionSignatureHasBody = false;
     std::vector<std::unique_ptr<FormatBreakNode>> children;
     std::vector<std::unique_ptr<FormatBreakNode>> items;
     std::vector<FormatBreakToken> separators;
