@@ -19,11 +19,14 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"macro_replacement_list", SyntaxTreeKind::MacroReplacementList},
     {"declaration", SyntaxTreeKind::Declaration},
     {"field_declaration", SyntaxTreeKind::FieldDeclaration},
+    {"alias_declaration", SyntaxTreeKind::AliasDeclaration},
     {"function_definition", SyntaxTreeKind::FunctionDefinition},
     {"compound_statement", SyntaxTreeKind::CompoundStatement},
     {"field_declaration_list", SyntaxTreeKind::FieldDeclarationList},
     {"enumerator_list", SyntaxTreeKind::EnumeratorList},
     {"initializer_list", SyntaxTreeKind::InitializerList},
+    {"field_initializer_list", SyntaxTreeKind::FieldInitializerList},
+    {"field_initializer", SyntaxTreeKind::FieldInitializer},
     {"declaration_list", SyntaxTreeKind::DeclarationList},
     {"namespace_definition", SyntaxTreeKind::NamespaceDefinition},
     {"enum_specifier", SyntaxTreeKind::EnumSpecifier},
@@ -36,6 +39,8 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"do_statement", SyntaxTreeKind::DoStatement},
     {"switch_statement", SyntaxTreeKind::SwitchStatement},
     {"case_statement", SyntaxTreeKind::CaseStatement},
+    {"condition_clause", SyntaxTreeKind::ConditionClause},
+    {"init_statement", SyntaxTreeKind::InitStatement},
     {"preproc_call", SyntaxTreeKind::PreprocCall},
     {"preproc_def", SyntaxTreeKind::PreprocDef},
     {"preproc_function_def", SyntaxTreeKind::PreprocFunctionDef},
@@ -59,7 +64,9 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"binary_expression", SyntaxTreeKind::BinaryExpression},
     {"unary_expression", SyntaxTreeKind::UnaryExpression},
     {"conditional_expression", SyntaxTreeKind::ConditionalExpression},
+    {"comma_expression", SyntaxTreeKind::CommaExpression},
     {"assignment_expression", SyntaxTreeKind::AssignmentExpression},
+    {"init_declarator", SyntaxTreeKind::InitDeclarator},
     {"cast_expression", SyntaxTreeKind::CastExpression},
     {"pointer_declarator", SyntaxTreeKind::PointerDeclarator},
     {"abstract_pointer_declarator", SyntaxTreeKind::AbstractPointerDeclarator},
@@ -87,6 +94,8 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"operator_name", SyntaxTreeKind::OperatorName},
     {"operator_cast", SyntaxTreeKind::OperatorCast},
     {"ms_call_modifier", SyntaxTreeKind::MsCallModifier},
+    {"ms_declspec_modifier", SyntaxTreeKind::MsDeclspecModifier},
+    {"concatenated_string", SyntaxTreeKind::ConcatenatedString},
     {"raw_string_literal", SyntaxTreeKind::RawStringLiteral},
     {"string_literal", SyntaxTreeKind::StringLiteral},
     {"system_lib_string", SyntaxTreeKind::SystemLibString},
@@ -96,7 +105,7 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"field_identifier", SyntaxTreeKind::Identifier},
     {"namespace_identifier", SyntaxTreeKind::Identifier},
     {"type_identifier", SyntaxTreeKind::Identifier},
-    {"qualified_identifier", SyntaxTreeKind::Identifier},
+    {"qualified_identifier", SyntaxTreeKind::Identifier}
 });
 
 const std::unordered_map<std::string_view, SyntaxTreeKind>& TreeKindByType() {
@@ -107,7 +116,8 @@ const std::unordered_map<std::string_view, SyntaxTreeKind>& TreeKindByType() {
             result.emplace(mapping.text, mapping.kind);
         }
         return result;
-    }();
+    }
+    ();
     return treeKinds;
 }
 
@@ -166,7 +176,8 @@ bool KeepWholeNodeAsFreeToken(SyntaxTreeKind kind) {
     return IsLiteralKind(kind) ||
         kind == SyntaxTreeKind::PreprocArg ||
         kind == SyntaxTreeKind::SystemLibString ||
-        kind == SyntaxTreeKind::MsCallModifier;
+        kind == SyntaxTreeKind::MsCallModifier ||
+        kind == SyntaxTreeKind::MsDeclspecModifier;
 }
 
 bool IsAtomicPreprocessorNode(SyntaxTreeKind kind) {
@@ -189,9 +200,7 @@ bool IsPragmaOnceNode(const SyntaxNode& node) {
 }
 
 bool IsIncludeNode(const std::unique_ptr<SyntaxNode>& node) {
-    return node != nullptr &&
-        node->kind == SyntaxNodeKind::Tree &&
-        node->treeKind == SyntaxTreeKind::PreprocInclude;
+    return node != nullptr && node->kind == SyntaxNodeKind::Tree && node->treeKind == SyntaxTreeKind::PreprocInclude;
 }
 
 bool IsOpeningIncludeSpacer(const SyntaxNode& node) {
@@ -214,34 +223,28 @@ std::unique_ptr<SyntaxNode> MakeKnownToken(KnownToken token) {
 }
 
 bool IsTriviaNode(const std::unique_ptr<SyntaxNode>& node) {
-    return node != nullptr &&
-        (node->kind == SyntaxNodeKind::BlankLine ||
-         node->kind == SyntaxNodeKind::Comment ||
-         node->kind == SyntaxNodeKind::TrailingComment);
+    return node != nullptr && (
+        node->kind == SyntaxNodeKind::BlankLine ||
+        node->kind == SyntaxNodeKind::Comment ||
+        node->kind == SyntaxNodeKind::TrailingComment
+    );
 }
 
 bool IsCommentNode(const std::unique_ptr<SyntaxNode>& node) {
-    return node != nullptr &&
-        (node->kind == SyntaxNodeKind::Comment ||
-         node->kind == SyntaxNodeKind::TrailingComment);
+    return node != nullptr && (node->kind == SyntaxNodeKind::Comment || node->kind == SyntaxNodeKind::TrailingComment);
 }
 
 bool IsKnownTokenNode(const std::unique_ptr<SyntaxNode>& node, KnownToken token) {
-    return node != nullptr &&
-        node->kind == SyntaxNodeKind::KnownToken &&
-        node->known == token;
+    return node != nullptr && node->kind == SyntaxNodeKind::KnownToken && node->known == token;
 }
 
 bool IsTreeNode(const std::unique_ptr<SyntaxNode>& node, SyntaxTreeKind kind) {
-    return node != nullptr &&
-        node->kind == SyntaxNodeKind::Tree &&
-        node->treeKind == kind;
+    return node != nullptr && node->kind == SyntaxNodeKind::Tree && node->treeKind == kind;
 }
 
-std::optional<size_t> PreviousNonTriviaChildIndex(
-    const std::vector<std::unique_ptr<SyntaxNode>>& children,
-    size_t before
-) {
+std::optional<
+    size_t
+> PreviousNonTriviaChildIndex(const std::vector<std::unique_ptr<SyntaxNode>>& children, size_t before) {
     while (before > 0) {
         --before;
         if (!IsTriviaNode(children[before])) {
@@ -251,10 +254,7 @@ std::optional<size_t> PreviousNonTriviaChildIndex(
     return std::nullopt;
 }
 
-std::optional<size_t> NextNonTriviaChildIndex(
-    const std::vector<std::unique_ptr<SyntaxNode>>& children,
-    size_t after
-) {
+std::optional<size_t> NextNonTriviaChildIndex(const std::vector<std::unique_ptr<SyntaxNode>>& children, size_t after) {
     for (size_t index = after; index < children.size(); ++index) {
         if (!IsTriviaNode(children[index])) {
             return index;
@@ -266,10 +266,12 @@ std::optional<size_t> NextNonTriviaChildIndex(
 void NormalizeTrailingCommas(SyntaxNode& node) {
     std::vector<std::unique_ptr<SyntaxNode>>& children = node.children;
     for (size_t index = 0; index < children.size(); ++index) {
-        if (!IsKnownTokenNode(children[index], KnownToken::RightBrace) &&
+        if (
+            !IsKnownTokenNode(children[index], KnownToken::RightBrace) &&
             !IsKnownTokenNode(children[index], KnownToken::RightParen) &&
             !IsKnownTokenNode(children[index], KnownToken::RightBracket) &&
-            !IsKnownTokenNode(children[index], KnownToken::Greater)) {
+            !IsKnownTokenNode(children[index], KnownToken::Greater)
+        ) {
             continue;
         }
         const std::optional<size_t> previous = PreviousNonTriviaChildIndex(children, index);
@@ -277,9 +279,14 @@ void NormalizeTrailingCommas(SyntaxNode& node) {
             continue;
         }
         if (node.treeKind == SyntaxTreeKind::EnumeratorList) {
-            if (!IsKnownTokenNode(children[*previous], KnownToken::Comma) &&
-                !IsKnownTokenNode(children[*previous], KnownToken::LeftBrace)) {
-                children.insert(children.begin() + static_cast<std::ptrdiff_t>(*previous + 1), MakeKnownToken(KnownToken::Comma));
+            if (
+                !IsKnownTokenNode(children[*previous], KnownToken::Comma) &&
+                !IsKnownTokenNode(children[*previous], KnownToken::LeftBrace)
+            ) {
+                children.insert(
+                    children.begin() + static_cast<std::ptrdiff_t>(*previous + 1),
+                    MakeKnownToken(KnownToken::Comma)
+                );
                 ++index;
             }
             continue;
@@ -292,8 +299,9 @@ void NormalizeTrailingCommas(SyntaxNode& node) {
 }
 
 void WrapControlBody(SyntaxNode& node, size_t childIndex) {
-    if (childIndex >= node.children.size() ||
-        IsTreeNode(node.children[childIndex], SyntaxTreeKind::CompoundStatement)) {
+    if (
+        childIndex >= node.children.size() || IsTreeNode(node.children[childIndex], SyntaxTreeKind::CompoundStatement)
+    ) {
         return;
     }
     size_t firstBodyIndex = childIndex;
@@ -324,8 +332,10 @@ std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
     }
     std::optional<size_t> ifIndex;
     for (size_t index = 0; index < node.children.size(); ++index) {
-        if (IsKnownTokenNode(node.children[index], KnownToken::LeftBrace) ||
-            IsKnownTokenNode(node.children[index], KnownToken::RightBrace)) {
+        if (
+            IsKnownTokenNode(node.children[index], KnownToken::LeftBrace) ||
+            IsKnownTokenNode(node.children[index], KnownToken::RightBrace)
+        ) {
             continue;
         }
         if (IsTreeNode(node.children[index], SyntaxTreeKind::IfStatement) && !ifIndex) {
@@ -398,22 +408,22 @@ void NormalizeLastControlBody(SyntaxNode& node) {
 
 void NormalizeControlBodies(SyntaxNode& node) {
     switch (node.treeKind) {
-    case SyntaxTreeKind::IfStatement:
-        NormalizeIfStatementBody(node);
-        return;
-    case SyntaxTreeKind::ElseClause:
-        NormalizeElseClauseBody(node);
-        return;
-    case SyntaxTreeKind::ForStatement:
-    case SyntaxTreeKind::WhileStatement:
-    case SyntaxTreeKind::SwitchStatement:
-        NormalizeLastControlBody(node);
-        return;
-    case SyntaxTreeKind::DoStatement:
-        NormalizeDoStatementBody(node);
-        return;
-    default:
-        return;
+        case SyntaxTreeKind::IfStatement:
+            NormalizeIfStatementBody(node);
+            return;
+        case SyntaxTreeKind::ElseClause:
+            NormalizeElseClauseBody(node);
+            return;
+        case SyntaxTreeKind::ForStatement:
+        case SyntaxTreeKind::WhileStatement:
+        case SyntaxTreeKind::SwitchStatement:
+            NormalizeLastControlBody(node);
+            return;
+        case SyntaxTreeKind::DoStatement:
+            NormalizeDoStatementBody(node);
+            return;
+        default:
+            return;
     }
 }
 
@@ -576,8 +586,8 @@ ParseResult ParseFailure(TSNode root) {
         problem = {.found = true, .missing = false, .node = root};
     }
     const TSPoint point = StartPoint(problem.node);
-    const std::string nodeType = problem.missing ? "missing " + std::string(ts_node_type(problem.node)) :
-                                                   std::string(ts_node_type(problem.node));
+    const std::string nodeType = problem.missing ?
+        "missing " + std::string(ts_node_type(problem.node)) : std::string(ts_node_type(problem.node));
     ParseResult parse;
     parse.ok = false;
     parse.error = "tree-sitter parse failed at " +

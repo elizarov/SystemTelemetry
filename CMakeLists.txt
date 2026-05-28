@@ -856,11 +856,15 @@ add_executable(CaseDashTools
     src/tools/tools_main.cpp
     src/tools/format.cpp
     src/tools/impl/format_args.cpp
+    src/tools/impl/format_break_model.cpp
+    src/tools/impl/format_break_model_builder.cpp
+    src/tools/impl/format_break_solver.cpp
     src/tools/impl/format_config.cpp
     src/tools/impl/format_include_sort.cpp
     src/tools/impl/format_model.cpp
     src/tools/impl/format_model_builder.cpp
     src/tools/impl/format_pretty_printer.cpp
+    src/tools/impl/format_spacing.cpp
     src/tools/lint_check.cpp
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp

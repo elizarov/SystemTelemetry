@@ -1,23 +1,17 @@
 #include "tools/impl/format_pretty_printer.h"
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "tools/impl/format_break_model_builder.h"
+#include "tools/impl/format_break_solver.h"
 #include "tools/impl/format_include_sort.h"
+#include "tools/impl/format_spacing.h"
 #include "tools/impl/tools_common.h"
 
 namespace {
-
-enum class PrintTokenKind {
-    Known,
-    Free,
-    Comment,
-    TrailingComment,
-    BlankLine,
-    Preprocessor,
-    IncludeRun,
-};
 
 enum class BraceRole {
     Compact,
@@ -27,111 +21,50 @@ enum class BraceRole {
     CaseBlock,
 };
 
-struct PrintToken {
-    PrintTokenKind kind = PrintTokenKind::Free;
-    KnownToken known = KnownToken::Unknown;
-    std::string_view text;
-    SyntaxTreeKind treeKind = SyntaxTreeKind::Unknown;
-    SyntaxTreeKind parentKind = SyntaxTreeKind::Unknown;
-    SyntaxTreeKind grandParentKind = SyntaxTreeKind::Unknown;
-    bool inTemplateDeclaration = false;
-    bool inRequiresClause = false;
-    bool inMacroValue = false;
-    bool breakBeforeMacroValue = false;
-    const SyntaxNode* node = nullptr;
-    const SyntaxNode* macroDefinition = nullptr;
-    const SyntaxNode* macroValueElement = nullptr;
-};
-
 bool IsPreprocessorNode(SyntaxTreeKind kind) {
     return kind == SyntaxTreeKind::PreprocCall ||
         kind == SyntaxTreeKind::PreprocInclude ||
         kind == SyntaxTreeKind::PreprocUsing;
 }
 
-bool IsPreprocessorPrintToken(PrintTokenKind kind) {
-    return kind == PrintTokenKind::Preprocessor || kind == PrintTokenKind::IncludeRun;
-}
-
-bool IsPreprocessorLikeToken(const PrintToken& token) {
-    return IsPreprocessorPrintToken(token.kind) || token.macroDefinition != nullptr;
-}
-
-bool IsCommentToken(PrintTokenKind kind) {
-    return kind == PrintTokenKind::Comment || kind == PrintTokenKind::TrailingComment;
-}
-
-bool IsWordLike(const PrintToken& token) {
-    if (token.kind == PrintTokenKind::Free) {
-        return true;
-    }
-    return token.kind == PrintTokenKind::Known && KnownTokenHasClass(token.known, TokenClass::Keyword);
-}
-
-bool IsStringLike(const PrintToken& token) {
-    return token.treeKind == SyntaxTreeKind::StringLiteral ||
-        token.treeKind == SyntaxTreeKind::RawStringLiteral ||
-        token.treeKind == SyntaxTreeKind::CharacterLiteral;
-}
-
-bool IsDeclaratorReferenceParent(SyntaxTreeKind kind) {
-    return kind == SyntaxTreeKind::PointerDeclarator ||
-        kind == SyntaxTreeKind::AbstractPointerDeclarator ||
-        kind == SyntaxTreeKind::ReferenceDeclarator ||
-        kind == SyntaxTreeKind::AbstractReferenceDeclarator ||
-        kind == SyntaxTreeKind::HandleDeclarator ||
-        kind == SyntaxTreeKind::AbstractHandleDeclarator ||
-        kind == SyntaxTreeKind::MemberPointerDeclarator;
-}
-
-bool IsReferenceToken(const PrintToken& token) {
-    return token.kind == PrintTokenKind::Known &&
-        KnownTokenHasClass(token.known, TokenClass::DeclaratorReferenceToken);
-}
-
-bool IsDeclaratorBindingToken(const PrintToken& token) {
-    return IsDeclaratorReferenceParent(token.parentKind) && IsReferenceToken(token);
-}
-
-bool IsUnaryContext(const PrintToken& token) {
-    return token.parentKind == SyntaxTreeKind::UnaryExpression;
-}
-
-bool IsBinaryContext(const PrintToken& token) {
-    return token.parentKind == SyntaxTreeKind::BinaryExpression ||
-        token.parentKind == SyntaxTreeKind::AssignmentExpression ||
-        token.parentKind == SyntaxTreeKind::ConditionalExpression;
-}
-
 BraceRole RoleForBraceParent(SyntaxTreeKind parentKind) {
     switch (parentKind) {
-    case SyntaxTreeKind::CompoundStatement:
-    case SyntaxTreeKind::FieldDeclarationList:
-    case SyntaxTreeKind::DeclarationList:
-        return BraceRole::Block;
-    case SyntaxTreeKind::EnumeratorList:
-        return BraceRole::Enum;
-    default:
-        return BraceRole::Compact;
+        case SyntaxTreeKind::CompoundStatement:
+        case SyntaxTreeKind::FieldDeclarationList:
+        case SyntaxTreeKind::DeclarationList:
+            return BraceRole::Block;
+        case SyntaxTreeKind::EnumeratorList:
+            return BraceRole::Enum;
+        default:
+            return BraceRole::Compact;
     }
 }
 
 BraceRole RoleForBrace(const PrintToken& token) {
-    if (token.parentKind == SyntaxTreeKind::DeclarationList &&
-        token.grandParentKind == SyntaxTreeKind::NamespaceDefinition) {
+    if (
+        token.inSingleStatementLambdaBody &&
+        token.parentKind == SyntaxTreeKind::CompoundStatement &&
+        token.grandParentKind == SyntaxTreeKind::LambdaExpression
+    ) {
+        return BraceRole::Compact;
+    }
+    if (
+        token.parentKind == SyntaxTreeKind::DeclarationList &&
+        token.grandParentKind == SyntaxTreeKind::NamespaceDefinition
+    ) {
         return BraceRole::Namespace;
     }
     return RoleForBraceParent(token.parentKind);
 }
 
 bool IsMacroDefinitionNode(SyntaxTreeKind kind) {
-    return kind == SyntaxTreeKind::PreprocDef ||
-        kind == SyntaxTreeKind::PreprocFunctionDef;
+    return kind == SyntaxTreeKind::PreprocDef || kind == SyntaxTreeKind::PreprocFunctionDef;
 }
 
 bool IsMacroDeclarationFragment(SyntaxTreeKind kind) {
     return kind == SyntaxTreeKind::Declaration ||
         kind == SyntaxTreeKind::FieldDeclaration ||
+        kind == SyntaxTreeKind::AliasDeclaration ||
         kind == SyntaxTreeKind::FunctionDefinition ||
         kind == SyntaxTreeKind::TemplateDeclaration ||
         kind == SyntaxTreeKind::EnumSpecifier ||
@@ -156,91 +89,299 @@ bool RequiresMacroValueBreak(const SyntaxNode& node) {
     return false;
 }
 
+bool ContainsLogicalOperator(const SyntaxNode& node) {
+    if (
+        node.kind == SyntaxNodeKind::KnownToken &&
+        (node.known == KnownToken::AmpersandAmpersand || node.known == KnownToken::PipePipe)
+    ) {
+        return true;
+    }
+    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+        if (child && ContainsLogicalOperator(*child)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool IsListDelimiter(KnownToken token) {
+    return token == KnownToken::LeftParen ||
+        token == KnownToken::RightParen ||
+        token == KnownToken::LeftBracket ||
+        token == KnownToken::RightBracket ||
+        token == KnownToken::Comma;
+}
+
+bool HasDelimitedListItemContent(const SyntaxNode& node) {
+    if (
+        node.kind == SyntaxNodeKind::BlankLine ||
+        node.kind == SyntaxNodeKind::Comment ||
+        node.kind == SyntaxNodeKind::TrailingComment
+    ) {
+        return false;
+    }
+    if (node.kind == SyntaxNodeKind::KnownToken && IsListDelimiter(node.known)) {
+        return false;
+    }
+    return true;
+}
+
+size_t CountDirectDelimitedListItems(const SyntaxNode& node) {
+    if (node.kind != SyntaxNodeKind::Tree) {
+        return 0;
+    }
+    bool hasItem = false;
+    size_t commaCount = 0;
+    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+        if (!child) {
+            continue;
+        }
+        if (child->kind == SyntaxNodeKind::KnownToken && child->known == KnownToken::Comma) {
+            ++commaCount;
+            continue;
+        }
+        hasItem = hasItem || HasDelimitedListItemContent(*child);
+    }
+    return hasItem ? commaCount + 1 : 0;
+}
+
+const SyntaxNode* FindDirectChild(const SyntaxNode& node, SyntaxTreeKind treeKind) {
+    if (node.kind != SyntaxNodeKind::Tree) {
+        return nullptr;
+    }
+    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+        if (child && child->kind == SyntaxNodeKind::Tree && child->treeKind == treeKind) {
+            return child.get();
+        }
+    }
+    return nullptr;
+}
+
+const SyntaxNode* FindLambdaHeaderChild(const SyntaxNode& node, SyntaxTreeKind treeKind) {
+    if (node.kind != SyntaxNodeKind::Tree) {
+        return nullptr;
+    }
+    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+        if (!child || child->kind != SyntaxNodeKind::Tree) {
+            continue;
+        }
+        if (child->treeKind == SyntaxTreeKind::CompoundStatement) {
+            continue;
+        }
+        if (child->treeKind == treeKind) {
+            return child.get();
+        }
+        if (const SyntaxNode* nested = FindLambdaHeaderChild(*child, treeKind)) {
+            return nested;
+        }
+    }
+    return nullptr;
+}
+
+bool HasSimpleLambdaHeader(const SyntaxNode* lambda) {
+    if (
+        lambda == nullptr ||
+        lambda->kind != SyntaxNodeKind::Tree ||
+        lambda->treeKind != SyntaxTreeKind::LambdaExpression
+    ) {
+        return false;
+    }
+    const SyntaxNode* captures = FindDirectChild(*lambda, SyntaxTreeKind::LambdaCaptureSpecifier);
+    const SyntaxNode* parameters = FindLambdaHeaderChild(*lambda, SyntaxTreeKind::ParameterList);
+    const size_t captureCount = captures == nullptr ? 0 : CountDirectDelimitedListItems(*captures);
+    const size_t parameterCount = parameters == nullptr ? 0 : CountDirectDelimitedListItems(*parameters);
+    return captureCount <= 1 && parameterCount <= 1;
+}
+
+bool IsSingleStatementLambdaBody(const SyntaxNode& node, SyntaxTreeKind parentKind, const SyntaxNode* parentNode) {
+    if (
+        node.kind != SyntaxNodeKind::Tree ||
+        node.treeKind != SyntaxTreeKind::CompoundStatement ||
+        parentKind != SyntaxTreeKind::LambdaExpression ||
+        !HasSimpleLambdaHeader(parentNode)
+    ) {
+        return false;
+    }
+    size_t statementCount = 0;
+    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+        if (
+            !child ||
+            child->kind == SyntaxNodeKind::BlankLine ||
+            child->kind == SyntaxNodeKind::Comment ||
+            child->kind == SyntaxNodeKind::TrailingComment ||
+            child->kind == SyntaxNodeKind::KnownToken
+        ) {
+            continue;
+        }
+        ++statementCount;
+        if (statementCount > 1) {
+            return false;
+        }
+    }
+    return statementCount == 1;
+}
+
 void AppendTokens(
     const SyntaxNode& node,
     SyntaxTreeKind parentKind,
     SyntaxTreeKind grandParentKind,
     bool inTemplateDeclaration,
     bool inRequiresClause,
+    bool splitRequiresClause,
+    bool inSingleStatementLambdaBody,
     const SyntaxNode* macroDefinition,
     const SyntaxNode* macroValueElement,
     bool inMacroValue,
     bool breakBeforeMacroValue,
+    std::vector<const SyntaxNode*> syntaxPath,
     std::vector<PrintToken>& tokens
 ) {
-    const bool childInTemplateDeclaration = inTemplateDeclaration ||
-        node.treeKind == SyntaxTreeKind::TemplateDeclaration;
-    const bool childInRequiresClause = inRequiresClause ||
-        node.treeKind == SyntaxTreeKind::RequiresClause;
-    const SyntaxNode* childMacroDefinition = macroDefinition != nullptr ? macroDefinition :
-        (IsMacroDefinitionNode(node.treeKind) ? &node : nullptr);
+    syntaxPath.push_back(&node);
+    const SyntaxNode* parentNode = syntaxPath.size() >= 2 ? syntaxPath[syntaxPath.size() - 2] : nullptr;
+    const bool childInTemplateDeclaration =
+        inTemplateDeclaration || node.treeKind == SyntaxTreeKind::TemplateDeclaration;
+    const bool childInRequiresClause = inRequiresClause || node.treeKind == SyntaxTreeKind::RequiresClause;
+    const bool childSplitRequiresClause =
+        splitRequiresClause || (node.treeKind == SyntaxTreeKind::RequiresClause && ContainsLogicalOperator(node));
+    const bool childInSingleStatementLambdaBody =
+        inSingleStatementLambdaBody || IsSingleStatementLambdaBody(node, parentKind, parentNode);
+    const SyntaxNode* childMacroDefinition =
+        macroDefinition != nullptr ? macroDefinition : (IsMacroDefinitionNode(node.treeKind) ? &node : nullptr);
     const bool childInMacroValue = inMacroValue || node.treeKind == SyntaxTreeKind::MacroReplacementList;
     const bool childBreakBeforeMacroValue = breakBeforeMacroValue ||
         (node.treeKind == SyntaxTreeKind::MacroReplacementList && RequiresMacroValueBreak(node));
     switch (node.kind) {
-    case SyntaxNodeKind::BlankLine:
-        tokens.push_back({
-            .kind = PrintTokenKind::BlankLine,
-            .inMacroValue = childInMacroValue,
-            .breakBeforeMacroValue = childBreakBeforeMacroValue,
-            .node = &node,
-            .macroDefinition = childMacroDefinition,
-            .macroValueElement = macroValueElement,
-        });
-        return;
-    case SyntaxNodeKind::Comment:
-    case SyntaxNodeKind::TrailingComment:
-        tokens.push_back({
-            .kind = node.kind == SyntaxNodeKind::TrailingComment ? PrintTokenKind::TrailingComment :
-                                                                    PrintTokenKind::Comment,
-            .text = node.text,
-            .treeKind = node.treeKind,
-            .parentKind = parentKind,
-            .grandParentKind = grandParentKind,
-            .inTemplateDeclaration = childInTemplateDeclaration,
-            .inRequiresClause = childInRequiresClause,
-            .inMacroValue = childInMacroValue,
-            .breakBeforeMacroValue = childBreakBeforeMacroValue,
-            .node = &node,
-            .macroDefinition = childMacroDefinition,
-            .macroValueElement = macroValueElement,
-        });
-        return;
-    case SyntaxNodeKind::KnownToken:
-        tokens.push_back({
-            .kind = PrintTokenKind::Known,
-            .known = node.known,
-            .text = KnownTokenText(node.known),
-            .treeKind = node.treeKind,
-            .parentKind = parentKind,
-            .grandParentKind = grandParentKind,
-            .inTemplateDeclaration = childInTemplateDeclaration,
-            .inRequiresClause = childInRequiresClause,
-            .inMacroValue = childInMacroValue,
-            .breakBeforeMacroValue = childBreakBeforeMacroValue,
-            .node = &node,
-            .macroDefinition = childMacroDefinition,
-            .macroValueElement = macroValueElement,
-        });
-        return;
-    case SyntaxNodeKind::FreeToken:
-        tokens.push_back({
-            .kind = PrintTokenKind::Free,
-            .text = node.text,
-            .treeKind = node.treeKind,
-            .parentKind = parentKind,
-            .grandParentKind = grandParentKind,
-            .inTemplateDeclaration = childInTemplateDeclaration,
-            .inRequiresClause = childInRequiresClause,
-            .inMacroValue = childInMacroValue,
-            .breakBeforeMacroValue = childBreakBeforeMacroValue,
-            .node = &node,
-            .macroDefinition = childMacroDefinition,
-            .macroValueElement = macroValueElement,
-        });
-        return;
-    case SyntaxNodeKind::Tree:
-        if (node.treeKind == SyntaxTreeKind::MacroReplacementList) {
+        case SyntaxNodeKind::BlankLine:
+            tokens.push_back({
+                .kind = PrintTokenKind::BlankLine,
+                .inMacroValue = childInMacroValue,
+                .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                .node = &node,
+                .syntaxPath = syntaxPath,
+                .macroDefinition = childMacroDefinition,
+                .macroValueElement = macroValueElement
+            });
+            return;
+        case SyntaxNodeKind::Comment:
+        case SyntaxNodeKind::TrailingComment:
+            tokens.push_back({
+                .kind = node.kind == SyntaxNodeKind::TrailingComment ?
+                    PrintTokenKind::TrailingComment : PrintTokenKind::Comment,
+                .text = node.text,
+                .treeKind = node.treeKind,
+                .parentKind = parentKind,
+                .grandParentKind = grandParentKind,
+                .inTemplateDeclaration = childInTemplateDeclaration,
+                .inRequiresClause = childInRequiresClause,
+                .splitRequiresClause = childSplitRequiresClause,
+                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+                .inMacroValue = childInMacroValue,
+                .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                .node = &node,
+                .syntaxPath = syntaxPath,
+                .macroDefinition = childMacroDefinition,
+                .macroValueElement = macroValueElement
+            });
+            return;
+        case SyntaxNodeKind::KnownToken:
+            tokens.push_back({
+                .kind = PrintTokenKind::Known,
+                .known = node.known,
+                .text = KnownTokenText(node.known),
+                .treeKind = node.treeKind,
+                .parentKind = parentKind,
+                .grandParentKind = grandParentKind,
+                .inTemplateDeclaration = childInTemplateDeclaration,
+                .inRequiresClause = childInRequiresClause,
+                .splitRequiresClause = childSplitRequiresClause,
+                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+                .inMacroValue = childInMacroValue,
+                .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                .node = &node,
+                .syntaxPath = syntaxPath,
+                .macroDefinition = childMacroDefinition,
+                .macroValueElement = macroValueElement
+            });
+            return;
+        case SyntaxNodeKind::FreeToken:
+            tokens.push_back({
+                .kind = PrintTokenKind::Free,
+                .text = node.text,
+                .treeKind = node.treeKind,
+                .parentKind = parentKind,
+                .grandParentKind = grandParentKind,
+                .inTemplateDeclaration = childInTemplateDeclaration,
+                .inRequiresClause = childInRequiresClause,
+                .splitRequiresClause = childSplitRequiresClause,
+                .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+                .inMacroValue = childInMacroValue,
+                .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                .node = &node,
+                .syntaxPath = syntaxPath,
+                .macroDefinition = childMacroDefinition,
+                .macroValueElement = macroValueElement
+            });
+            return;
+        case SyntaxNodeKind::Tree:
+            if (node.treeKind == SyntaxTreeKind::MacroReplacementList) {
+                for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+                    AppendTokens(
+                        *child,
+                        node.treeKind,
+                        parentKind,
+                        childInTemplateDeclaration,
+                        childInRequiresClause,
+                        childSplitRequiresClause,
+                        childInSingleStatementLambdaBody,
+                        childMacroDefinition,
+                        child.get(),
+                        true,
+                        childBreakBeforeMacroValue,
+                        syntaxPath,
+                        tokens
+                    );
+                }
+                return;
+            }
+            if (node.treeKind == SyntaxTreeKind::IncludeRun) {
+                tokens.push_back({
+                    .kind = PrintTokenKind::IncludeRun,
+                    .treeKind = node.treeKind,
+                    .parentKind = parentKind,
+                    .grandParentKind = grandParentKind,
+                    .inTemplateDeclaration = childInTemplateDeclaration,
+                    .inRequiresClause = childInRequiresClause,
+                    .splitRequiresClause = childSplitRequiresClause,
+                    .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+                    .inMacroValue = childInMacroValue,
+                    .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                    .node = &node,
+                    .syntaxPath = syntaxPath,
+                    .macroDefinition = childMacroDefinition,
+                    .macroValueElement = macroValueElement
+                });
+                return;
+            }
+            if (IsPreprocessorNode(node.treeKind)) {
+                tokens.push_back({
+                    .kind = PrintTokenKind::Preprocessor,
+                    .text = node.text,
+                    .treeKind = node.treeKind,
+                    .parentKind = parentKind,
+                    .grandParentKind = grandParentKind,
+                    .inTemplateDeclaration = childInTemplateDeclaration,
+                    .inRequiresClause = childInRequiresClause,
+                    .splitRequiresClause = childSplitRequiresClause,
+                    .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+                    .inMacroValue = childInMacroValue,
+                    .breakBeforeMacroValue = childBreakBeforeMacroValue,
+                    .node = &node,
+                    .syntaxPath = syntaxPath,
+                    .macroDefinition = childMacroDefinition,
+                    .macroValueElement = macroValueElement
+                });
+                return;
+            }
             for (const std::unique_ptr<SyntaxNode>& child : node.children) {
                 AppendTokens(
                     *child,
@@ -248,63 +389,17 @@ void AppendTokens(
                     parentKind,
                     childInTemplateDeclaration,
                     childInRequiresClause,
+                    childSplitRequiresClause,
+                    childInSingleStatementLambdaBody,
                     childMacroDefinition,
-                    child.get(),
-                    true,
+                    macroValueElement,
+                    childInMacroValue,
                     childBreakBeforeMacroValue,
+                    syntaxPath,
                     tokens
                 );
             }
             return;
-        }
-        if (node.treeKind == SyntaxTreeKind::IncludeRun) {
-            tokens.push_back({
-                .kind = PrintTokenKind::IncludeRun,
-                .treeKind = node.treeKind,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement,
-            });
-            return;
-        }
-        if (IsPreprocessorNode(node.treeKind)) {
-            tokens.push_back({
-                .kind = PrintTokenKind::Preprocessor,
-                .text = node.text,
-                .treeKind = node.treeKind,
-                .parentKind = parentKind,
-                .grandParentKind = grandParentKind,
-                .inTemplateDeclaration = childInTemplateDeclaration,
-                .inRequiresClause = childInRequiresClause,
-                .inMacroValue = childInMacroValue,
-                .breakBeforeMacroValue = childBreakBeforeMacroValue,
-                .node = &node,
-                .macroDefinition = childMacroDefinition,
-                .macroValueElement = macroValueElement,
-            });
-            return;
-        }
-        for (const std::unique_ptr<SyntaxNode>& child : node.children) {
-            AppendTokens(
-                *child,
-                node.treeKind,
-                parentKind,
-                childInTemplateDeclaration,
-                childInRequiresClause,
-                childMacroDefinition,
-                macroValueElement,
-                childInMacroValue,
-                childBreakBeforeMacroValue,
-                tokens
-            );
-        }
-        return;
     }
 }
 
@@ -357,33 +452,33 @@ std::string CollapseSourceWhitespace(std::string_view text) {
     return result;
 }
 
-bool IsAccessKeyword(const PrintToken& token) {
-    return token.kind == PrintTokenKind::Known && KnownTokenHasClass(token.known, TokenClass::AccessKeyword);
-}
-
-bool IsCaseLabelKeyword(const PrintToken& token) {
-    return token.kind == PrintTokenKind::Known &&
-        token.parentKind == SyntaxTreeKind::CaseStatement &&
-        (token.known == KnownToken::KeywordCase || token.known == KnownToken::KeywordDefault);
-}
-
-bool IsParenthesizedDeclarator(SyntaxTreeKind kind) {
-    return kind == SyntaxTreeKind::ParenthesizedDeclarator ||
-        kind == SyntaxTreeKind::AbstractParenthesizedDeclarator;
-}
-
-bool IsCompilerCallModifierStart(const PrintToken* token) {
-    return token != nullptr &&
-        token->kind == PrintTokenKind::Known &&
-        (token->known == KnownToken::KeywordCdecl || token->known == KnownToken::KeywordDeclspec);
+void AnnotateMacroValueWidths(std::vector<PrintToken>& tokens) {
+    for (size_t index = 0; index < tokens.size(); ++index) {
+        if (!tokens[index].inMacroValue || tokens[index].macroValueRemainingWidth != 0) {
+            continue;
+        }
+        const SyntaxNode* macroDefinition = tokens[index].macroDefinition;
+        size_t end = index;
+        int width = 0;
+        const PrintToken* previous = index > 0 ? &tokens[index - 1] : nullptr;
+        while (end < tokens.size() && tokens[end].inMacroValue && tokens[end].macroDefinition == macroDefinition) {
+            width += (FormatTokenNeedsSpace(previous, tokens[end]) ? 1 : 0) + FormatTokenWidth(tokens[end]);
+            previous = &tokens[end];
+            ++end;
+        }
+        for (size_t cursor = index; cursor < end; ++cursor) {
+            tokens[cursor].macroValueRemainingWidth = width;
+        }
+        index = end == 0 ? 0 : end - 1;
+    }
 }
 
 class Printer {
 public:
-    Printer(const FormatterConfig& config, std::string_view sourcePath) :
-        config_(config),
-        sourcePath_(sourcePath),
-        indentWidth_(std::max(1, config.indentWidth)) {}
+    Printer(
+        const FormatterConfig& config,
+        std::string_view sourcePath
+    ) : config_(config), sourcePath_(sourcePath), indentWidth_(std::max(1, config.indentWidth)) {}
 
     std::string Print(const std::vector<PrintToken>& tokens) {
         for (size_t index = 0; index < tokens.size(); ++index) {
@@ -392,6 +487,7 @@ public:
             const PrintToken* rawNext = RawNextToken(tokens, index);
             PrintOne(tokens[index], previous, next, rawNext);
         }
+        FlushPendingTokens();
         FinishLine();
         if (!output_.empty() && output_.back() != '\n') {
             output_.push_back('\n');
@@ -404,18 +500,24 @@ private:
     std::string_view sourcePath_;
     int indentWidth_ = 4;
     std::string output_;
+    std::vector<PrintToken> pendingTokens_;
     int indentLevel_ = 0;
     bool atLineStart_ = true;
     bool lineHasText_ = false;
     bool macroContinuationLine_ = false;
     bool forceColumnZeroLine_ = false;
+    bool emittingMacroValue_ = false;
+    std::optional<int> pendingIndentLevel_;
     int compactRightBraceSkips_ = 0;
     int switchDepth_ = 0;
     int parenDepth_ = 0;
     int bracketDepth_ = 0;
     std::vector<BraceRole> braceStack_;
     std::vector<int> braceParenDepthStack_;
+    std::vector<int> braceIndentRestoreStack_;
+    std::vector<int> braceCloseIndentStack_;
     std::vector<int> activeCaseBodySwitchDepths_;
+    std::optional<int> pendingIndentRestoreAfterFlush_;
 
     static const PrintToken* PreviousToken(const std::vector<PrintToken>& tokens, size_t index) {
         while (index > 0) {
@@ -462,6 +564,12 @@ private:
         lineHasText_ = false;
         macroContinuationLine_ = macroContinuation;
         forceColumnZeroLine_ = false;
+        pendingIndentLevel_.reset();
+    }
+
+    void NewLineWithIndent(int indentLevel) {
+        NewLine(emittingMacroValue_);
+        pendingIndentLevel_ = std::max(0, indentLevel);
     }
 
     void BlankLine() {
@@ -473,6 +581,7 @@ private:
         lineHasText_ = false;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
+        pendingIndentLevel_.reset();
     }
 
     void WriteIndentIfNeeded() {
@@ -480,11 +589,12 @@ private:
             return;
         }
         const int macroOffset = macroContinuationLine_ ? 1 : 0;
-        const int indentLevel = forceColumnZeroLine_ ? 0 : indentLevel_ + macroOffset;
+        const int indentLevel = pendingIndentLevel_.value_or(forceColumnZeroLine_ ? 0 : indentLevel_ + macroOffset);
         output_.append(static_cast<size_t>(std::max(0, indentLevel) * indentWidth_), ' ');
         atLineStart_ = false;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
+        pendingIndentLevel_.reset();
     }
 
     void WriteWithIndentOffset(std::string_view text, int indentOffset) {
@@ -498,6 +608,7 @@ private:
         atLineStart_ = false;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
+        pendingIndentLevel_.reset();
         output_.append(text);
         lineHasText_ = lineHasText_ || !text.empty();
     }
@@ -521,6 +632,282 @@ private:
         }
     }
 
+    int CurrentColumn() const {
+        if (atLineStart_) {
+            const int macroOffset = macroContinuationLine_ ? 1 : 0;
+            const int indentLevel = pendingIndentLevel_.value_or(forceColumnZeroLine_ ? 0 : indentLevel_ + macroOffset);
+            return std::max(0, indentLevel) * indentWidth_;
+        }
+        const size_t lineStart = output_.find_last_of('\n');
+        if (lineStart == std::string::npos) {
+            return static_cast<int>(output_.size());
+        }
+        return static_cast<int>(output_.size() - lineStart - 1);
+    }
+
+    int CurrentLineIndentLevel() const {
+        const size_t lineStart = output_.find_last_of('\n');
+        size_t cursor = lineStart == std::string::npos ? 0 : lineStart + 1;
+        int spaces = 0;
+        while (cursor < output_.size() && output_[cursor] == ' ') {
+            ++spaces;
+            ++cursor;
+        }
+        return spaces / indentWidth_;
+    }
+
+    int PendingCompactWidth() const {
+        int width = 0;
+        bool hasText = lineHasText_;
+        const PrintToken* previous = nullptr;
+        for (const PrintToken& token : pendingTokens_) {
+            if (FormatTokenNeedsSpace(previous, token) && hasText) {
+                ++width;
+            }
+            width += FormatTokenWidth(token);
+            hasText = hasText || FormatTokenWidth(token) > 0;
+            previous = &token;
+        }
+        return width;
+    }
+
+    void BufferToken(const PrintToken& token) {
+        pendingTokens_.push_back(token);
+    }
+
+    FormatBreakChoice ChoiceFor(const FormatBreakSolution& solution, int nodeId) const {
+        const auto found = solution.choices.find(nodeId);
+        return found == solution.choices.end() ? FormatBreakChoice::Compact : found->second;
+    }
+
+    void WriteBreakToken(const FormatBreakToken& token) {
+        if (token.token.macroDefinition != nullptr && !token.token.inMacroValue && atLineStart_) {
+            forceColumnZeroLine_ = true;
+            pendingIndentLevel_.reset();
+        }
+        if (token.spaceBefore && !atLineStart_) {
+            Space();
+        }
+        Write(FormatTokenText(token.token));
+    }
+
+    void EmitBreakNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        switch (node.kind) {
+            case FormatBreakNodeKind::Token:
+                WriteBreakToken(node.token);
+                return;
+            case FormatBreakNodeKind::Sequence:
+                for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+                    EmitBreakNode(*child, solution, baseIndent);
+                }
+                return;
+            case FormatBreakNodeKind::Delimited:
+                EmitDelimitedNode(node, solution, baseIndent);
+                return;
+            case FormatBreakNodeKind::PrefixList:
+                EmitPrefixListNode(node, solution, baseIndent);
+                return;
+            case FormatBreakNodeKind::Chain:
+                EmitChainNode(node, solution, baseIndent);
+                return;
+            case FormatBreakNodeKind::AdjacentStrings:
+                EmitAdjacentStringsNode(node, solution, baseIndent);
+                return;
+        }
+    }
+
+    bool ShouldCombineSplitBracedItemBoundary(
+        const FormatBreakNode& node,
+        const FormatBreakSolution& solution,
+        size_t index
+    ) const {
+        return node.delimiterKind == FormatBreakDelimiterKind::Brace &&
+            index + 1 < node.items.size() &&
+            index < node.separators.size() &&
+            node.separators[index].token.kind == PrintTokenKind::Known &&
+            node.separators[index].token.known == KnownToken::Comma &&
+            node.items[index]->kind == FormatBreakNodeKind::Delimited &&
+            node.items[index]->delimiterKind == FormatBreakDelimiterKind::Brace &&
+            ChoiceFor(solution, node.items[index]->id) == FormatBreakChoice::Split &&
+            node.items[index + 1]->kind == FormatBreakNodeKind::Delimited &&
+            node.items[index + 1]->delimiterKind == FormatBreakDelimiterKind::Brace &&
+            ChoiceFor(solution, node.items[index + 1]->id) == FormatBreakChoice::Split;
+    }
+
+    void EmitDelimitedNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice != FormatBreakChoice::Split || node.items.empty()) {
+            EmitBreakNode(*node.children[0], solution, baseIndent);
+            for (size_t index = 0; index < node.items.size(); ++index) {
+                EmitBreakNode(*node.items[index], solution, baseIndent);
+                if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                    WriteBreakToken(node.separators[index]);
+                }
+            }
+            EmitBreakNode(*node.children[1], solution, baseIndent);
+            return;
+        }
+
+        EmitBreakNode(*node.children[0], solution, baseIndent);
+        NewLineWithIndent(baseIndent + 1);
+        for (size_t index = 0; index < node.items.size(); ++index) {
+            EmitBreakNode(*node.items[index], solution, baseIndent + 1);
+            if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                WriteBreakToken(node.separators[index]);
+            }
+            if (ShouldCombineSplitBracedItemBoundary(node, solution, index)) {
+                Space();
+            } else {
+                NewLineWithIndent(index + 1 < node.items.size() ? baseIndent + 1 : baseIndent);
+            }
+        }
+        EmitBreakNode(*node.children[1], solution, baseIndent);
+    }
+
+    void EmitPrefixListNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice != FormatBreakChoice::Split) {
+            EmitBreakNode(*node.children[0], solution, baseIndent);
+            for (size_t index = 0; index < node.items.size(); ++index) {
+                EmitBreakNode(*node.items[index], solution, baseIndent);
+                if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                    WriteBreakToken(node.separators[index]);
+                }
+            }
+            return;
+        }
+
+        EmitBreakNode(*node.children[0], solution, baseIndent);
+        NewLineWithIndent(baseIndent + 1);
+        for (size_t index = 0; index < node.items.size(); ++index) {
+            EmitBreakNode(*node.items[index], solution, baseIndent + 1);
+            if (index < node.separators.size() && node.separators[index].token.kind == PrintTokenKind::Known) {
+                WriteBreakToken(node.separators[index]);
+            }
+            if (index + 1 < node.items.size()) {
+                NewLineWithIndent(baseIndent + 1);
+            }
+        }
+    }
+
+    void EmitChainNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        if (choice == FormatBreakChoice::Compact) {
+            for (size_t index = 0; index < node.operands.size(); ++index) {
+                EmitBreakNode(*node.operands[index], solution, baseIndent);
+                if (index < node.operators.size()) {
+                    WriteBreakToken(node.operators[index]);
+                }
+            }
+            return;
+        }
+
+        if (node.chainKind == FormatBreakChainKind::StreamBeforeOperator) {
+            EmitBreakNode(*node.operands.front(), solution, baseIndent);
+            NewLineWithIndent(baseIndent + 1);
+            for (size_t index = 0; index < node.operators.size(); ++index) {
+                WriteBreakToken(node.operators[index]);
+                EmitBreakNode(*node.operands[index + 1], solution, baseIndent + 1);
+                if (
+                    choice == FormatBreakChoice::Split &&
+                    index + 1 < node.operators.size() &&
+                    !IsFormatBreakStreamConfigurationOperand(
+                        *node.operands[index + 1],
+                        config_.streamShiftConfigurationMethods
+                    )
+                ) {
+                    NewLineWithIndent(baseIndent + 1);
+                }
+            }
+            return;
+        }
+
+        if (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() > 2) {
+            for (size_t index = 0; index < node.operands.size(); ++index) {
+                EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : baseIndent + 1);
+                if (index < node.operators.size()) {
+                    WriteBreakToken(node.operators[index]);
+                    if (
+                        node.operators[index].token.kind == PrintTokenKind::Known &&
+                        node.operators[index].token.known == KnownToken::Colon
+                    ) {
+                        NewLineWithIndent(baseIndent + 1);
+                    }
+                }
+            }
+            return;
+        }
+
+        if (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() == 2) {
+            const int continuationIndent = node.flatSplitIndent ? baseIndent : baseIndent + 1;
+            const bool breakAfterQuestion =
+                choice == FormatBreakChoice::TernaryBreakAfterQuestion || choice == FormatBreakChoice::Split;
+            const bool breakAfterColon =
+                choice == FormatBreakChoice::TernaryBreakAfterColon || choice == FormatBreakChoice::Split;
+            for (size_t index = 0; index < node.operands.size(); ++index) {
+                EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : continuationIndent);
+                if (index < node.operators.size()) {
+                    WriteBreakToken(node.operators[index]);
+                    if ((index == 0 && breakAfterQuestion) || (index == 1 && breakAfterColon)) {
+                        NewLineWithIndent(continuationIndent);
+                    }
+                }
+            }
+            return;
+        }
+
+        const int continuationIndent = node.flatSplitIndent ? baseIndent : baseIndent + 1;
+        for (size_t index = 0; index < node.operands.size(); ++index) {
+            EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : continuationIndent);
+            if (index < node.operators.size()) {
+                WriteBreakToken(node.operators[index]);
+                NewLineWithIndent(continuationIndent);
+            }
+        }
+    }
+
+    void EmitAdjacentStringsNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
+        const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        for (size_t index = 0; index < node.operands.size(); ++index) {
+            if (choice == FormatBreakChoice::Split && index > 0) {
+                NewLineWithIndent(baseIndent + 1);
+            }
+            EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : baseIndent + 1);
+        }
+    }
+
+    void FlushPendingTokens() {
+        if (pendingTokens_.empty()) {
+            return;
+        }
+        FormatBreakModel model = BuildFormatBreakModel(pendingTokens_);
+        const bool previousEmittingMacroValue = emittingMacroValue_;
+        emittingMacroValue_ = std::any_of(
+            pendingTokens_.begin(),
+            pendingTokens_.end(),
+            [](const PrintToken& token) { return token.inMacroValue; }
+        );
+        if (emittingMacroValue_ && pendingTokens_.front().inMacroValue && atLineStart_) {
+            pendingIndentLevel_ = std::max(pendingIndentLevel_.value_or(0), indentLevel_ + 1);
+        }
+        const int baseIndentLevel = pendingIndentLevel_.value_or(indentLevel_);
+        FormatBreakSolution solution =
+            SolveFormatBreaks(config_, model, CurrentColumn(), baseIndentLevel, indentWidth_);
+        if (model.root) {
+            EmitBreakNode(*model.root, solution, baseIndentLevel);
+        }
+        emittingMacroValue_ = previousEmittingMacroValue;
+        pendingTokens_.clear();
+        if (pendingIndentRestoreAfterFlush_) {
+            indentLevel_ = *pendingIndentRestoreAfterFlush_;
+            pendingIndentRestoreAfterFlush_.reset();
+        }
+    }
+
+    bool HasBufferedLineText() const {
+        return lineHasText_ || !pendingTokens_.empty();
+    }
+
     bool InEnumBody() const {
         return !braceStack_.empty() && braceStack_.back() == BraceRole::Enum;
     }
@@ -532,29 +919,19 @@ private:
         return parenDepth_ <= braceParenDepthStack_.back();
     }
 
-    bool SameMacroDefinition(const PrintToken* left, const PrintToken* right) const {
-        return left != nullptr &&
-            right != nullptr &&
-            left->macroDefinition != nullptr &&
-            left->macroDefinition == right->macroDefinition;
-    }
-
     bool ShouldContinueMacroLine(const PrintToken& token, const PrintToken* next) const {
-        return token.inMacroValue &&
-            next != nullptr &&
-            next->macroDefinition == token.macroDefinition;
+        return token.inMacroValue && next != nullptr && next->macroDefinition == token.macroDefinition;
     }
 
-    bool StartsMacroValue(const PrintToken* previous, const PrintToken& current) const {
+    bool StartsMacroValueRun(const PrintToken* previous, const PrintToken& current) const {
         return current.inMacroValue &&
-            current.breakBeforeMacroValue &&
-            (previous == nullptr || !SameMacroDefinition(previous, &current) || !previous->inMacroValue);
+            (previous == nullptr || !FormatTokensShareMacroDefinition(previous, &current) || !previous->inMacroValue);
     }
 
     bool StartsMacroValueElement(const PrintToken* previous, const PrintToken& current) const {
         return current.inMacroValue &&
             previous != nullptr &&
-            SameMacroDefinition(previous, &current) &&
+            FormatTokensShareMacroDefinition(previous, &current) &&
             previous->inMacroValue &&
             previous->macroValueElement != nullptr &&
             current.macroValueElement != nullptr &&
@@ -564,200 +941,49 @@ private:
     void PrepareMacroBoundary(const PrintToken* previous, const PrintToken& current) {
         if (current.macroDefinition != nullptr && !current.inMacroValue && atLineStart_) {
             forceColumnZeroLine_ = true;
+            pendingIndentLevel_.reset();
         }
-        if (previous != nullptr &&
+        if (
+            previous != nullptr &&
             previous->macroDefinition != nullptr &&
-            previous->macroDefinition != current.macroDefinition) {
-            if (lineHasText_) {
+            previous->macroDefinition != current.macroDefinition
+        ) {
+            if (HasBufferedLineText()) {
+                FlushPendingTokens();
                 NewLine(false);
+            }
+            if (current.macroDefinition != nullptr && !current.inMacroValue) {
+                forceColumnZeroLine_ = true;
+                pendingIndentLevel_.reset();
             }
             if (!IsPreprocessorLikeToken(current)) {
                 BlankLine();
             }
         }
-        if (current.macroDefinition != nullptr &&
+        if (
+            current.macroDefinition != nullptr &&
             (previous == nullptr || previous->macroDefinition != current.macroDefinition) &&
-            lineHasText_) {
+            HasBufferedLineText()
+        ) {
+            FlushPendingTokens();
             NewLine(false);
             if (!current.inMacroValue) {
                 forceColumnZeroLine_ = true;
+                pendingIndentLevel_.reset();
             }
         }
-        if ((StartsMacroValue(previous, current) || StartsMacroValueElement(previous, current)) && lineHasText_) {
+        const bool startsMacroValue = StartsMacroValueRun(previous, current);
+        const bool macroValueWouldOverflow = startsMacroValue &&
+            CurrentColumn() + PendingCompactWidth() + 1 + current.macroValueRemainingWidth > config_.columnLimit;
+        if (
+            (
+                (startsMacroValue && (current.breakBeforeMacroValue || macroValueWouldOverflow)) ||
+                StartsMacroValueElement(previous, current)
+            ) && HasBufferedLineText()
+        ) {
+            FlushPendingTokens();
             NewLine(true);
         }
-    }
-
-    bool ShouldSpaceBetween(const PrintToken* previous, const PrintToken& current) const {
-        if (previous == nullptr ||
-            (IsPreprocessorLikeToken(*previous) && previous->macroDefinition == nullptr) ||
-            (IsPreprocessorLikeToken(current) && current.macroDefinition == nullptr)) {
-            return false;
-        }
-        if (current.inMacroValue && !previous->inMacroValue && SameMacroDefinition(previous, &current)) {
-            return true;
-        }
-        if (previous->kind != PrintTokenKind::Known && current.kind != PrintTokenKind::Known) {
-            return IsWordLike(*previous) && IsWordLike(current);
-        }
-        const KnownToken prev = previous->kind == PrintTokenKind::Known ? previous->known : KnownToken::Unknown;
-        const KnownToken cur = current.kind == PrintTokenKind::Known ? current.known : KnownToken::Unknown;
-
-        if (IsStringLike(*previous) && IsStringLike(current)) {
-            return true;
-        }
-        if ((cur == KnownToken::Arrow && current.parentKind == SyntaxTreeKind::TrailingReturnType) ||
-            (prev == KnownToken::Arrow && previous->parentKind == SyntaxTreeKind::TrailingReturnType)) {
-            return true;
-        }
-        if (cur == KnownToken::Dot && current.parentKind == SyntaxTreeKind::FieldDesignator &&
-            prev == KnownToken::Comma) {
-            return true;
-        }
-        if (cur == KnownToken::RightParen || cur == KnownToken::RightBracket || cur == KnownToken::Comma ||
-            cur == KnownToken::Semicolon || cur == KnownToken::ColonColon || cur == KnownToken::Dot ||
-            cur == KnownToken::Arrow || cur == KnownToken::DotStar || cur == KnownToken::ArrowStar) {
-            if (cur == KnownToken::ColonColon &&
-                (KnownTokenHasClass(prev, TokenClass::Keyword) ||
-                 KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
-                 prev == KnownToken::KeywordReturn)) {
-                return true;
-            }
-            return false;
-        }
-        if (prev == KnownToken::LeftParen || prev == KnownToken::LeftBracket || prev == KnownToken::ColonColon ||
-            prev == KnownToken::Dot || prev == KnownToken::Arrow || prev == KnownToken::DotStar ||
-            prev == KnownToken::ArrowStar || prev == KnownToken::Tilde) {
-            return false;
-        }
-        if (prev == KnownToken::KeywordOperator && cur != KnownToken::LeftParen) {
-            return false;
-        }
-        if (prev == KnownToken::KeywordVirtual && cur == KnownToken::Tilde) {
-            return true;
-        }
-        if (cur == KnownToken::LeftParen) {
-            if (IsParenthesizedDeclarator(current.parentKind)) {
-                return true;
-            }
-            if (previous->parentKind == SyntaxTreeKind::OperatorName ||
-                previous->parentKind == SyntaxTreeKind::OperatorCast) {
-                return false;
-            }
-            if (previous->kind == PrintTokenKind::Known &&
-                (KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
-                 (KnownTokenHasClass(prev, TokenClass::BinaryOperator) && IsBinaryContext(*previous)) ||
-                 prev == KnownToken::Comma ||
-                 prev == KnownToken::KeywordReturn ||
-                 (prev == KnownToken::Colon && previous->parentKind == SyntaxTreeKind::ConditionalExpression) ||
-                 prev == KnownToken::Question)) {
-                return true;
-            }
-            return previous->kind == PrintTokenKind::Known &&
-                KnownTokenHasClass(prev, TokenClass::ControlKeyword);
-        }
-        if (cur == KnownToken::LeftBracket) {
-            if (current.parentKind == SyntaxTreeKind::StructuredBindingDeclarator) {
-                return true;
-            }
-            if (current.parentKind == SyntaxTreeKind::LambdaCaptureSpecifier) {
-                return previous->kind == PrintTokenKind::Known &&
-                    (KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
-                     prev == KnownToken::Comma ||
-                     prev == KnownToken::KeywordReturn ||
-                     prev == KnownToken::Question ||
-                     (prev == KnownToken::Colon && previous->parentKind == SyntaxTreeKind::ConditionalExpression));
-            }
-            return false;
-        }
-        if (cur == KnownToken::LeftBrace) {
-            if (current.parentKind == SyntaxTreeKind::InitializerList) {
-                return previous->kind == PrintTokenKind::Known &&
-                    (KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
-                     prev == KnownToken::Comma ||
-                     prev == KnownToken::KeywordReturn ||
-                     prev == KnownToken::Question ||
-                     prev == KnownToken::Colon);
-            }
-            if (current.parentKind == SyntaxTreeKind::CompoundStatement ||
-                current.parentKind == SyntaxTreeKind::FieldDeclarationList ||
-                current.parentKind == SyntaxTreeKind::DeclarationList ||
-                current.parentKind == SyntaxTreeKind::EnumeratorList) {
-                return true;
-            }
-            return prev == KnownToken::KeywordReturn;
-        }
-        if (prev == KnownToken::Comma || prev == KnownToken::Semicolon || prev == KnownToken::Question) {
-            return true;
-        }
-        if (prev == KnownToken::Ellipsis && IsWordLike(current)) {
-            return true;
-        }
-        if (cur == KnownToken::Question) {
-            return true;
-        }
-        if (prev == KnownToken::Colon) {
-            return current.parentKind != SyntaxTreeKind::CaseStatement &&
-                !KnownTokenHasClass(previous->known, TokenClass::AccessKeyword);
-        }
-        if (cur == KnownToken::Less && prev == KnownToken::KeywordTemplate) {
-            return true;
-        }
-        if (cur == KnownToken::Colon) {
-            if (previous->known == KnownToken::KeywordDefault ||
-                KnownTokenHasClass(previous->known, TokenClass::AccessKeyword)) {
-                return false;
-            }
-            return current.parentKind != SyntaxTreeKind::CaseStatement;
-        }
-        if (IsDeclaratorBindingToken(current)) {
-            return false;
-        }
-        if (IsDeclaratorBindingToken(*previous)) {
-            if (cur == KnownToken::Greater) {
-                return false;
-            }
-            if (IsParenthesizedDeclarator(previous->grandParentKind)) {
-                return false;
-            }
-            return !IsDeclaratorBindingToken(current);
-        }
-        if (prev == KnownToken::KeywordReturn && current.kind == PrintTokenKind::Known &&
-            KnownTokenHasClass(cur, TokenClass::UnaryOperator)) {
-            return true;
-        }
-        if (current.kind == PrintTokenKind::Known &&
-            (KnownTokenHasClass(cur, TokenClass::AssignmentOperator) ||
-             (KnownTokenHasClass(cur, TokenClass::BinaryOperator) && IsBinaryContext(current)))) {
-            return true;
-        }
-        if (previous->kind == PrintTokenKind::Known &&
-            (KnownTokenHasClass(prev, TokenClass::AssignmentOperator) ||
-             (KnownTokenHasClass(prev, TokenClass::BinaryOperator) && IsBinaryContext(*previous)))) {
-            return true;
-        }
-        if (current.kind == PrintTokenKind::Known && KnownTokenHasClass(cur, TokenClass::UnaryOperator) &&
-            IsUnaryContext(current)) {
-            return false;
-        }
-        if (previous->kind == PrintTokenKind::Known && KnownTokenHasClass(prev, TokenClass::UnaryOperator) &&
-            IsUnaryContext(*previous)) {
-            return false;
-        }
-        if (KnownTokenHasClass(prev, TokenClass::MemberOperator) ||
-            KnownTokenHasClass(cur, TokenClass::MemberOperator)) {
-            return false;
-        }
-        if (IsWordLike(*previous) && IsWordLike(current)) {
-            return true;
-        }
-        if (previous->kind == PrintTokenKind::Known &&
-            (prev == KnownToken::RightParen || prev == KnownToken::RightBracket || prev == KnownToken::RightBrace ||
-             prev == KnownToken::Greater) &&
-            IsWordLike(current)) {
-            return true;
-        }
-        return false;
     }
 
     void PrintOne(
@@ -768,18 +994,22 @@ private:
     ) {
         PrepareMacroBoundary(previous, token);
         if (token.kind == PrintTokenKind::BlankLine) {
+            FlushPendingTokens();
             BlankLine();
             return;
         }
         if (IsCommentToken(token.kind)) {
+            FlushPendingTokens();
             PrintComment(token);
             return;
         }
         if (token.kind == PrintTokenKind::Preprocessor) {
+            FlushPendingTokens();
             PrintPreprocessor(token, next);
             return;
         }
         if (token.kind == PrintTokenKind::IncludeRun) {
+            FlushPendingTokens();
             PrintIncludeRun(token, next);
             return;
         }
@@ -787,10 +1017,7 @@ private:
             PrintKnown(token, previous, next, rawNext);
             return;
         }
-        if (ShouldSpaceBetween(previous, token)) {
-            Space();
-        }
-        Write(token.text);
+        BufferToken(token);
     }
 
     void PrintComment(const PrintToken& token) {
@@ -835,8 +1062,11 @@ private:
         lineHasText_ = true;
         atLineStart_ = false;
         NewLine();
-        if (tools::StartsWith(line, "#pragma once") || isUndef ||
-            (!isInclude && next != nullptr && !IsPreprocessorLikeToken(*next))) {
+        if (
+            tools::StartsWith(line, "#pragma once") ||
+            isUndef ||
+            (!isInclude && next != nullptr && !IsPreprocessorLikeToken(*next))
+        ) {
             BlankLine();
         }
     }
@@ -848,135 +1078,186 @@ private:
         const PrintToken* rawNext
     ) {
         switch (token.known) {
-        case KnownToken::LeftParen:
-            if (ShouldSpaceBetween(previous, token) && !IsCompilerCallModifierStart(rawNext)) {
-                Space();
-            }
-            Write(KnownTokenText(token.known));
-            ++parenDepth_;
-            return;
-        case KnownToken::RightParen:
-            Write(KnownTokenText(token.known));
-            if (parenDepth_ > 0) {
-                --parenDepth_;
-            }
-            if (token.inRequiresClause && token.inTemplateDeclaration &&
-                !(next != nullptr && next->inRequiresClause)) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
-        case KnownToken::LeftBracket:
-            if (ShouldSpaceBetween(previous, token)) {
-                Space();
-            }
-            Write(KnownTokenText(token.known));
-            ++bracketDepth_;
-            return;
-        case KnownToken::RightBracket:
-            Write(KnownTokenText(token.known));
-            if (bracketDepth_ > 0) {
-                --bracketDepth_;
-            }
-            return;
-        case KnownToken::Greater:
-            if (ShouldSpaceBetween(previous, token)) {
-                Space();
-            }
-            Write(KnownTokenText(token.known));
-            if (token.parentKind == SyntaxTreeKind::TemplateParameterList &&
-                token.inTemplateDeclaration &&
-                !(next != nullptr && next->kind == PrintTokenKind::Known &&
-                  next->known == KnownToken::KeywordRequires)) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
-        case KnownToken::LeftBrace:
-            PrintLeftBrace(token, previous, rawNext);
-            return;
-        case KnownToken::RightBrace:
-            PrintRightBrace(token, next);
-            return;
-        case KnownToken::Semicolon:
-            Write(";");
-            if (ShouldBreakAfterSemicolon() &&
-                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
-        case KnownToken::Comma:
-            Write(",");
-            if (InEnumBody() && parenDepth_ == 0 && bracketDepth_ == 0 &&
-                !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
-        case KnownToken::Colon:
-            if (ShouldSpaceBetween(previous, token)) {
-                Space();
-            }
-            Write(":");
-            if (token.parentKind == SyntaxTreeKind::CaseStatement) {
-                ++indentLevel_;
-                activeCaseBodySwitchDepths_.push_back(switchDepth_);
-                if (rawNext != nullptr && rawNext->kind == PrintTokenKind::Known &&
-                    rawNext->known == KnownToken::LeftBrace) {
+            case KnownToken::LeftParen:
+                BufferToken(token);
+                ++parenDepth_;
+                return;
+            case KnownToken::RightParen:
+                BufferToken(token);
+                if (parenDepth_ > 0) {
+                    --parenDepth_;
+                }
+                if (
+                    token.inRequiresClause &&
+                    token.inTemplateDeclaration &&
+                    !(next != nullptr && next->inRequiresClause)
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
+                return;
+            case KnownToken::LeftBracket:
+                BufferToken(token);
+                ++bracketDepth_;
+                return;
+            case KnownToken::RightBracket:
+                BufferToken(token);
+                if (bracketDepth_ > 0) {
+                    --bracketDepth_;
+                }
+                return;
+            case KnownToken::Greater:
+                BufferToken(token);
+                if (
+                    token.parentKind == SyntaxTreeKind::TemplateParameterList &&
+                    token.inTemplateDeclaration &&
+                    !(
+                        next != nullptr &&
+                        next->kind == PrintTokenKind::Known &&
+                        next->known == KnownToken::KeywordRequires
+                    )
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
+                return;
+            case KnownToken::LeftBrace:
+                PrintLeftBrace(token, previous, rawNext);
+                return;
+            case KnownToken::RightBrace:
+                PrintRightBrace(token, next, rawNext);
+                return;
+            case KnownToken::Semicolon:
+                BufferToken(token);
+                if (
+                    !token.inSingleStatementLambdaBody &&
+                    ShouldBreakAfterSemicolon() &&
+                    !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
+                return;
+            case KnownToken::Comma:
+                BufferToken(token);
+                if (
+                    InEnumBody() &&
+                    parenDepth_ == 0 &&
+                    bracketDepth_ == 0 &&
+                    !(rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment)
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
+                return;
+            case KnownToken::Colon:
+                BufferToken(token);
+                if (token.parentKind == SyntaxTreeKind::CaseStatement) {
+                    FlushPendingTokens();
+                    ++indentLevel_;
+                    activeCaseBodySwitchDepths_.push_back(switchDepth_);
+                    if (
+                        rawNext != nullptr &&
+                        rawNext->kind == PrintTokenKind::Known &&
+                        rawNext->known == KnownToken::LeftBrace
+                    ) {
+                        return;
+                    }
+                    NewLine(ShouldContinueMacroLine(token, next));
                     return;
                 }
-                NewLine(ShouldContinueMacroLine(token, next));
+                if (
+                    previous != nullptr &&
+                    previous->kind == PrintTokenKind::Known &&
+                    (
+                        previous->known == KnownToken::KeywordDefault ||
+                        KnownTokenHasClass(previous->known, TokenClass::AccessKeyword)
+                    )
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
                 return;
-            }
-            if (previous != nullptr && previous->kind == PrintTokenKind::Known &&
-                (previous->known == KnownToken::KeywordDefault ||
-                 KnownTokenHasClass(previous->known, TokenClass::AccessKeyword))) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
-        default:
-            if (ShouldSpaceBetween(previous, token)) {
-                Space();
-            }
-            if (IsCaseLabelKeyword(token) && atLineStart_) {
-                CloseCaseBodyIndentIfNeeded();
-            }
-            if (IsAccessKeyword(token)) {
-                WriteWithIndentOffset(KnownTokenText(token.known), -1);
+            default:
+                if (IsCaseLabelKeyword(token) && atLineStart_) {
+                    CloseCaseBodyIndentIfNeeded();
+                }
+                if (IsAccessKeyword(token)) {
+                    FlushPendingTokens();
+                    WriteWithIndentOffset(KnownTokenText(token.known), -1);
+                    return;
+                }
+                if (
+                    token.known == KnownToken::KeywordRequires &&
+                    token.inTemplateDeclaration &&
+                    token.splitRequiresClause &&
+                    HasBufferedLineText()
+                ) {
+                    FlushPendingTokens();
+                    NewLineWithIndent(indentLevel_ + 1);
+                }
+                BufferToken(token);
+                if (
+                    token.inRequiresClause &&
+                    token.inTemplateDeclaration &&
+                    !(next != nullptr && next->inRequiresClause)
+                ) {
+                    FlushPendingTokens();
+                    NewLine(ShouldContinueMacroLine(token, next));
+                }
                 return;
-            }
-            Write(KnownTokenText(token.known));
-            if (token.inRequiresClause && token.inTemplateDeclaration &&
-                !(next != nullptr && next->inRequiresClause)) {
-                NewLine(ShouldContinueMacroLine(token, next));
-            }
-            return;
         }
     }
 
     void PrintLeftBrace(const PrintToken& token, const PrintToken* previous, const PrintToken* rawNext) {
-        const bool isEmptyBracePair = rawNext != nullptr &&
-            rawNext->kind == PrintTokenKind::Known &&
-            rawNext->known == KnownToken::RightBrace;
+        const bool isEmptyBracePair =
+            rawNext != nullptr && rawNext->kind == PrintTokenKind::Known && rawNext->known == KnownToken::RightBrace;
         const bool isCaseBlock = previous != nullptr &&
             previous->kind == PrintTokenKind::Known &&
             previous->known == KnownToken::Colon &&
             previous->parentKind == SyntaxTreeKind::CaseStatement;
         const BraceRole role = isCaseBlock ? BraceRole::CaseBlock : RoleForBrace(token);
-        if (ShouldSpaceBetween(previous, token)) {
+        const bool followsConstructorInitializer = previous != nullptr && (
+            previous->parentKind == SyntaxTreeKind::FieldInitializerList ||
+            previous->grandParentKind == SyntaxTreeKind::FieldInitializer
+        );
+        if (!isEmptyBracePair && role == BraceRole::Block && followsConstructorInitializer && HasBufferedLineText()) {
+            FlushPendingTokens();
+            NewLine(ShouldContinueMacroLine(token, rawNext));
+        }
+        if (role == BraceRole::CaseBlock && lineHasText_) {
             Space();
         }
         if (isEmptyBracePair) {
-            Write("{}");
+            PrintToken compact = token;
+            compact.kind = PrintTokenKind::Free;
+            compact.known = KnownToken::Unknown;
+            compact.text = "{}";
+            BufferToken(compact);
             ++compactRightBraceSkips_;
             return;
         }
-        Write("{");
+        BufferToken(token);
+        if (role == BraceRole::Compact) {
+            return;
+        }
+        FlushPendingTokens();
+        const int openLineIndent =
+            token.inMacroValue ? indentLevel_ : (lineHasText_ ? CurrentLineIndentLevel() : indentLevel_);
         braceStack_.push_back(role);
         braceParenDepthStack_.push_back(parenDepth_);
-        if (token.parentKind == SyntaxTreeKind::CompoundStatement &&
-            token.grandParentKind == SyntaxTreeKind::SwitchStatement) {
+        braceIndentRestoreStack_.push_back(indentLevel_);
+        braceCloseIndentStack_.push_back(
+            role == BraceRole::Block || role == BraceRole::Enum ? openLineIndent : indentLevel_
+        );
+        if (
+            token.parentKind == SyntaxTreeKind::CompoundStatement &&
+            token.grandParentKind == SyntaxTreeKind::SwitchStatement
+        ) {
             ++switchDepth_;
         }
         if (role == BraceRole::Block || role == BraceRole::Enum) {
-            ++indentLevel_;
+            indentLevel_ = std::max(indentLevel_, openLineIndent) + 1;
             NewLine(ShouldContinueMacroLine(token, rawNext));
         } else if (role == BraceRole::Namespace || role == BraceRole::CaseBlock) {
             NewLine(ShouldContinueMacroLine(token, rawNext));
@@ -986,22 +1267,42 @@ private:
         }
     }
 
-    void PrintRightBrace(const PrintToken& token, const PrintToken* next) {
+    void PrintRightBrace(const PrintToken& token, const PrintToken* next, const PrintToken* rawNext) {
         if (compactRightBraceSkips_ > 0) {
             --compactRightBraceSkips_;
             return;
         }
-        const BraceRole role = braceStack_.empty() ? RoleForBrace(token) : braceStack_.back();
+        const BraceRole tokenRole = RoleForBrace(token);
+        if (tokenRole == BraceRole::Compact) {
+            BufferToken(token);
+            return;
+        }
+        const BraceRole role = braceStack_.empty() ? tokenRole : braceStack_.back();
+        FlushPendingTokens();
         if (!braceStack_.empty()) {
             braceStack_.pop_back();
             braceParenDepthStack_.pop_back();
+        }
+        const std::optional<int> restoreIndent =
+            !braceIndentRestoreStack_.empty() ? std::optional<int>(braceIndentRestoreStack_.back()) : std::nullopt;
+        if (!braceIndentRestoreStack_.empty()) {
+            braceIndentRestoreStack_.pop_back();
+        }
+        const std::optional<int> closeIndent =
+            !braceCloseIndentStack_.empty() ? std::optional<int>(braceCloseIndentStack_.back()) : std::nullopt;
+        if (!braceCloseIndentStack_.empty()) {
+            braceCloseIndentStack_.pop_back();
         }
         if (role == BraceRole::Namespace) {
             if (lineHasText_) {
                 NewLine(token.inMacroValue);
             }
             BlankLine();
-            Write("}");
+            BufferToken(token);
+            FlushPendingTokens();
+            if (rawNext != nullptr && rawNext->kind == PrintTokenKind::TrailingComment) {
+                return;
+            }
             NewLine(ShouldContinueMacroLine(token, next));
             return;
         }
@@ -1022,25 +1323,48 @@ private:
             if (isSwitchBody) {
                 CloseCaseBodyIndentIfNeeded();
             }
-            indentLevel_ = std::max(0, indentLevel_ - 1);
-            Write("}");
+            indentLevel_ = closeIndent.value_or(restoreIndent.value_or(std::max(0, indentLevel_ - 1)));
+            if (restoreIndent && *restoreIndent != indentLevel_) {
+                pendingIndentRestoreAfterFlush_ = *restoreIndent;
+            }
+            BufferToken(token);
             if (isSwitchBody) {
                 switchDepth_ = std::max(0, switchDepth_ - 1);
             }
-            if (next != nullptr && next->kind == PrintTokenKind::Known &&
-                (next->known == KnownToken::Semicolon || next->known == KnownToken::Comma ||
-                 (token.parentKind == SyntaxTreeKind::CompoundStatement &&
-                  token.grandParentKind == SyntaxTreeKind::LambdaExpression &&
-                  next->known == KnownToken::RightParen) ||
-                 (KnownTokenHasClass(next->known, TokenClass::AttachAfterBlockKeyword) &&
-                  next->known != KnownToken::KeywordWhile) ||
-                 (next->known == KnownToken::KeywordWhile && next->parentKind == SyntaxTreeKind::DoStatement))) {
+            if (
+                next != nullptr &&
+                next->kind == PrintTokenKind::Known &&
+                (
+                    next->known == KnownToken::Semicolon ||
+                    next->known == KnownToken::Comma ||
+                    (
+                        token.parentKind == SyntaxTreeKind::CompoundStatement &&
+                        token.grandParentKind == SyntaxTreeKind::LambdaExpression &&
+                        next->known == KnownToken::RightParen
+                    ) ||
+                    (
+                        KnownTokenHasClass(next->known, TokenClass::AttachAfterBlockKeyword) &&
+                        next->known != KnownToken::KeywordWhile
+                    ) ||
+                    (next->known == KnownToken::KeywordWhile && next->parentKind == SyntaxTreeKind::DoStatement)
+                )
+            ) {
                 return;
             }
+            if (
+                next != nullptr &&
+                token.parentKind == SyntaxTreeKind::FieldDeclarationList &&
+                (
+                    token.grandParentKind == SyntaxTreeKind::StructSpecifier ||
+                    token.grandParentKind == SyntaxTreeKind::ClassSpecifier
+                )
+            ) {
+                return;
+            }
+            FlushPendingTokens();
             NewLine(ShouldContinueMacroLine(token, next));
             return;
         }
-        Write(KnownTokenText(token.known));
     }
 };
 
@@ -1057,11 +1381,15 @@ std::string FormatModelText(const FormatterConfig& config, const FormatModel& mo
         SyntaxTreeKind::Unknown,
         false,
         false,
+        false,
+        false,
         nullptr,
         nullptr,
         false,
         false,
+        {},
         tokens
     );
+    AnnotateMacroValueWidths(tokens);
     return Printer(config, sourcePath).Print(tokens);
 }
