@@ -873,13 +873,24 @@ private:
         if (!stack) {
             return;
         }
-        const int continuationIndent = baseIndent + 1;
+        int currentLineIndent = baseIndent;
+        int nextOpenIndent = baseIndent + 1;
+        std::vector<int> delimiterIndents;
+        delimiterIndents.reserve(stack->delimiters.size());
         for (const FormatBreakNode* delimiter : stack->delimiters) {
-            WritePackedBreakToken(delimiter->children.front()->token, continuationIndent);
+            const FormatBreakToken& open = delimiter->children.front()->token;
+            const int space = open.spaceBefore && !atLineStart_ ? 1 : 0;
+            if (!atLineStart_ && CurrentColumn() + space + FormatTokenWidth(open.token) > config_.columnLimit) {
+                currentLineIndent = nextOpenIndent;
+                NewLineWithIndent(currentLineIndent);
+                ++nextOpenIndent;
+            }
+            delimiterIndents.push_back(currentLineIndent);
+            WriteBreakToken(open);
         }
-        EmitBreakNode(*stack->leaf, solution, continuationIndent);
-        for (auto it = stack->delimiters.rbegin(); it != stack->delimiters.rend(); ++it) {
-            WritePackedBreakToken((*it)->children.back()->token, baseIndent);
+        EmitBreakNode(*stack->leaf, solution, nextOpenIndent);
+        for (size_t index = stack->delimiters.size(); index-- > 0;) {
+            WritePackedBreakToken(stack->delimiters[index]->children.back()->token, delimiterIndents[index]);
         }
     }
 

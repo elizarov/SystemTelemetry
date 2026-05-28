@@ -566,27 +566,33 @@ private:
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         result.choices.emplace(node.id, FormatBreakChoice::SplitDelimiterStack);
 
-        const int continuationIndent = indentLevel + 1;
+        int currentLineIndent = indentLevel;
+        int nextOpenIndent = indentLevel + 1;
+        std::vector<int> delimiterIndents;
+        delimiterIndents.reserve(stack.delimiters.size());
         for (const FormatBreakNode* delimiter : stack.delimiters) {
             const FormatBreakToken& open = delimiter->children.front()->token;
             if (TokenWouldOverflow(result, open)) {
-                result = AddBreak(result, continuationIndent, node.structuralDepth);
+                currentLineIndent = nextOpenIndent;
+                result = AddBreak(result, currentLineIndent, node.structuralDepth);
+                ++nextOpenIndent;
             }
+            delimiterIndents.push_back(currentLineIndent);
             result = AddToken(result, open);
         }
 
         NodeResult leaf = Solve(*stack.leaf, result.endColumn, result.endIndentLevel, result.endLineHasText);
         if (leaf.valid && leaf.maxOverflow > 0 && result.endLineHasText) {
-            NodeResult broken = AddBreak(result, continuationIndent, node.structuralDepth);
+            NodeResult broken = AddBreak(result, nextOpenIndent, node.structuralDepth);
             leaf = Solve(*stack.leaf, broken.endColumn, broken.endIndentLevel, broken.endLineHasText);
             result = broken;
         }
         Merge(result, leaf);
 
-        for (auto it = stack.delimiters.rbegin(); it != stack.delimiters.rend(); ++it) {
-            const FormatBreakToken& close = (*it)->children.back()->token;
+        for (size_t index = stack.delimiters.size(); index-- > 0;) {
+            const FormatBreakToken& close = stack.delimiters[index]->children.back()->token;
             if (TokenWouldOverflow(result, close)) {
-                result = AddBreak(result, indentLevel, node.structuralDepth);
+                result = AddBreak(result, delimiterIndents[index], node.structuralDepth);
             }
             result = AddToken(result, close);
         }
