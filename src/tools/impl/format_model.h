@@ -59,6 +59,7 @@ enum class SyntaxTreeKind : std::uint16_t {
     UnaryExpression,
     ConditionalExpression,
     AssignmentExpression,
+    CastExpression,
     PointerDeclarator,
     AbstractPointerDeclarator,
     ReferenceDeclarator,

@@ -12,8 +12,7 @@ REPO_ROOT = TEST_ROOT.parents[2]
 FORMAT_CMD = REPO_ROOT / "format.cmd"
 FORMAT_EXE = REPO_ROOT / "build" / "CaseDashTools.exe"
 INPUT_FIXTURE = Path("src") / "format_test_input.cpp"
-OUTPUT_FIXTURE = Path("src") / "format_test_output_temp.cpp"
-FULL_OUTPUT_FIXTURE = Path("src") / "format_test_output.cpp"
+OUTPUT_FIXTURE = Path("src") / "format_test_output.cpp"
 
 
 def native_format(*args: str, cwd: Path = REPO_ROOT, input_text: str | None = None) -> subprocess.CompletedProcess[str]:
@@ -42,73 +41,6 @@ def read_fixture(path: Path) -> str:
     return (TEST_ROOT / path).read_text(encoding="utf-8")
 
 
-def opening_include_block(text: str) -> str:
-    lines = text.splitlines()
-    for index, line in enumerate(lines):
-        if line.startswith("#define"):
-            return "\n".join(lines[:index]) + "\n"
-    return text
-
-
-def opening_preprocessor_block(text: str) -> str:
-    lines = text.splitlines()
-    for index, line in enumerate(lines):
-        if line.startswith("namespace "):
-            return "\n".join(lines[:index]) + "\n"
-    return text
-
-
-def normalize_deferred_macro_wraps(text: str) -> str:
-    return text.replace(
-        "#define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) \\\n"
-        "    ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))",
-        "#define FORMAT_FIXTURE_SUM(firstValue, secondValue, thirdValue) "
-        "((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))",
-    )
-
-
-def structure_without_wrapping(text: str) -> str:
-    text = normalize_deferred_macro_wraps(text)
-    result: list[str] = []
-    index = 0
-    while index < len(text):
-        char = text[index]
-        if char.isspace():
-            index += 1
-            continue
-        if text.startswith("//", index):
-            end = text.find("\n", index)
-            if end == -1:
-                end = len(text)
-            result.append(text[index:end])
-            index = end
-            continue
-        if text.startswith("/*", index):
-            end = text.find("*/", index + 2)
-            if end == -1:
-                end = len(text) - 2
-            result.append(text[index:end + 2])
-            index = end + 2
-            continue
-        if char in ("\"", "'"):
-            quote = char
-            end = index + 1
-            while end < len(text):
-                if text[end] == "\\":
-                    end += 2
-                    continue
-                if text[end] == quote:
-                    end += 1
-                    break
-                end += 1
-            result.append(text[index:end])
-            index = end
-            continue
-        result.append(char)
-        index += 1
-    return "".join(result)
-
-
 class FormatCommandTests(unittest.TestCase):
     maxDiff = None
 
@@ -124,24 +56,6 @@ class FormatCommandTests(unittest.TestCase):
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertNotIn("tree-sitter parse failed", result.stderr)
-
-    def test_temporary_golden_include_block_matches_full_golden(self) -> None:
-        self.assertEqual(
-            opening_include_block(read_fixture(FULL_OUTPUT_FIXTURE)),
-            opening_include_block(read_fixture(OUTPUT_FIXTURE)),
-        )
-
-    def test_temporary_golden_preprocessor_block_matches_full_golden_except_deferred_wrapping(self) -> None:
-        self.assertEqual(
-            normalize_deferred_macro_wraps(opening_preprocessor_block(read_fixture(FULL_OUTPUT_FIXTURE))),
-            opening_preprocessor_block(read_fixture(OUTPUT_FIXTURE)),
-        )
-
-    def test_temporary_golden_matches_full_golden_except_wrapping(self) -> None:
-        self.assertEqual(
-            structure_without_wrapping(read_fixture(FULL_OUTPUT_FIXTURE)),
-            structure_without_wrapping(read_fixture(OUTPUT_FIXTURE)),
-        )
 
     def test_file_argument_formats_to_stdout(self) -> None:
         result = native_format("--style=file", str(TEST_ROOT / OUTPUT_FIXTURE))

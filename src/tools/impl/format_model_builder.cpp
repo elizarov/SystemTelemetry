@@ -60,6 +60,7 @@ constexpr auto kTreeKinds = std::to_array<TreeMapping>({
     {"unary_expression", SyntaxTreeKind::UnaryExpression},
     {"conditional_expression", SyntaxTreeKind::ConditionalExpression},
     {"assignment_expression", SyntaxTreeKind::AssignmentExpression},
+    {"cast_expression", SyntaxTreeKind::CastExpression},
     {"pointer_declarator", SyntaxTreeKind::PointerDeclarator},
     {"abstract_pointer_declarator", SyntaxTreeKind::AbstractPointerDeclarator},
     {"reference_declarator", SyntaxTreeKind::ReferenceDeclarator},

@@ -62,7 +62,7 @@ try {
 
     if ($hasStagedCppFiles) {
         Write-Host 'pre-commit: formatter check temporarily skipped'
-        # Temporarily disabled while the in-tree formatter uses format_test_output_temp.cpp.
+        # Temporarily disabled while formatter break selection is still under implementation.
         # & cmd.exe /c "`"$repoRoot\format.cmd`" fix staged --restage"
         # $formatStatus = $LASTEXITCODE
         # if ($formatStatus -ne 0) {
