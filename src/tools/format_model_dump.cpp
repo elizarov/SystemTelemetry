@@ -77,16 +77,17 @@ void WriteNode(const SyntaxNode& node, int indent, bool listItem) {
     WriteString(SyntaxNodeKindName(node.kind));
     std::fputc('\n', stdout);
 
-    WriteIndent(fieldIndent);
-    std::fputs("text: ", stdout);
-    WriteTextValue(node.text);
-    std::fputc('\n', stdout);
+    if (!node.text.empty()) {
+        WriteIndent(fieldIndent);
+        std::fputs("text: ", stdout);
+        WriteTextValue(node.text);
+        std::fputc('\n', stdout);
+    }
 
-    WriteIndent(fieldIndent);
     if (node.children.empty()) {
-        std::fputs("children: []\n", stdout);
         return;
     }
+    WriteIndent(fieldIndent);
     std::fputs("children:\n", stdout);
     for (const std::unique_ptr<SyntaxNode>& child : node.children) {
         if (child != nullptr) {
