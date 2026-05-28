@@ -167,7 +167,7 @@ private:
                 std::vector<NodeResult> alternatives;
                 for (NodeResult compact : SolveDelimitedCompactAlternatives(node, column, indentLevel, lineHasText)) {
                     if (!node.forceSplit && !(
-                        compact.valid && compact.extraLines > 0 && !CanKeepDelimiterStackCompact(node, compact)
+                        compact.valid && compact.extraLines > 0 && !CanKeepDelimitedCompactWithExtraLines(node, compact)
                     )) {
                         alternatives.push_back(std::move(compact));
                     }
@@ -269,14 +269,12 @@ private:
         return best;
     }
 
-    std::vector<NodeResult>
-        SolveChildrenAlternatives(
-            const std::vector<std::unique_ptr<FormatBreakNode>>& children,
-            int column,
-            int indentLevel,
-            bool lineHasText
-        )
-    {
+    std::vector<NodeResult> SolveChildrenAlternatives(
+        const std::vector<std::unique_ptr<FormatBreakNode>>& children,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
         std::vector<const FormatBreakNode*> sequenceChildren;
         AppendSequenceChildren(children, sequenceChildren);
         std::vector<NodeResult>
@@ -498,14 +496,12 @@ private:
             result.endColumn + TokenColumnAdvance(token, result.endLineHasText) > config_.columnLimit;
     }
 
-    std::vector<NodeResult>
-        SolveDelimitedCompactItemAlternatives(
-            const FormatBreakNode& item,
-            int column,
-            int indentLevel,
-            bool lineHasText
-        )
-    {
+    std::vector<NodeResult> SolveDelimitedCompactItemAlternatives(
+        const FormatBreakNode& item,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
         if (IsDelimiterStackItem(item)) {
             return {Solve(item, column, indentLevel, lineHasText)};
         }
@@ -520,9 +516,9 @@ private:
         result.choices.emplace(node.id, FormatBreakChoice::Compact);
         result = AddToken(result, node.children[0]->token);
         std::vector<NodeResult> current{result};
-        const bool canKeepMultilineItem = node.items.size() == 1;
         for (size_t index = 0; index < node.items.size(); ++index) {
             std::map<ResultStateKey, NodeResult> nextByState;
+            const bool canKeepMultilineItem = node.items.size() == 1 || index + 1 == node.items.size();
             for (const NodeResult& prefix : current) {
                 for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
                     *node.items[index],
@@ -618,7 +614,12 @@ private:
         ) {
             return split;
         }
-        if (compact.valid && split.valid && compact.extraLines > 0 && !CanKeepDelimiterStackCompact(node, compact)) {
+        if (
+            compact.valid &&
+            split.valid &&
+            compact.extraLines > 0 &&
+            !CanKeepDelimitedCompactWithExtraLines(node, compact)
+        ) {
             return split;
         }
         return Better(split, compact) ? split : compact;
@@ -732,6 +733,36 @@ private:
         );
     }
 
+    static bool ContainsCompactBodyHeader(const FormatBreakNode& node, const NodeResult& compact) {
+        if (node.kind == FormatBreakNodeKind::BodyHeader && ChoiceFor(compact, node) == FormatBreakChoice::Compact) {
+            return true;
+        }
+        for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+            if (child && ContainsCompactBodyHeader(*child, compact)) {
+                return true;
+            }
+        }
+        for (const std::unique_ptr<FormatBreakNode>& item : node.items) {
+            if (item && ContainsCompactBodyHeader(*item, compact)) {
+                return true;
+            }
+        }
+        for (const std::unique_ptr<FormatBreakNode>& operand : node.operands) {
+            if (operand && ContainsCompactBodyHeader(*operand, compact)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool CanKeepTrailingBodyHeaderCompact(const FormatBreakNode& node, const NodeResult& compact) {
+        return node.items.size() > 1 && node.items.back() && ContainsCompactBodyHeader(*node.items.back(), compact);
+    }
+
+    static bool CanKeepDelimitedCompactWithExtraLines(const FormatBreakNode& node, const NodeResult& compact) {
+        return CanKeepDelimiterStackCompact(node, compact) || CanKeepTrailingBodyHeaderCompact(node, compact);
+    }
+
     static bool IsCommaChain(const FormatBreakNode& node) {
         return !node.operators.empty() && std::all_of(
             node.operators.begin(),
@@ -756,15 +787,10 @@ private:
         ) {
             return false;
         }
-        return std::all_of(
-            item.operators.begin(),
-            item.operators.end(),
-            [](const FormatBreakToken& token)
-            {
-                return token.token.kind == PrintTokenKind::Known &&
-                    (token.token.syntaxKind == SyntaxNodeKind::Plus || token.token.syntaxKind == SyntaxNodeKind::Minus);
-            }
-        );
+        return std::all_of(item.operators.begin(), item.operators.end(), [](const FormatBreakToken& token) {
+            return token.token.kind == PrintTokenKind::Known &&
+                (token.token.syntaxKind == SyntaxNodeKind::Plus || token.token.syntaxKind == SyntaxNodeKind::Minus);
+        });
     }
 
     static bool HasLaterOperandWithOperator(const FormatBreakNode& node, SyntaxNodeKind token) {
@@ -971,10 +997,12 @@ private:
     NodeResult SolveFunctionSignature(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
         NodeResult compact = SolveFunctionSignatureCompact(node, column, indentLevel, lineHasText);
         NodeResult split = SolveFunctionSignatureSplit(node, column, indentLevel, lineHasText);
-        if (compact.valid && split.valid && CompactLineEndsOverLimit(compact) && split.maxOverflow == 0) {
+        NodeResult returnType =
+            node.children.empty() ? NodeResult{} : Solve(*node.children[0], column, indentLevel, lineHasText);
+        if (compact.valid && split.valid && returnType.valid && returnType.extraLines > 0) {
             return split;
         }
-        if (compact.valid && split.valid && compact.extraLines > 0) {
+        if (compact.valid && split.valid && CompactLineEndsOverLimit(compact) && split.maxOverflow == 0) {
             return split;
         }
         return Better(split, compact) ? split : compact;
@@ -1012,7 +1040,9 @@ private:
     NodeResult SolveBodyHeader(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
         NodeResult compact = SolveBodyHeaderCompact(node, column, indentLevel, lineHasText);
         NodeResult split = SolveBodyHeaderSplit(node, column, indentLevel, lineHasText);
-        if (compact.valid && split.valid && compact.extraLines > 0) {
+        NodeResult header =
+            node.children.empty() ? NodeResult{} : Solve(*node.children[0], column, indentLevel, lineHasText);
+        if (compact.valid && split.valid && header.valid && header.extraLines > 0) {
             return split;
         }
         if (compact.valid && split.valid && CompactLineEndsOverLimit(compact) && split.maxOverflow == 0) {

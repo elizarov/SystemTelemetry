@@ -1206,9 +1206,37 @@ private:
         }
     }
 
-    void FlushPendingTokens(const FormatBreakModelContext& context = {}) {
+    bool UsesSplitContextClose(const FormatBreakNode& node, const FormatBreakSolution& solution) const {
+        if (
+            node.kind == FormatBreakNodeKind::Delimited &&
+            node.children.size() > 1 &&
+            node.children[1]->kind == FormatBreakNodeKind::Token &&
+            node.children[1]->token.contextOnly &&
+            IsSplitChoice(ChoiceFor(solution, node.id))
+        ) {
+            return true;
+        }
+        for (const std::unique_ptr<FormatBreakNode>& child : node.children) {
+            if (child && UsesSplitContextClose(*child, solution)) {
+                return true;
+            }
+        }
+        for (const std::unique_ptr<FormatBreakNode>& item : node.items) {
+            if (item && UsesSplitContextClose(*item, solution)) {
+                return true;
+            }
+        }
+        for (const std::unique_ptr<FormatBreakNode>& operand : node.operands) {
+            if (operand && UsesSplitContextClose(*operand, solution)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool FlushPendingTokens(const FormatBreakModelContext& context = {}) {
         if (pendingTokens_.empty()) {
-            return;
+            return false;
         }
         FormatBreakModel model = BuildFormatBreakModel(pendingTokens_, context);
         const bool previousEmittingMacroValue = emittingMacroValue_;
@@ -1223,7 +1251,9 @@ private:
         const int baseIndentLevel = pendingIndentLevel_.value_or(indentLevel_);
         FormatBreakSolution solution =
             SolveFormatBreaks(config_, model, CurrentColumn(), baseIndentLevel, indentWidth_);
+        bool splitContextClose = false;
         if (model.root) {
+            splitContextClose = UsesSplitContextClose(*model.root, solution);
             EmitBreakNode(*model.root, solution, baseIndentLevel);
         }
         emittingMacroValue_ = previousEmittingMacroValue;
@@ -1232,6 +1262,7 @@ private:
             indentLevel_ = *pendingIndentRestoreAfterFlush_;
             pendingIndentRestoreAfterFlush_.reset();
         }
+        return splitContextClose;
     }
 
     bool HasBufferedLineText() const {
@@ -1277,11 +1308,24 @@ private:
 
         FormatBreakToken virtualClose{(*activeTokens_)[*closeIndex], false, true};
         const int baseIndentLevel = pendingIndentLevel_.value_or(indentLevel_);
+        bool hasCommaAfterLambda = false;
+        for (size_t index = *lambdaCloseIndex + 1; index < *closeIndex; ++index) {
+            const PrintToken& candidate = (*activeTokens_)[index];
+            if (
+                candidate.kind == PrintTokenKind::Known &&
+                candidate.syntaxKind == SyntaxNodeKind::Comma &&
+                SyntaxPathContains(candidate, argumentList)
+            ) {
+                hasCommaAfterLambda = true;
+                break;
+            }
+        }
+
         return LambdaSplitCallPlan{
             .breakContext = {
                 .virtualDelimiterOpen = argumentOpen,
                 .virtualDelimiterClose = virtualClose,
-                .forceSplitVirtualDelimiter = true
+                .forceSplitVirtualDelimiter = hasCommaAfterLambda
             },
             .deferredContext = {
                 .argumentList = argumentList,
@@ -1688,13 +1732,14 @@ private:
         if (role == BraceRole::Compact) {
             return;
         }
-        FlushPendingTokens(splitCallPlan ? splitCallPlan->breakContext : FormatBreakModelContext{});
-        if (splitCallPlan) {
+        const bool splitCall =
+            FlushPendingTokens(splitCallPlan ? splitCallPlan->breakContext : FormatBreakModelContext{});
+        if (splitCallPlan && splitCall) {
             deferredSplitCallContexts_.push_back(splitCallPlan->deferredContext);
         }
         const bool functionBlock = token.parentKind == SyntaxNodeKind::CompoundStatement &&
             token.grandParentKind == SyntaxNodeKind::FunctionDefinition;
-        const int openLineIndent = splitCallPlan ? splitCallPlan->deferredContext.argumentIndent : (
+        const int openLineIndent = splitCallPlan && splitCall ? splitCallPlan->deferredContext.argumentIndent : (
             token.inMacroValue || functionBlock ?
                 indentLevel_ : (lineHasText_ ? CurrentLineIndentLevel() : indentLevel_)
         );

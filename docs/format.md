@@ -246,7 +246,7 @@ value = first + BuildValue(
 Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
 
-Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. When a continued function signature is followed by a body, the body `{` starts on its own line at the declaration indentation.
+Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. When a continued function signature is followed by a body, the body `{` starts on its own line at the declaration indentation.
 
 ```cpp
 std::vector<std::string>
@@ -258,6 +258,14 @@ std::vector<std::string>
         size_t& index
     )
 {
+    return {};
+}
+
+std::set<std::string> RequireSuffixGroup(
+    const std::map<std::string, std::set<std::string>>& suffixGroups,
+    std::string_view configPath,
+    std::string_view groupName
+) {
     return {};
 }
 

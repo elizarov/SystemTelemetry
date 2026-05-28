@@ -337,13 +337,29 @@ std::vector<std::string>
 std::vector<std::string>
     ParseIndentedStringListDeclaration(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent);
 
-std::vector<std::string>
-    ParseIndentedStringListWithSplitParameters(
-        const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture,
-        size_t& indexWithLongNameForFormatterFixture,
-        int parentIndentWithLongNameForFormatterFixture
-    )
-{
+std::vector<std::string> ParseIndentedStringListWithSplitParameters(
+    const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture,
+    size_t& indexWithLongNameForFormatterFixture,
+    int parentIndentWithLongNameForFormatterFixture
+) {
+    return {};
+}
+
+struct IncludeGroup {
+    int priority;
+};
+
+void SortIncludeGroups(std::vector<IncludeGroup>& groups) {
+    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {
+        return left.priority < right.priority;
+    });
+}
+
+std::set<std::string> RequireSuffixGroup(
+    const std::map<std::string, std::set<std::string>>& suffixGroups,
+    std::string_view configPath,
+    std::string_view groupName
+) {
     return {};
 }
 
