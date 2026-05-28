@@ -89,7 +89,7 @@ void WriteNode(const SyntaxNode& node, int indent, bool listItem) {
     }
     WriteIndent(fieldIndent);
     std::fputs("children:\n", stdout);
-    for (const std::unique_ptr<SyntaxNode>& child : node.children) {
+    for (const SyntaxNode* child : node.children) {
         if (child != nullptr) {
             WriteNode(*child, fieldIndent + 1, true);
         }

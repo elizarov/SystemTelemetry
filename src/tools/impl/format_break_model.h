@@ -1,7 +1,9 @@
 #pragma once
 
+#include <algorithm>
 #include <deque>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -43,10 +45,19 @@ enum class FormatBreakChoice {
     TernaryBreakAfterColon,
 };
 
+struct FormatBreakNode;
+
 struct FormatBreakToken {
     const PrintToken* token = nullptr;
     bool spaceBefore = false;
     bool contextOnly = false;
+};
+
+struct FormatBreakListItem {
+    FormatBreakNode* node = nullptr;
+    FormatBreakToken separator;
+    FormatBreakToken trailingComment;
+    bool blankLineBefore = false;
 };
 
 inline const PrintToken& FormatBreakTokenValue(const FormatBreakToken& token) {
@@ -72,17 +83,51 @@ struct FormatBreakNode {
     bool forceSplit = false;
     bool flatSplitIndent = false;
     bool functionSignatureHasBody = false;
-    std::vector<FormatBreakNode*> children;
-    std::vector<FormatBreakNode*> items;
-    std::vector<FormatBreakToken> separators;
-    std::vector<FormatBreakToken> trailingComments;
-    std::vector<bool> blankLinesBeforeItems;
+    std::span<FormatBreakNode*> children;
+    std::vector<FormatBreakListItem> items;
     std::vector<FormatBreakNode*> operands;
     std::vector<FormatBreakToken> operators;
 };
 
+template <typename T>
+class FormatBreakArena {
+public:
+    std::span<T> Append(std::span<const T> values) {
+        std::span<T> result = Allocate(values.size());
+        std::copy(values.begin(), values.end(), result.begin());
+        return result;
+    }
+
+private:
+    static constexpr size_t kBlockSize = 256;
+
+    std::span<T> Allocate(size_t count) {
+        if (count == 0) {
+            return {};
+        }
+        if (remaining_ < count) {
+            AllocateBlock(std::max(count, kBlockSize));
+        }
+        T* result = cursor_;
+        cursor_ += count;
+        remaining_ -= count;
+        return {result, count};
+    }
+
+    void AllocateBlock(size_t capacity) {
+        blocks_.push_back(std::make_unique<T[]>(capacity));
+        cursor_ = blocks_.back().get();
+        remaining_ = capacity;
+    }
+
+    std::vector<std::unique_ptr<T[]>> blocks_;
+    T* cursor_ = nullptr;
+    size_t remaining_ = 0;
+};
+
 struct FormatBreakModel {
     std::unique_ptr<std::deque<FormatBreakNode>> nodes;
+    FormatBreakArena<FormatBreakNode*> nodePointers;
     FormatBreakNode* root = nullptr;
 };
 

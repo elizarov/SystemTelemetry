@@ -69,7 +69,28 @@ bool IsPragmaOnceNode(const SyntaxNode& node) {
         tools::StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
 }
 
-bool IsIncludeNode(const std::unique_ptr<SyntaxNode>& node) {
+SyntaxNode* MakeNode(FormatModel& model) {
+    return &model.nodes.emplace_back();
+}
+
+void SetParentRecursive(SyntaxNode& node, const SyntaxNode* parent) {
+    node.parent = parent;
+    node.depth = parent == nullptr ? 0 : parent->depth + 1;
+    for (SyntaxNode* child : node.children) {
+        if (child != nullptr) {
+            SetParentRecursive(*child, &node);
+        }
+    }
+}
+
+void AppendChild(SyntaxNode& parent, SyntaxNode* child) {
+    if (child != nullptr) {
+        SetParentRecursive(*child, &parent);
+    }
+    parent.children.push_back(child);
+}
+
+bool IsIncludeNode(const SyntaxNode* node) {
     return node != nullptr && node->kind == SyntaxNodeKind::PreprocInclude;
 }
 
@@ -79,19 +100,19 @@ bool IsOpeningIncludeSpacer(const SyntaxNode& node) {
         node.kind == SyntaxNodeKind::TrailingComment;
 }
 
-std::unique_ptr<SyntaxNode> MakeBlankLine() {
-    auto node = std::make_unique<SyntaxNode>();
+SyntaxNode* MakeBlankLine(FormatModel& model) {
+    SyntaxNode* node = MakeNode(model);
     node->kind = SyntaxNodeKind::BlankLine;
     return node;
 }
 
-std::unique_ptr<SyntaxNode> MakeTokenNode(SyntaxNodeKind token) {
-    auto node = std::make_unique<SyntaxNode>();
+SyntaxNode* MakeTokenNode(FormatModel& model, SyntaxNodeKind token) {
+    SyntaxNode* node = MakeNode(model);
     node->kind = token;
     return node;
 }
 
-bool IsTriviaNode(const std::unique_ptr<SyntaxNode>& node) {
+bool IsTriviaNode(const SyntaxNode* node) {
     return node != nullptr && (
         node->kind == SyntaxNodeKind::BlankLine ||
             node->kind == SyntaxNodeKind::Comment ||
@@ -99,21 +120,19 @@ bool IsTriviaNode(const std::unique_ptr<SyntaxNode>& node) {
     );
 }
 
-bool IsCommentNode(const std::unique_ptr<SyntaxNode>& node) {
+bool IsCommentNode(const SyntaxNode* node) {
     return node != nullptr && (node->kind == SyntaxNodeKind::Comment || node->kind == SyntaxNodeKind::TrailingComment);
 }
 
-bool IsTokenNode(const std::unique_ptr<SyntaxNode>& node, SyntaxNodeKind token) {
+bool IsTokenNode(const SyntaxNode* node, SyntaxNodeKind token) {
     return node != nullptr && node->kind == token;
 }
 
-bool IsTreeNode(const std::unique_ptr<SyntaxNode>& node, SyntaxNodeKind kind) {
+bool IsTreeNode(const SyntaxNode* node, SyntaxNodeKind kind) {
     return node != nullptr && node->kind == kind;
 }
 
-std::optional<
-    size_t
-> PreviousNonTriviaChildIndex(const std::vector<std::unique_ptr<SyntaxNode>>& children, size_t before) {
+std::optional<size_t> PreviousNonTriviaChildIndex(const std::vector<SyntaxNode*>& children, size_t before) {
     while (before > 0) {
         --before;
         if (!IsTriviaNode(children[before])) {
@@ -123,7 +142,7 @@ std::optional<
     return std::nullopt;
 }
 
-std::optional<size_t> NextNonTriviaChildIndex(const std::vector<std::unique_ptr<SyntaxNode>>& children, size_t after) {
+std::optional<size_t> NextNonTriviaChildIndex(const std::vector<SyntaxNode*>& children, size_t after) {
     for (size_t index = after; index < children.size(); ++index) {
         if (!IsTriviaNode(children[index])) {
             return index;
@@ -132,8 +151,8 @@ std::optional<size_t> NextNonTriviaChildIndex(const std::vector<std::unique_ptr<
     return std::nullopt;
 }
 
-void NormalizeTrailingCommas(SyntaxNode& node) {
-    std::vector<std::unique_ptr<SyntaxNode>>& children = node.children;
+void NormalizeTrailingCommas(FormatModel& model, SyntaxNode& node) {
+    std::vector<SyntaxNode*>& children = node.children;
     for (size_t index = 0; index < children.size(); ++index) {
         if (
             !IsTokenNode(children[index], SyntaxNodeKind::RightBrace) &&
@@ -152,10 +171,9 @@ void NormalizeTrailingCommas(SyntaxNode& node) {
                 !IsTokenNode(children[*previous], SyntaxNodeKind::Comma) &&
                 !IsTokenNode(children[*previous], SyntaxNodeKind::LeftBrace)
             ) {
-                children.insert(
-                    children.begin() + static_cast<std::ptrdiff_t>(*previous + 1),
-                    MakeTokenNode(SyntaxNodeKind::Comma)
-                );
+                SyntaxNode* comma = MakeTokenNode(model, SyntaxNodeKind::Comma);
+                SetParentRecursive(*comma, &node);
+                children.insert(children.begin() + static_cast<std::ptrdiff_t>(*previous + 1), comma);
                 ++index;
             }
             continue;
@@ -167,7 +185,7 @@ void NormalizeTrailingCommas(SyntaxNode& node) {
     }
 }
 
-void WrapControlBody(SyntaxNode& node, size_t childIndex) {
+void WrapControlBody(FormatModel& model, SyntaxNode& node, size_t childIndex) {
     if (
         childIndex >= node.children.size() || IsTreeNode(node.children[childIndex], SyntaxNodeKind::CompoundStatement)
     ) {
@@ -178,20 +196,21 @@ void WrapControlBody(SyntaxNode& node, size_t childIndex) {
         --firstBodyIndex;
     }
 
-    auto compound = std::make_unique<SyntaxNode>();
+    SyntaxNode* compound = MakeNode(model);
     compound->kind = SyntaxNodeKind::CompoundStatement;
     compound->children.reserve(childIndex - firstBodyIndex + 3);
-    compound->children.push_back(MakeTokenNode(SyntaxNodeKind::LeftBrace));
+    AppendChild(*compound, MakeTokenNode(model, SyntaxNodeKind::LeftBrace));
     for (size_t index = firstBodyIndex; index <= childIndex; ++index) {
-        compound->children.push_back(std::move(node.children[index]));
+        AppendChild(*compound, node.children[index]);
     }
-    compound->children.push_back(MakeTokenNode(SyntaxNodeKind::RightBrace));
+    AppendChild(*compound, MakeTokenNode(model, SyntaxNodeKind::RightBrace));
 
     node.children.erase(
         node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex),
         node.children.begin() + static_cast<std::ptrdiff_t>(childIndex + 1)
     );
-    node.children.insert(node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex), std::move(compound));
+    SetParentRecursive(*compound, &node);
+    node.children.insert(node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex), compound);
 }
 
 std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
@@ -215,7 +234,7 @@ std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
     return ifIndex;
 }
 
-void NormalizeElseClauseBody(SyntaxNode& node) {
+void NormalizeElseClauseBody(FormatModel& model, SyntaxNode& node) {
     for (size_t index = 0; index < node.children.size(); ++index) {
         if (!IsTokenNode(node.children[index], SyntaxNodeKind::KeywordElse)) {
             continue;
@@ -230,17 +249,18 @@ void NormalizeElseClauseBody(SyntaxNode& node) {
         if (IsTreeNode(node.children[*bodyIndex], SyntaxNodeKind::CompoundStatement)) {
             std::optional<size_t> ifIndex = FindOnlyIfInBraceBlock(*node.children[*bodyIndex]);
             if (ifIndex) {
-                node.children[*bodyIndex] = std::move(node.children[*bodyIndex]->children[*ifIndex]);
+                node.children[*bodyIndex] = node.children[*bodyIndex]->children[*ifIndex];
+                SetParentRecursive(*node.children[*bodyIndex], &node);
                 return;
             }
             return;
         }
-        WrapControlBody(node, *bodyIndex);
+        WrapControlBody(model, node, *bodyIndex);
         return;
     }
 }
 
-void NormalizeIfStatementBody(SyntaxNode& node) {
+void NormalizeIfStatementBody(FormatModel& model, SyntaxNode& node) {
     size_t before = node.children.size();
     for (size_t index = 0; index < node.children.size(); ++index) {
         if (IsTreeNode(node.children[index], SyntaxNodeKind::ElseClause)) {
@@ -250,58 +270,60 @@ void NormalizeIfStatementBody(SyntaxNode& node) {
     }
     const std::optional<size_t> consequenceIndex = PreviousNonTriviaChildIndex(node.children, before);
     if (consequenceIndex) {
-        WrapControlBody(node, *consequenceIndex);
+        WrapControlBody(model, node, *consequenceIndex);
     }
 }
 
-void NormalizeDoStatementBody(SyntaxNode& node) {
+void NormalizeDoStatementBody(FormatModel& model, SyntaxNode& node) {
     for (size_t index = 0; index < node.children.size(); ++index) {
         if (!IsTokenNode(node.children[index], SyntaxNodeKind::KeywordWhile)) {
             continue;
         }
         const std::optional<size_t> bodyIndex = PreviousNonTriviaChildIndex(node.children, index);
         if (bodyIndex) {
-            WrapControlBody(node, *bodyIndex);
+            WrapControlBody(model, node, *bodyIndex);
         }
         return;
     }
 }
 
-void NormalizeLastControlBody(SyntaxNode& node) {
+void NormalizeLastControlBody(FormatModel& model, SyntaxNode& node) {
     const std::optional<size_t> bodyIndex = PreviousNonTriviaChildIndex(node.children, node.children.size());
     if (bodyIndex) {
-        WrapControlBody(node, *bodyIndex);
+        WrapControlBody(model, node, *bodyIndex);
     }
 }
 
-void NormalizeControlBodies(SyntaxNode& node) {
+void NormalizeControlBodies(FormatModel& model, SyntaxNode& node) {
     switch (node.kind) {
         case SyntaxNodeKind::IfStatement:
-            NormalizeIfStatementBody(node);
+            NormalizeIfStatementBody(model, node);
             return;
         case SyntaxNodeKind::ElseClause:
-            NormalizeElseClauseBody(node);
+            NormalizeElseClauseBody(model, node);
             return;
         case SyntaxNodeKind::ForStatement:
         case SyntaxNodeKind::WhileStatement:
         case SyntaxNodeKind::SwitchStatement:
-            NormalizeLastControlBody(node);
+            NormalizeLastControlBody(model, node);
             return;
         case SyntaxNodeKind::DoStatement:
-            NormalizeDoStatementBody(node);
+            NormalizeDoStatementBody(model, node);
             return;
         default:
             return;
     }
 }
 
-void NormalizeSyntaxNode(SyntaxNode& node) {
-    NormalizeTrailingCommas(node);
-    NormalizeControlBodies(node);
+void NormalizeSyntaxNode(FormatModel& model, SyntaxNode& node) {
+    NormalizeTrailingCommas(model, node);
+    NormalizeControlBodies(model, node);
 }
 
-std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
-    auto node = std::make_unique<SyntaxNode>();
+SyntaxNode* BuildNode(FormatModel& model, TSNode tsNode, std::string_view source, const SyntaxNode* parent) {
+    SyntaxNode* node = MakeNode(model);
+    node->parent = parent;
+    node->depth = parent == nullptr ? 0 : parent->depth + 1;
     const std::string_view type = ts_node_type(tsNode);
     const std::string_view text = NodeText(tsNode, source);
     const SyntaxNodeKind syntaxKind = SyntaxNodeKindFromTreeType(type);
@@ -343,19 +365,19 @@ std::unique_ptr<SyntaxNode> BuildNode(TSNode tsNode, std::string_view source) {
         TSNode child = ts_node_child(tsNode, index);
         const uint32_t childStart = ts_node_start_byte(child);
         if (!node->children.empty() && ContainsBlankLine(source, previousEnd, childStart)) {
-            node->children.push_back(MakeBlankLine());
+            AppendChild(*node, MakeBlankLine(model));
         }
-        std::unique_ptr<SyntaxNode> childNode = BuildNode(child, source);
+        SyntaxNode* childNode = BuildNode(model, child, source, node);
         if (childNode->kind == SyntaxNodeKind::Comment) {
             if (!node->children.empty() && previousEndRow == StartPoint(child).row) {
                 childNode->kind = SyntaxNodeKind::TrailingComment;
             }
         }
-        node->children.push_back(std::move(childNode));
+        node->children.push_back(childNode);
         previousEnd = ts_node_end_byte(child);
         previousEndRow = ts_node_end_point(child).row;
     }
-    NormalizeSyntaxNode(*node);
+    NormalizeSyntaxNode(model, *node);
     return node;
 }
 
@@ -388,16 +410,17 @@ ProblemNode FindFirstProblem(TSNode node) {
 }
 
 void AppendIncludeRun(
-    std::vector<std::unique_ptr<SyntaxNode>>& sourceChildren,
+    std::vector<SyntaxNode*>& sourceChildren,
     size_t& index,
-    std::vector<std::unique_ptr<SyntaxNode>>& groupedChildren
+    std::vector<SyntaxNode*>& groupedChildren,
+    FormatModel& model
 ) {
-    auto includeRun = std::make_unique<SyntaxNode>();
+    SyntaxNode* includeRun = MakeNode(model);
     includeRun->kind = SyntaxNodeKind::IncludeRun;
 
     for (; index < sourceChildren.size(); ++index) {
         if (IsIncludeNode(sourceChildren[index])) {
-            includeRun->children.push_back(std::move(sourceChildren[index]));
+            AppendChild(*includeRun, sourceChildren[index]);
             continue;
         }
         if (sourceChildren[index] != nullptr && sourceChildren[index]->kind == SyntaxNodeKind::BlankLine) {
@@ -406,21 +429,21 @@ void AppendIncludeRun(
         break;
     }
 
-    groupedChildren.push_back(std::move(includeRun));
+    groupedChildren.push_back(includeRun);
 }
 
-void GroupOpeningIncludeRuns(SyntaxNode& root) {
+void GroupOpeningIncludeRuns(FormatModel& model, SyntaxNode& root) {
     if (root.kind != SyntaxNodeKind::TranslationUnit) {
         return;
     }
 
-    std::vector<std::unique_ptr<SyntaxNode>> groupedChildren;
+    std::vector<SyntaxNode*> groupedChildren;
     groupedChildren.reserve(root.children.size());
     bool sawInclude = false;
     bool inOpeningArea = true;
     for (size_t index = 0; index < root.children.size();) {
         if (inOpeningArea && IsIncludeNode(root.children[index])) {
-            AppendIncludeRun(root.children, index, groupedChildren);
+            AppendIncludeRun(root.children, index, groupedChildren, model);
             sawInclude = true;
             continue;
         }
@@ -428,17 +451,22 @@ void GroupOpeningIncludeRuns(SyntaxNode& root) {
             root.children[index] != nullptr &&
             (IsOpeningIncludeSpacer(*root.children[index]) || (!sawInclude && IsPragmaOnceNode(*root.children[index])));
         if (canRemainInOpeningArea) {
-            groupedChildren.push_back(std::move(root.children[index]));
+            groupedChildren.push_back(root.children[index]);
             ++index;
             continue;
         }
 
         inOpeningArea = false;
-        groupedChildren.push_back(std::move(root.children[index]));
+        groupedChildren.push_back(root.children[index]);
         ++index;
     }
 
     root.children = std::move(groupedChildren);
+    for (SyntaxNode* child : root.children) {
+        if (child != nullptr && child->parent != &root) {
+            SetParentRecursive(*child, &root);
+        }
+    }
 }
 
 ParseResult ParseFailure(TSNode root) {
@@ -476,8 +504,8 @@ FormatModel BuildFormatModel(TSNode root, std::unique_ptr<std::string> sourceTex
         return model;
     }
 
-    model.root = BuildNode(root, source);
-    GroupOpeningIncludeRuns(*model.root);
+    model.root = BuildNode(model, root, source, nullptr);
+    GroupOpeningIncludeRuns(model, *model.root);
     model.parse.ok = true;
     return model;
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstdint>
+#include <deque>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -10,6 +11,8 @@ struct ParseResult {
     bool ok = false;
     std::string error;
 };
+
+struct PrintToken;
 
 enum class SyntaxNodeKind : std::uint16_t {
     // Structural nodes.
@@ -277,7 +280,15 @@ struct SyntaxNode {
     // Keep nodes maximally generic and space-efficient; avoid fields that only apply to one node kind.
     SyntaxNodeKind kind = SyntaxNodeKind::Unknown;
     std::string_view text;
-    std::vector<std::unique_ptr<SyntaxNode>> children;
+    const SyntaxNode* parent = nullptr;
+    size_t depth = 0;
+    std::vector<SyntaxNode*> children;
+
+    // Break model scratch storage. These fields are valid only for the active formatting pass mark.
+    mutable const PrintToken* formatPrintToken = nullptr;
+    mutable std::uint32_t formatSelectionMark = 0;
+    mutable std::uint32_t formatTokenMark = 0;
+    mutable bool formatSpaceBefore = false;
 };
 
 struct FormatModel {
@@ -289,5 +300,6 @@ struct FormatModel {
 
     ParseResult parse;
     std::unique_ptr<std::string> sourceText;
-    std::unique_ptr<SyntaxNode> root;
+    std::deque<SyntaxNode> nodes;
+    SyntaxNode* root = nullptr;
 };

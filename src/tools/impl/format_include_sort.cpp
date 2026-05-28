@@ -213,33 +213,29 @@ std::string FormatIncludeRunText(
     const IncludeSortContext context{.config = config, .mainIncludeRegex = BuildMainIncludeRegex(config, sourcePath)};
     std::vector<IncludeEntry> includes;
     includes.reserve(includeRun.children.size());
-    for (const std::unique_ptr<SyntaxNode>& child : includeRun.children) {
+    for (const SyntaxNode* child : includeRun.children) {
         if (!child || !IsIncludeNode(*child)) {
             continue;
         }
         IncludeText include = ParseIncludeText(child->text);
         includes.push_back({
-                .line = std::move(include.line),
-                .target = include.target,
-                .sortKey = tools::ToLowerAscii(include.target),
-                .priority = IncludePriority(context, include.target),
-                .originalIndex = includes.size()
-            });
+            .line = std::move(include.line),
+            .target = include.target,
+            .sortKey = tools::ToLowerAscii(include.target),
+            .priority = IncludePriority(context, include.target),
+            .originalIndex = includes.size()
+        });
     }
 
-    std::stable_sort(
-        includes.begin(),
-        includes.end(),
-        [](const IncludeEntry& left, const IncludeEntry& right) {
-            if (left.priority != right.priority) {
-                return left.priority < right.priority;
-            }
-            if (left.sortKey != right.sortKey) {
-                return left.sortKey < right.sortKey;
-            }
-            return left.originalIndex < right.originalIndex;
+    std::stable_sort(includes.begin(), includes.end(), [](const IncludeEntry& left, const IncludeEntry& right) {
+        if (left.priority != right.priority) {
+            return left.priority < right.priority;
         }
-    );
+        if (left.sortKey != right.sortKey) {
+            return left.sortKey < right.sortKey;
+        }
+        return left.originalIndex < right.originalIndex;
+    });
 
     std::string result;
     int previousPriority = 0;

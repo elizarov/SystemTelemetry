@@ -354,6 +354,7 @@ using RuntimeConfigForEachDynamicItem =
     void (*)(const AppConfig& config, void* context, RuntimeConfigDynamicItemVisitor visitor);
 using ZesDriver = void*;
 using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
+using SlowPathCompilerCallModifierSpacingReproducer = VeryLongLevelZeroResultTypeName(__cdecl*)(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 using LayoutEditParameter = ::LayoutEditParameter;
 using TextLayoutResult = ::TextLayoutResult;

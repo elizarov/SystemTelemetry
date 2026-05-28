@@ -73,12 +73,6 @@ bool IsCaseLabelKeyword(const PrintToken& token) {
         (token.syntaxKind == SyntaxNodeKind::KeywordCase || token.syntaxKind == SyntaxNodeKind::KeywordDefault);
 }
 
-bool IsCompilerCallModifierStart(const PrintToken* token) {
-    return token != nullptr &&
-        token->kind == PrintTokenKind::Known &&
-        (token->syntaxKind == SyntaxNodeKind::KeywordCdecl || token->syntaxKind == SyntaxNodeKind::KeywordDeclspec);
-}
-
 bool FormatTokensShareMacroDefinition(const PrintToken* left, const PrintToken* right) {
     return left != nullptr &&
         right != nullptr &&

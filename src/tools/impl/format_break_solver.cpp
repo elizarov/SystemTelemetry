@@ -4,6 +4,7 @@
 #include <deque>
 #include <limits>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <unordered_map>
 #include <vector>
@@ -15,19 +16,6 @@ struct SolveKey {
     int column = 0;
     int indentLevel = 0;
     bool lineHasText = false;
-
-    friend bool operator<(const SolveKey& left, const SolveKey& right) {
-        if (left.nodeId != right.nodeId) {
-            return left.nodeId < right.nodeId;
-        }
-        if (left.column != right.column) {
-            return left.column < right.column;
-        }
-        if (left.indentLevel != right.indentLevel) {
-            return left.indentLevel < right.indentLevel;
-        }
-        return left.lineHasText < right.lineHasText;
-    }
 
     friend bool operator==(const SolveKey& left, const SolveKey& right) {
         return left.nodeId == right.nodeId &&
@@ -84,6 +72,11 @@ public:
             return found->second;
         }
 
+        if (std::optional<NodeResult> compact = SolveCompactOneLine(node, column, indentLevel, lineHasText)) {
+            memo_.emplace(key, *compact);
+            return *compact;
+        }
+
         NodeResult result;
         switch (node.kind) {
             case FormatBreakNodeKind::Token:
@@ -126,12 +119,11 @@ private:
     }
 
     static bool HasTrailingComment(const FormatBreakNode& node, size_t index) {
-        return index < node.trailingComments.size() &&
-            IsCommentToken(FormatBreakTokenKind(node.trailingComments[index]));
+        return index < node.items.size() && IsCommentToken(FormatBreakTokenKind(node.items[index].trailingComment));
     }
 
     static bool HasBlankLineBeforeItem(const FormatBreakNode& node, size_t index) {
-        return index < node.blankLinesBeforeItems.size() && node.blankLinesBeforeItems[index];
+        return index < node.items.size() && node.items[index].blankLineBefore;
     }
 
     static int SpaceBeforeToken(const FormatBreakToken& token, bool lineHasText) {
@@ -290,7 +282,7 @@ private:
     }
 
     NodeResult SolveChildren(
-        const std::vector<FormatBreakNode*>& children,
+        std::span<FormatBreakNode* const> children,
         int column,
         int indentLevel,
         bool lineHasText
@@ -305,7 +297,7 @@ private:
     }
 
     std::vector<NodeResult> SolveChildrenAlternatives(
-        const std::vector<FormatBreakNode*>& children,
+        std::span<FormatBreakNode* const> children,
         int column,
         int indentLevel,
         bool lineHasText
@@ -338,7 +330,7 @@ private:
     }
 
     static void AppendSequenceChildren(
-        const std::vector<FormatBreakNode*>& children,
+        std::span<FormatBreakNode* const> children,
         std::vector<const FormatBreakNode*>& output
     ) {
         for (const FormatBreakNode* child : children) {
@@ -465,6 +457,29 @@ private:
             left.endLineHasText == right.endLineHasText;
     }
 
+    static bool DominatesResult(const NodeResult& left, const NodeResult& right) {
+        if (left.endIndentLevel != right.endIndentLevel || left.endLineHasText != right.endLineHasText) {
+            return false;
+        }
+        if (left.endColumn > right.endColumn) {
+            return false;
+        }
+        if (
+            left.maxOverflow > right.maxOverflow ||
+            left.extraLines > right.extraLines ||
+            left.deepestBreakIndent > right.deepestBreakIndent ||
+            left.deepestBreakDepth > right.deepestBreakDepth ||
+            left.bestOperatorBreakPriority > right.bestOperatorBreakPriority
+        ) {
+            return false;
+        }
+        return left.maxOverflow < right.maxOverflow ||
+            left.extraLines < right.extraLines ||
+            left.deepestBreakIndent < right.deepestBreakIndent ||
+            left.deepestBreakDepth < right.deepestBreakDepth ||
+            left.bestOperatorBreakPriority < right.bestOperatorBreakPriority;
+    }
+
     static bool ResultStateLess(const NodeResult& left, const NodeResult& right) {
         if (left.endColumn != right.endColumn) {
             return left.endColumn < right.endColumn;
@@ -479,18 +494,23 @@ private:
         if (!candidate.valid) {
             return;
         }
-        const auto found = std::find_if(
-            results.begin(),
-            results.end(),
-            [&candidate](const NodeResult& existing) { return SameResultState(existing, candidate); }
-        );
-        if (found == results.end()) {
-            results.push_back(std::move(candidate));
-            return;
+        for (auto it = results.begin(); it != results.end();) {
+            if (SameResultState(*it, candidate)) {
+                if (Better(candidate, *it)) {
+                    *it = std::move(candidate);
+                }
+                return;
+            }
+            if (DominatesResult(*it, candidate)) {
+                return;
+            }
+            if (DominatesResult(candidate, *it)) {
+                it = results.erase(it);
+                continue;
+            }
+            ++it;
         }
-        if (Better(candidate, *found)) {
-            *found = std::move(candidate);
-        }
+        results.push_back(std::move(candidate));
     }
 
     static void SortPrunedResults(std::vector<NodeResult>& results) {
@@ -501,11 +521,118 @@ private:
         return compact.endLineHasText && compact.endColumn > config_.columnLimit;
     }
 
+    std::optional<NodeResult>
+        SolveCompactOneLine(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) const
+    {
+        NodeResult
+            result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
+        if (!AppendCompactOneLine(node, result)) {
+            return std::nullopt;
+        }
+        if (result.endLineHasText && result.endColumn >= config_.columnLimit) {
+            return std::nullopt;
+        }
+        return result;
+    }
+
+    bool AddCompactToken(NodeResult& result, const FormatBreakToken& token) const {
+        if (token.contextOnly) {
+            return true;
+        }
+        const PrintToken& printToken = FormatBreakTokenValue(token);
+        if (printToken.kind == PrintTokenKind::BlankLine || IsCommentToken(printToken.kind)) {
+            return false;
+        }
+        const int space = SpaceBeforeToken(token, result.endLineHasText);
+        const int width = FormatTokenWidth(printToken);
+        result.endColumn += space + width;
+        result.endLineHasText = result.endLineHasText || width > 0;
+        return !result.endLineHasText || result.endColumn < config_.columnLimit;
+    }
+
+    bool AppendCompactOneLine(const FormatBreakNode& node, NodeResult& result) const {
+        if (node.forceSplit) {
+            return false;
+        }
+        switch (node.kind) {
+            case FormatBreakNodeKind::Token:
+                return AddCompactToken(result, node.token);
+            case FormatBreakNodeKind::Sequence:
+            case FormatBreakNodeKind::FunctionSignature:
+            case FormatBreakNodeKind::BodyHeader:
+                for (const FormatBreakNode* child : node.children) {
+                    if (child != nullptr && !AppendCompactOneLine(*child, result)) {
+                        return false;
+                    }
+                }
+                return true;
+            case FormatBreakNodeKind::Delimited:
+                if (node.children.size() < 2 || !AppendCompactOneLine(*node.children[0], result)) {
+                    return false;
+                }
+                for (size_t index = 0; index < node.items.size(); ++index) {
+                    const FormatBreakListItem& item = node.items[index];
+                    if (item.node != nullptr && !AppendCompactOneLine(*item.node, result)) {
+                        return false;
+                    }
+                    if (
+                        FormatBreakTokenKind(item.separator) == PrintTokenKind::Known &&
+                        !AddCompactToken(result, item.separator)
+                    ) {
+                        return false;
+                    }
+                    if (HasTrailingComment(node, index)) {
+                        return false;
+                    }
+                }
+                return AppendCompactOneLine(*node.children[1], result);
+            case FormatBreakNodeKind::PrefixList:
+                if (node.children.empty() || !AppendCompactOneLine(*node.children[0], result)) {
+                    return false;
+                }
+                for (size_t index = 0; index < node.items.size(); ++index) {
+                    const FormatBreakListItem& item = node.items[index];
+                    if (item.node != nullptr && !AppendCompactOneLine(*item.node, result)) {
+                        return false;
+                    }
+                    if (
+                        FormatBreakTokenKind(item.separator) == PrintTokenKind::Known &&
+                        !AddCompactToken(result, item.separator)
+                    ) {
+                        return false;
+                    }
+                    if (HasTrailingComment(node, index)) {
+                        return false;
+                    }
+                }
+                return true;
+            case FormatBreakNodeKind::Chain:
+                for (size_t index = 0; index < node.operands.size(); ++index) {
+                    if (node.operands[index] != nullptr && !AppendCompactOneLine(*node.operands[index], result)) {
+                        return false;
+                    }
+                    if (index < node.operators.size() && !AddCompactToken(result, node.operators[index])) {
+                        return false;
+                    }
+                }
+                return true;
+            case FormatBreakNodeKind::AdjacentStrings:
+                for (const FormatBreakNode* operand : node.operands) {
+                    if (operand != nullptr && !AppendCompactOneLine(*operand, result)) {
+                        return false;
+                    }
+                }
+                return true;
+        }
+        return false;
+    }
+
     static bool HasRealSeparators(const FormatBreakNode& node) {
         return std::any_of(
-            node.separators.begin(),
-            node.separators.end(),
-            [](const FormatBreakToken& separator) { return FormatBreakTokenKind(separator) == PrintTokenKind::Known; }
+            node.items.begin(),
+            node.items.end(),
+            [](const FormatBreakListItem& item)
+            { return FormatBreakTokenKind(item.separator) == PrintTokenKind::Known; }
         );
     }
 
@@ -521,7 +648,7 @@ private:
         const FormatBreakNode* current = &node;
         while (current != nullptr) {
             stack.delimiters.push_back(current);
-            const FormatBreakNode* item = current->items.front();
+            const FormatBreakNode* item = current->items.front().node;
             if (
                 item == nullptr ||
                 !IsDelimiterStackItem(*item) ||
@@ -567,11 +694,12 @@ private:
         result = AddToken(result, node.children[0]->token);
         std::vector<NodeResult> current{result};
         for (size_t index = 0; index < node.items.size(); ++index) {
+            const FormatBreakListItem& listItem = node.items[index];
             std::vector<NodeResult> nextByState;
             const bool canKeepMultilineItem = node.items.size() == 1 || index + 1 == node.items.size();
             for (const NodeResult& prefix : current) {
                 for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
-                    *node.items[index],
+                    *listItem.node,
                     prefix.endColumn,
                     prefix.endIndentLevel,
                     prefix.endLineHasText
@@ -584,14 +712,11 @@ private:
                     }
                     NodeResult next = prefix;
                     Merge(next, item);
-                    if (
-                        index < node.separators.size() &&
-                        FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
-                    ) {
-                        next = AddToken(next, node.separators[index]);
+                    if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                        next = AddToken(next, listItem.separator);
                     }
                     if (HasTrailingComment(node, index)) {
-                        next = AddToken(next, node.trailingComments[index]);
+                        next = AddToken(next, listItem.trailingComment);
                     }
                     AddPrunedResult(nextByState, std::move(next));
                 }
@@ -628,15 +753,14 @@ private:
         result = AddToken(result, node.children[0]->token);
         result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
-            NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
+            const FormatBreakListItem& listItem = node.items[index];
+            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (
-                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
-            ) {
-                result = AddToken(result, node.separators[index]);
+            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                result = AddToken(result, listItem.separator);
             }
             if (HasTrailingComment(node, index)) {
-                result = AddToken(result, node.trailingComments[index]);
+                result = AddToken(result, listItem.trailingComment);
             }
             const bool hasNextItem = index + 1 < node.items.size();
             result = AddListBreak(
@@ -793,13 +917,14 @@ private:
         if (CanKeepParenthesizedArithmeticSplitCompact(node, compact)) {
             return true;
         }
-        if (!EndsWithCompactPrefixAndSplitDelimiter(*node.items.front(), compact)) {
+        if (!EndsWithCompactPrefixAndSplitDelimiter(*node.items.front().node, compact)) {
             return false;
         }
         return std::none_of(
-            node.separators.begin(),
-            node.separators.end(),
-            [](const FormatBreakToken& separator) { return FormatBreakTokenKind(separator) == PrintTokenKind::Known; }
+            node.items.begin(),
+            node.items.end(),
+            [](const FormatBreakListItem& item)
+            { return FormatBreakTokenKind(item.separator) == PrintTokenKind::Known; }
         );
     }
 
@@ -812,8 +937,8 @@ private:
                 return true;
             }
         }
-        for (const FormatBreakNode* item : node.items) {
-            if (item && ContainsCompactBodyHeader(*item, compact)) {
+        for (const FormatBreakListItem& item : node.items) {
+            if (item.node && ContainsCompactBodyHeader(*item.node, compact)) {
                 return true;
             }
         }
@@ -826,7 +951,9 @@ private:
     }
 
     static bool CanKeepTrailingBodyHeaderCompact(const FormatBreakNode& node, const NodeResult& compact) {
-        return node.items.size() > 1 && node.items.back() && ContainsCompactBodyHeader(*node.items.back(), compact);
+        return node.items.size() > 1 &&
+            node.items.back().node &&
+            ContainsCompactBodyHeader(*node.items.back().node, compact);
     }
 
     static bool CanKeepDelimitedCompactWithExtraLines(const FormatBreakNode& node, const NodeResult& compact) {
@@ -845,7 +972,7 @@ private:
         if (node.delimiterKind != FormatBreakDelimiterKind::Paren || node.items.size() != 1) {
             return false;
         }
-        const FormatBreakNode& item = *node.items.front();
+        const FormatBreakNode& item = *node.items.front().node;
         if (
             item.kind != FormatBreakNodeKind::Chain ||
             item.chainKind != FormatBreakChainKind::AfterOperator ||
@@ -892,7 +1019,7 @@ private:
             return std::any_of(
                 node.items.begin(),
                 node.items.end(),
-                [token](const FormatBreakNode* item) { return item && ContainsOperator(*item, token); }
+                [token](const FormatBreakListItem& item) { return item.node && ContainsOperator(*item.node, token); }
             );
         }
         if (node.kind == FormatBreakNodeKind::Sequence) {
@@ -946,15 +1073,14 @@ private:
         AddChoice(result, node.id, FormatBreakChoice::Compact);
         result = AddToken(result, node.children[0]->token);
         for (size_t index = 0; index < node.items.size(); ++index) {
-            NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
+            const FormatBreakListItem& listItem = node.items[index];
+            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (
-                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
-            ) {
-                result = AddToken(result, node.separators[index]);
+            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                result = AddToken(result, listItem.separator);
             }
             if (HasTrailingComment(node, index)) {
-                result = AddToken(result, node.trailingComments[index]);
+                result = AddToken(result, listItem.trailingComment);
             }
         }
         return result;
@@ -967,15 +1093,14 @@ private:
         result = AddToken(result, node.children[0]->token);
         result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
-            NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
+            const FormatBreakListItem& listItem = node.items[index];
+            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (
-                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
-            ) {
-                result = AddToken(result, node.separators[index]);
+            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                result = AddToken(result, listItem.separator);
             }
             if (HasTrailingComment(node, index)) {
-                result = AddToken(result, node.trailingComments[index]);
+                result = AddToken(result, listItem.trailingComment);
             }
             if (index + 1 < node.items.size()) {
                 result = AddListBreak(
@@ -1173,15 +1298,14 @@ private:
         result = AddToken(result, node.children[0]->token);
         result = AddListBreak(result, baseIndent + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
-            NodeResult item = Solve(*node.items[index], result.endColumn, result.endIndentLevel, result.endLineHasText);
+            const FormatBreakListItem& listItem = node.items[index];
+            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (
-                index < node.separators.size() && FormatBreakTokenKind(node.separators[index]) == PrintTokenKind::Known
-            ) {
-                result = AddToken(result, node.separators[index]);
+            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                result = AddToken(result, listItem.separator);
             }
             if (HasTrailingComment(node, index)) {
-                result = AddToken(result, node.trailingComments[index]);
+                result = AddToken(result, listItem.trailingComment);
             }
             const bool hasNextItem = index + 1 < node.items.size();
             result = AddListBreak(
