@@ -33,6 +33,7 @@ enum class FormatBreakChainKind {
 enum class FormatBreakChoice {
     Compact,
     Split,
+    SplitAttachedOpen,
     StreamCompactTail,
     TernaryBreakAfterQuestion,
     TernaryBreakAfterColon,
@@ -41,6 +42,7 @@ enum class FormatBreakChoice {
 struct FormatBreakToken {
     PrintToken token;
     bool spaceBefore = false;
+    bool contextOnly = false;
 };
 
 struct FormatBreakNode {
@@ -61,6 +63,12 @@ struct FormatBreakNode {
 
 struct FormatBreakModel {
     std::unique_ptr<FormatBreakNode> root;
+};
+
+struct FormatBreakModelContext {
+    const SyntaxNode* virtualDelimiterOpen = nullptr;
+    FormatBreakToken virtualDelimiterClose;
+    bool forceSplitVirtualDelimiter = false;
 };
 
 bool FormatBreakLeadingNameMatches(const FormatBreakNode& node, std::string_view candidate);

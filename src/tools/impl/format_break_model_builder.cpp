@@ -84,8 +84,7 @@ bool IsBinaryOperatorForNode(const FormatBreakToken& token) {
 
 bool IsAssignmentOperatorForNode(const FormatBreakToken& token) {
     return token.token.kind == PrintTokenKind::Known &&
-        KnownTokenHasClass(token.token.known, TokenClass::AssignmentOperator) &&
-        (
+        KnownTokenHasClass(token.token.known, TokenClass::AssignmentOperator) && (
             token.token.parentKind == SyntaxTreeKind::AssignmentExpression ||
             token.token.parentKind == SyntaxTreeKind::InitDeclarator ||
             token.token.parentKind == SyntaxTreeKind::FieldDeclaration ||
@@ -237,7 +236,8 @@ bool UsesFlatLogicalContinuation(const FormatBreakToken& open, const FormatBreak
 
 class BreakModelBuilder {
 public:
-    explicit BreakModelBuilder(std::span<const PrintToken> tokens) {
+    BreakModelBuilder(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) : context_(context)
+    {
         const PrintToken* previous = nullptr;
         for (size_t index = 0; index < tokens.size(); ++index) {
             const PrintToken& token = tokens[index];
@@ -276,6 +276,7 @@ public:
     }
 
 private:
+    const FormatBreakModelContext& context_;
     std::unordered_map<const SyntaxNode*, FormatBreakToken> tokensByNode_;
     std::unordered_set<const SyntaxNode*> selectedNodes_;
     const SyntaxNode* root_ = nullptr;
@@ -617,8 +618,7 @@ private:
             }
             if (
                 (node.treeKind == SyntaxTreeKind::BinaryExpression && IsBinaryOperatorForNode(*token)) ||
-                (node.treeKind == SyntaxTreeKind::CommaExpression && IsCommaOperatorForNode(*token)) ||
-                (
+                (node.treeKind == SyntaxTreeKind::CommaExpression && IsCommaOperatorForNode(*token)) || (
                     (
                         node.treeKind == SyntaxTreeKind::AssignmentExpression ||
                         node.treeKind == SyntaxTreeKind::InitDeclarator ||
@@ -870,11 +870,15 @@ private:
         }
         const std::optional<std::pair<size_t, FormatBreakDelimiterKind>> closeMatch =
             FindDirectClose(children, openIndex, end, delimiter);
-        if (!closeMatch) {
+        const bool hasVirtualClose = !closeMatch &&
+            context_.virtualDelimiterOpen == open->token.node &&
+            ClosingDelimiter(context_.virtualDelimiterClose) == delimiter;
+        if (!closeMatch && !hasVirtualClose) {
             return nullptr;
         }
-        const size_t closeIndex = closeMatch->first;
-        const FormatBreakToken* close = TokenForNode(*children[closeIndex]);
+        const size_t closeIndex = closeMatch ? closeMatch->first : end;
+        const FormatBreakToken* close =
+            closeMatch ? TokenForNode(*children[closeIndex]) : &context_.virtualDelimiterClose;
 
         auto delimited = MakeNode(FormatBreakNodeKind::Delimited, depth);
         delimited->delimiterKind = delimiter;
@@ -928,8 +932,9 @@ private:
         if (!delimited->items.empty()) {
             delimited->separators.push_back({});
         }
-        delimited->forceSplit = IsConstructorParameterListWithInitializerList(*open) && delimited->items.size() > 1;
-        afterDelimited = closeIndex + 1;
+        delimited->forceSplit = (IsConstructorParameterListWithInitializerList(*open) && delimited->items.size() > 1) ||
+            (hasVirtualClose && context_.forceSplitVirtualDelimiter);
+        afterDelimited = hasVirtualClose ? end : closeIndex + 1;
         return delimited;
     }
 };
@@ -937,5 +942,9 @@ private:
 }  // namespace
 
 FormatBreakModel BuildFormatBreakModel(std::span<const PrintToken> tokens) {
-    return BreakModelBuilder(tokens).Build();
+    return BuildFormatBreakModel(tokens, {});
+}
+
+FormatBreakModel BuildFormatBreakModel(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) {
+    return BreakModelBuilder(tokens, context).Build();
 }
