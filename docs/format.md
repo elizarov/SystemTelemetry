@@ -7,7 +7,6 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 ## Main Tenets
 
 - Never use vertical alignment.
-- When a wrapped construct closes, the matching closing delimiter begins a line at the owning indent.
 - Keep formatter-owned chains and lists compact or split item-by-item.
 - Use no heuristics or weights; use only the general line-break optimization rule.
 - Use indentation changes as visual group borders.
@@ -99,6 +98,56 @@ Line break opportunities are optional boundaries that the optimizer may take whe
 - After semicolons inside `for` and control headers.
 - Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
 
+## Indent Economy
+
+Indent economy lets nested delimiter groups share one body indentation level when their opener and closer placement stays visually unambiguous. It applies to broken `()`, `[]`, `{}`, and parsed template `<>` delimiter groups. It is a legality rule for candidate layouts; the optimizer still chooses among legal layouts with the normal dynamic-programming objective.
+
+For any broken delimiter stack:
+
+- The opening line ends with an opener or opener sequence, so the body break is immediately after an opener.
+- If the opening line starts with an opener or opener sequence after indentation, the whole line contains only openers.
+- The closing line starts with all closers for the stack combined. Syntax that belongs after the stack, such as `;`, `,`, another closer, or the next opener in a list boundary, may follow those closers.
+
+This allows wrapper and nested delimiter groups to share indentation:
+
+```cpp
+render(transform(
+    first,
+    second
+));
+
+Widget rows[] = {{
+    first,
+    second
+}};
+```
+
+A broken delimiter body cannot put item content after a line-start opener:
+
+```cpp
+POINT points[] = {
+    {rect.left,
+        rect.top
+    }
+};
+```
+
+The formatter produces a separate opener line instead:
+
+```cpp
+POINT points[] = {
+    {
+        rect.left,
+        rect.top
+    }, {
+        rect.right,
+        rect.bottom
+    }
+};
+```
+
+The `}, {` boundary is allowed because the line starts with the combined closers for the previous element and then opens the next element. The next body break is still immediately after that opener.
+
 ## Lists
 
 Lists use compact or split form.
@@ -115,7 +164,7 @@ call(
 
 The rule applies to function arguments, template arguments, braced initializer lists, subscript lists, declaration parameter lists, base-class lists, enum bodies, and similar comma-separated syntax.
 
-Compact comma-separated lists may keep leading items on the opener line while the final item splits internally through a delimiter. The final item may be any expression, such as a braced initializer or call. If any earlier item splits, if the final item only splits at an operator, or if the final item would start a physical line with a delimiter and continue content after that opener, the whole list uses split form.
+Compact comma-separated lists may keep leading items on the opener line while the final item uses an indent-economy delimiter expansion. The final item may be any expression, such as a braced initializer or call. If any earlier item splits, or if the final item only splits at an operator, the whole list uses split form.
 
 ```cpp
 call(first, second, [](int value) {
@@ -123,9 +172,9 @@ call(first, second, [](int value) {
 });
 ```
 
-When a template list wraps, `<` stays with the owner, each top-level argument occupies one line, and the closing `>` starts the continuation line.
+When a template list wraps, `<` stays with the owner and each top-level argument occupies one line.
 
-Nested braced initializer and braced constructor elements are independent structural parts. Each nested element uses the same compact-or-split optimization as any other segment. In a split braced comma-list, adjacent split braced elements may render the comma boundary as `}, {`; this is the only comma-list boundary form that combines two split elements.
+Nested braced initializer and braced constructor elements are independent structural parts. Each nested element uses the same compact-or-split optimization as any other segment and follows indent-economy delimiter placement.
 
 ```cpp
 Widget rows[] = {
@@ -172,7 +221,7 @@ struct Context {
 - Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, and comparisons.
 - Chain classification is independent of operand count. A chain with two operands is still a chain.
 - Chains use compact or split form.
-- Compact chains may keep leading operands on one line while the final operand splits internally through a delimiter that does not start the physical line.
+- Compact chains may keep leading operands on one line while the final operand uses an indent-economy delimiter expansion.
 - A final operand that only splits at another operator does not qualify for compact chain form.
 - Split chains take every top-level chain opportunity.
 - Chain parts use the chain item indentation, not an additional continuation indentation.
@@ -251,9 +300,7 @@ Each node exposes its legal compact and split layouts. The optimizer chooses whi
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
 
-Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`. A delimiter split emits its opening delimiter sequence as the last content on a physical line and its matching closing delimiter sequence as the first content on a physical line. When a physical line starts with an opening delimiter or sequence of opening delimiters whose matching closer is on a later line, the formatter breaks immediately after that opener sequence. Delimiter sequences stay run-symmetric: when N matching closers are emitted together, their N openers are emitted together as the corresponding opener sequence. This is a universal rule with no exceptions.
-When compact content ends in a split delimiter group and no intervening separator or item content follows it, wrapper delimiter groups may stay compact so any number of adjacent openers and closers combine across delimiter kinds.
-When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack can keep the opening sequence together and the closing sequence together regardless of nesting depth.
+Delimiter-group legality is defined by indent economy. The legality rules restrict candidate layouts without forcing a local break choice; the optimizer chooses among the legal compact, split, and indent-economy layouts.
 
 Function signatures may break after the complete return type before breaking inside the return type. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. Functions and lambdas deliberately share one callable-header model. Function definitions whose return-type prefix is split away from the function name start the body `{` on its own line at declaration indentation. Assigned lambdas whose assignment prefix is split away from the lambda header expose both attached and declaration-indented body-header layouts to the optimizer. A callable whose only header continuation is a split parameter list must keep `) {` together.
 
@@ -286,11 +333,6 @@ render(
     ),
     third
 );
-
-Widget rows[] = {{
-    first,
-    second
-}};
 ```
 
 Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, compiler declaration prefix groups, `__declspec` groups, operator function names, or template-angle tokens that are not template argument lists.
