@@ -108,6 +108,7 @@ bool KeepsListCommentInBreakModel(const PrintToken& token) {
         case SyntaxNodeKind::FieldInitializerList:
         case SyntaxNodeKind::ParameterList:
         case SyntaxNodeKind::ArgumentList:
+        case SyntaxNodeKind::SubscriptArgumentList:
         case SyntaxNodeKind::TemplateParameterList:
         case SyntaxNodeKind::TemplateArgumentList:
         case SyntaxNodeKind::LambdaCaptureSpecifier:
@@ -116,18 +117,6 @@ bool KeepsListCommentInBreakModel(const PrintToken& token) {
         default:
             return false;
     }
-}
-
-bool ContainsLogicalOperator(const SyntaxNode& node) {
-    if (node.kind == SyntaxNodeKind::AmpersandAmpersand || node.kind == SyntaxNodeKind::PipePipe) {
-        return true;
-    }
-    for (const SyntaxNode* child : node.children) {
-        if (child && ContainsLogicalOperator(*child)) {
-            return true;
-        }
-    }
-    return false;
 }
 
 int CollapsedSourceWidth(std::string_view text) {
@@ -178,6 +167,27 @@ int CollapsedNodeWidth(const SyntaxNode& node) {
     return width;
 }
 
+bool IsDeclarationLikeNode(SyntaxNodeKind kind) {
+    return kind == SyntaxNodeKind::Declaration || kind == SyntaxNodeKind::FieldDeclaration;
+}
+
+const SyntaxNode* LambdaCompactContext(const SyntaxNode& lambda) {
+    const SyntaxNode* parent = lambda.parent;
+    if (parent == nullptr) {
+        return &lambda;
+    }
+    if (parent->kind == SyntaxNodeKind::AssignmentExpression) {
+        return parent;
+    }
+    if (parent->kind == SyntaxNodeKind::InitDeclarator && parent->parent != nullptr) {
+        const SyntaxNode* declaration = parent->parent;
+        if (IsDeclarationLikeNode(declaration->kind)) {
+            return declaration;
+        }
+    }
+    return &lambda;
+}
+
 bool IsSingleStatementLambdaBody(
     const SyntaxNode& node,
     SyntaxNodeKind parentKind,
@@ -187,7 +197,7 @@ bool IsSingleStatementLambdaBody(
     if (node.kind != SyntaxNodeKind::CompoundStatement || parentKind != SyntaxNodeKind::LambdaExpression) {
         return false;
     }
-    if (parentNode == nullptr || CollapsedNodeWidth(*parentNode) > columnLimit) {
+    if (parentNode == nullptr || CollapsedNodeWidth(*LambdaCompactContext(*parentNode)) > columnLimit) {
         return false;
     }
     size_t statementCount = 0;
@@ -215,7 +225,6 @@ void AppendTokens(
     SyntaxNodeKind grandParentKind,
     bool inTemplateDeclaration,
     bool inRequiresClause,
-    bool splitRequiresClause,
     bool inCompilerCallModifier,
     bool inSingleStatementLambdaBody,
     const SyntaxNode* macroDefinition,
@@ -229,8 +238,6 @@ void AppendTokens(
     const SyntaxNodeKind nodeKind = node.kind;
     const bool childInTemplateDeclaration = inTemplateDeclaration || nodeKind == SyntaxNodeKind::TemplateDeclaration;
     const bool childInRequiresClause = inRequiresClause || nodeKind == SyntaxNodeKind::RequiresClause;
-    const bool childSplitRequiresClause =
-        splitRequiresClause || (nodeKind == SyntaxNodeKind::RequiresClause && ContainsLogicalOperator(node));
     const bool childInCompilerCallModifier = inCompilerCallModifier ||
         nodeKind == SyntaxNodeKind::MsCallModifier ||
         nodeKind == SyntaxNodeKind::MsDeclspecModifier;
@@ -266,7 +273,6 @@ void AppendTokens(
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
             .inRequiresClause = childInRequiresClause,
-            .splitRequiresClause = childSplitRequiresClause,
             .inCompilerCallModifier = childInCompilerCallModifier,
             .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
             .inMacroValue = childInMacroValue,
@@ -286,7 +292,6 @@ void AppendTokens(
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
             .inRequiresClause = childInRequiresClause,
-            .splitRequiresClause = childSplitRequiresClause,
             .inCompilerCallModifier = childInCompilerCallModifier,
             .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
             .inMacroValue = childInMacroValue,
@@ -305,7 +310,6 @@ void AppendTokens(
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
             .inRequiresClause = childInRequiresClause,
-            .splitRequiresClause = childSplitRequiresClause,
             .inCompilerCallModifier = childInCompilerCallModifier,
             .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
             .inMacroValue = childInMacroValue,
@@ -325,7 +329,6 @@ void AppendTokens(
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
             .inRequiresClause = childInRequiresClause,
-            .splitRequiresClause = childSplitRequiresClause,
             .inCompilerCallModifier = childInCompilerCallModifier,
             .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
             .inMacroValue = childInMacroValue,
@@ -345,7 +348,6 @@ void AppendTokens(
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
             .inRequiresClause = childInRequiresClause,
-            .splitRequiresClause = childSplitRequiresClause,
             .inCompilerCallModifier = childInCompilerCallModifier,
             .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
             .inMacroValue = childInMacroValue,
@@ -364,7 +366,6 @@ void AppendTokens(
                 parentKind,
                 childInTemplateDeclaration,
                 childInRequiresClause,
-                childSplitRequiresClause,
                 childInCompilerCallModifier,
                 childInSingleStatementLambdaBody,
                 childMacroDefinition,
@@ -385,7 +386,6 @@ void AppendTokens(
                 parentKind,
                 childInTemplateDeclaration,
                 childInRequiresClause,
-                childSplitRequiresClause,
                 childInCompilerCallModifier,
                 childInSingleStatementLambdaBody,
                 childMacroDefinition,
@@ -645,6 +645,68 @@ private:
             }
         }
         return nullptr;
+    }
+
+    bool AppendCompactWidthToken(
+        const PrintToken& token,
+        int& width,
+        bool& hasText,
+        const PrintToken*& previous,
+        bool& previousStringLike
+    ) const {
+        if (token.kind != PrintTokenKind::Known && token.kind != PrintTokenKind::Free) {
+            return false;
+        }
+        const bool stringLike = IsStringLike(token);
+        if (
+            token.inMacroValue ||
+            token.breakBeforeMacroValue ||
+            token.macroDefinition != nullptr ||
+            (stringLike && previousStringLike) ||
+            token.parentKind == SyntaxNodeKind::FieldInitializerList ||
+            token.grandParentKind == SyntaxNodeKind::FieldInitializerList
+        ) {
+            return false;
+        }
+        if (FormatTokenNeedsSpace(previous, token) && hasText) {
+            ++width;
+        }
+        const int tokenWidth = FormatTokenWidth(token);
+        width += tokenWidth;
+        hasText = hasText || tokenWidth > 0;
+        previous = &token;
+        previousStringLike = stringLike;
+        return true;
+    }
+
+    bool CanKeepRequiresClauseOnTemplateLine(const PrintToken& token) const {
+        const SyntaxNode* requiresClause = NearestAncestor(token, SyntaxNodeKind::RequiresClause);
+        if (requiresClause == nullptr || activeTokens_ == nullptr) {
+            return true;
+        }
+
+        int width = 0;
+        bool hasText = lineHasText_;
+        const PrintToken* previous = nullptr;
+        bool previousStringLike = false;
+        for (const PrintToken& pending : pendingTokens_) {
+            if (!AppendCompactWidthToken(pending, width, hasText, previous, previousStringLike)) {
+                return false;
+            }
+        }
+        for (size_t index = currentTokenIndex_; index < activeTokens_->size(); ++index) {
+            const PrintToken& candidate = (*activeTokens_)[index];
+            if (!SyntaxPathContains(candidate, requiresClause)) {
+                if (index > currentTokenIndex_) {
+                    break;
+                }
+                continue;
+            }
+            if (!AppendCompactWidthToken(candidate, width, hasText, previous, previousStringLike)) {
+                return false;
+            }
+        }
+        return CurrentColumn() + width <= config_.columnLimit;
     }
 
     static bool IsAccessLabel(const PrintToken& token, const PrintToken* next) {
@@ -1875,8 +1937,8 @@ private:
                 if (
                     token.syntaxKind == SyntaxNodeKind::KeywordRequires &&
                     token.inTemplateDeclaration &&
-                    token.splitRequiresClause &&
-                    HasBufferedLineText()
+                    HasBufferedLineText() &&
+                    !CanKeepRequiresClauseOnTemplateLine(token)
                 ) {
                     FlushPendingTokens();
                     NewLineWithIndent(indentLevel_ + 1);
@@ -2084,7 +2146,6 @@ std::string FormatModelText(
         *model.root,
         SyntaxNodeKind::Unknown,
         SyntaxNodeKind::Unknown,
-        false,
         false,
         false,
         false,

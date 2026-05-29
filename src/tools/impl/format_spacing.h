@@ -22,7 +22,6 @@ struct PrintToken {
     SyntaxNodeKind grandParentKind = SyntaxNodeKind::Unknown;
     bool inTemplateDeclaration = false;
     bool inRequiresClause = false;
-    bool splitRequiresClause = false;
     bool inCompilerCallModifier = false;
     bool inSingleStatementLambdaBody = false;
     bool inMacroValue = false;

@@ -84,6 +84,7 @@ enum class SyntaxNodeKind : std::uint16_t {
     AbstractParenthesizedDeclarator,
     ParameterList,
     ArgumentList,
+    SubscriptArgumentList,
     TemplateParameterList,
     TemplateArgumentList,
     TemplateDeclaration,

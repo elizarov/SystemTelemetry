@@ -46,6 +46,22 @@ const SyntaxNode* GrandParentNode(const PrintToken& token) {
     return parent != nullptr ? parent->parent : nullptr;
 }
 
+size_t CountParameterItems(const SyntaxNode& parameterList) {
+    size_t count = 0;
+    for (const SyntaxNode* child : parameterList.children) {
+        if (
+            child != nullptr &&
+            !SyntaxNodeKindHasClass(child->kind, TokenClass::Known) &&
+            child->kind != SyntaxNodeKind::Comment &&
+            child->kind != SyntaxNodeKind::TrailingComment &&
+            child->kind != SyntaxNodeKind::BlankLine
+        ) {
+            ++count;
+        }
+    }
+    return count;
+}
+
 bool IsCompactEmptyBraceToken(const PrintToken& token) {
     return token.kind == PrintTokenKind::Free && token.text == "{}";
 }
@@ -80,22 +96,27 @@ bool HasCallModifierBeforeDeclaratorBinding(const PrintToken& token) {
     return false;
 }
 
-bool IsAmbiguousDirectInitializerMultiply(const PrintToken& token) {
-    if (token.kind != PrintTokenKind::Known || token.syntaxKind != SyntaxNodeKind::Star || token.node == nullptr) {
+bool IsSingleItemAmbiguousDirectInitializerOperator(const PrintToken& token) {
+    // Tree-sitter parses value(a * b) as a block-scope function declarator; keep that single-item shape expression-like.
+    if (
+        token.kind != PrintTokenKind::Known ||
+        !SyntaxNodeKindHasClass(token.syntaxKind, TokenClass::DeclaratorReferenceToken) ||
+        token.node == nullptr
+    ) {
         return false;
     }
-    const SyntaxNode* pointerDeclarator = ParentNode(token);
+    const SyntaxNode* declarator = ParentNode(token);
     const SyntaxNode* parameterItem = GrandParentNode(token);
     const SyntaxNode* parameterList = parameterItem != nullptr ? parameterItem->parent : nullptr;
     const SyntaxNode* functionDeclarator = parameterList != nullptr ? parameterList->parent : nullptr;
     const SyntaxNode* declaration = functionDeclarator != nullptr ? functionDeclarator->parent : nullptr;
     const SyntaxNode* declarationParent = declaration != nullptr ? declaration->parent : nullptr;
-    return pointerDeclarator != nullptr &&
-        pointerDeclarator->kind == SyntaxNodeKind::PointerDeclarator &&
+    return declarator != nullptr &&
+        IsDeclaratorReferenceParent(declarator->kind) &&
         parameterItem != nullptr &&
-        parameterItem->kind == SyntaxNodeKind::Tree &&
         parameterList != nullptr &&
         parameterList->kind == SyntaxNodeKind::ParameterList &&
+        CountParameterItems(*parameterList) == 1 &&
         functionDeclarator != nullptr &&
         functionDeclarator->kind == SyntaxNodeKind::FunctionDeclarator &&
         declaration != nullptr &&
@@ -351,7 +372,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         }
         return current.parentKind != SyntaxNodeKind::CaseStatement;
     }
-    if (IsAmbiguousDirectInitializerMultiply(current) || IsAmbiguousDirectInitializerMultiply(*previous)) {
+    if (IsSingleItemAmbiguousDirectInitializerOperator(current) || IsSingleItemAmbiguousDirectInitializerOperator(
+        *previous
+    )) {
         return true;
     }
     if (IsDeclaratorBindingToken(current)) {
@@ -375,16 +398,14 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
     ) {
         return true;
     }
-    if (current.kind == PrintTokenKind::Known && (
-        SyntaxNodeKindHasClass(cur, TokenClass::AssignmentOperator) ||
-        (SyntaxNodeKindHasClass(cur, TokenClass::BinaryOperator) && IsBinaryContext(current))
-    )) {
+    if (current.kind == PrintTokenKind::Known && (SyntaxNodeKindHasClass(cur, TokenClass::AssignmentOperator) || (
+        SyntaxNodeKindHasClass(cur, TokenClass::BinaryOperator) && IsBinaryContext(current)
+    ))) {
         return true;
     }
-    if (previous->kind == PrintTokenKind::Known && (
-        SyntaxNodeKindHasClass(prev, TokenClass::AssignmentOperator) ||
-        (SyntaxNodeKindHasClass(prev, TokenClass::BinaryOperator) && IsBinaryContext(*previous))
-    )) {
+    if (previous->kind == PrintTokenKind::Known && (SyntaxNodeKindHasClass(prev, TokenClass::AssignmentOperator) || (
+        SyntaxNodeKindHasClass(prev, TokenClass::BinaryOperator) && IsBinaryContext(*previous)
+    ))) {
         return true;
     }
     if (

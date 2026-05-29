@@ -151,6 +151,7 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     ),
     Tree(SyntaxNodeKind::ParameterList, "parameter_list"),
     Tree(SyntaxNodeKind::ArgumentList, "argument_list"),
+    Tree(SyntaxNodeKind::SubscriptArgumentList, "subscript_argument_list"),
     Tree(SyntaxNodeKind::TemplateParameterList, "template_parameter_list"),
     Tree(SyntaxNodeKind::TemplateArgumentList, "template_argument_list"),
     Tree(SyntaxNodeKind::TemplateDeclaration, "template_declaration", Bit(TokenClass::MacroDeclarationFragment)),
@@ -203,7 +204,7 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     ),
     Token(SyntaxNodeKind::Slash, "/", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::Percent, "%", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)),
-    Token(SyntaxNodeKind::Caret, "^", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)),
+    Token(SyntaxNodeKind::Caret, "^", kChainBinaryClasses | Bit(TokenClass::DeclaratorReferenceToken)),
     Token(
         SyntaxNodeKind::Ampersand,
         "&",
@@ -554,6 +555,8 @@ std::string_view SyntaxNodeKindName(SyntaxNodeKind kind) {
             return "ParameterList";
         case SyntaxNodeKind::ArgumentList:
             return "ArgumentList";
+        case SyntaxNodeKind::SubscriptArgumentList:
+            return "SubscriptArgumentList";
         case SyntaxNodeKind::TemplateParameterList:
             return "TemplateParameterList";
         case SyntaxNodeKind::TemplateArgumentList:

@@ -1011,18 +1011,30 @@ private:
         if (std::optional<FormatBreakToken> token = TokenForNode(*node.children[question])) {
             operators.push_back(*token);
         }
-        operands.push_back(BuildSequenceFromChildren(node.children, question + 1, colon, depth + 1));
+        AppendConditionalBranch(node.children, question + 1, colon, operands, operators, depth);
         if (std::optional<FormatBreakToken> token = TokenForNode(*node.children[colon])) {
             operators.push_back(*token);
         }
+        AppendConditionalBranch(node.children, colon + 1, node.children.size(), operands, operators, depth);
+    }
+
+    void AppendConditionalBranch(
+        const std::vector<SyntaxNode*>& children,
+        size_t begin,
+        size_t end,
+        std::vector<FormatBreakNode*>& operands,
+        std::vector<FormatBreakToken>& operators,
+        int depth
+    ) {
         if (
-            node.children.size() == colon + 2 &&
-            node.children[colon + 1] &&
-            node.children[colon + 1]->kind == SyntaxNodeKind::ConditionalExpression
+            end == begin + 1 &&
+            begin < children.size() &&
+            children[begin] != nullptr &&
+            children[begin]->kind == SyntaxNodeKind::ConditionalExpression
         ) {
-            AppendConditionalChain(*node.children[colon + 1], operands, operators, depth);
+            AppendConditionalChain(*children[begin], operands, operators, depth);
         } else {
-            operands.push_back(BuildSequenceFromChildren(node.children, colon + 1, node.children.size(), depth + 1));
+            operands.push_back(BuildSequenceFromChildren(children, begin, end, depth + 1));
         }
     }
 

@@ -159,10 +159,10 @@ struct Context {
 ## Operator Chains
 
 - Chain operators are token-class defined.
-- Binary chain operators are `+`, `*`, `&`, `|`, `&&`, and `||`.
+- Binary chain operators are `+`, `*`, `&`, `|`, `^`, `&&`, and `||`.
 - Comma is a chain operator only in comma expressions.
 - Stream-shift chain operators are `<<` and `>>`.
-- Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, `^`, and comparisons.
+- Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, and comparisons.
 - Chain classification is independent of operand count. A chain with two operands is still a chain.
 - Chains use compact or split form.
 - Split chains take every top-level chain opportunity.
@@ -347,7 +347,7 @@ void FuncLong(
 }
 ```
 
-Template prefixes are emitted before the introduced declaration. A short `requires(...)` clause may stay on the same line as `template <...>`. A long `requires` clause moves to a subordinate line and wraps structurally.
+Template prefixes are emitted before the introduced declaration. A `requires` clause stays on the same line as `template <...>` only when the complete template prefix and compact clause fit on that line. Otherwise, including when the clause owns a forced break, the `requires` clause moves to a subordinate line and wraps structurally.
 
 ```cpp
 template <typename T> requires(HasValue<T>)

@@ -447,6 +447,14 @@ void UseShortRequires(T& value) {
     value.Use();
 }
 
+template <typename ExtremelyLongTemplateParameterNameForFormatterRequires>
+    requires(ExtremelyLongConceptNameWithoutLogicalOperatorsThatStillNeedsSubordinateLine<
+        ExtremelyLongTemplateParameterNameForFormatterRequires
+    >)
+void UseLongRequires(ExtremelyLongTemplateParameterNameForFormatterRequires& value) {
+    value.Use();
+}
+
 using ConfigMetricAvailabilityResolver = bool (*)(std::string_view metricRef);
 using RuntimeConfigDynamicItemVisitor = void (*)(void* context, std::string_view key, const void* item);
 using RuntimeConfigEnsureDynamicItem = void* (*)(AppConfig& config, std::string_view key);
@@ -569,6 +577,10 @@ void ManagedReferenceSpacing(
     );
 }
 
+void LocalDeclaratorReferenceSpacing() {
+    ResultType local(FirstType* first, SecondType& second);
+}
+
 void RegisterStaticTextAnchor(
     const RenderRect&,
     const std::string&,
@@ -578,6 +590,14 @@ void RegisterStaticTextAnchor(
     std::optional<LayoutEditParameter>,
     LayoutEditTargetOutline
 ) override {}
+
+void RegisterSubscriptListComment() {
+    value = matrix[
+        firstReallyLongIndexForFormatterGenerality,  // selected row
+        secondReallyLongIndexForFormatterGenerality,
+        thirdReallyLongIndexForFormatterGenerality
+    ];
+}
 
 struct NetworkFooterWidgetConfig {
     int bottomGap{};  // config_meta: policy=non_negative_int
@@ -1140,6 +1160,10 @@ void UniversalBreakSelectionCases() {
             thirdArgumentWithLongName
         ) :
         fallbackValueWithLongName;
+    const int ternaryTrueBranchChainValue =
+        firstConditionWithLongName ? secondConditionWithLongName ? firstValueWithLongName :
+            secondValueWithLongName :
+            fallbackValueWithLongName;
     UseTemplate<
         FirstTemplateArgumentWithLongName,
         SecondTemplateArgumentWithLongName,
@@ -1424,6 +1448,15 @@ void PlaceEmptyLambdaCallout() {
     );
 }
 
+void AssignedSingleStatementLambdaContext() {
+    const auto shortAssignedLambda = [](int value) { return value + 1; };
+    const auto extremelyLongAssignedLambdaNameThatConsumesEnoughColumnsToForceTheAssignmentPrefixAwayFromTheLambdaHeaderBeforeTheSingleStatementBody =
+        [](int value)
+    {
+        return value + 1;
+    };
+}
+
 void SnapGaugeWidth() {
     const bool snapped = layout_snap_solver::FindNearestSnapWeight(
         kCurrentGaugeWeight,
@@ -1645,13 +1678,20 @@ unsigned int ParenthesizedBitwiseAndChain() {
 unsigned int ParenthesizedXorOperator() {
     return (
         firstReallyLongParenthesizedXorOperandForOrdinaryBinaryOperatorSplit ^
-            secondReallyLongParenthesizedXorOperandForOrdinaryBinaryOperatorSplit
+        secondReallyLongParenthesizedXorOperandForOrdinaryBinaryOperatorSplit
     );
 }
 
 unsigned int SplitXorOperator() {
     return firstReallyLongXorLeftOperandForOrdinaryBinaryOperatorSplit ^
         secondReallyLongXorRightOperandForOrdinaryBinaryOperatorSplit;
+}
+
+unsigned int SplitXorChainOperator() {
+    return firstReallyLongXorFirstOperandForFormatterOwnedChainSplit ^
+        secondReallyLongXorSecondOperandForFormatterOwnedChainSplit ^
+        thirdReallyLongXorThirdOperandForFormatterOwnedChainSplit ^
+        fourthReallyLongXorFourthOperandForFormatterOwnedChainSplit;
 }
 
 int ParenthesizedDivisionOperator() {
