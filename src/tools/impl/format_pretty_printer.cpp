@@ -1532,15 +1532,11 @@ private:
         const bool closesLambdaArgument = token.parentKind == SyntaxNodeKind::CompoundStatement &&
             token.grandParentKind == SyntaxNodeKind::LambdaExpression &&
             afterClose->syntaxKind == SyntaxNodeKind::RightParen;
-        const bool attachesToFollowingKeyword =
-            SyntaxNodeKindHasClass(afterClose->syntaxKind, TokenClass::AttachAfterBlockKeyword) &&
-                afterClose->syntaxKind != SyntaxNodeKind::KeywordWhile;
         const bool closesDoWhile = afterClose->syntaxKind == SyntaxNodeKind::KeywordWhile &&
             afterClose->parentKind == SyntaxNodeKind::DoStatement;
         return afterClose->syntaxKind != SyntaxNodeKind::Semicolon &&
             afterClose->syntaxKind != SyntaxNodeKind::Comma &&
             !closesLambdaArgument &&
-            !attachesToFollowingKeyword &&
             !closesDoWhile;
     }
 

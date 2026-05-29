@@ -378,7 +378,7 @@ DashboardApp::DashboardApp(
 }
 ```
 
-Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain. Compact empty control bodies stay `{}` and use the same following-token attachment rules as non-empty control bodies.
+Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain. Compact empty control bodies stay `{}` and finish their own control-body line before a following block-attachment keyword.
 
 ```cpp
 if (ready) {
