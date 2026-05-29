@@ -89,7 +89,7 @@ if (value != next) {
 
 ## Line Break Opportunities
 
-Line break opportunities are optional boundaries that the optimizer may take when formatting one segment between mandatory breaks.
+Line break opportunities are optional boundaries that the optimizer may take when formatting one segment between mandatory breaks. The formatter sends these opportunities to a dynamic-programming optimization solver; see **Break Selection Algorithm** for the solver objective and tie-break rules.
 
 - After assignment operators and after binary or ternary operators.
 - After delimiter openers and before matching closers for `()`, `[]`, `{}`, and template `<>`.
@@ -213,6 +213,8 @@ struct Context {
 ```
 
 ## Operator Chains
+
+Binary chain operators are the operators whose usual source meaning is an associative, mostly commutative aggregation. Formatting them as a chain avoids implying that the first operand owns a subordinate "rest of expression" branch. Stream shifts and comma expressions are also chain-shaped because their syntax is a repeated separator sequence, but they do not use the associativity rationale.
 
 - Chain operators are token-class defined.
 - Binary chain operators are `+`, `*`, `&`, `|`, `^`, `&&`, and `||`.
