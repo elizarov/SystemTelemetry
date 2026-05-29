@@ -355,6 +355,16 @@ struct InitializerGeneralityWidget {
     int third_ = 0;
 };
 
+struct DirectInitializedDeclarationGenerality {
+ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage fieldWithBracedDirectInitializerName{value};
+ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage fieldWithParenDirectInitializerName(value);
+};
+
+void DirectInitializedDeclarationGeneralityLocals(){
+ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage localWithBracedDirectInitializerName{value};
+ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage localWithParenDirectInitializerName(value);
+}
+
 InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other) {
     Touch();
 }
@@ -494,7 +504,10 @@ void ManagedReferenceSpacing(
     );
 }
 
+ResultType NamespaceDeclaratorReferenceSpacing(FirstType* first, SecondType& second);
+
 void LocalDeclaratorReferenceSpacing() {
+    int directProduct(a*b, c&d);
     ResultType local(FirstType* first, SecondType& second);
 }
 
@@ -760,9 +773,14 @@ const auto guideSheetLookup = [&config, activeTheme, &colorsSection]
 void LambdaGeneralityCases(int left, int right) {
     auto twoParameterLambda = [](int left, int right) { return left + right; };
     auto twoCaptureLambda = [left, right](int value) { return left + right + value; };
+    auto splitParameterSingleStatementLambda = [](
+        int firstParameterNameThatForcesTheLambdaHeaderToSplit,
+        int secondParameterNameThatForcesTheLambdaHeaderToSplit,
+        int thirdParameterNameThatForcesTheLambdaHeaderToSplit
+    ) { return 1; };
     Call(firstVeryLongArgumentName, [](int value) { Prepare(value); return value + 1; }, secondVeryLongArgumentName);
     std::array callbacks{firstVeryLongArgumentName, [](int value) { Prepare(value); return value + 1; }, secondVeryLongArgumentName};
-    Use(twoParameterLambda, twoCaptureLambda, callbacks);
+    Use(twoParameterLambda, twoCaptureLambda, splitParameterSingleStatementLambda, callbacks);
 }
 
 constexpr int kPrimaryFlag = 1;
@@ -1341,6 +1359,15 @@ class BaseClassSpacingPublic : public BaseClassSpacingRoot {};
 class BaseClassSpacingPrivate : private BaseClassSpacingRoot {};
 
 class BaseClassSpacingProtected : protected BaseClassSpacingRoot {};
+
+class BaseClassListCommentRootA {};
+
+class BaseClassListCommentRootB {};
+
+class BaseClassListCommentRootC {};
+
+class BaseClassListCommentDerived : public BaseClassListCommentRootA,  // primary
+public BaseClassListCommentRootB, public BaseClassListCommentRootC {};
 
 bool AttachedOpenChainKeepsFollowingOperator(const PrintToken* previous, KnownToken prev, const PrintToken& current) {
     if (

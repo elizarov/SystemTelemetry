@@ -427,6 +427,20 @@ struct InitializerGeneralityWidget {
     int third_ = 0;
 };
 
+struct DirectInitializedDeclarationGenerality {
+    ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage
+        fieldWithBracedDirectInitializerName{value};
+    ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage
+        fieldWithParenDirectInitializerName(value);
+};
+
+void DirectInitializedDeclarationGeneralityLocals() {
+    ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage
+        localWithBracedDirectInitializerName{value};
+    ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage
+        localWithParenDirectInitializerName(value);
+}
+
 InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other) {
     Touch();
 }
@@ -572,8 +586,11 @@ void ManagedReferenceSpacing(
     );
 }
 
+ResultType NamespaceDeclaratorReferenceSpacing(FirstType* first, SecondType& second);
+
 void LocalDeclaratorReferenceSpacing() {
-    ResultType local(FirstType* first, SecondType& second);
+    int directProduct(a * b, c & d);
+    ResultType local(FirstType * first, SecondType & second);
 }
 
 void RegisterStaticTextAnchor(
@@ -840,6 +857,13 @@ const auto guideSheetLookup =
 void LambdaGeneralityCases(int left, int right) {
     auto twoParameterLambda = [](int left, int right) { return left + right; };
     auto twoCaptureLambda = [left, right](int value) { return left + right + value; };
+    auto splitParameterSingleStatementLambda = [](
+        int firstParameterNameThatForcesTheLambdaHeaderToSplit,
+        int secondParameterNameThatForcesTheLambdaHeaderToSplit,
+        int thirdParameterNameThatForcesTheLambdaHeaderToSplit
+    ) {
+        return 1;
+    };
     Call(
         firstVeryLongArgumentName,
         [](int value) {
@@ -856,7 +880,7 @@ void LambdaGeneralityCases(int left, int right) {
         },
         secondVeryLongArgumentName
     };
-    Use(twoParameterLambda, twoCaptureLambda, callbacks);
+    Use(twoParameterLambda, twoCaptureLambda, splitParameterSingleStatementLambda, callbacks);
 }
 
 constexpr int kPrimaryFlag = 1;
@@ -1248,10 +1272,9 @@ void FormatterSelfBreakCases() {
         return;
     }
     if (next < tokens.size() && tokens[next].kind == TokenKind::Word && (
-        tokens[next].text == "else" ||
-        tokens[next].text == "catch" ||
-        tokens[next].text == "finally" ||
-        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+        tokens[next].text == "else" || tokens[next].text == "catch" || tokens[next].text == "finally" || (
+            tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement
+        )
     )) {
         return;
     }
@@ -1487,10 +1510,7 @@ void PlaceEmptyLambdaCallout() {
 void AssignedSingleStatementLambdaContext() {
     const auto shortAssignedLambda = [](int value) { return value + 1; };
     const auto extremelyLongAssignedLambdaNameThatConsumesEnoughColumnsToForceTheAssignmentPrefixAwayFromTheLambdaHeaderBeforeTheSingleStatementBody =
-        [](int value)
-    {
-        return value + 1;
-    };
+        [](int value) { return value + 1; };
 }
 
 void SnapGaugeWidth() {
@@ -1777,6 +1797,17 @@ class BaseClassSpacingPublic : public BaseClassSpacingRoot {};
 class BaseClassSpacingPrivate : private BaseClassSpacingRoot {};
 
 class BaseClassSpacingProtected : protected BaseClassSpacingRoot {};
+
+class BaseClassListCommentRootA {};
+
+class BaseClassListCommentRootB {};
+
+class BaseClassListCommentRootC {};
+
+class BaseClassListCommentDerived :
+    public BaseClassListCommentRootA,  // primary
+    public BaseClassListCommentRootB,
+    public BaseClassListCommentRootC {};
 
 bool AttachedOpenChainKeepsFollowingOperator(const PrintToken* previous, KnownToken prev, const PrintToken& current) {
     if (

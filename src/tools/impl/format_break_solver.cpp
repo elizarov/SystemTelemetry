@@ -527,6 +527,30 @@ private:
         return result;
     }
 
+    NodeResult
+        SolveListItemWithSuffix(const FormatBreakListItem& listItem, int column, int indentLevel, bool lineHasText)
+    {
+        if (listItem.node == nullptr) {
+            return {};
+        }
+        NodeResult best;
+        for (NodeResult item : SolveAlternatives(*listItem.node, column, indentLevel, lineHasText)) {
+            if (!item.valid) {
+                continue;
+            }
+            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
+                item = AddToken(item, listItem.separator);
+            }
+            if (IsCommentToken(FormatBreakTokenKind(listItem.trailingComment))) {
+                item = AddToken(item, listItem.trailingComment);
+            }
+            if (Better(item, best)) {
+                best = item;
+            }
+        }
+        return best;
+    }
+
     bool Better(const NodeResult& candidate, const NodeResult& incumbent) const {
         if (!candidate.valid) {
             return false;
@@ -628,7 +652,7 @@ private:
         if (!AppendCompactOneLine(node, result)) {
             return std::nullopt;
         }
-        if (result.endLineHasText && result.endColumn >= config_.columnLimit) {
+        if (result.endLineHasText && result.endColumn > config_.columnLimit) {
             return std::nullopt;
         }
         return result;
@@ -646,7 +670,7 @@ private:
         const int width = FormatTokenWidth(printToken);
         result.endColumn += space + width;
         result.endLineHasText = result.endLineHasText || width > 0;
-        return !result.endLineHasText || result.endColumn < config_.columnLimit;
+        return !result.endLineHasText || result.endColumn <= config_.columnLimit;
     }
 
     bool AppendCompactOneLine(const FormatBreakNode& node, NodeResult& result) const {
@@ -850,14 +874,9 @@ private:
         result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             const FormatBreakListItem& listItem = node.items[index];
-            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
+            NodeResult item =
+                SolveListItemWithSuffix(listItem, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
-                result = AddToken(result, listItem.separator);
-            }
-            if (HasTrailingComment(node, index)) {
-                result = AddToken(result, listItem.trailingComment);
-            }
             const bool hasNextItem = index + 1 < node.items.size();
             result = AddListBreak(
                 result,
@@ -880,15 +899,6 @@ private:
             return split;
         }
         if (compact.valid && split.valid && CompactLineEndsOverLimit(compact) && split.maxOverflow == 0) {
-            return split;
-        }
-        if (
-            compact.valid &&
-            split.valid &&
-            compact.maxOverflow == 0 &&
-            split.maxOverflow == 0 &&
-            compact.endColumn >= config_.columnLimit
-        ) {
             return split;
         }
         if (compact.valid && split.valid && compact.extraLines > 0 && ContainsForceSplitAdjacentStrings(node)) {
@@ -1226,14 +1236,9 @@ private:
         result = AddToken(result, node.children[0]->token);
         for (size_t index = 0; index < node.items.size(); ++index) {
             const FormatBreakListItem& listItem = node.items[index];
-            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
+            NodeResult item =
+                SolveListItemWithSuffix(listItem, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
-                result = AddToken(result, listItem.separator);
-            }
-            if (HasTrailingComment(node, index)) {
-                result = AddToken(result, listItem.trailingComment);
-            }
         }
         return result;
     }
@@ -1246,14 +1251,9 @@ private:
         result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(node, 0));
         for (size_t index = 0; index < node.items.size(); ++index) {
             const FormatBreakListItem& listItem = node.items[index];
-            NodeResult item = Solve(*listItem.node, result.endColumn, result.endIndentLevel, result.endLineHasText);
+            NodeResult item =
+                SolveListItemWithSuffix(listItem, result.endColumn, result.endIndentLevel, result.endLineHasText);
             Merge(result, item);
-            if (FormatBreakTokenKind(listItem.separator) == PrintTokenKind::Known) {
-                result = AddToken(result, listItem.separator);
-            }
-            if (HasTrailingComment(node, index)) {
-                result = AddToken(result, listItem.trailingComment);
-            }
             if (index + 1 < node.items.size()) {
                 result = AddListBreak(result, indentLevel + 1, node.structuralDepth, HasBlankLineBeforeItem(
                     node,
@@ -1550,12 +1550,17 @@ private:
             const bool splitTrailingBodyHeaderAtParentIndent = node.splitTrailingBodyHeaderAtParentIndent &&
                 index + 1 == node.operands.size() - 1 &&
                 node.operands[index + 1]->kind == FormatBreakNodeKind::BodyHeader;
-            NodeResult operand = splitTrailingBodyHeaderAtParentIndent ? SolveBodyHeaderSplitAtParentIndent(
-                *node.operands[index + 1],
-                normal.endColumn,
-                normal.endIndentLevel,
-                normal.endLineHasText
-            ) : Solve(*node.operands[index + 1], normal.endColumn, normal.endIndentLevel, normal.endLineHasText);
+            NodeResult operand =
+                Solve(*node.operands[index + 1], normal.endColumn, normal.endIndentLevel, normal.endLineHasText);
+            if (splitTrailingBodyHeaderAtParentIndent) {
+                NodeResult parentIndentOperand = SolveBodyHeaderSplitAtParentIndent(
+                    *node.operands[index + 1],
+                    normal.endColumn,
+                    normal.endIndentLevel,
+                    normal.endLineHasText
+                );
+                operand = Better(parentIndentOperand, operand) ? parentIndentOperand : operand;
+            }
             Merge(normal, operand);
 
             NodeResult attached;
@@ -1679,24 +1684,17 @@ private:
         }
         if (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() == 2) {
             NodeResult best = compact;
-            NodeResults
-                alternatives{
-                    SolveSingleTernary(
-                        node,
-                        column,
-                        indentLevel,
-                        lineHasText,
-                        FormatBreakChoice::TernaryBreakAfterQuestion
-                    ),
-                    SolveSingleTernary(
-                        node,
-                        column,
-                        indentLevel,
-                        lineHasText,
-                        FormatBreakChoice::TernaryBreakAfterColon
-                    ),
-                    SolveSingleTernary(node, column, indentLevel, lineHasText, FormatBreakChoice::Split)
-                };
+            NodeResults alternatives{
+                SolveSingleTernary(
+                    node,
+                    column,
+                    indentLevel,
+                    lineHasText,
+                    FormatBreakChoice::TernaryBreakAfterQuestion
+                ),
+                SolveSingleTernary(node, column, indentLevel, lineHasText, FormatBreakChoice::TernaryBreakAfterColon),
+                SolveSingleTernary(node, column, indentLevel, lineHasText, FormatBreakChoice::Split)
+            };
             for (const NodeResult& alternative : alternatives) {
                 if (Better(alternative, best)) {
                     best = alternative;

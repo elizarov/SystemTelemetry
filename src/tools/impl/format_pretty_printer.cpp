@@ -1,7 +1,6 @@
 #include "tools/impl/format_pretty_printer.h"
 
 #include <algorithm>
-#include <cctype>
 #include <chrono>
 #include <optional>
 #include <string>
@@ -106,6 +105,7 @@ bool KeepsListCommentInBreakModel(const PrintToken& token) {
     switch (token.parentKind) {
         case SyntaxNodeKind::InitializerList:
         case SyntaxNodeKind::FieldInitializerList:
+        case SyntaxNodeKind::BaseClassClause:
         case SyntaxNodeKind::ParameterList:
         case SyntaxNodeKind::ArgumentList:
         case SyntaxNodeKind::SubscriptArgumentList:
@@ -119,85 +119,8 @@ bool KeepsListCommentInBreakModel(const PrintToken& token) {
     }
 }
 
-int CollapsedSourceWidth(std::string_view text) {
-    int width = 0;
-    bool pendingSpace = false;
-    bool hasText = false;
-    for (const char ch : text) {
-        if (std::isspace(static_cast<unsigned char>(ch))) {
-            pendingSpace = hasText;
-            continue;
-        }
-        if (pendingSpace) {
-            ++width;
-            pendingSpace = false;
-        }
-        ++width;
-        hasText = true;
-    }
-    return width;
-}
-
-void AppendCollapsedNodeWidth(const SyntaxNode& node, int& width, bool& hasText) {
-    std::string_view text;
-    if (SyntaxNodeKindHasClass(node.kind, TokenClass::Known)) {
-        text = SyntaxNodeKindTokenText(node.kind);
-    } else if (!node.text.empty()) {
-        text = node.text;
-    }
-    if (!text.empty()) {
-        if (hasText) {
-            ++width;
-        }
-        width += CollapsedSourceWidth(text);
-        hasText = true;
-        return;
-    }
-    for (const SyntaxNode* child : node.children) {
-        if (child != nullptr) {
-            AppendCollapsedNodeWidth(*child, width, hasText);
-        }
-    }
-}
-
-int CollapsedNodeWidth(const SyntaxNode& node) {
-    int width = 0;
-    bool hasText = false;
-    AppendCollapsedNodeWidth(node, width, hasText);
-    return width;
-}
-
-bool IsDeclarationLikeNode(SyntaxNodeKind kind) {
-    return kind == SyntaxNodeKind::Declaration || kind == SyntaxNodeKind::FieldDeclaration;
-}
-
-const SyntaxNode* LambdaCompactContext(const SyntaxNode& lambda) {
-    const SyntaxNode* parent = lambda.parent;
-    if (parent == nullptr) {
-        return &lambda;
-    }
-    if (parent->kind == SyntaxNodeKind::AssignmentExpression) {
-        return parent;
-    }
-    if (parent->kind == SyntaxNodeKind::InitDeclarator && parent->parent != nullptr) {
-        const SyntaxNode* declaration = parent->parent;
-        if (IsDeclarationLikeNode(declaration->kind)) {
-            return declaration;
-        }
-    }
-    return &lambda;
-}
-
-bool IsSingleStatementLambdaBody(
-    const SyntaxNode& node,
-    SyntaxNodeKind parentKind,
-    const SyntaxNode* parentNode,
-    int columnLimit
-) {
+bool IsSingleStatementLambdaBody(const SyntaxNode& node, SyntaxNodeKind parentKind) {
     if (node.kind != SyntaxNodeKind::CompoundStatement || parentKind != SyntaxNodeKind::LambdaExpression) {
-        return false;
-    }
-    if (parentNode == nullptr || CollapsedNodeWidth(*LambdaCompactContext(*parentNode)) > columnLimit) {
         return false;
     }
     size_t statementCount = 0;
@@ -231,10 +154,8 @@ void AppendTokens(
     const SyntaxNode* macroValueElement,
     bool inMacroValue,
     bool breakBeforeMacroValue,
-    int columnLimit,
     std::vector<PrintToken>& tokens
 ) {
-    const SyntaxNode* parentNode = node.parent;
     const SyntaxNodeKind nodeKind = node.kind;
     const bool childInTemplateDeclaration = inTemplateDeclaration || nodeKind == SyntaxNodeKind::TemplateDeclaration;
     const bool childInRequiresClause = inRequiresClause || nodeKind == SyntaxNodeKind::RequiresClause;
@@ -242,7 +163,7 @@ void AppendTokens(
         nodeKind == SyntaxNodeKind::MsCallModifier ||
         nodeKind == SyntaxNodeKind::MsDeclspecModifier;
     const bool childInSingleStatementLambdaBody =
-        inSingleStatementLambdaBody || IsSingleStatementLambdaBody(node, parentKind, parentNode, columnLimit);
+        inSingleStatementLambdaBody || IsSingleStatementLambdaBody(node, parentKind);
     const SyntaxNode* childMacroDefinition =
         macroDefinition != nullptr ? macroDefinition : (IsMacroDefinitionNode(nodeKind) ? &node : nullptr);
     const bool childInMacroValue = inMacroValue || nodeKind == SyntaxNodeKind::MacroReplacementList;
@@ -372,7 +293,6 @@ void AppendTokens(
                 child,
                 true,
                 childBreakBeforeMacroValue,
-                columnLimit,
                 tokens
             );
         }
@@ -392,7 +312,6 @@ void AppendTokens(
                 macroValueElement,
                 childInMacroValue,
                 childBreakBeforeMacroValue,
-                columnLimit,
                 tokens
             );
         }
@@ -2157,7 +2076,6 @@ std::string FormatModelText(
         nullptr,
         false,
         false,
-        config.columnLimit,
         tokens
     );
     stats.tokenize += std::chrono::steady_clock::now() - tokenizeStart;

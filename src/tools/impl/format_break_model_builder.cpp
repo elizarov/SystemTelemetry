@@ -207,10 +207,17 @@ bool IsListForceSplitMarker(SyntaxNodeKind kind) {
         kind == SyntaxNodeKind::TrailingComment;
 }
 
+bool IsPrefixListNodeKind(SyntaxNodeKind kind) {
+    return kind == SyntaxNodeKind::BaseClassClause || kind == SyntaxNodeKind::FieldInitializerList;
+}
+
+bool IsDeclarationNodeKind(SyntaxNodeKind kind) {
+    return kind == SyntaxNodeKind::Declaration || kind == SyntaxNodeKind::FieldDeclaration;
+}
+
 class BreakModelBuilder {
 public:
-    BreakModelBuilder(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) : context_(context)
-    {
+    BreakModelBuilder(std::span<const PrintToken> tokens, const FormatBreakModelContext& context) : context_(context) {
         model_.nodes = std::make_unique<std::deque<FormatBreakNode>>();
         selectionMark_ = NextSelectionMark();
         const PrintToken* previous = nullptr;
@@ -567,10 +574,12 @@ private:
         if (!SyntaxNodeKindHasClass(node.kind, TokenClass::Tree)) {
             return nullptr;
         }
-        if (node.kind == SyntaxNodeKind::Declaration) {
+        if (IsDeclarationNodeKind(node.kind)) {
             if (auto declaration = BuildDirectInitializedDeclaration(node, depth)) {
                 return declaration;
             }
+        }
+        if (node.kind == SyntaxNodeKind::Declaration) {
             if (auto declaration = BuildAssignedDeclaration(node, depth)) {
                 return declaration;
             }
@@ -598,7 +607,7 @@ private:
                 return expression;
             }
         }
-        if (node.kind == SyntaxNodeKind::FieldInitializerList) {
+        if (IsPrefixListNodeKind(node.kind)) {
             if (auto list = BuildPrefixList(node, depth)) {
                 return list;
             }
@@ -695,6 +704,11 @@ private:
         return hasInitializer && !hasAssignment;
     }
 
+    static bool IsAssignmentOperatorNode(const SyntaxNode& node) {
+        return SyntaxNodeKindHasClass(node.kind, TokenClass::Known) &&
+            SyntaxNodeKindHasClass(node.kind, TokenClass::AssignmentOperator);
+    }
+
     static bool IsParenthesizedDirectInitializedDeclarator(const SyntaxNode& node) {
         if (node.kind != SyntaxNodeKind::FunctionDeclarator) {
             return false;
@@ -704,17 +718,34 @@ private:
         });
     }
 
-    FormatBreakNode* BuildDirectInitializedDeclaration(const SyntaxNode& node, int depth) {
-        std::optional<size_t> declaratorIndex;
+    bool AllowsParenthesizedDirectInitializerShape(const SyntaxNode& node) const {
+        return node.kind == SyntaxNodeKind::FieldDeclaration || ParentKind(node) == SyntaxNodeKind::CompoundStatement;
+    }
+
+    std::optional<size_t> DirectInitializedDeclaratorIndex(const SyntaxNode& node) const {
+        bool hasAssignment = false;
         for (size_t index = 0; index < node.children.size(); ++index) {
-            if (node.children[index] && (IsDirectInitializedDeclarator(*node.children[index]) || (
-                ParentKind(node) == SyntaxNodeKind::CompoundStatement &&
-                IsParenthesizedDirectInitializedDeclarator(*node.children[index])
-            ))) {
-                declaratorIndex = index;
-                break;
+            const SyntaxNode* child = node.children[index];
+            if (child == nullptr) {
+                continue;
+            }
+            hasAssignment = hasAssignment || IsAssignmentOperatorNode(*child);
+            if (IsDirectInitializedDeclarator(*child)) {
+                return index;
+            }
+            if (AllowsParenthesizedDirectInitializerShape(node) && IsParenthesizedDirectInitializedDeclarator(*child)) {
+                return index;
+            }
+            // Some direct initializer forms attach the initializer list as a declaration child after the declarator.
+            if (child->kind == SyntaxNodeKind::InitializerList && index > 0 && !hasAssignment) {
+                return index - 1;
             }
         }
+        return std::nullopt;
+    }
+
+    FormatBreakNode* BuildDirectInitializedDeclaration(const SyntaxNode& node, int depth) {
+        const std::optional<size_t> declaratorIndex = DirectInitializedDeclaratorIndex(node);
         if (!declaratorIndex || *declaratorIndex == 0) {
             return nullptr;
         }
@@ -919,12 +950,10 @@ private:
         SyntaxNodeKind op,
         int depth
     ) {
-        if (
-            end == begin + 1 &&
-            children[begin] &&
-            IsChainOperatorKind(op) &&
-            HasSameDirectBinaryOperator(*children[begin], op)
-        ) {
+        if (end == begin + 1 && children[begin] && IsChainOperatorKind(op) && HasSameDirectBinaryOperator(
+            *children[begin],
+            op
+        )) {
             AppendBinaryChain(*children[begin], op, operands, operators, depth);
             return;
         }
@@ -984,11 +1013,9 @@ private:
         chain->operators = StoreTokens({*token});
         chain->splitTrailingBodyHeaderAtParentIndent =
             IsAssignmentOperatorForNode(*token) && right != nullptr && ContainsBodyHeader(*right);
-        if (
-            IsAssignmentOperatorForNode(*token) &&
-            right != nullptr &&
-            IsDirectForceSplitAdjacentStringsInitializer(*right)
-        ) {
+        if (IsAssignmentOperatorForNode(*token) && right != nullptr && IsDirectForceSplitAdjacentStringsInitializer(
+            *right
+        )) {
             MarkForceSplitAdjacentStringsFlat(*right);
         }
         return chain;
