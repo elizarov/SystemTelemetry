@@ -1,16 +1,11 @@
 #include "tools/format.h"
 
 #include <algorithm>
-#include <atomic>
 #include <chrono>
 #include <cstdio>
-#include <cstdlib>
-#include <functional>
-#include <io.h>
 #include <optional>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "tools/impl/format_args.h"
@@ -19,6 +14,8 @@
 #include "tools/impl/format_model_parse.h"
 #include "tools/impl/format_pretty_printer.h"
 #include "tools/impl/tools_common.h"
+#include "tools/impl/tools_parallel.h"
+#include "tools/impl/tools_progress.h"
 
 namespace {
 
@@ -37,17 +34,6 @@ struct CompletedFileFormat {
     bool hasPending = false;
     bool readFailed = false;
 };
-
-std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
-    const double seconds = std::chrono::duration<double>(elapsed).count();
-    char buffer[64] = {};
-    if (seconds < 1.0) {
-        std::snprintf(buffer, sizeof(buffer), "%dms", static_cast<int>(seconds * 1000.0 + 0.5));
-    } else {
-        std::snprintf(buffer, sizeof(buffer), "%.3fs", seconds);
-    }
-    return buffer;
-}
 
 std::string ToFileLineEndings(std::string_view text) {
     std::string result;
@@ -101,43 +87,6 @@ bool TextMatchesFormattedOutput(std::string_view source, std::string_view format
     return true;
 }
 
-size_t FormatWorkerCount(size_t workSize) {
-    if (workSize <= 1) {
-        return workSize;
-    }
-    const unsigned int hardware = std::thread::hardware_concurrency();
-    const size_t workerCount = hardware == 0 ? 4 : static_cast<size_t>(hardware);
-    return std::min(workSize, std::max<size_t>(1, workerCount));
-}
-
-void RunFormatWorker(
-    const std::vector<ResolvedFileFormat>& work,
-    std::vector<CompletedFileFormat>& completed,
-    std::atomic<size_t>& nextIndex,
-    std::atomic<size_t>& completedCount
-) {
-    while (true) {
-        const size_t index = nextIndex.fetch_add(1, std::memory_order_relaxed);
-        if (index >= work.size()) {
-            return;
-        }
-
-        const ResolvedFileFormat& item = work[index];
-        CompletedFileFormat result;
-        result.pending.file = item.file;
-        std::optional<std::string> text = tools::ReadFileText(item.file);
-        if (!text) {
-            result.readFailed = true;
-            result.pending.result.ok = false;
-        } else {
-            result.hasPending = true;
-            result.pending.result = FormatSourceText(*text, *item.config, item.file);
-        }
-        completed[index] = std::move(result);
-        completedCount.fetch_add(1, std::memory_order_relaxed);
-    }
-}
-
 }  // namespace
 
 SourceFormatResult FormatSourceText(std::string_view text, const FormatterConfig& config, std::string_view sourcePath) {
@@ -174,22 +123,32 @@ FILE* SummaryStream(const FormatOptions& options) {
     return options.mode == FormatMode::Stdout ? stderr : stdout;
 }
 
+std::string CompletedFileText(int completedCount, size_t totalCount) {
+    std::string text = std::to_string(completedCount);
+    if (completedCount != static_cast<int>(totalCount)) {
+        text += "/" + std::to_string(totalCount);
+    }
+    text += totalCount == 1 ? " file" : " files";
+    return text;
+}
+
 void PrintFormatSummary(
     FILE* output,
     const char* verb,
     int processedCount,
+    size_t totalCount,
     int changedCount,
     int ignoredCount,
     int parseErrorCount,
     std::chrono::steady_clock::time_point start
 ) {
+    const std::string completedFiles = CompletedFileText(processedCount, totalCount);
     std::fprintf(
         output,
-        "%s %d file%s in %s.",
+        "%s %s in %s.",
         verb,
-        processedCount,
-        processedCount == 1 ? "" : "s",
-        FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
+        completedFiles.c_str(),
+        FormatToolElapsed(std::chrono::steady_clock::now() - start).c_str()
     );
     if (changedCount > 0) {
         std::fprintf(output, " %d file%s require formatting.", changedCount, changedCount == 1 ? "" : "s");
@@ -228,7 +187,7 @@ int RunFormat(int argc, char** argv) {
     }
 
     FormatStyleCache styleCache(options.explicitStylePath);
-    const std::string currentDirectory = tools::CurrentDirectoryAbsolute();
+    const std::string currentDirectory = AbsolutePath(CurrentDirectoryPath().string());
     FILE* summary = SummaryStream(options);
 
     if (options.files.empty() && !options.fileListProvided) {
@@ -247,7 +206,7 @@ int RunFormat(int argc, char** argv) {
             std::fprintf(
                 summary,
                 "Formatting is required for stdin. Checked stdin in %s.\n",
-                FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
+                FormatToolElapsed(std::chrono::steady_clock::now() - start).c_str()
             );
             return 1;
         }
@@ -258,7 +217,7 @@ int RunFormat(int argc, char** argv) {
             summary,
             "%s stdin in %s.\n",
             options.mode == FormatMode::DryRun ? "Checked" : "Formatted",
-            FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
+            FormatToolElapsed(std::chrono::steady_clock::now() - start).c_str()
         );
         return 0;
     }
@@ -269,13 +228,11 @@ int RunFormat(int argc, char** argv) {
     int ignoredCount = 0;
     int processedCount = 0;
     std::vector<PendingFileFormat> pendingResults;
-    const bool showProgress = _isatty(_fileno(summary)) != 0;
-    size_t previousProgressLength = 0;
     std::vector<ResolvedFileFormat> work;
     work.reserve(options.files.size());
 
     for (int index = 0; index < static_cast<int>(options.files.size()); ++index) {
-        const std::string file = tools::AbsolutePath(options.files[static_cast<size_t>(index)]);
+        const std::string file = AbsolutePath(options.files[static_cast<size_t>(index)]);
         std::string error;
         if (styleCache.IsIgnored(file, error)) {
             ++ignoredCount;
@@ -294,43 +251,22 @@ int RunFormat(int argc, char** argv) {
         work.push_back({file, config});
     }
 
-    std::atomic<size_t> nextIndex = 0;
-    std::atomic<size_t> completedCount = 0;
-    const size_t workerCount = FormatWorkerCount(work.size());
     std::vector<CompletedFileFormat> completed(work.size());
-    std::vector<std::thread> workers;
-    workers.reserve(workerCount);
-    for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
-        workers.emplace_back(
-            RunFormatWorker,
-            std::cref(work),
-            std::ref(completed),
-            std::ref(nextIndex),
-            std::ref(completedCount)
-        );
-    }
-    while (showProgress && completedCount.load(std::memory_order_relaxed) < work.size()) {
-        const std::string progress = "format " +
-            std::to_string(completedCount.load(std::memory_order_relaxed)) +
-            "/" +
-            std::to_string(work.size()) +
-            " files";
-        const std::string padding(
-            previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
-            ' '
-        );
-        std::fprintf(summary, "\r%s%s", progress.c_str(), padding.c_str());
-        std::fflush(summary);
-        previousProgressLength = progress.size();
-        std::this_thread::sleep_for(std::chrono::milliseconds(50));
-    }
-    for (std::thread& worker : workers) {
-        worker.join();
-    }
-    if (showProgress && previousProgressLength > 0) {
-        std::fprintf(summary, "\r%s\r", std::string(previousProgressLength, ' ').c_str());
-        std::fflush(summary);
-    }
+    ToolFileProgress progress(summary, "format", work.size(), start, true);
+    RunToolParallelFor(work.size(), options.concurrency, &progress, [&](size_t index) {
+        const ResolvedFileFormat& item = work[index];
+        CompletedFileFormat result;
+        result.pending.file = item.file;
+        std::optional<std::string> text = ReadFileBinary(item.file);
+        if (!text) {
+            result.readFailed = true;
+            result.pending.result.ok = false;
+        } else {
+            result.hasPending = true;
+            result.pending.result = FormatSourceText(*text, *item.config, item.file);
+        }
+        completed[index] = std::move(result);
+    });
 
     for (CompletedFileFormat& completedFormat : completed) {
         const std::string& file = completedFormat.pending.file;
@@ -363,7 +299,7 @@ int RunFormat(int argc, char** argv) {
             if (options.mode == FormatMode::Stdout) {
                 std::fwrite(pending.result.formatted.data(), 1, pending.result.formatted.size(), stdout);
             } else if (options.mode == FormatMode::InPlace && pending.result.changed) {
-                if (!tools::WriteFileText(pending.file, ToFileLineEndings(pending.result.formatted))) {
+                if (!WriteFileBinary(pending.file, ToFileLineEndings(pending.result.formatted))) {
                     std::fprintf(stderr, "Failed to write %s\n", pending.file.c_str());
                     failed = true;
                 }
@@ -387,12 +323,12 @@ int RunFormat(int argc, char** argv) {
         if (ignoredCount > 0) {
             std::fprintf(summary, ". Skipped %d ignored file%s", ignoredCount, ignoredCount == 1 ? "" : "s");
         }
+        const std::string completedFiles = CompletedFileText(processedCount, work.size());
         std::fprintf(
             summary,
-            ". Checked %d file%s in %s.\n",
-            processedCount,
-            processedCount == 1 ? "" : "s",
-            FormatElapsed(std::chrono::steady_clock::now() - start).c_str()
+            ". Checked %s in %s.\n",
+            completedFiles.c_str(),
+            FormatToolElapsed(std::chrono::steady_clock::now() - start).c_str()
         );
         return 1;
     }
@@ -401,6 +337,7 @@ int RunFormat(int argc, char** argv) {
         summary,
         verb,
         processedCount,
+        work.size(),
         options.mode == FormatMode::DryRun ? changedCount : 0,
         ignoredCount,
         parseErrorCount,

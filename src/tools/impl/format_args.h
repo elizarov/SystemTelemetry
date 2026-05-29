@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstddef>
 #include <cstdio>
 #include <optional>
 #include <string>
@@ -16,6 +17,7 @@ struct FormatOptions {
     bool verbose = false;
     bool help = false;
     bool fileListProvided = false;
+    size_t concurrency = 0;
     std::optional<std::string> explicitStylePath;
     std::vector<std::string> files;
 };

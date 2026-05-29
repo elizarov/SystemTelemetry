@@ -3,10 +3,10 @@
 #include <windows.h>
 
 #include <algorithm>
-#include <cctype>
 #include <cstdio>
 
-namespace tools {
+#include "util/file_path.h"
+#include "util/strings.h"
 
 namespace {
 
@@ -18,17 +18,6 @@ bool IsDrivePrefix(std::string_view path) {
     return path.size() >= 2 &&
         path[1] == ':' &&
         ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
-}
-
-bool IsAbsolutePath(std::string_view path) {
-    return path.size() >= 2 &&
-        IsSeparator(path[0]) &&
-        IsSeparator(path[1]) ||
-        path.size() >= 3 &&
-        IsDrivePrefix(path) &&
-        IsSeparator(path[2]) ||
-        !path.empty() &&
-        IsSeparator(path[0]);
 }
 
 std::string TrimTrailingSeparators(std::string value) {
@@ -45,7 +34,7 @@ bool CreateDirectoryTree(std::string_view path) {
     if (path.empty() || DirectoryExists(path)) {
         return true;
     }
-    const std::string parent = ParentPath(path);
+    const std::string parent = FilePath(path).ParentPath().string();
     if (!parent.empty() && parent != path && !CreateDirectoryTree(parent)) {
         return false;
     }
@@ -57,7 +46,7 @@ bool CreateDirectoryTree(std::string_view path) {
 }
 
 void RecursiveFilesInto(std::string_view root, std::vector<std::string>& files) {
-    const std::string pattern = JoinPath(root, "*");
+    const std::string pattern = (FilePath(root) / "*").string();
     WIN32_FIND_DATAA data{};
     HANDLE find = FindFirstFileA(pattern.c_str(), &data);
     if (find == INVALID_HANDLE_VALUE) {
@@ -68,7 +57,7 @@ void RecursiveFilesInto(std::string_view root, std::vector<std::string>& files) 
         if (name == "." || name == "..") {
             continue;
         }
-        const std::string path = JoinPath(root, name);
+        const std::string path = (FilePath(root) / name).string();
         if ((data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
             RecursiveFilesInto(path, files);
         } else {
@@ -80,20 +69,6 @@ void RecursiveFilesInto(std::string_view root, std::vector<std::string>& files) 
 
 }  // namespace
 
-std::string CurrentDirectoryAbsolute() {
-    DWORD length = GetCurrentDirectoryA(0, nullptr);
-    if (length == 0) {
-        return {};
-    }
-    std::string path(length, '\0');
-    const DWORD written = GetCurrentDirectoryA(length, path.data());
-    if (written == 0 || written >= length) {
-        return {};
-    }
-    path.resize(written);
-    return AbsolutePath(path);
-}
-
 std::string ExecutablePath() {
     std::string path(MAX_PATH, '\0');
     DWORD length = GetModuleFileNameA(nullptr, path.data(), static_cast<DWORD>(path.size()));
@@ -103,36 +78,6 @@ std::string ExecutablePath() {
     }
     path.resize(length);
     return AbsolutePath(path);
-}
-
-std::string ParentPath(std::string_view path) {
-    std::string value = TrimTrailingSeparators(std::string(path));
-    const size_t separator = value.find_last_of("\\/");
-    if (separator == std::string::npos) {
-        return {};
-    }
-    if (separator == 2 && IsDrivePrefix(value)) {
-        return value.substr(0, 3);
-    }
-    if (separator == 0) {
-        return value.substr(0, 1);
-    }
-    return value.substr(0, separator);
-}
-
-std::string JoinPath(std::string_view base, std::string_view child) {
-    if (base.empty() || IsAbsolutePath(child)) {
-        return std::string(child);
-    }
-    if (child.empty()) {
-        return std::string(base);
-    }
-    std::string joined(base);
-    if (!IsSeparator(joined.back())) {
-        joined.push_back('\\');
-    }
-    joined += child;
-    return joined;
 }
 
 std::string AbsolutePath(std::string_view path) {
@@ -152,8 +97,8 @@ std::string AbsolutePath(std::string_view path) {
 std::string RelativePath(std::string_view path, std::string_view root) {
     const std::string normalizedPath = NormalizeSeparators(AbsolutePath(path));
     std::string normalizedRoot = TrimTrailingSeparators(NormalizeSeparators(AbsolutePath(root)));
-    const std::string lowerPath = ToLowerAscii(normalizedPath);
-    const std::string lowerRoot = ToLowerAscii(normalizedRoot);
+    const std::string lowerPath = ToLower(normalizedPath);
+    const std::string lowerRoot = ToLower(normalizedRoot);
     if (lowerPath == lowerRoot) {
         return {};
     }
@@ -169,7 +114,7 @@ std::string NormalizeSeparators(std::string value) {
 }
 
 std::string NormalizePathKey(std::string_view path) {
-    return ToLowerAscii(NormalizeSeparators(AbsolutePath(path)));
+    return ToLower(NormalizeSeparators(AbsolutePath(path)));
 }
 
 std::string Extension(std::string_view path) {
@@ -190,55 +135,13 @@ std::string RemoveExtension(std::string_view path) {
     return std::string(path.substr(0, dot));
 }
 
-bool FileExists(std::string_view path) {
-    const DWORD attributes = GetFileAttributesA(std::string(path).c_str());
-    return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) == 0;
-}
-
 bool DirectoryExists(std::string_view path) {
     const DWORD attributes = GetFileAttributesA(std::string(path).c_str());
     return attributes != INVALID_FILE_ATTRIBUTES && (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 }
 
-std::optional<std::string> ReadFileText(std::string_view path) {
-    FILE* file = nullptr;
-    if (fopen_s(&file, std::string(path).c_str(), "rb") != 0 || file == nullptr) {
-        return std::nullopt;
-    }
-    if (fseek(file, 0, SEEK_END) != 0) {
-        fclose(file);
-        return std::nullopt;
-    }
-    const long length = ftell(file);
-    if (length < 0) {
-        fclose(file);
-        return std::nullopt;
-    }
-    rewind(file);
-    std::string content(static_cast<size_t>(length), '\0');
-    if (!content.empty() && fread(content.data(), 1, content.size(), file) != content.size()) {
-        fclose(file);
-        return std::nullopt;
-    }
-    fclose(file);
-    return content;
-}
-
-bool WriteFileText(std::string_view path, std::string_view text) {
-    if (!EnsureParentDirectory(path)) {
-        return false;
-    }
-    FILE* file = nullptr;
-    if (fopen_s(&file, std::string(path).c_str(), "wb") != 0 || file == nullptr) {
-        return false;
-    }
-    const bool ok = text.empty() || fwrite(text.data(), 1, text.size(), file) == text.size();
-    fclose(file);
-    return ok;
-}
-
 bool EnsureParentDirectory(std::string_view path) {
-    const std::string parent = ParentPath(path);
+    const std::string parent = FilePath(path).ParentPath().string();
     return parent.empty() || CreateDirectoryTree(parent);
 }
 
@@ -257,27 +160,6 @@ std::vector<std::string> RecursiveFiles(std::string_view root) {
     std::vector<std::string> files;
     RecursiveFilesInto(root, files);
     return files;
-}
-
-std::string Trim(std::string_view value) {
-    size_t first = 0;
-    while (first < value.size() && std::isspace(static_cast<unsigned char>(value[first])) != 0) {
-        ++first;
-    }
-    size_t last = value.size();
-    while (last > first && std::isspace(static_cast<unsigned char>(value[last - 1])) != 0) {
-        --last;
-    }
-    return std::string(value.substr(first, last - first));
-}
-
-std::string ToLowerAscii(std::string value) {
-    for (char& ch : value) {
-        if (ch >= 'A' && ch <= 'Z') {
-            ch = static_cast<char>(ch - 'A' + 'a');
-        }
-    }
-    return value;
 }
 
 bool StartsWith(std::string_view value, std::string_view prefix) {
@@ -477,5 +359,3 @@ std::string StripCommentsAndStrings(std::string_view text) {
     }
     return result;
 }
-
-}  // namespace tools

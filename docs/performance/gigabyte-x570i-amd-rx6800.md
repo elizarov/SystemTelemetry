@@ -18,7 +18,7 @@ Ranges use direct `build\CaseDashBenchmarks.exe` runs unless a note says otherwi
 | `animation 240 2` | `animation_loop` and `animation_frame` about `0.43-0.53 ms` | Current direct rerun reports `snapshot_animations=28`, `overlay_animations=0`, and `active_chunk_frames=120`. |
 | `snapshot-handoff 20 2` | `snapshot_loop` about `7.9-8.2 ms` | `presentation_frame_build` carries nearly all cost; `presentation_frame_publish` stays near `0.00 ms`. |
 | `edit-layout 240 2` | `drag_loop` about `2.36-2.60 ms` | `snap` about `0.07-0.09 ms`, `apply` about `0.05-0.06 ms`, `paint_draw` about `2.22-2.43 ms`. |
-| `format-all 5 2` | `format_loop` about `115-123 ms` | `405` files process and `17` files are ignored; parse and print splits are cumulative across workers and remain the dominant CPU work. |
+| `format-all 5 2` | Serial CPU benchmark; current local value should be remeasured after the concurrency change | `405` files process and `17` files are ignored on the historical run; the benchmark now forces concurrency `1`, while interactive formatter checks remain parallel by default. |
 | `format-golden 100 2` | `format_loop` about `24.5 ms` | Parse about `13.2 ms`, print about `10.5 ms`, break model about `3.9 ms`, solve about `4.4 ms`. |
 | `layout-guide-sheet 20 2` | `sheet_loop` about `90-126 ms` | `sheet_place` is the dominant split, recently about `43-76 ms`; `sheet_draw` is usually about `30-36 ms`. |
 | `layout-switch 240 2` | `switch_loop` about `3.52-4.08 ms` | `switch_apply` about `0.80-0.97 ms`, `dialog_refresh` about `0.16-0.24 ms`, `switch_paint` about `2.57-2.84 ms`. |
@@ -32,7 +32,7 @@ Ranges use direct `build\CaseDashBenchmarks.exe` runs unless a note says otherwi
 - `snapshot-handoff` is frame-build bound in `DashboardRenderer::BuildPresentationFrame` and live layer bitmap drawing; publish cost is negligible.
 - `edit-layout`, `layout-switch`, `theme-change`, and the retained-overlay `mouse-hover` path are mainly Direct2D, DirectWrite, text-shaping, layer drawing, and driver-stack work once snap, apply, hover hit testing, and edit-tree refresh stay in range.
 - `layout-guide-sheet` remains placement-score bound. Leader intersection scoring and side repair dominate before offscreen drawing.
-- `format-all` is parse-heavy even after per-file parallelism. Wall time is mostly the slowest worker batches, while cumulative CPU samples remain concentrated in tree-sitter parse, format-model construction, and pending-token flushing.
+- `format-all` is parse-heavy. The benchmark now measures serial formatter CPU work, while interactive formatter wall time remains governed by per-file parallel batches.
 - `update-telemetry` is mildly collector-bound on this hardware. The remaining provider cost is concentrated in real Gigabyte SIV board sampling, AMD ADLX GPU sampling, and shared GPU/FPS update work, while repaint remains the other large half of the loop.
 - `PDH.DLL` is not currently the dominant telemetry hotspot after raw GPU Engine sampling and ADLX load/VRAM preference.
 

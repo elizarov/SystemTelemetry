@@ -882,7 +882,12 @@ add_executable(CaseDashTools
     src/tools/impl/lint_checkers.cpp
     src/tools/impl/lint_common.cpp
     src/tools/impl/lint_json.cpp
+    src/tools/impl/tools_parallel.cpp
+    src/tools/impl/tools_progress.cpp
     src/tools/impl/tools_common.cpp
+    src/util/file_path.cpp
+    src/util/strings.cpp
+    src/util/text_encoding.cpp
 )
 target_include_directories(CaseDashTools PRIVATE
     "${CMAKE_SOURCE_DIR}/src"
@@ -1147,6 +1152,8 @@ add_executable(CaseDashBenchmarks
     src/tools/impl/format_model_parse.cpp
     src/tools/impl/format_pretty_printer.cpp
     src/tools/impl/format_spacing.cpp
+    src/tools/impl/tools_parallel.cpp
+    src/tools/impl/tools_progress.cpp
     src/tools/impl/tools_common.cpp
     src/util/strings.cpp
     src/util/numeric_format.cpp

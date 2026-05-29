@@ -23,6 +23,20 @@ if /I "%~1"=="--verbose" (
     shift
     goto parse_lint_args
 )
+if /I "%~1"=="--concurrency" (
+    if "%~2"=="" goto :usage
+    set "lint_check_args=!lint_check_args! --concurrency %~2"
+    shift
+    shift
+    goto parse_lint_args
+)
+set "arg=%~1"
+if /I "!arg:~0,14!"=="--concurrency=" (
+    if "!arg:~14!"=="" goto :usage
+    set "lint_check_args=!lint_check_args! --concurrency !arg:~14!"
+    shift
+    goto parse_lint_args
+)
 if /I "%~1"=="includes" (
     if "!include_lint!"=="1" goto :usage
     set "include_lint=1"
@@ -124,6 +138,7 @@ exit /b !errorlevel!
 :usage
 echo Usage:
 echo   lint [-v^|--verbose]
+echo   lint [--concurrency n]
 echo   lint [-v^|--verbose] includes
 echo   lint [-v^|--verbose] includes changed
 popd >nul

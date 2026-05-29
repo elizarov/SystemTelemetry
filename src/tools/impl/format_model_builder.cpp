@@ -65,8 +65,7 @@ std::string_view TrimLeadingWhitespace(std::string_view value) {
 }
 
 bool IsPragmaOnceNode(const SyntaxNode& node) {
-    return node.kind == SyntaxNodeKind::PreprocCall &&
-        tools::StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
+    return node.kind == SyntaxNodeKind::PreprocCall && StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
 }
 
 SyntaxNode* MakeNode(FormatModel& model) {

@@ -1797,8 +1797,8 @@ private:
 
     void PrintPreprocessor(const PrintToken& token, const PrintToken* next) {
         const std::string line = CollapseSourceWhitespace(token.text);
-        const bool isInclude = tools::StartsWith(line, "#include");
-        const bool isUndef = tools::StartsWith(line, "#undef");
+        const bool isInclude = StartsWith(line, "#include");
+        const bool isUndef = StartsWith(line, "#undef");
         if (isUndef) {
             BlankLine();
         }
@@ -1810,7 +1810,7 @@ private:
         lineHasText_ = true;
         atLineStart_ = false;
         NewLine();
-        if (tools::StartsWith(line, "#pragma once") || isUndef || (
+        if (StartsWith(line, "#pragma once") || isUndef || (
             !isInclude && next != nullptr && !IsPreprocessorLikeToken(*next)
         )) {
             BlankLine();

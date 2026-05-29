@@ -36,12 +36,12 @@ std::string StripYamlComment(std::string_view text) {
         }
         result.push_back(ch);
     }
-    return tools::Trim(result);
+    return Trim(result);
 }
 
 std::vector<ConfigLine> ReadConfigLines(std::string_view text) {
     std::vector<ConfigLine> lines;
-    for (const std::string& line : tools::SplitLines(text)) {
+    for (const std::string& line : SplitLines(text)) {
         std::string stripped = StripYamlComment(line);
         if (stripped.empty() || stripped == "---" || stripped == "...") {
             continue;
@@ -56,11 +56,11 @@ std::pair<std::string, std::string> SplitKeyValue(std::string_view text) {
     if (colon == std::string_view::npos) {
         return {};
     }
-    return {tools::Trim(text.substr(0, colon)), tools::Trim(text.substr(colon + 1))};
+    return {Trim(text.substr(0, colon)), Trim(text.substr(colon + 1))};
 }
 
 std::string UnquoteScalar(std::string value) {
-    value = tools::Trim(value);
+    value = Trim(value);
     if (value.size() >= 2 && value.front() == '\'' && value.back() == '\'') {
         std::string result;
         for (size_t index = 1; index + 1 < value.size(); ++index) {
@@ -92,11 +92,9 @@ int ParseInt(std::string_view text, std::string_view key) {
     }
 }
 
-std::vector<std::string> ParseIndentedStringList(
-    const std::vector<ConfigLine>& lines,
-    size_t& index,
-    int parentIndent
-) {
+std::vector<std::string>
+    ParseIndentedStringList(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent)
+{
     std::vector<std::string> values;
     for (++index; index < lines.size(); ++index) {
         const ConfigLine& line = lines[index];
@@ -120,12 +118,12 @@ void ParseIncludeCategories(const std::vector<ConfigLine>& lines, size_t& index,
             --index;
             break;
         }
-        if (!tools::StartsWith(line.text, "- ")) {
+        if (!StartsWith(line.text, "- ")) {
             continue;
         }
         IncludeGroup group;
         group.priority = static_cast<int>(groups.size()) + 1;
-        std::string first = tools::Trim(std::string_view(line.text).substr(2));
+        std::string first = Trim(std::string_view(line.text).substr(2));
         if (!first.empty()) {
             const auto [key, value] = SplitKeyValue(first);
             if (key == "Regex") {
@@ -221,22 +219,22 @@ FormatterConfig ParseFormatterConfig(std::string_view text) {
 }
 
 std::string StartDirectory(std::string_view path) {
-    const std::string absolute = tools::AbsolutePath(path);
-    if (tools::DirectoryExists(absolute)) {
+    const std::string absolute = AbsolutePath(path);
+    if (DirectoryExists(absolute)) {
         return absolute;
     }
-    return tools::ParentPath(absolute);
+    return FilePath(absolute).ParentPath().string();
 }
 
 std::optional<std::string> FindUpwards(std::string_view startDirectory, std::string_view fileName) {
-    std::string directory = tools::AbsolutePath(startDirectory);
+    std::string directory = AbsolutePath(startDirectory);
     while (!directory.empty()) {
-        const std::string candidate = tools::JoinPath(directory, fileName);
-        if (tools::FileExists(candidate)) {
+        const std::string candidate = (FilePath(directory) / fileName).string();
+        if (FileExists(candidate)) {
             return candidate;
         }
-        const std::string parent = tools::ParentPath(directory);
-        if (parent.empty() || tools::NormalizePathKey(parent) == tools::NormalizePathKey(directory)) {
+        const std::string parent = FilePath(directory).ParentPath().string();
+        if (parent.empty() || NormalizePathKey(parent) == NormalizePathKey(directory)) {
             break;
         }
         directory = parent;
@@ -245,7 +243,7 @@ std::optional<std::string> FindUpwards(std::string_view startDirectory, std::str
 }
 
 std::optional<FormatterConfig> LoadConfigFile(std::string_view path, std::string& error) {
-    const std::optional<std::string> text = tools::ReadFileText(path);
+    const std::optional<std::string> text = ReadFileBinary(path);
     if (!text.has_value()) {
         error = "could not read formatter config: " + std::string(path);
         return std::nullopt;
@@ -260,26 +258,26 @@ std::optional<FormatterConfig> LoadConfigFile(std::string_view path, std::string
 
 FormatterIgnoreFile ParseIgnoreFile(std::string_view path, std::string_view text) {
     FormatterIgnoreFile ignore;
-    ignore.path = tools::AbsolutePath(path);
-    ignore.directory = tools::ParentPath(ignore.path);
-    for (const std::string& line : tools::SplitLines(text)) {
+    ignore.path = AbsolutePath(path);
+    ignore.directory = FilePath(ignore.path).ParentPath().string();
+    for (const std::string& line : SplitLines(text)) {
         std::string entry = StripYamlComment(line);
-        entry = tools::NormalizeSeparators(entry);
-        while (tools::StartsWith(entry, "./")) {
+        entry = NormalizeSeparators(entry);
+        while (StartsWith(entry, "./")) {
             entry.erase(0, 2);
         }
         while (!entry.empty() && entry.back() == '/') {
             entry.pop_back();
         }
         if (!entry.empty()) {
-            ignore.entries.push_back(tools::ToLowerAscii(entry));
+            ignore.entries.push_back(ToLower(entry));
         }
     }
     return ignore;
 }
 
 std::optional<FormatterIgnoreFile> LoadIgnoreFile(std::string_view path, std::string& error) {
-    const std::optional<std::string> text = tools::ReadFileText(path);
+    const std::optional<std::string> text = ReadFileBinary(path);
     if (!text.has_value()) {
         error = "could not read formatter ignore file: " + std::string(path);
         return std::nullopt;
@@ -290,12 +288,11 @@ std::optional<FormatterIgnoreFile> LoadIgnoreFile(std::string_view path, std::st
 }  // namespace
 
 bool FormatterIgnoreFile::Ignores(std::string_view filePath) const {
-    const std::string relative =
-        tools::ToLowerAscii(tools::NormalizeSeparators(tools::RelativePath(filePath, directory)));
-    const std::vector<std::string> parts = tools::Split(relative, '/');
+    const std::string relative = ToLower(NormalizeSeparators(RelativePath(filePath, directory)));
+    const std::vector<std::string> parts = Split(relative, '/');
     for (const std::string& entry : entries) {
-        if (tools::Contains(entry, "/")) {
-            if (relative == entry || tools::StartsWith(relative, entry + "/")) {
+        if (Contains(entry, "/")) {
+            if (relative == entry || StartsWith(relative, entry + "/")) {
                 return true;
             }
             continue;
@@ -321,7 +318,7 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
     }
 
     const std::string start = StartDirectory(path);
-    const std::string startKey = tools::NormalizePathKey(start);
+    const std::string startKey = NormalizePathKey(start);
     auto cachedSearch = configSearchCache_.find(startKey);
     if (cachedSearch == configSearchCache_.end()) {
         cachedSearch = configSearchCache_.emplace(startKey, FindUpwards(start, ".cpp-format")).first;
@@ -331,8 +328,8 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
         return nullptr;
     }
 
-    const std::string configPath = tools::AbsolutePath(*cachedSearch->second);
-    const std::string configKey = tools::NormalizePathKey(configPath);
+    const std::string configPath = AbsolutePath(*cachedSearch->second);
+    const std::string configKey = NormalizePathKey(configPath);
     auto cachedConfig = configsByPath_.find(configKey);
     if (cachedConfig == configsByPath_.end()) {
         std::optional<FormatterConfig> loaded = LoadConfigFile(configPath, error);
@@ -346,7 +343,7 @@ const FormatterConfig* FormatStyleCache::ConfigForPath(std::string_view path, st
 
 bool FormatStyleCache::IsIgnored(std::string_view path, std::string& error) {
     const std::string start = StartDirectory(path);
-    const std::string startKey = tools::NormalizePathKey(start);
+    const std::string startKey = NormalizePathKey(start);
     auto cachedSearch = ignoreSearchCache_.find(startKey);
     if (cachedSearch == ignoreSearchCache_.end()) {
         cachedSearch = ignoreSearchCache_.emplace(startKey, FindUpwards(start, ".cpp-format-ignore")).first;
@@ -355,8 +352,8 @@ bool FormatStyleCache::IsIgnored(std::string_view path, std::string& error) {
         return false;
     }
 
-    const std::string ignorePath = tools::AbsolutePath(*cachedSearch->second);
-    const std::string ignoreKey = tools::NormalizePathKey(ignorePath);
+    const std::string ignorePath = AbsolutePath(*cachedSearch->second);
+    const std::string ignoreKey = NormalizePathKey(ignorePath);
     auto cachedIgnore = ignoresByPath_.find(ignoreKey);
     if (cachedIgnore == ignoresByPath_.end()) {
         std::optional<FormatterIgnoreFile> loaded = LoadIgnoreFile(ignorePath, error);

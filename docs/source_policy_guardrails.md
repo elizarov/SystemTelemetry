@@ -4,7 +4,7 @@ This page summarizes hard project source-policy lessons. `lint.cmd` enforces the
 
 - `std::function` is not used in maintained source. Use `FunctionRef` for synchronous borrowed callbacks or a purpose-built interface when callback ownership must outlive the call.
 - `std::filesystem` and `<filesystem>` are not used. Use `src/util/file_path.*` so path handling stays Win32-backed without pulling filesystem machinery into the shipped app.
-- STL threading primitives are not used in maintained source or tests. Use `LightweightMutex` for small locks and direct Win32 thread/event handles for worker wakeups instead of `std::mutex`, `std::thread`, or `std::condition_variable`.
+- STL threading primitives are not used in shipped runtime source or tests. Use `LightweightMutex` for small locks and direct Win32 thread/event handles for worker wakeups instead of `std::mutex`, `std::thread`, or `std::condition_variable`. Repository-only sources under `src/tools/` may use STL threading primitives because those tools are not size-optimized shipped runtime binaries.
 - `std::hash` is not used for fixed project caches. Use a concrete project-owned helper such as `StableStringHash`, compact scans, fixed slots, or a measured package-owned custom hash table.
 - Maintained source does not use conditional compilation guards. Target-specific helper code stays ordinary code and relies on the linker to remove unreferenced paths.
 - CaseDash declares UTF-8 as the process code page and calls Win32 A APIs by default. New `*W` Win32 calls, conversion-only `*Utf8` helpers, and UTF-16 detours are not used when an A API is available.

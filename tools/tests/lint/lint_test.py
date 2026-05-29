@@ -68,6 +68,48 @@ class LintCheckTests(unittest.TestCase):
         self.assertIn("  1. 1 LOC: maintained -> (none)", result.stdout)
         self.assertNotIn("ignored", result.stdout)
 
+    def test_lint_check_allows_tool_threading_primitives(self) -> None:
+        clean_root = TEST_ROOT / "build" / "tools_threading"
+        shutil.rmtree(clean_root, ignore_errors=True)
+        (clean_root / "src" / "tools").mkdir(parents=True)
+        (clean_root / "src" / "tools" / "threaded.h").write_text(
+            "#pragma once\n"
+            "\n"
+            "#include <thread>\n"
+            "\n"
+            "struct ToolThreaded {\n"
+            "    std::thread worker;\n"
+            "};\n",
+            encoding="utf-8",
+        )
+        (clean_root / "src" / "tools" / "threaded.cpp").write_text(
+            '#include "tools/threaded.h"\n',
+            encoding="utf-8",
+        )
+
+        env = os.environ.copy()
+        env["GIT_CEILING_DIRECTORIES"] = str(TEST_ROOT.parent)
+        result = subprocess.run(
+            [
+                str(TOOLS_EXE),
+                "lint_check",
+                "--config",
+                str(REPO_ROOT / "tools" / "lint_config.json"),
+                "--check",
+                "--no-progress",
+                "--concurrency",
+                "1",
+            ],
+            cwd=clean_root,
+            env=env,
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertIn("Scanned 8 LOC across 2 lint input file(s).", result.stdout)
+
     def test_lint_check_reports_all_known_violation_shapes(self) -> None:
         shutil.rmtree(TEST_ROOT / "build", ignore_errors=True)
 
@@ -147,6 +189,23 @@ class LintCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(2, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+
+    def test_lint_check_rejects_invalid_concurrency(self) -> None:
+        for args in [("--concurrency",), ("--concurrency", "0"), ("--concurrency", "nope")]:
+            with self.subTest(args=args):
+                result = subprocess.run(
+                    [
+                        str(TOOLS_EXE),
+                        "lint_check",
+                        *args,
+                    ],
+                    cwd=TEST_ROOT,
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+
+                self.assertEqual(2, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
 
 
 if __name__ == "__main__":

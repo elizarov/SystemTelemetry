@@ -10,6 +10,7 @@ set "mode=check"
 set "scope=all"
 set "restage=0"
 set "verbose=0"
+set "concurrency_arg="
 
 :parse_args
 if "%~1"=="" goto args_done
@@ -45,6 +46,20 @@ if /I "%~1"=="-v" (
 )
 if /I "%~1"=="--verbose" (
     set "verbose=1"
+    shift
+    goto parse_args
+)
+if /I "%~1"=="--concurrency" (
+    if "%~2"=="" goto :usage
+    set "concurrency_arg=--concurrency %~2"
+    shift
+    shift
+    goto parse_args
+)
+set "arg=%~1"
+if /I "!arg:~0,14!"=="--concurrency=" (
+    if "!arg:~14!"=="" goto :usage
+    set "concurrency_arg=--concurrency !arg:~14!"
     shift
     goto parse_args
 )
@@ -96,6 +111,7 @@ if /I "!mode!"=="fix" (
 ) else (
     set "native_options=!native_options! --dry-run"
 )
+if defined concurrency_arg set "native_options=!native_options! !concurrency_arg!"
 if "!verbose!"=="1" set "native_options=!native_options! --verbose"
 
 set "format_failed=0"
@@ -172,5 +188,6 @@ echo   format fix
 echo   format changed
 echo   format fix changed
 echo   format fix staged --restage
+echo   format [--concurrency n]
 popd >nul
 exit /b 2

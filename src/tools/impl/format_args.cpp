@@ -3,12 +3,9 @@
 #include <cstdio>
 
 #include "tools/impl/tools_common.h"
+#include "tools/impl/tools_parallel.h"
 
 namespace {
-
-bool StartsWith(std::string_view value, std::string_view prefix) {
-    return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
-}
 
 std::optional<std::string> ParseStyleValue(std::string_view value, std::string& error) {
     if (value == "file") {
@@ -21,13 +18,13 @@ std::optional<std::string> ParseStyleValue(std::string_view value, std::string& 
             error = "--style=file:<path> requires a path";
             return std::string{};
         }
-        return tools::AbsolutePath(path);
+        return AbsolutePath(path);
     }
     if (value.empty()) {
         error = "--style requires a value";
         return std::string{};
     }
-    return tools::AbsolutePath(value);
+    return AbsolutePath(value);
 }
 
 bool AppendFilesFromList(std::string_view path, FormatOptions& options, std::string& error) {
@@ -35,15 +32,15 @@ bool AppendFilesFromList(std::string_view path, FormatOptions& options, std::str
         error = "--files requires a path";
         return false;
     }
-    const std::string absolute = tools::AbsolutePath(path);
-    std::optional<std::string> text = tools::ReadFileText(absolute);
+    const std::string absolute = AbsolutePath(path);
+    std::optional<std::string> text = ReadFileBinary(absolute);
     if (!text) {
         error = "failed to read --files list " + std::string(path);
         return false;
     }
     options.fileListProvided = true;
-    for (std::string line : tools::SplitLines(*text)) {
-        line = tools::Trim(line);
+    for (std::string line : SplitLines(*text)) {
+        line = Trim(line);
         if (!line.empty()) {
             options.files.push_back(line);
         }
@@ -73,6 +70,18 @@ std::optional<FormatOptions> ParseFormatArgs(int argc, char** argv, std::string&
             options.mode = FormatMode::DryRun;
         } else if (arg == "-v" || arg == "--verbose") {
             options.verbose = true;
+        } else if (arg == "--concurrency") {
+            if (index + 1 >= argc) {
+                error = "--concurrency requires a value";
+                return std::nullopt;
+            }
+            if (!ParseToolConcurrency(argv[++index], options.concurrency, error)) {
+                return std::nullopt;
+            }
+        } else if (StartsWith(arg, "--concurrency=")) {
+            if (!ParseToolConcurrency(std::string_view(arg).substr(14), options.concurrency, error)) {
+                return std::nullopt;
+            }
         } else if (arg == "--files") {
             if (index + 1 >= argc) {
                 error = "--files requires a path";
@@ -129,11 +138,12 @@ void PrintFormatUsage(FILE* output) {
     std::fprintf(output, "Usage:\n");
     std::fprintf(
         output,
-        "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-v|--verbose]\n"
+        "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] "
+            "[--concurrency <n>] [-v|--verbose]\n"
     );
     std::fprintf(
         output,
         "  CaseDashTools.exe format [--style=file|--style=<path>|--style=file:<path>] [-i|-n|--dry-run] "
-            "[--files <path>|--files=<path>] [file...]\n"
+            "[--concurrency <n>] [--files <path>|--files=<path>] [file...]\n"
     );
 }

@@ -6,7 +6,6 @@
 #include <utility>
 
 #include "util/text_encoding.h"
-#include "util/text_format.h"
 
 namespace {
 
@@ -18,8 +17,9 @@ bool IsSeparator(char ch) {
 }
 
 bool HasDrivePrefix(std::string_view path) {
-    return path.size() >= 2 && path[1] == ':' &&
-           ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
+    return path.size() >= 2 &&
+        path[1] == ':' &&
+        ((path[0] >= 'A' && path[0] <= 'Z') || (path[0] >= 'a' && path[0] <= 'z'));
 }
 
 size_t RootLength(std::string_view path) {
@@ -114,8 +114,12 @@ FilePath JoinPath(const FilePath& base, const FilePath& child) {
     }
     const std::string baseText = base.string();
     const std::string childText = child.string();
-    return FilePath(IsSeparator(baseText.back()) ? FormatText("%s%s", baseText.c_str(), childText.c_str())
-                                                 : FormatText("%s\\%s", baseText.c_str(), childText.c_str()));
+    std::string joined = baseText;
+    if (!IsSeparator(joined.back())) {
+        joined.push_back('\\');
+    }
+    joined += childText;
+    return FilePath(std::move(joined));
 }
 
 FilePath JoinPath(const FilePath& base, const char* child) {

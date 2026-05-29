@@ -57,7 +57,7 @@ std::string_view ConsumeIncludeDirective(std::string_view text) {
     }
     text.remove_prefix(1);
     text = TrimView(text);
-    if (!tools::StartsWith(text, "include")) {
+    if (!StartsWith(text, "include")) {
         return {};
     }
     text.remove_prefix(std::string_view("include").size());
@@ -88,7 +88,7 @@ IncludeText ParseIncludeText(std::string_view text) {
     std::string_view rest = ConsumeIncludeDirective(text);
     std::string_view target = HeaderNameTarget(rest);
     if (target.empty()) {
-        return {.line = tools::Trim(text), .target = {}};
+        return {.line = Trim(text), .target = {}};
     }
 
     std::string line = "#include ";
@@ -115,11 +115,11 @@ std::string StripHeaderDelimiter(std::string_view target) {
         target.remove_prefix(1);
         target.remove_suffix(1);
     }
-    return tools::NormalizeSeparators(std::string(target));
+    return NormalizeSeparators(std::string(target));
 }
 
 std::string BaseNameNoExtension(std::string_view path) {
-    std::string normalized = tools::NormalizeSeparators(std::string(path));
+    std::string normalized = NormalizeSeparators(std::string(path));
     if (normalized.empty() || normalized.front() == '<') {
         return {};
     }
@@ -127,7 +127,7 @@ std::string BaseNameNoExtension(std::string_view path) {
     if (slash != std::string::npos) {
         normalized.erase(0, slash + 1);
     }
-    return tools::RemoveExtension(normalized);
+    return RemoveExtension(normalized);
 }
 
 std::string EscapeRegexLiteral(std::string_view text) {
@@ -135,20 +135,20 @@ std::string EscapeRegexLiteral(std::string_view text) {
     escaped.reserve(text.size());
     for (const char ch : text) {
         switch (ch) {
-            case'\\':
-            case'^':
-            case'$':
-            case'.':
-            case'|':
-            case'?':
-            case'*':
-            case'+':
-            case'(':
-            case')':
-            case'[':
-            case']':
-            case'{':
-            case'}':
+            case '\\':
+            case '^':
+            case '$':
+            case '.':
+            case '|':
+            case '?':
+            case '*':
+            case '+':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
                 escaped.push_back('\\');
                 break;
             default:
@@ -205,11 +205,9 @@ bool IsIncludeNode(const SyntaxNode& node) {
 
 }  // namespace
 
-std::string FormatIncludeRunText(
-    const FormatterConfig& config,
-    const SyntaxNode& includeRun,
-    std::string_view sourcePath
-) {
+std::string
+    FormatIncludeRunText(const FormatterConfig& config, const SyntaxNode& includeRun, std::string_view sourcePath)
+{
     const IncludeSortContext context{.config = config, .mainIncludeRegex = BuildMainIncludeRegex(config, sourcePath)};
     std::vector<IncludeEntry> includes;
     includes.reserve(includeRun.children.size());
@@ -221,7 +219,7 @@ std::string FormatIncludeRunText(
         includes.push_back({
             .line = std::move(include.line),
             .target = include.target,
-            .sortKey = tools::ToLowerAscii(include.target),
+            .sortKey = ToLower(include.target),
             .priority = IncludePriority(context, include.target),
             .originalIndex = includes.size()
         });

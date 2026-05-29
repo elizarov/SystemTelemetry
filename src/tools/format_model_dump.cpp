@@ -31,19 +31,19 @@ void WriteQuotedText(std::string_view text) {
     std::fputc('"', stdout);
     for (const unsigned char ch : text) {
         switch (ch) {
-            case'\\':
+            case '\\':
                 std::fputs("\\\\", stdout);
                 break;
-            case'"':
+            case '"':
                 std::fputs("\\\"", stdout);
                 break;
-            case'\n':
+            case '\n':
                 std::fputs("\\n", stdout);
                 break;
-            case'\r':
+            case '\r':
                 std::fputs("\\r", stdout);
                 break;
-            case'\t':
+            case '\t':
                 std::fputs("\\t", stdout);
                 break;
             default:
@@ -108,8 +108,8 @@ int RunFormatModelDump(int argc, char** argv) {
         return 2;
     }
 
-    const std::string path = tools::AbsolutePath(argv[0]);
-    const std::optional<std::string> text = tools::ReadFileText(path);
+    const std::string path = AbsolutePath(argv[0]);
+    const std::optional<std::string> text = ReadFileBinary(path);
     if (!text.has_value()) {
         std::fprintf(stderr, "format_model_dump: cannot read file: %s\n", path.c_str());
         return 1;

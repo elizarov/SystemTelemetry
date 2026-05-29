@@ -2,7 +2,6 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -13,7 +12,6 @@
 #include <sstream>
 #include <string>
 #include <string_view>
-#include <thread>
 #include <vector>
 
 #include "config/color_resolver.h"
@@ -989,22 +987,13 @@ void MergePhaseStats(PhaseStats& target, const PhaseStats& source) {
     target.samples += source.samples;
 }
 
-size_t FormatBenchmarkWorkerCount(size_t workSize) {
-    if (workSize <= 1) {
-        return workSize;
-    }
-    const unsigned int hardware = std::thread::hardware_concurrency();
-    const size_t workerCount = hardware == 0 ? 4 : static_cast<size_t>(hardware);
-    return std::min(workSize, std::max<size_t>(1, workerCount));
-}
-
 bool IsBenchmarkFormatSourcePath(std::string_view path) {
-    const std::string extension = tools::ToLowerAscii(tools::Extension(path));
+    const std::string extension = ToLower(Extension(path));
     return extension == ".cpp" || extension == ".h";
 }
 
 void AppendBenchmarkFormatSourceFiles(std::string_view root, std::vector<std::string>& files) {
-    for (const std::string& path : tools::RecursiveFiles(root)) {
+    for (const std::string& path : RecursiveFiles(root)) {
         if (IsBenchmarkFormatSourcePath(path)) {
             files.push_back(path);
         }
@@ -1014,36 +1003,24 @@ void AppendBenchmarkFormatSourceFiles(std::string_view root, std::vector<std::st
 std::vector<std::string> SourceFormatAllInputPaths() {
     const std::string sourceRoot = SourceRootPath().string();
     std::vector<std::string> files;
-    AppendBenchmarkFormatSourceFiles(tools::JoinPath(sourceRoot, "src"), files);
-    AppendBenchmarkFormatSourceFiles(tools::JoinPath(sourceRoot, "tests"), files);
+    AppendBenchmarkFormatSourceFiles(sourceRoot + "\\src", files);
+    AppendBenchmarkFormatSourceFiles(sourceRoot + "\\tests", files);
     std::sort(files.begin(), files.end(), [](const std::string& left, const std::string& right) {
-        return tools::NormalizePathKey(left) < tools::NormalizePathKey(right);
+        return NormalizePathKey(left) < NormalizePathKey(right);
     });
     files.erase(std::unique(files.begin(), files.end(), [](const std::string& left, const std::string& right) {
-        return tools::NormalizePathKey(left) == tools::NormalizePathKey(right);
+        return NormalizePathKey(left) == NormalizePathKey(right);
     }), files.end());
     return files;
 }
 
-void RunFormatAllWorker(
-    const std::vector<FormatAllFileWork>& work,
-    std::atomic<size_t>& nextIndex,
-    std::atomic<bool>& stop,
-    FormatAllWorkerStats& stats
-) {
-    while (!stop.load(std::memory_order_relaxed)) {
-        const size_t index = nextIndex.fetch_add(1, std::memory_order_relaxed);
-        if (index >= work.size()) {
-            return;
-        }
-
-        const FormatAllFileWork& item = work[index];
+void RunFormatAllWorker(const std::vector<FormatAllFileWork>& work, FormatAllWorkerStats& stats) {
+    for (const FormatAllFileWork& item : work) {
         const auto readStart = Clock::now();
-        std::optional<std::string> input = tools::ReadFileText(item.file);
+        std::optional<std::string> input = ReadFileBinary(item.file);
         RecordPhase(stats.read, Clock::now() - readStart);
         if (!input.has_value()) {
             stats.error = "failed to read format-all input: " + item.file;
-            stop.store(true, std::memory_order_relaxed);
             return;
         }
         stats.inputBytes += input->size();
@@ -1056,7 +1033,6 @@ void RunFormatAllWorker(
             const std::string parseError =
                 model.parse.error.empty() ? "tree-sitter parser setup failed" : model.parse.error;
             stats.error = item.file + ": " + parseError;
-            stop.store(true, std::memory_order_relaxed);
             return;
         }
 
@@ -1222,24 +1198,9 @@ int RunFormatAllBenchmarkCommand(size_t iterations, double renderScale) {
             work.push_back({file, config});
         }
 
-        std::atomic<size_t> nextIndex = 0;
-        std::atomic<bool> stop = false;
-        const size_t workerCount = FormatBenchmarkWorkerCount(work.size());
-        std::vector<FormatAllWorkerStats> workerStats(workerCount);
-        std::vector<std::thread> workers;
-        workers.reserve(workerCount);
-        for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
-            workers.emplace_back(
-                RunFormatAllWorker,
-                std::cref(work),
-                std::ref(nextIndex),
-                std::ref(stop),
-                std::ref(workerStats[workerIndex])
-            );
-        }
-        for (std::thread& worker : workers) {
-            worker.join();
-        }
+        // format-all tracks cumulative formatter CPU work, so keep it serial instead of measuring parallel wall time.
+        std::vector<FormatAllWorkerStats> workerStats(1);
+        RunFormatAllWorker(work, workerStats[0]);
 
         size_t processedFiles = 0;
         size_t changedFiles = 0;
@@ -1279,6 +1240,7 @@ int RunFormatAllBenchmarkCommand(size_t iterations, double renderScale) {
         << iterations
         << " render_scale_ignored="
         << renderScale
+        << " concurrency=1"
         << " root=\""
         << SourceRootPath().string()
         << "\" candidate_files="
@@ -1314,11 +1276,9 @@ int RunFormatAllBenchmarkCommand(size_t iterations, double renderScale) {
     return 0;
 }
 
-LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
-    BenchmarkHost& host,
-    const std::vector<std::string>& layoutNames,
-    size_t iterations
-) {
+LayoutSwitchBenchTotals
+    RunLayoutSwitchBenchmark(BenchmarkHost& host, const std::vector<std::string>& layoutNames, size_t iterations)
+{
     LayoutSwitchBenchTotals totals{};
     if (layoutNames.empty() || iterations == 0) {
         return totals;
@@ -1339,7 +1299,7 @@ LayoutSwitchBenchTotals RunLayoutSwitchBenchmark(
         RecordPhase(totals.phases.switchApply, switchApplyEnd - switchApplyStart);
 
         const auto dialogRefreshStart = Clock::now();
-        [[maybe_unused]]const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
         const auto dialogRefreshEnd = Clock::now();
         RecordPhase(totals.phases.dialogRefresh, dialogRefreshEnd - dialogRefreshStart);
 
@@ -1398,11 +1358,9 @@ AnimationBenchTotals RunAnimationFrameBenchmark(DashboardPresentationFrame frame
     return totals;
 }
 
-SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
-    DashboardRenderer& renderer,
-    TelemetryCollector& telemetry,
-    size_t iterations
-) {
+SnapshotHandoffBenchTotals
+    RunSnapshotHandoffBenchmark(DashboardRenderer& renderer, TelemetryCollector& telemetry, size_t iterations)
+{
     SnapshotHandoffBenchTotals totals{};
     if (iterations == 0) {
         return totals;
@@ -1447,11 +1405,9 @@ SnapshotHandoffBenchTotals RunSnapshotHandoffBenchmark(
     return totals;
 }
 
-ThemeChangeBenchTotals RunThemeChangeBenchmark(
-    BenchmarkHost& host,
-    const std::vector<std::string>& themeNames,
-    size_t iterations
-) {
+ThemeChangeBenchTotals
+    RunThemeChangeBenchmark(BenchmarkHost& host, const std::vector<std::string>& themeNames, size_t iterations)
+{
     ThemeChangeBenchTotals totals{};
     if (themeNames.empty() || iterations == 0) {
         return totals;
@@ -1499,7 +1455,7 @@ ThemeChangeBenchTotals RunThemeChangeBenchmark(
         RecordPhase(totals.phases.dashboardReconfigure, dashboardReconfigureEnd - dashboardReconfigureStart);
 
         const auto dialogTreeRebuildStart = Clock::now();
-        [[maybe_unused]]const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
+        [[maybe_unused]] const LayoutEditTreeModel treeModel = BuildLayoutEditTreeModel(host.CurrentConfig());
         const auto dialogTreeRebuildEnd = Clock::now();
         RecordPhase(totals.phases.dialogTreeRebuild, dialogTreeRebuildEnd - dialogTreeRebuildStart);
 
@@ -2028,19 +1984,16 @@ int RunLayoutGuideSheetBenchmarkCommand(size_t iterations, double renderScale, T
         << totals.callouts
         << "\n";
     PrintLayoutGuideSheetBenchResult(totals);
-    PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuideActiveRegions),
-        totals.phases[PhaseIndex(BenchPhase::LayoutGuideActiveRegions)]
-    );
+    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideActiveRegions), totals.phases[
+        PhaseIndex(BenchPhase::LayoutGuideActiveRegions)
+    ]);
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuidePlan), totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlan)]);
-    PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuideMeasure),
-        totals.phases[PhaseIndex(BenchPhase::LayoutGuideMeasure)]
-    );
-    PrintPhaseResult(
-        PhaseName(BenchPhase::LayoutGuidePlacement),
-        totals.phases[PhaseIndex(BenchPhase::LayoutGuidePlacement)]
-    );
+    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideMeasure), totals.phases[
+        PhaseIndex(BenchPhase::LayoutGuideMeasure)
+    ]);
+    PrintPhaseResult(PhaseName(BenchPhase::LayoutGuidePlacement), totals.phases[
+        PhaseIndex(BenchPhase::LayoutGuidePlacement)
+    ]);
     PrintPhaseResult(PhaseName(BenchPhase::LayoutGuideDraw), totals.phases[PhaseIndex(BenchPhase::LayoutGuideDraw)]);
     return 0;
 }

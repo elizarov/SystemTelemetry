@@ -111,10 +111,38 @@ class FormatCommandTests(unittest.TestCase):
             file_list = root / "files.txt"
             file_list.write_text(f"{source}\n\n", encoding="utf-8")
 
-            result = native_format("--style=file", "--dry-run", "--files", str(file_list))
+            result = native_format("--style=file", "--dry-run", "--concurrency", "1", "--files", str(file_list))
 
             self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
             self.assertRegex(result.stdout, r"Checked 1 file in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
+
+    def test_concurrency_one_preserves_file_list_output_order(self) -> None:
+        build_dir = REPO_ROOT / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="format_order_", dir=build_dir) as temp_dir:
+            root = Path(temp_dir)
+            shutil.copyfile(REPO_ROOT / ".cpp-format", root / ".cpp-format")
+            first = root / "first.cpp"
+            second = root / "second.cpp"
+            first.write_text("int first(){return 1;}\n", encoding="utf-8")
+            second.write_text("int second(){return 2;}\n", encoding="utf-8")
+            file_list = root / "files.txt"
+            file_list.write_text(f"{second}\n{first}\n", encoding="utf-8")
+
+            result = native_format("--style=file", "--concurrency", "1", "--files", str(file_list), cwd=root)
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+            self.assertEqual(
+                "int second() {\n"
+                "    return 2;\n"
+                "}\n"
+                "int first() {\n"
+                "    return 1;\n"
+                "}\n",
+                result.stdout,
+            )
+            self.assertRegex(result.stderr, r"Formatted 2 files in (?:\d+ms|\d+\.\d{3}s)\.\s*$")
 
     def test_in_place_formats_file(self) -> None:
         build_dir = REPO_ROOT / "build"
@@ -339,6 +367,9 @@ class FormatCommandTests(unittest.TestCase):
             ("--style",),
             ("--files",),
             ("--files=",),
+            ("--concurrency",),
+            ("--concurrency", "0"),
+            ("--concurrency", "nope"),
             ("--unknown",),
         ]
 

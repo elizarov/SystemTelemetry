@@ -1,12 +1,8 @@
 #include "tools/lint_check.h"
 
-#include <windows.h>
-
 #include <algorithm>
 #include <chrono>
-#include <cmath>
 #include <cstdio>
-#include <io.h>
 #include <regex>
 #include <set>
 #include <stdexcept>
@@ -14,6 +10,8 @@
 #include "tools/impl/lint_checkers.h"
 #include "tools/impl/lint_common.h"
 #include "tools/impl/lint_json.h"
+#include "tools/impl/tools_parallel.h"
+#include "tools/impl/tools_progress.h"
 
 namespace tools::lint {
 
@@ -31,7 +29,13 @@ struct LintArgs {
     bool check = false;
     bool noProgress = false;
     bool verbose = false;
+    size_t concurrency = 0;
     std::optional<std::string> reportJson;
+};
+
+struct CompletedLintScan {
+    FileRecord record;
+    std::string error;
 };
 
 bool IsNewerThan(std::string_view source, std::uint64_t targetTime) {
@@ -40,13 +44,14 @@ bool IsNewerThan(std::string_view source, std::uint64_t targetTime) {
 }
 
 bool IsCMakeBuildGraphStale(const std::string& repoRoot) {
-    const std::optional<std::uint64_t> cmakeListsTime = LastWriteTime(JoinPath(repoRoot, "CMakeLists.txt"));
+    const std::optional<std::uint64_t> cmakeListsTime = LastWriteTime((FilePath(repoRoot) / "CMakeLists.txt").string());
     if (!cmakeListsTime.has_value()) {
         return false;
     }
 
     // A CMake edit can refresh build.ninja without relinking CaseDashTools when the tool target is unchanged.
-    const std::optional<std::uint64_t> buildGraphTime = LastWriteTime(JoinPath(repoRoot, "build/cmake/build.ninja"));
+    const std::optional<std::uint64_t> buildGraphTime =
+        LastWriteTime((FilePath(repoRoot) / "build/cmake/build.ninja").string());
     return !buildGraphTime.has_value() || *cmakeListsTime > *buildGraphTime;
 }
 
@@ -56,11 +61,11 @@ bool IsToolStale() {
     if (!exeTime.has_value()) {
         return false;
     }
-    const std::string repoRoot = ParentPath(ParentPath(exePath));
+    const std::string repoRoot = FilePath(FilePath(exePath).ParentPath().string()).ParentPath().string();
     if (IsCMakeBuildGraphStale(repoRoot)) {
         return true;
     }
-    for (const std::string& path : RecursiveFiles(JoinPath(repoRoot, "src/tools"))) {
+    for (const std::string& path : RecursiveFiles((FilePath(repoRoot) / "src/tools").string())) {
         const std::string relative = RelativePath(path, repoRoot);
         // The freshness check runs before lint config parsing, so keep vendored roots out here as well.
         if (IsExcluded(relative, ToolRefreshExcludedPrefixes())) {
@@ -80,12 +85,12 @@ std::string ResolveProjectPath(const std::string& projectRoot, const std::string
     if (isAbsolute) {
         return AbsolutePath(path);
     }
-    return AbsolutePath(JoinPath(projectRoot, path));
+    return AbsolutePath((FilePath(projectRoot) / path).string());
 }
 
 LintArgs ParseArgs(int argc, char** argv, const std::string& projectRoot) {
     LintArgs args;
-    args.configPath = JoinPath(projectRoot, "tools/lint_config.json");
+    args.configPath = (FilePath(projectRoot) / "tools/lint_config.json").string();
     for (int i = 0; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--config") {
@@ -97,6 +102,19 @@ LintArgs ParseArgs(int argc, char** argv, const std::string& projectRoot) {
             args.check = true;
         } else if (arg == "--no-progress") {
             args.noProgress = true;
+        } else if (arg == "--concurrency") {
+            if (i + 1 >= argc) {
+                throw std::runtime_error("--concurrency requires a value");
+            }
+            std::string error;
+            if (!ParseToolConcurrency(argv[++i], args.concurrency, error)) {
+                throw std::runtime_error(error);
+            }
+        } else if (StartsWith(arg, "--concurrency=")) {
+            std::string error;
+            if (!ParseToolConcurrency(std::string_view(arg).substr(14), args.concurrency, error)) {
+                throw std::runtime_error(error);
+            }
         } else if (arg == "--report-json") {
             if (i + 1 >= argc) {
                 throw std::runtime_error("--report-json requires a value");
@@ -172,10 +190,9 @@ void ValidateConfig(const JsonValue& config, const std::map<std::string, std::se
     }
 }
 
-ScanSettings ParseScanSettings(
-    const JsonValue& config,
-    const std::map<std::string, std::set<std::string>>& suffixGroups
-) {
+ScanSettings
+    ParseScanSettings(const JsonValue& config, const std::map<std::string, std::set<std::string>>& suffixGroups)
+{
     const JsonValue& scan = config.At("scan");
     ScanSettings settings;
     settings.roots = ConfigStrings(scan, "roots");
@@ -200,7 +217,7 @@ bool IsLintInput(const FileEntry& entry, const std::string& projectRoot, const S
 std::set<std::string> ProjectPathsFromGit(const std::string& projectRoot, const std::vector<std::string>& lines) {
     std::set<std::string> paths;
     for (const std::string& line : lines) {
-        paths.insert(NormalizePathKey(JoinPath(projectRoot, line)));
+        paths.insert(NormalizePathKey((FilePath(projectRoot) / line).string()));
     }
     return paths;
 }
@@ -214,7 +231,7 @@ std::vector<FileEntry> DiscoverLintInputs(const std::string& projectRoot, const 
     std::vector<FileEntry> entries;
     if (!trackedLines.has_value() || !untrackedLines.has_value()) {
         for (const std::string& root : settings.roots) {
-            for (const std::string& path : RecursiveFiles(JoinPath(projectRoot, root))) {
+            for (const std::string& path : RecursiveFiles((FilePath(projectRoot) / root).string())) {
                 FileEntry entry{path, true};
                 if (IsLintInput(entry, projectRoot, settings)) {
                     entries.push_back(std::move(entry));
@@ -228,7 +245,7 @@ std::vector<FileEntry> DiscoverLintInputs(const std::string& projectRoot, const 
         allPaths.insert(untrackedPaths.begin(), untrackedPaths.end());
         for (const std::string& key : allPaths) {
             FileEntry entry{AbsolutePath(key), trackedPaths.find(key) != trackedPaths.end()};
-            if (FileExists(entry.path) && IsLintInput(entry, projectRoot, settings)) {
+            if (FileExists(FilePath(entry.path)) && IsLintInput(entry, projectRoot, settings)) {
                 entries.push_back(std::move(entry));
             }
         }
@@ -243,7 +260,7 @@ std::vector<FileEntry> DiscoverLintInputs(const std::string& projectRoot, const 
 FileRecord ScanFile(const FileEntry& entry, const std::string& projectRoot, const ScanSettings& settings) {
     static const std::regex includePattern(R"include(^\s*#include\s+("([^"]+)"|<([^>]+)>))include");
 
-    const std::optional<std::string> text = ReadFileText(entry.path);
+    const std::optional<std::string> text = ReadFileBinary(entry.path);
     if (!text.has_value()) {
         throw std::runtime_error("could not read " + entry.path);
     }
@@ -272,70 +289,31 @@ FileRecord ScanFile(const FileEntry& entry, const std::string& projectRoot, cons
     return record;
 }
 
-int ConsoleColumns() {
-    CONSOLE_SCREEN_BUFFER_INFO info{};
-    if (GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &info)) {
-        return info.srWindow.Right - info.srWindow.Left + 1;
-    }
-    return 120;
-}
-
-std::string TruncateProgressLine(const std::string& prefix, const std::string& relative) {
-    const int columns = ConsoleColumns();
-    if (columns <= 1) {
-        return prefix + relative;
-    }
-    const size_t maxLength = static_cast<size_t>(columns - 1);
-    const std::string fullLine = prefix + relative;
-    if (fullLine.size() <= maxLength) {
-        return fullLine;
-    }
-    const size_t pathBudget = maxLength > prefix.size() ? maxLength - prefix.size() : 0;
-    if (pathBudget <= 3) {
-        return fullLine.substr(0, maxLength);
-    }
-    return prefix + "..." + relative.substr(relative.size() - (pathBudget - 3));
-}
-
 std::vector<FileRecord> ScanLintInputs(
     const std::vector<FileEntry>& entries,
     const std::string& projectRoot,
     const ScanSettings& settings,
-    std::vector<std::unique_ptr<Checker>>& checkers,
-    bool showProgress
+    size_t concurrency,
+    bool showProgress,
+    std::chrono::steady_clock::time_point started
 ) {
+    std::vector<CompletedLintScan> completed(entries.size());
+    ToolFileProgress progress(stdout, "lint-check", entries.size(), started, showProgress);
+    RunToolParallelFor(entries.size(), concurrency, &progress, [&](size_t index) {
+        try {
+            completed[index].record = ScanFile(entries[index], projectRoot, settings);
+        } catch (const std::exception& error) {
+            completed[index].error = error.what();
+        }
+    });
+
     std::vector<FileRecord> records;
     records.reserve(entries.size());
-    const bool useProgress = showProgress && _isatty(_fileno(stdout)) != 0;
-    size_t previousProgressLength = 0;
-    for (int index = 0; index < static_cast<int>(entries.size()); ++index) {
-        if (useProgress) {
-            const std::string relative = RelativePath(entries[static_cast<size_t>(index)].path, projectRoot);
-            const std::string progress = TruncateProgressLine(
-                "[" + std::to_string(index + 1) + "/" + std::to_string(entries.size()) + "] lint-check ",
-                relative
-            );
-            const std::string padding(
-                previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
-                ' '
-            );
-            std::printf("\r%s%s", progress.c_str(), padding.c_str());
-            std::fflush(stdout);
-            previousProgressLength = progress.size();
+    for (CompletedLintScan& scan : completed) {
+        if (!scan.error.empty()) {
+            throw std::runtime_error(scan.error);
         }
-        FileRecord record = ScanFile(entries[static_cast<size_t>(index)], projectRoot, settings);
-        for (std::unique_ptr<Checker>& checker : checkers) {
-            try {
-                checker->ProcessFile(record);
-            } catch (const std::exception& error) {
-                throw std::runtime_error("while processing " + record.relative + ": " + error.what());
-            }
-        }
-        records.push_back(std::move(record));
-    }
-    if (useProgress) {
-        std::printf("\r%s\r", std::string(previousProgressLength, ' ').c_str());
-        std::fflush(stdout);
+        records.push_back(std::move(scan.record));
     }
     return records;
 }
@@ -348,7 +326,7 @@ std::string CheckName(const CheckResult& result) {
     if (EndsWith(title, " check")) {
         title.resize(title.size() - 6);
     }
-    title = ToLowerAscii(Trim(title));
+    title = ToLower(Trim(title));
     std::replace(title.begin(), title.end(), ' ', '_');
     return title;
 }
@@ -395,15 +373,23 @@ bool WriteReportJson(const std::string& path, bool failed, const std::vector<Dia
     }
     json += "  ]\n";
     json += "}\n";
-    return WriteFileText(path, json);
+    return EnsureParentDirectory(path) && WriteFileBinary(path, json);
 }
 
-void PrintScannedLocSummary(const std::vector<FileRecord>& records) {
+std::string ScannedFileCountText(size_t scannedFiles, size_t totalFiles) {
+    if (scannedFiles == totalFiles) {
+        return std::to_string(scannedFiles);
+    }
+    return std::to_string(scannedFiles) + "/" + std::to_string(totalFiles);
+}
+
+void PrintScannedLocSummary(const std::vector<FileRecord>& records, size_t totalFiles) {
     int loc = 0;
     for (const FileRecord& record : records) {
         loc += record.LineCount();
     }
-    std::printf("Scanned %s LOC across %zu lint input file(s).\n", FormatCount(loc).c_str(), records.size());
+    const std::string scannedFiles = ScannedFileCountText(records.size(), totalFiles);
+    std::printf("Scanned %s LOC across %s lint input file(s).\n", FormatCount(loc).c_str(), scannedFiles.c_str());
 }
 
 void PrintFailureResult(const CheckResult& result) {
@@ -425,25 +411,11 @@ void PrintFailureResult(const CheckResult& result) {
     }
 }
 
-std::string FormatElapsed(double seconds) {
-    if (seconds < 1.0) {
-        return std::to_string(static_cast<int>(std::llround(seconds * 1000.0))) + "ms";
-    }
-    char buffer[64]{};
-    std::snprintf(buffer, sizeof(buffer), "%.3fs", seconds);
-    return buffer;
-}
-
-double ElapsedSeconds(std::chrono::steady_clock::time_point started) {
-    return std::chrono::duration<double>(std::chrono::steady_clock::now() - started).count();
-}
-
 }  // namespace
 
 }  // namespace tools::lint
 
 int RunLintCheck(int argc, char** argv) {
-    using namespace tools;
     using namespace tools::lint;
 
     const auto started = std::chrono::steady_clock::now();
@@ -452,14 +424,14 @@ int RunLintCheck(int argc, char** argv) {
         return kToolStaleExitCode;
     }
 
-    const std::string projectRoot = CurrentDirectoryAbsolute();
+    const std::string projectRoot = AbsolutePath(CurrentDirectoryPath().string());
     LintArgs args;
     JsonValue config;
     std::map<std::string, std::set<std::string>> suffixGroups;
     ScanSettings settings;
     try {
         args = ParseArgs(argc, argv, projectRoot);
-        const std::optional<std::string> configText = ReadFileText(args.configPath);
+        const std::optional<std::string> configText = ReadFileBinary(args.configPath);
         if (!configText.has_value()) {
             throw std::runtime_error("could not read " + args.configPath);
         }
@@ -469,7 +441,7 @@ int RunLintCheck(int argc, char** argv) {
         settings = ParseScanSettings(config, suffixGroups);
     } catch (const std::exception& error) {
         std::fprintf(stderr, "lint config error: %s\n", error.what());
-        std::printf("Lint failed in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+        std::printf("Lint failed in %s.\n", FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str());
         return 2;
     }
 
@@ -484,26 +456,36 @@ int RunLintCheck(int argc, char** argv) {
         checkers = CreateCheckers(config, context);
     } catch (const std::exception& error) {
         std::fprintf(stderr, "lint config error: %s\n", error.what());
-        std::printf("Lint failed in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+        std::printf("Lint failed in %s.\n", FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str());
         return 2;
     }
 
+    std::vector<FileEntry> entries;
     std::vector<FileRecord> records;
     std::vector<CheckResult> results;
     try {
-        records = ScanLintInputs(
-            DiscoverLintInputs(projectRoot, settings),
-            projectRoot,
-            settings,
-            checkers,
-            !args.noProgress
-        );
+        entries = DiscoverLintInputs(projectRoot, settings);
+        records = ScanLintInputs(entries, projectRoot, settings, args.concurrency, !args.noProgress, started);
+        for (const FileRecord& record : records) {
+            for (std::unique_ptr<Checker>& checker : checkers) {
+                try {
+                    checker->ProcessFile(record);
+                } catch (const std::exception& error) {
+                    throw std::runtime_error("while processing " + record.relative + ": " + error.what());
+                }
+            }
+        }
         for (std::unique_ptr<Checker>& checker : checkers) {
             results.push_back(checker->Finish(args.verbose));
         }
     } catch (const std::exception& error) {
         std::fprintf(stderr, "lint error: %s\n", error.what());
-        std::printf("Lint failed in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+        const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
+        std::printf(
+            "Lint failed after scanning %s file(s) in %s.\n",
+            scannedFiles.c_str(),
+            FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
+        );
         return 2;
     }
 
@@ -515,7 +497,12 @@ int RunLintCheck(int argc, char** argv) {
         const std::string reportPath = ResolveProjectPath(projectRoot, *args.reportJson);
         if (!WriteReportJson(reportPath, failed, diagnostics)) {
             std::fprintf(stderr, "lint report error: could not write %s\n", reportPath.c_str());
-            std::printf("Lint failed in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+            const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
+            std::printf(
+                "Lint failed after scanning %s file(s) in %s.\n",
+                scannedFiles.c_str(),
+                FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
+            );
             return 2;
         }
     }
@@ -536,11 +523,16 @@ int RunLintCheck(int argc, char** argv) {
         if (printedReport) {
             std::printf("\n");
         }
-        std::printf("Lint failed in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+        const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
+        std::printf(
+            "Lint failed after scanning %s file(s) in %s.\n",
+            scannedFiles.c_str(),
+            FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
+        );
         return 1;
     }
 
-    PrintScannedLocSummary(records);
+    PrintScannedLocSummary(records, entries.size());
     if (args.verbose) {
         std::vector<std::string> verboseLines;
         for (const CheckResult& result : results) {
@@ -553,6 +545,10 @@ int RunLintCheck(int argc, char** argv) {
             }
         }
     }
-    std::printf("Lint succeeded in %s.\n", FormatElapsed(ElapsedSeconds(started)).c_str());
+    std::printf(
+        "Lint succeeded after scanning %s file(s) in %s.\n",
+        ScannedFileCountText(records.size(), entries.size()).c_str(),
+        FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
+    );
     return 0;
 }

@@ -4,8 +4,6 @@
 #include <cctype>
 #include <utility>
 
-#include "util/text_format.h"
-
 std::string ToLower(std::string value) {
     std::transform(value.begin(), value.end(), value.begin(), [](unsigned char ch) {
         return static_cast<char>(std::tolower(ch));
@@ -28,9 +26,9 @@ std::vector<std::string> SplitTrimmed(std::string_view value, char delimiter) {
     size_t start = 0;
     while (start <= value.size()) {
         const size_t delimiterIndex = value.find(delimiter, start);
-        const std::string trimmed =
-            Trim(delimiterIndex == std::string_view::npos ? value.substr(start)
-                                                          : value.substr(start, delimiterIndex - start));
+        const std::string trimmed = Trim(
+            delimiterIndex == std::string_view::npos ? value.substr(start) : value.substr(start, delimiterIndex - start)
+        );
         if (!trimmed.empty()) {
             parts.push_back(trimmed);
         }
@@ -47,8 +45,9 @@ std::vector<std::string> SplitTrimmedPreservingEmpty(std::string_view value, cha
     size_t start = 0;
     while (start <= value.size()) {
         const size_t delimiterIndex = value.find(delimiter, start);
-        parts.push_back(Trim(delimiterIndex == std::string_view::npos ? value.substr(start)
-                                                                      : value.substr(start, delimiterIndex - start)));
+        parts.push_back(Trim(
+            delimiterIndex == std::string_view::npos ? value.substr(start) : value.substr(start, delimiterIndex - start)
+        ));
         if (delimiterIndex == std::string_view::npos) {
             break;
         }
@@ -91,9 +90,9 @@ std::string JoinNames(const std::vector<std::string>& names) {
     std::string joined;
     for (size_t i = 0; i < names.size(); ++i) {
         if (i != 0) {
-            AppendFormat(joined, ",");
+            joined.push_back(',');
         }
-        AppendFormat(joined, "%s", names[i].c_str());
+        joined += names[i];
     }
     return joined;
 }

@@ -119,8 +119,14 @@ std::optional<std::string> FunctionNameBeforeBody(std::string signaturePrefix) {
         return std::nullopt;
     }
     const std::string tail = Trim(signaturePrefix.substr(closeParen + 1));
-    if (!tail.empty() && tail != "const" && tail != "noexcept" && tail != "const noexcept" &&
-        tail != "noexcept const" && !StartsWith(tail, "->")) {
+    if (
+        !tail.empty() &&
+        tail != "const" &&
+        tail != "noexcept" &&
+        tail != "const noexcept" &&
+        tail != "noexcept const" &&
+        !StartsWith(tail, "->")
+    ) {
         return std::nullopt;
     }
     const size_t openParen = signaturePrefix.rfind('(', closeParen);
@@ -181,7 +187,10 @@ std::string ModuleDirectory(const std::string& moduleName) {
 }
 
 std::string FormatAllowedPackageDependencies(
-    const std::string& package, const std::set<std::string>& dependencies, const std::set<std::string>& universal) {
+    const std::string& package,
+    const std::set<std::string>& dependencies,
+    const std::set<std::string>& universal
+) {
     std::set<std::string> allowed = dependencies;
     if (universal.find(package) == universal.end()) {
         allowed.insert(universal.begin(), universal.end());
@@ -239,7 +248,7 @@ std::pair<int, int> LineBounds(const std::string& text, int index) {
     const size_t end = text.find('\n', static_cast<size_t>(index));
     return {
         start == std::string::npos ? 0 : static_cast<int>(start + 1),
-        end == std::string::npos ? static_cast<int>(text.size()) : static_cast<int>(end),
+        end == std::string::npos ? static_cast<int>(text.size()) : static_cast<int>(end)
     };
 }
 
@@ -337,22 +346,26 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
             if (literalIndex < static_cast<int>(text.size()) && text[static_cast<size_t>(literalIndex)] == 'R') {
                 ++literalIndex;
             }
-            while (literalIndex < static_cast<int>(text.size()) &&
-                (text[static_cast<size_t>(literalIndex)] == ' ' || text[static_cast<size_t>(literalIndex)] == '\t' ||
-                    text[static_cast<size_t>(literalIndex)] == '\r' ||
-                    text[static_cast<size_t>(literalIndex)] == '\n')) {
+            while (literalIndex < static_cast<int>(text.size()) && (
+                text[static_cast<size_t>(literalIndex)] == ' ' ||
+                text[static_cast<size_t>(literalIndex)] == '\t' ||
+                text[static_cast<size_t>(literalIndex)] == '\r' ||
+                text[static_cast<size_t>(literalIndex)] == '\n'
+            )) {
                 ++literalIndex;
             }
-            if (literalIndex < static_cast<int>(text.size()) &&
-                (text[static_cast<size_t>(literalIndex)] == '"' || text[static_cast<size_t>(literalIndex)] == '\'')) {
+            if (literalIndex < static_cast<int>(text.size()) && (
+                text[static_cast<size_t>(literalIndex)] == '"' || text[static_cast<size_t>(literalIndex)] == '\''
+            )) {
                 const bool raw = literalIndex > 0 && text.substr(static_cast<size_t>(literalIndex - 1), 2) == "R\"";
                 const int end = raw ? SkipRawStringLiteral(text, literalIndex - 1) :
                     SkipQuotedLiteral(text, literalIndex, text[static_cast<size_t>(literalIndex)]);
                 if (!IsAllowedConstWideStringLiteral(text, index, literalIndex, end)) {
                     lines.push_back(line);
                 }
-                line += static_cast<int>(std::count(
-                    text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n'));
+                line += static_cast<int>(
+                    std::count(text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n')
+                );
                 index = end;
                 continue;
             }
@@ -360,14 +373,16 @@ std::vector<int> FindUndocumentedWideLiteralLines(const std::string& text) {
         if (ch == 'R' && next == '"') {
             const int end = SkipRawStringLiteral(text, index);
             line += static_cast<int>(
-                std::count(text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n'));
+                std::count(text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n')
+            );
             index = end;
             continue;
         }
         if (ch == '"' || ch == '\'') {
             const int end = SkipQuotedLiteral(text, index, ch);
             line += static_cast<int>(
-                std::count(text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n'));
+                std::count(text.begin() + index, text.begin() + std::min(end, static_cast<int>(text.size())), '\n')
+            );
             index = end;
             continue;
         }
@@ -382,12 +397,18 @@ public:
         context_(std::move(context)),
         roots_(ConfigStrings(config, "roots")),
         headerSuffixes_(RequireSuffixGroup(
-            context_.suffixGroups, "architecture.header_suffix_group", config.At("header_suffix_group").AsString())),
-        implementationSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+            context_.suffixGroups,
+            "architecture.header_suffix_group",
+            config.At("header_suffix_group").AsString()
+        )),
+        implementationSuffixes_(RequireSuffixGroup(
+            context_.suffixGroups,
             "architecture.implementation_suffix_group",
-            config.At("implementation_suffix_group").AsString())),
+            config.At("implementation_suffix_group").AsString()
+        )),
         headerSuffix_(*headerSuffixes_.begin()),
-        implementationSuffix_(*implementationSuffixes_.begin()) {
+        implementationSuffix_(*implementationSuffixes_.begin())
+    {
         const std::vector<std::string> headerBodyAllowlist = ConfigStrings(config, "header_body_allowlist");
         headerBodyAllowlist_.insert(headerBodyAllowlist.begin(), headerBodyAllowlist.end());
         const std::vector<std::string> cppWithoutHeaderAllowlist =
@@ -425,8 +446,10 @@ public:
 private:
     bool IsEligible(const FileRecord& record) const {
         const std::string suffix = Extension(record.path);
-        if (headerSuffixes_.find(suffix) == headerSuffixes_.end() &&
-            implementationSuffixes_.find(suffix) == implementationSuffixes_.end()) {
+        if (
+            headerSuffixes_.find(suffix) == headerSuffixes_.end() &&
+            implementationSuffixes_.find(suffix) == implementationSuffixes_.end()
+        ) {
             return false;
         }
         if (!roots_.empty() && !HasRoot(record.relative, roots_)) {
@@ -437,8 +460,8 @@ private:
 
     void ProcessHeader(const FileRecord& record) {
         static const std::regex classDeclPattern(R"(\b(class|struct)\s+([A-Za-z_]\w*(::[A-Za-z_]\w*)*)\b)");
-        static const std::regex freeDeclPattern(
-            R"((^|[\s*&])([A-Za-z_]\w*)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)");
+        static const std::regex
+            freeDeclPattern(R"((^|[\s*&])([A-Za-z_]\w*)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)");
 
         std::vector<std::string> namespaceStack;
         for (const std::string& rawLine : record.strippedLines) {
@@ -458,10 +481,15 @@ private:
         }
 
         for (const Statement& statement : CollectTopLevelStatements(record.strippedText)) {
-            if (statement.terminator != ';' || StartsWith(statement.text, "class ") ||
-                StartsWith(statement.text, "struct ") || StartsWith(statement.text, "enum ") ||
-                StartsWith(statement.text, "using ") || StartsWith(statement.text, "typedef ") ||
-                Contains(statement.text, "operator")) {
+            if (
+                statement.terminator != ';' ||
+                StartsWith(statement.text, "class ") ||
+                StartsWith(statement.text, "struct ") ||
+                StartsWith(statement.text, "enum ") ||
+                StartsWith(statement.text, "using ") ||
+                StartsWith(statement.text, "typedef ") ||
+                Contains(statement.text, "operator")
+            ) {
                 continue;
             }
             std::smatch match;
@@ -493,35 +521,45 @@ private:
             }
             const size_t templatePrefixStart = brace > 80 ? brace - 80 : 0;
             const std::string prefix = record.strippedText.substr(templatePrefixStart, brace - templatePrefixStart);
-            if (Contains(prefix, "template <") || Contains(prefix, "template<") ||
-                Contains(statementPrefix, "template <") || Contains(statementPrefix, "template<")) {
+            if (
+                Contains(prefix, "template <") ||
+                Contains(prefix, "template<") ||
+                Contains(statementPrefix, "template <") ||
+                Contains(statementPrefix, "template<")
+            ) {
                 brace = record.strippedText.find('{', brace + 1);
                 continue;
             }
-            const int line =
-                static_cast<int>(std::count(record.strippedText.begin(), record.strippedText.begin() + brace, '\n')) +
-                1;
-            violations_.push_back({record.relative + ":" + std::to_string(line),
+            const int line = static_cast<int>(
+                std::count(record.strippedText.begin(), record.strippedText.begin() + brace, '\n')
+            ) + 1;
+            violations_.push_back({
+                record.relative + ":" + std::to_string(line),
                 "header-body",
-                "Function body for " + name +
-                    " appears in a header; move non-template logic to a matching .cpp file."});
+                "Function body for " + name + " appears in a header; move non-template logic to a matching .cpp file."
+            });
             brace = record.strippedText.find('{', brace + 1);
         }
     }
 
     void ProcessImplementation(const FileRecord& record) {
         static const std::regex qualifiedDefPattern(
-            R"((^|[\s*&])([A-Za-z_]\w*(::[A-Za-z_~]\w*)+)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)");
-        static const std::regex freeDeclPattern(
-            R"((^|[\s*&])([A-Za-z_]\w*)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)");
+            R"((^|[\s*&])([A-Za-z_]\w*(::[A-Za-z_~]\w*)+)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)"
+        );
+        static const std::regex
+            freeDeclPattern(R"((^|[\s*&])([A-Za-z_]\w*)\s*\([^;]*\)\s*(const\b)?\s*(noexcept\b)?(\s*->\s*.+)?$)");
 
         if (cppWithoutHeaderAllowlist_.find(record.relative) == cppWithoutHeaderAllowlist_.end()) {
             const std::string expected = PairedHeaderForCpp(record.relative);
-            if (!FileExists(JoinPath(context_.projectRoot, expected))) {
-                violations_.push_back({record.relative + ":1",
+            if (!FileExists(FilePath(context_.projectRoot) / expected)) {
+                violations_.push_back({
+                    record.relative + ":1",
                     "missing-header",
-                    record.relative + " has no matching header " + expected +
-                        "; add one or allowlist the translation unit."});
+                    record.relative +
+                        " has no matching header " +
+                        expected +
+                        "; add one or allowlist the translation unit."
+                });
             }
         }
 
@@ -550,8 +588,10 @@ private:
         for (const Definition& definition : definitions_) {
             const auto owners =
                 definition.qualified ? classHeaders_.find(definition.ownerName) : freeHeaders_.find(definition.name);
-            if (owners == (definition.qualified ? classHeaders_.end() : freeHeaders_.end()) ||
-                owners->second.size() != 1) {
+            if (
+                owners == (definition.qualified ? classHeaders_.end() : freeHeaders_.end()) ||
+                owners->second.size() != 1
+            ) {
                 continue;
             }
             const std::string ownerHeader = *owners->second.begin();
@@ -559,10 +599,18 @@ private:
             if (definition.relpath == expectedCpp) {
                 continue;
             }
-            violations_.push_back({definition.relpath + ":" + std::to_string(definition.line),
+            violations_.push_back({
+                definition.relpath + ":" + std::to_string(definition.line),
                 "impl-mismatch",
-                definition.name + " is declared from " + ownerHeader + " but implemented in " + definition.relpath +
-                    "; expected " + expectedCpp + "."});
+                definition.name +
+                    " is declared from " +
+                    ownerHeader +
+                    " but implemented in " +
+                    definition.relpath +
+                    "; expected " +
+                    expectedCpp +
+                    "."
+            });
         }
     }
 
@@ -600,12 +648,16 @@ public:
         context_(std::move(context)),
         roots_(ConfigStrings(config, "roots")),
         suffixes_(RequireSuffixGroup(
-            context_.suffixGroups, "include_style.suffix_group", config.At("suffix_group").AsString())),
+            context_.suffixGroups,
+            "include_style.suffix_group",
+            config.At("suffix_group").AsString()
+        )),
         trackedOnly_(config.Find("tracked_only") != nullptr && config.At("tracked_only").AsBool()),
         nolintPattern_(MakeRegex(config.At("nolint_pattern").AsString())),
-        nolintMessage_(config.At("nolint_message").AsString()) {
+        nolintMessage_(config.At("nolint_message").AsString())
+    {
         for (const std::string& root : ConfigStrings(config, "include_roots")) {
-            includeRoots_.push_back({root, AbsolutePath(JoinPath(context_.projectRoot, root))});
+            includeRoots_.push_back({root, AbsolutePath((FilePath(context_.projectRoot) / root).string())});
         }
     }
 
@@ -616,7 +668,8 @@ public:
         for (int index = 0; index < static_cast<int>(record.lines.size()); ++index) {
             if (std::regex_search(record.lines[static_cast<size_t>(index)], nolintPattern_)) {
                 violations_.push_back(
-                    {record.relative + ":" + std::to_string(index + 1), "include-style", nolintMessage_});
+                    {record.relative + ":" + std::to_string(index + 1), "include-style", nolintMessage_}
+                );
             }
         }
 
@@ -632,11 +685,19 @@ public:
             if (NormalizeInclude(include.text) == expected) {
                 continue;
             }
-            violations_.push_back({record.relative + ":" + std::to_string(include.line),
+            violations_.push_back({
+                record.relative + ":" + std::to_string(include.line),
                 "include-style",
-                "Project header \"" + include.text + "\" resolves to " +
-                    RelativePath(resolved->first, context_.projectRoot) + "; use \"" + expected + "\" from the " +
-                    resolved->second + " include root instead of a relative or local shorthand path."});
+                "Project header \"" +
+                    include.text +
+                    "\" resolves to " +
+                    RelativePath(resolved->first, context_.projectRoot) +
+                    "; use \"" +
+                    expected +
+                    "\" from the " +
+                    resolved->second +
+                    " include root instead of a relative or local shorthand path."
+            });
         }
     }
 
@@ -667,13 +728,14 @@ private:
         return !IsExcluded(record.relative, context_.excludedPrefixes);
     }
 
-    std::optional<std::pair<std::string, std::string>> ResolveProjectInclude(
-        const std::string& currentFile, const std::string& includeText) const {
+    std::optional<std::pair<std::string, std::string>>
+        ResolveProjectInclude(const std::string& currentFile, const std::string& includeText) const
+    {
         const std::string includePath = NormalizeInclude(includeText);
         std::vector<std::string> candidates;
-        candidates.push_back(JoinPath(ParentPath(currentFile), includePath));
+        candidates.push_back((FilePath(currentFile).ParentPath() / includePath).string());
         for (const IncludeRoot& root : includeRoots_) {
-            candidates.push_back(JoinPath(root.path, includePath));
+            candidates.push_back((FilePath(root.path) / includePath).string());
         }
         for (const std::string& candidate : candidates) {
             if (!FileExists(candidate)) {
@@ -771,17 +833,24 @@ public:
         context_(std::move(context)),
         roots_(ConfigStrings(config, "roots")),
         sourceRootName_(roots_.empty() ? "" : roots_[0]),
-        sourceRoot_(AbsolutePath(JoinPath(context_.projectRoot, sourceRootName_))),
+        sourceRoot_(AbsolutePath((FilePath(context_.projectRoot) / sourceRootName_).string())),
         suffixes_(RequireSuffixGroup(
-            context_.suffixGroups, "source_dependencies.suffix_group", config.At("suffix_group").AsString())),
-        headerSuffixes_(RequireSuffixGroup(context_.suffixGroups,
+            context_.suffixGroups,
+            "source_dependencies.suffix_group",
+            config.At("suffix_group").AsString()
+        )),
+        headerSuffixes_(RequireSuffixGroup(
+            context_.suffixGroups,
             "source_dependencies.header_suffix_group",
-            config.At("header_suffix_group").AsString())),
-        largeSourceFileLocThreshold_(config.Find("large_source_file_loc_threshold") != nullptr ?
-                config.At("large_source_file_loc_threshold").AsInt() :
-                1000),
+            config.At("header_suffix_group").AsString()
+        )),
+        largeSourceFileLocThreshold_(
+            config.Find("large_source_file_loc_threshold") != nullptr ?
+                config.At("large_source_file_loc_threshold").AsInt() : 1000
+        ),
         packageEncapsulationMessage_(config.At("package_encapsulation_message").AsString()),
-        packageDependencyMessage_(config.At("package_dependency_message").AsString()) {
+        packageDependencyMessage_(config.At("package_dependency_message").AsString())
+    {
         const std::vector<std::string> universalPackageDependencies =
             ConfigStrings(config, "universal_package_dependencies");
         universalPackageDependencies_.insert(universalPackageDependencies.begin(), universalPackageDependencies.end());
@@ -800,7 +869,7 @@ public:
                 const JsonValue* directory = item.Find("directory");
                 external.directory = directory != nullptr ? directory->AsString() : "external";
                 for (const JsonValue& includeName : item.At("include_names").AsArray()) {
-                    external.includeNames.insert(ToLowerAscii(includeName.AsString()));
+                    external.includeNames.insert(ToLower(includeName.AsString()));
                 }
                 for (const JsonValue& package : item.At("allowed_packages").AsArray()) {
                     external.allowedPackages.insert(package.AsString());
@@ -841,7 +910,7 @@ public:
         const std::string kind =
             headerSuffixes_.find(Extension(record.path)) != headerSuffixes_.end() ? "public" : "private";
         for (const IncludeDirective& include : record.includes) {
-            const std::string normalized = ToLowerAscii(NormalizeInclude(include.text));
+            const std::string normalized = ToLower(NormalizeInclude(include.text));
             const auto external = externalModuleByInclude_.find(normalized);
             if (external != externalModuleByInclude_.end()) {
                 uses_.push_back({moduleName, external->second, kind});
@@ -917,9 +986,9 @@ private:
     std::optional<std::string> ResolveInclude(const std::string& currentFile, const std::string& includeText) const {
         const std::string normalized = NormalizeInclude(includeText);
         const std::vector<std::string> candidates = {
-            JoinPath(ParentPath(currentFile), normalized),
-            JoinPath(sourceRoot_, normalized),
-            JoinPath(context_.projectRoot, normalized),
+            (FilePath(currentFile).ParentPath() / normalized).string(),
+            (FilePath(sourceRoot_) / normalized).string(),
+            (FilePath(context_.projectRoot) / normalized).string()
         };
         for (const std::string& candidate : candidates) {
             if (!FileExists(candidate)) {
@@ -969,16 +1038,17 @@ private:
             if (sourcePackage == targetPackage) {
                 continue;
             }
-            findings.push_back({source + " -> " + target,
+            findings.push_back({
+                source + " -> " + target,
                 "package-encapsulation",
-                FormatTemplate(packageEncapsulationMessage_,
-                    {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"target_package", targetPackage},
-                        {"target_package_root", sourceRootName_ + "/" + targetPackage},
-                    })});
+                FormatTemplate(packageEncapsulationMessage_, {
+                    {"source", source},
+                    {"target", target},
+                    {"source_package", sourcePackage},
+                    {"target_package", targetPackage},
+                    {"target_package_root", sourceRootName_ + "/" + targetPackage}
+                })
+            });
         }
         return findings;
     }
@@ -998,25 +1068,29 @@ private:
             if (allowed == packageDependencyLimits_.end()) {
                 continue;
             }
-            if (universalPackageDependencies_.find(targetPackage) != universalPackageDependencies_.end() &&
-                universalPackageDependencies_.find(sourcePackage) == universalPackageDependencies_.end()) {
+            if (
+                universalPackageDependencies_.find(targetPackage) != universalPackageDependencies_.end() &&
+                universalPackageDependencies_.find(sourcePackage) == universalPackageDependencies_.end()
+            ) {
                 continue;
             }
             if (targetPackage == sourcePackage || allowed->second.find(targetPackage) != allowed->second.end()) {
                 continue;
             }
-            findings.push_back({source + " -> " + target,
+            findings.push_back({
+                source + " -> " + target,
                 "package-dependency-" + sourcePackage,
-                FormatTemplate(packageDependencyMessage_,
+                FormatTemplate(packageDependencyMessage_, {
+                    {"source", source},
+                    {"target", target},
+                    {"source_package", sourcePackage},
+                    {"target_package", targetPackage},
                     {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"target_package", targetPackage},
-                        {"allowed_dependencies",
-                            FormatAllowedPackageDependencies(
-                                sourcePackage, allowed->second, universalPackageDependencies_)},
-                    })});
+                        "allowed_dependencies",
+                        FormatAllowedPackageDependencies(sourcePackage, allowed->second, universalPackageDependencies_)
+                    }
+                })
+            });
         }
         return findings;
     }
@@ -1042,15 +1116,15 @@ private:
                 }
                 allowedPackages += package;
             }
-            findings.push_back({source + " -> " + target,
-                external->second.violationKind,
-                FormatTemplate(external->second.violationMessage,
-                    {
-                        {"source", source},
-                        {"target", target},
-                        {"source_package", sourcePackage},
-                        {"allowed_packages", allowedPackages},
-                    })});
+            findings.push_back(
+                {source + " -> " + target, external->second.violationKind, FormatTemplate(
+                    external->second.violationMessage,
+                    {{"source", source}, {"target", target}, {"source_package", sourcePackage}, {
+                        "allowed_packages",
+                        allowedPackages
+                    }}
+                )}
+            );
         }
         return findings;
     }
@@ -1065,8 +1139,10 @@ private:
         }
         for (const auto& [edge, kind] : edges_) {
             (void)kind;
-            if (externalModuleByName_.find(edge.first) != externalModuleByName_.end() ||
-                externalModuleByName_.find(edge.second) != externalModuleByName_.end()) {
+            if (
+                externalModuleByName_.find(edge.first) != externalModuleByName_.end() ||
+                externalModuleByName_.find(edge.second) != externalModuleByName_.end()
+            ) {
                 continue;
             }
             const std::string sourcePackage = TopLevelPackage(edge.first);
@@ -1175,8 +1251,16 @@ private:
             }
             const auto summary = summaries.find(package);
             const int totalLoc = summary == summaries.end() ? 0 : summary->second.TotalLoc();
-            lines.push_back("  " + std::to_string(index + 1) + ". " + FormatCount(totalLoc) + " LOC: " + package +
-                " -> " + dependencies);
+            lines.push_back(
+                "  " +
+                    std::to_string(index + 1) +
+                    ". " +
+                    FormatCount(totalLoc) +
+                    " LOC: " +
+                    package +
+                    " -> " +
+                    dependencies
+            );
         }
         return lines;
     }
@@ -1209,6 +1293,7 @@ struct LineRule {
     std::string message;
     int captureGroup = -1;
     std::map<std::string, std::set<std::string>> allowedMatchesByFile;
+    std::vector<std::string> excludedPrefixes;
 };
 
 bool LineCouldMatchRule(const LineRule& rule, const std::string& line) {
@@ -1222,8 +1307,12 @@ bool LineCouldMatchRule(const LineRule& rule, const std::string& line) {
         return Contains(line, "std") && Contains(line, "hash");
     }
     if (Contains(rule.patternText, "condition_variable")) {
-        return Contains(line, "condition_variable") || Contains(line, "jthread") || Contains(line, "mutex") ||
-            Contains(line, "shared_mutex") || Contains(line, "thread") || Contains(line, "timed_mutex");
+        return Contains(line, "condition_variable") ||
+            Contains(line, "jthread") ||
+            Contains(line, "mutex") ||
+            Contains(line, "shared_mutex") ||
+            Contains(line, "thread") ||
+            Contains(line, "timed_mutex");
     }
     if (Contains(rule.patternText, "#\\s*(?:if")) {
         return StartsWith(Trim(line), "#");
@@ -1243,9 +1332,13 @@ public:
         context_(std::move(context)),
         roots_(ConfigStrings(config, "roots")),
         suffixes_(RequireSuffixGroup(
-            context_.suffixGroups, "source_policy.suffix_group", config.At("suffix_group").AsString())),
+            context_.suffixGroups,
+            "source_policy.suffix_group",
+            config.At("suffix_group").AsString()
+        )),
         guardrailsDoc_(config.Find("guardrails_doc") != nullptr ? config.At("guardrails_doc").AsString() : ""),
-        wideLiteralMessage_(config.At("wide_literals").At("message").AsString()) {
+        wideLiteralMessage_(config.At("wide_literals").At("message").AsString())
+    {
         const JsonValue* rules = config.Find("line_rules");
         if (rules != nullptr) {
             for (const JsonValue& rule : rules->AsArray()) {
@@ -1261,6 +1354,10 @@ public:
         for (int index = 0; index < static_cast<int>(record.strippedLines.size()); ++index) {
             const std::string& line = record.strippedLines[static_cast<size_t>(index)];
             for (const LineRule& rule : lineRules_) {
+                if (IsExcluded(record.relative, rule.excludedPrefixes)) {
+                    // Repository tools are not size-optimized, so src/tools/ may use STL threading primitives.
+                    continue;
+                }
                 if (!LineCouldMatchRule(rule, line)) {
                     continue;
                 }
@@ -1270,29 +1367,36 @@ public:
                         if (rule.captureGroup >= 0) {
                             const std::string matched = match.str(static_cast<size_t>(rule.captureGroup));
                             const auto allowedFile = rule.allowedMatchesByFile.find(record.relative);
-                            if (allowedFile != rule.allowedMatchesByFile.end() &&
-                                allowedFile->second.find(matched) != allowedFile->second.end()) {
+                            if (
+                                allowedFile != rule.allowedMatchesByFile.end() &&
+                                allowedFile->second.find(matched) != allowedFile->second.end()
+                            ) {
                                 continue;
                             }
                         }
-                        violations_.push_back({record.relative + ":" + std::to_string(index + 1),
+                        violations_.push_back({
+                            record.relative + ":" + std::to_string(index + 1),
                             rule.kind,
-                            FormatRuleMessage(rule.message, match)});
+                            FormatRuleMessage(rule.message, match)
+                        });
                         if (rule.captureGroup < 0) {
                             break;
                         }
                     }
                 } catch (const std::regex_error& error) {
                     throw std::runtime_error(
-                        "source-policy regex failed for pattern " + rule.patternText + ": " + error.what());
+                        "source-policy regex failed for pattern " + rule.patternText + ": " + error.what()
+                    );
                 }
             }
         }
 
         for (int line : FindUndocumentedWideLiteralLines(record.text)) {
-            violations_.push_back({record.relative + ":" + std::to_string(line),
+            violations_.push_back({
+                record.relative + ":" + std::to_string(line),
                 "source-policy",
-                FormatRuleMessage(wideLiteralMessage_, {})});
+                FormatRuleMessage(wideLiteralMessage_, {})
+            });
         }
     }
 
@@ -1337,6 +1441,7 @@ private:
                 }
             }
         }
+        parsed.excludedPrefixes = ConfigStrings(rule, "excluded_prefixes");
         return parsed;
     }
 

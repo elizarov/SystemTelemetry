@@ -51,6 +51,7 @@
       "renderer": ["config"],
       "telemetry": ["config"],
       "config": [],
+      "tools": [],
       "util": []
     },
     "package_encapsulation_message": "{source} depends on package-private module {target}; only {target_package_root}/ files may include modules below {target_package_root}/*/.",
@@ -89,6 +90,7 @@
       {
         "kind": "source-policy",
         "pattern": "\\bstd\\s*::\\s*(?:condition_variable(?:_any)?|jthread|mutex|recursive_mutex|shared_mutex|thread|timed_mutex)\\b|^\\s*#\\s*include\\s*<\\s*(?:condition_variable|mutex|shared_mutex|thread)\\s*>",
+        "excluded_prefixes": ["src/tools/"],
         "message": "STL threading primitives are not allowed in maintained source; use LightweightMutex for small locks and direct Win32 thread or event handles for worker wakeups so prior size-optimization wins stay enforced. See {guardrails_doc}."
       },
       {
