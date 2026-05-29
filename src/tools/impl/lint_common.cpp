@@ -3,6 +3,9 @@
 #include <cstdio>
 #include <stdexcept>
 
+#include "tools/impl/tools_common.h"
+#include "util/strings.h"
+
 namespace tools::lint {
 
 namespace {

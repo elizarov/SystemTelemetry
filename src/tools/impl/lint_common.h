@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <map>
 #include <optional>
 #include <set>
@@ -9,7 +8,6 @@
 #include <vector>
 
 #include "tools/impl/lint_json.h"
-#include "tools/impl/tools_common.h"
 
 namespace tools::lint {
 

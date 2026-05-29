@@ -5,7 +5,6 @@
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <optional>
@@ -32,13 +31,13 @@
 #include "telemetry/impl/collector.h"
 #include "telemetry/metrics.h"
 #include "telemetry/telemetry.h"
-#include "tools/format.h"
 #include "tools/impl/format_model_parse.h"
 #include "tools/impl/format_pretty_printer.h"
 #include "tools/impl/tools_common.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
+#include "util/strings.h"
 #include "util/trace.h"
 
 #define CASEDASH_BENCHMARK_ITEMS(X) \

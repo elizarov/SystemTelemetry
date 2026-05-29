@@ -1,7 +1,7 @@
 #pragma once
 
 #include <memory>
-#include <string_view>
+#include <string>
 #include <tree_sitter/api.h>
 
 #include "tools/impl/format_model.h"

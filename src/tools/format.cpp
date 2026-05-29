@@ -16,6 +16,7 @@
 #include "tools/impl/tools_common.h"
 #include "tools/impl/tools_parallel.h"
 #include "tools/impl/tools_progress.h"
+#include "util/file_path.h"
 
 namespace {
 

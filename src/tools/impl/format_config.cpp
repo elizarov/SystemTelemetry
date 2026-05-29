@@ -5,6 +5,8 @@
 #include <stdexcept>
 
 #include "tools/impl/tools_common.h"
+#include "util/file_path.h"
+#include "util/strings.h"
 
 namespace {
 

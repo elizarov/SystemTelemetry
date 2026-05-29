@@ -6,9 +6,6 @@
 #include <string_view>
 #include <vector>
 
-#include "util/file_path.h"
-#include "util/strings.h"
-
 std::string ExecutablePath();
 std::string AbsolutePath(std::string_view path);
 std::string RelativePath(std::string_view path, std::string_view root);

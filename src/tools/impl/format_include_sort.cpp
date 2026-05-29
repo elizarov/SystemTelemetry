@@ -3,7 +3,6 @@
 #include <algorithm>
 #include <cctype>
 #include <limits>
-#include <memory>
 #include <optional>
 #include <regex>
 #include <string>
@@ -12,6 +11,7 @@
 #include "tools/impl/format_config.h"
 #include "tools/impl/format_model.h"
 #include "tools/impl/tools_common.h"
+#include "util/strings.h"
 
 namespace {
 
