@@ -429,8 +429,7 @@ struct InitializerGeneralityWidget {
     int third_ = 0;
 };
 
-InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other)
-{
+InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other) {
     Touch();
 }
 

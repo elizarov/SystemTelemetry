@@ -652,19 +652,21 @@ private:
         int& width,
         bool& hasText,
         const PrintToken*& previous,
-        bool& previousStringLike
+        bool& previousStringLike,
+        bool allowFieldInitializerList = false
     ) const {
         if (token.kind != PrintTokenKind::Known && token.kind != PrintTokenKind::Free) {
             return false;
         }
         const bool stringLike = IsStringLike(token);
+        const bool inFieldInitializerList = token.parentKind == SyntaxNodeKind::FieldInitializerList ||
+            token.grandParentKind == SyntaxNodeKind::FieldInitializerList;
         if (
             token.inMacroValue ||
             token.breakBeforeMacroValue ||
             token.macroDefinition != nullptr ||
             (stringLike && previousStringLike) ||
-            token.parentKind == SyntaxNodeKind::FieldInitializerList ||
-            token.grandParentKind == SyntaxNodeKind::FieldInitializerList
+            (!allowFieldInitializerList && inFieldInitializerList)
         ) {
             return false;
         }
@@ -705,6 +707,22 @@ private:
             if (!AppendCompactWidthToken(candidate, width, hasText, previous, previousStringLike)) {
                 return false;
             }
+        }
+        return CurrentColumn() + width <= config_.columnLimit;
+    }
+
+    bool CanKeepConstructorBodyBraceWithInitializerList(const PrintToken& token) const {
+        int width = 0;
+        bool hasText = lineHasText_;
+        const PrintToken* previous = nullptr;
+        bool previousStringLike = false;
+        for (const PrintToken& pending : pendingTokens_) {
+            if (!AppendCompactWidthToken(pending, width, hasText, previous, previousStringLike, true)) {
+                return false;
+            }
+        }
+        if (!AppendCompactWidthToken(token, width, hasText, previous, previousStringLike, true)) {
+            return false;
         }
         return CurrentColumn() + width <= config_.columnLimit;
     }
@@ -1969,7 +1987,13 @@ private:
             previous->parentKind == SyntaxNodeKind::FieldInitializerList ||
             previous->grandParentKind == SyntaxNodeKind::FieldInitializer
         );
-        if (!isEmptyBracePair && role == BraceRole::Block && followsConstructorInitializer && HasBufferedLineText()) {
+        if (
+            !isEmptyBracePair &&
+            role == BraceRole::Block &&
+            followsConstructorInitializer &&
+            HasBufferedLineText() &&
+            !CanKeepConstructorBodyBraceWithInitializerList(token)
+        ) {
             FlushPendingTokens();
             NewLine(ShouldContinueMacroLine(token, rawNext));
         }

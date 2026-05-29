@@ -361,7 +361,7 @@ template <typename Callable>
 FunctionRef(Callable&& callable);
 ```
 
-Constructor initializer lists use compact or split form. A long initializer list keeps `) :` on the header line, or `) noexcept :` when a trailing qualifier is present. Initializer count alone does not force the constructor parameter list to split. Non-empty bodies put the opening body brace on its own line after the initializer list. Empty bodies keep `{}` compact.
+Constructor initializer lists use compact or split form. A long initializer list keeps `) :` on the header line, or `) noexcept :` when a trailing qualifier is present. Initializer count alone does not force the constructor parameter list to split. Non-empty bodies keep the opening body brace with the initializer list when the complete line fits; otherwise the brace moves to its own line after the initializer list. Empty bodies keep `{}` compact.
 
 ```cpp
 Widget::Widget(int value) : value_(value) {}
