@@ -2,15 +2,18 @@
 
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
+#include <functional>
 #include <iomanip>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "config/color_resolver.h"
@@ -34,6 +37,7 @@
 #include "tools/format.h"
 #include "tools/impl/format_model_parse.h"
 #include "tools/impl/format_pretty_printer.h"
+#include "tools/impl/tools_common.h"
 #include "util/enum_string.h"
 #include "util/file_path.h"
 #include "util/lightweight_mutex.h"
@@ -42,6 +46,7 @@
 #define CASEDASH_BENCHMARK_ITEMS(X) \
     X(Animation, "animation") \
     X(EditLayout, "edit-layout") \
+    X(FormatAll, "format-all") \
     X(FormatGolden, "format-golden") \
     X(LayoutGuideSheet, "layout-guide-sheet") \
     X(LayoutSwitch, "layout-switch") \
@@ -90,6 +95,29 @@ struct BenchResult {
     Duration perIteration{};
 };
 
+struct FormatAllFileWork {
+    std::string file;
+    const FormatterConfig* config = nullptr;
+};
+
+struct FormatAllWorkerStats {
+    size_t processedFiles = 0;
+    size_t changedFiles = 0;
+    size_t inputBytes = 0;
+    size_t formattedBytes = 0;
+    PhaseStats read;
+    PhaseStats parse;
+    PhaseStats print;
+    PhaseStats tokenize;
+    PhaseStats annotate;
+    PhaseStats emit;
+    PhaseStats breakModel;
+    PhaseStats solve;
+    PhaseStats write;
+    PhaseStats compare;
+    std::string error;
+};
+
 struct BenchmarkCommandLine {
     Benchmark benchmark;
     size_t iterations = 240;
@@ -103,6 +131,10 @@ FilePath SourceConfigPath() {
 
 FilePath SourceFormatGoldenInputPath() {
     return FilePath(CASEDASH_SOURCE_DIR) / "tools" / "tests" / "format" / "src" / "format_test_input.cpp";
+}
+
+FilePath SourceRootPath() {
+    return FilePath(CASEDASH_SOURCE_DIR);
 }
 
 ConfigParseContext BenchmarkConfigParseContext() {
@@ -215,6 +247,8 @@ std::optional<BenchmarkCommandLine> ParseBenchmarkCommandLine(int argc, char** a
     BenchmarkCommandLine commandLine{*parsedBenchmark};
     if (commandLine.benchmark == Benchmark::TelemetryInit) {
         commandLine.iterations = 2;
+    } else if (commandLine.benchmark == Benchmark::FormatAll) {
+        commandLine.iterations = 3;
     } else if (commandLine.benchmark == Benchmark::FormatGolden) {
         commandLine.iterations = 20;
     }
@@ -950,6 +984,104 @@ void PrintFormatPhaseResult(const char* name, const PhaseStats& stats, size_t it
     PrintBenchLoopResult(name, BenchResult{total, Duration(total.count() / static_cast<double>(iterations))});
 }
 
+void MergePhaseStats(PhaseStats& target, const PhaseStats& source) {
+    target.total += source.total;
+    target.samples += source.samples;
+}
+
+size_t FormatBenchmarkWorkerCount(size_t workSize) {
+    if (workSize <= 1) {
+        return workSize;
+    }
+    const unsigned int hardware = std::thread::hardware_concurrency();
+    const size_t workerCount = hardware == 0 ? 4 : static_cast<size_t>(hardware);
+    return std::min(workSize, std::max<size_t>(1, workerCount));
+}
+
+bool IsBenchmarkFormatSourcePath(std::string_view path) {
+    const std::string extension = tools::ToLowerAscii(tools::Extension(path));
+    return extension == ".cpp" || extension == ".h";
+}
+
+void AppendBenchmarkFormatSourceFiles(std::string_view root, std::vector<std::string>& files) {
+    for (const std::string& path : tools::RecursiveFiles(root)) {
+        if (IsBenchmarkFormatSourcePath(path)) {
+            files.push_back(path);
+        }
+    }
+}
+
+std::vector<std::string> SourceFormatAllInputPaths() {
+    const std::string sourceRoot = SourceRootPath().string();
+    std::vector<std::string> files;
+    AppendBenchmarkFormatSourceFiles(tools::JoinPath(sourceRoot, "src"), files);
+    AppendBenchmarkFormatSourceFiles(tools::JoinPath(sourceRoot, "tests"), files);
+    std::sort(files.begin(), files.end(), [](const std::string& left, const std::string& right) {
+        return tools::NormalizePathKey(left) < tools::NormalizePathKey(right);
+    });
+    files.erase(std::unique(files.begin(), files.end(), [](const std::string& left, const std::string& right) {
+        return tools::NormalizePathKey(left) == tools::NormalizePathKey(right);
+    }), files.end());
+    return files;
+}
+
+void RunFormatAllWorker(
+    const std::vector<FormatAllFileWork>& work,
+    std::atomic<size_t>& nextIndex,
+    std::atomic<bool>& stop,
+    FormatAllWorkerStats& stats
+) {
+    while (!stop.load(std::memory_order_relaxed)) {
+        const size_t index = nextIndex.fetch_add(1, std::memory_order_relaxed);
+        if (index >= work.size()) {
+            return;
+        }
+
+        const FormatAllFileWork& item = work[index];
+        const auto readStart = Clock::now();
+        std::optional<std::string> input = tools::ReadFileText(item.file);
+        RecordPhase(stats.read, Clock::now() - readStart);
+        if (!input.has_value()) {
+            stats.error = "failed to read format-all input: " + item.file;
+            stop.store(true, std::memory_order_relaxed);
+            return;
+        }
+        stats.inputBytes += input->size();
+        ++stats.processedFiles;
+
+        const auto parseStart = Clock::now();
+        FormatModel model = ParseFormatModel(*input);
+        RecordPhase(stats.parse, Clock::now() - parseStart);
+        if (!model.parse.ok) {
+            const std::string parseError =
+                model.parse.error.empty() ? "tree-sitter parser setup failed" : model.parse.error;
+            stats.error = item.file + ": " + parseError;
+            stop.store(true, std::memory_order_relaxed);
+            return;
+        }
+
+        const auto printStart = Clock::now();
+        FormatModelTextStats formatStats;
+        std::string formatted = FormatModelText(*item.config, model, item.file, formatStats);
+        RecordPhase(stats.print, Clock::now() - printStart);
+        RecordPhase(stats.tokenize, formatStats.tokenize);
+        RecordPhase(stats.annotate, formatStats.annotate);
+        RecordPhase(stats.emit, formatStats.print);
+        RecordPhase(stats.breakModel, formatStats.breakModel);
+        RecordPhase(stats.solve, formatStats.solve);
+        RecordPhase(stats.write, formatStats.emit);
+        stats.formattedBytes += formatted.size();
+
+        const auto compareStart = Clock::now();
+        const bool changed =
+            model.sourceText != nullptr && !BenchmarkTextMatchesFormattedOutput(*model.sourceText, formatted);
+        RecordPhase(stats.compare, Clock::now() - compareStart);
+        if (changed) {
+            ++stats.changedFiles;
+        }
+    }
+}
+
 int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
     const FilePath inputPath = SourceFormatGoldenInputPath();
     std::optional<std::string> input = ReadFileBinary(inputPath);
@@ -1034,6 +1166,150 @@ int RunFormatGoldenBenchmarkCommand(size_t iterations, double renderScale) {
         << changedIterations
         << " formatted_bytes="
         << formattedBytes
+        << "\n";
+    return 0;
+}
+
+int RunFormatAllBenchmarkCommand(size_t iterations, double renderScale) {
+    const std::vector<std::string> files = SourceFormatAllInputPaths();
+    if (files.empty()) {
+        std::cerr << "format-all found no maintained C++ source files\n";
+        return 1;
+    }
+
+    size_t lastProcessedFiles = 0;
+    size_t lastIgnoredFiles = 0;
+    size_t lastChangedFiles = 0;
+    size_t lastInputBytes = 0;
+    size_t lastFormattedBytes = 0;
+    PhaseStats styleStats;
+    PhaseStats readStats;
+    PhaseStats parseStats;
+    PhaseStats printStats;
+    PhaseStats tokenizeStats;
+    PhaseStats annotateStats;
+    PhaseStats emitStats;
+    PhaseStats breakModelStats;
+    PhaseStats solveStats;
+    PhaseStats writeStats;
+    PhaseStats compareStats;
+
+    const auto loopStart = Clock::now();
+    for (size_t iteration = 0; iteration < iterations; ++iteration) {
+        FormatStyleCache styleCache(std::nullopt);
+        std::vector<FormatAllFileWork> work;
+        work.reserve(files.size());
+        size_t ignoredFiles = 0;
+        for (const std::string& file : files) {
+            const auto styleStart = Clock::now();
+            std::string error;
+            const bool ignored = styleCache.IsIgnored(file, error);
+            if (!error.empty()) {
+                std::cerr << error << "\n";
+                return 2;
+            }
+            if (ignored) {
+                RecordPhase(styleStats, Clock::now() - styleStart);
+                ++ignoredFiles;
+                continue;
+            }
+            const FormatterConfig* config = styleCache.ConfigForPath(file, error);
+            RecordPhase(styleStats, Clock::now() - styleStart);
+            if (config == nullptr) {
+                std::cerr << error << "\n";
+                return 2;
+            }
+            work.push_back({file, config});
+        }
+
+        std::atomic<size_t> nextIndex = 0;
+        std::atomic<bool> stop = false;
+        const size_t workerCount = FormatBenchmarkWorkerCount(work.size());
+        std::vector<FormatAllWorkerStats> workerStats(workerCount);
+        std::vector<std::thread> workers;
+        workers.reserve(workerCount);
+        for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+            workers.emplace_back(
+                RunFormatAllWorker,
+                std::cref(work),
+                std::ref(nextIndex),
+                std::ref(stop),
+                std::ref(workerStats[workerIndex])
+            );
+        }
+        for (std::thread& worker : workers) {
+            worker.join();
+        }
+
+        size_t processedFiles = 0;
+        size_t changedFiles = 0;
+        size_t inputBytes = 0;
+        size_t formattedBytes = 0;
+        for (const FormatAllWorkerStats& worker : workerStats) {
+            if (!worker.error.empty()) {
+                std::cerr << worker.error << "\n";
+                return 1;
+            }
+            processedFiles += worker.processedFiles;
+            changedFiles += worker.changedFiles;
+            inputBytes += worker.inputBytes;
+            formattedBytes += worker.formattedBytes;
+            MergePhaseStats(readStats, worker.read);
+            MergePhaseStats(parseStats, worker.parse);
+            MergePhaseStats(printStats, worker.print);
+            MergePhaseStats(tokenizeStats, worker.tokenize);
+            MergePhaseStats(annotateStats, worker.annotate);
+            MergePhaseStats(emitStats, worker.emit);
+            MergePhaseStats(breakModelStats, worker.breakModel);
+            MergePhaseStats(solveStats, worker.solve);
+            MergePhaseStats(writeStats, worker.write);
+            MergePhaseStats(compareStats, worker.compare);
+        }
+
+        lastProcessedFiles = processedFiles;
+        lastIgnoredFiles = ignoredFiles;
+        lastChangedFiles = changedFiles;
+        lastInputBytes = inputBytes;
+        lastFormattedBytes = formattedBytes;
+    }
+    const Duration total = Clock::now() - loopStart;
+
+    std::cout
+        << "format_all_benchmark iterations="
+        << iterations
+        << " render_scale_ignored="
+        << renderScale
+        << " root=\""
+        << SourceRootPath().string()
+        << "\" candidate_files="
+        << files.size()
+        << "\n";
+    PrintBenchLoopResult("format_loop", BenchResult{total, Duration(total.count() / static_cast<double>(iterations))});
+    PrintFormatPhaseResult("format_style", styleStats, iterations);
+    PrintFormatPhaseResult("format_read", readStats, iterations);
+    PrintFormatPhaseResult("format_parse", parseStats, iterations);
+    PrintFormatPhaseResult("format_print", printStats, iterations);
+    PrintFormatPhaseResult("format_tokenize", tokenizeStats, iterations);
+    PrintFormatPhaseResult("format_annotate", annotateStats, iterations);
+    PrintFormatPhaseResult("format_emit", emitStats, iterations);
+    PrintFormatPhaseResult("format_model", breakModelStats, iterations);
+    PrintFormatPhaseResult("format_solve", solveStats, iterations);
+    PrintFormatPhaseResult("format_write", writeStats, iterations);
+    PrintFormatPhaseResult("format_compare", compareStats, iterations);
+    std::cout
+        << std::left << std::setw(18) << "format_result"
+        << " all_formatted="
+        << (lastChangedFiles == 0 ? "true" : "false")
+        << " processed_files="
+        << lastProcessedFiles
+        << " ignored_files="
+        << lastIgnoredFiles
+        << " changed_files="
+        << lastChangedFiles
+        << " input_bytes="
+        << lastInputBytes
+        << " formatted_bytes="
+        << lastFormattedBytes
         << "\n";
     return 0;
 }
@@ -1909,6 +2185,8 @@ int RunBenchmarkCommand(const BenchmarkCommandLine& commandLine, Trace& trace) {
             return RunAnimationBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
         case Benchmark::EditLayout:
             return RunEditLayoutBenchmarkCommand(commandLine.iterations, commandLine.renderScale, trace);
+        case Benchmark::FormatAll:
+            return RunFormatAllBenchmarkCommand(commandLine.iterations, commandLine.renderScale);
         case Benchmark::FormatGolden:
             return RunFormatGoldenBenchmarkCommand(commandLine.iterations, commandLine.renderScale);
         case Benchmark::LayoutGuideSheet:

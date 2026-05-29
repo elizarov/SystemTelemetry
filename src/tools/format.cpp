@@ -1,12 +1,16 @@
 #include "tools/format.h"
 
+#include <algorithm>
+#include <atomic>
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <io.h>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 #include "tools/impl/format_args.h"
@@ -21,6 +25,17 @@ namespace {
 struct PendingFileFormat {
     std::string file;
     SourceFormatResult result;
+};
+
+struct ResolvedFileFormat {
+    std::string file;
+    const FormatterConfig* config = nullptr;
+};
+
+struct CompletedFileFormat {
+    PendingFileFormat pending;
+    bool hasPending = false;
+    bool readFailed = false;
 };
 
 std::string FormatElapsed(std::chrono::steady_clock::duration elapsed) {
@@ -84,6 +99,43 @@ bool TextMatchesFormattedOutput(std::string_view source, std::string_view format
         }
     }
     return true;
+}
+
+size_t FormatWorkerCount(size_t workSize) {
+    if (workSize <= 1) {
+        return workSize;
+    }
+    const unsigned int hardware = std::thread::hardware_concurrency();
+    const size_t workerCount = hardware == 0 ? 4 : static_cast<size_t>(hardware);
+    return std::min(workSize, std::max<size_t>(1, workerCount));
+}
+
+void RunFormatWorker(
+    const std::vector<ResolvedFileFormat>& work,
+    std::vector<CompletedFileFormat>& completed,
+    std::atomic<size_t>& nextIndex,
+    std::atomic<size_t>& completedCount
+) {
+    while (true) {
+        const size_t index = nextIndex.fetch_add(1, std::memory_order_relaxed);
+        if (index >= work.size()) {
+            return;
+        }
+
+        const ResolvedFileFormat& item = work[index];
+        CompletedFileFormat result;
+        result.pending.file = item.file;
+        std::optional<std::string> text = tools::ReadFileText(item.file);
+        if (!text) {
+            result.readFailed = true;
+            result.pending.result.ok = false;
+        } else {
+            result.hasPending = true;
+            result.pending.result = FormatSourceText(*text, *item.config, item.file);
+        }
+        completed[index] = std::move(result);
+        completedCount.fetch_add(1, std::memory_order_relaxed);
+    }
 }
 
 }  // namespace
@@ -219,6 +271,8 @@ int RunFormat(int argc, char** argv) {
     std::vector<PendingFileFormat> pendingResults;
     const bool showProgress = _isatty(_fileno(summary)) != 0;
     size_t previousProgressLength = 0;
+    std::vector<ResolvedFileFormat> work;
+    work.reserve(options.files.size());
 
     for (int index = 0; index < static_cast<int>(options.files.size()); ++index) {
         const std::string file = tools::AbsolutePath(options.files[static_cast<size_t>(index)]);
@@ -237,30 +291,59 @@ int RunFormat(int argc, char** argv) {
             std::fprintf(stderr, "%s\n", error.c_str());
             return 2;
         }
-        if (showProgress) {
-            const std::string relative = tools::NormalizeSeparators(tools::RelativePath(file, currentDirectory));
-            std::string progress =
-                "[" + std::to_string(index + 1) + "/" + std::to_string(options.files.size()) + "] format " + relative;
-            if (progress.size() > 119) {
-                progress = progress.substr(0, 116) + "...";
-            }
-            const std::string padding(
-                previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
-                ' '
-            );
-            std::fprintf(summary, "\r%s%s", progress.c_str(), padding.c_str());
-            std::fflush(summary);
-            previousProgressLength = progress.size();
-        }
+        work.push_back({file, config});
+    }
 
-        std::optional<std::string> text = tools::ReadFileText(file);
-        if (!text) {
+    std::atomic<size_t> nextIndex = 0;
+    std::atomic<size_t> completedCount = 0;
+    const size_t workerCount = FormatWorkerCount(work.size());
+    std::vector<CompletedFileFormat> completed(work.size());
+    std::vector<std::thread> workers;
+    workers.reserve(workerCount);
+    for (size_t workerIndex = 0; workerIndex < workerCount; ++workerIndex) {
+        workers.emplace_back(
+            RunFormatWorker,
+            std::cref(work),
+            std::ref(completed),
+            std::ref(nextIndex),
+            std::ref(completedCount)
+        );
+    }
+    while (showProgress && completedCount.load(std::memory_order_relaxed) < work.size()) {
+        const std::string progress = "format " +
+            std::to_string(completedCount.load(std::memory_order_relaxed)) +
+            "/" +
+            std::to_string(work.size()) +
+            " files";
+        const std::string padding(
+            previousProgressLength > progress.size() ? previousProgressLength - progress.size() : 0,
+            ' '
+        );
+        std::fprintf(summary, "\r%s%s", progress.c_str(), padding.c_str());
+        std::fflush(summary);
+        previousProgressLength = progress.size();
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+    for (std::thread& worker : workers) {
+        worker.join();
+    }
+    if (showProgress && previousProgressLength > 0) {
+        std::fprintf(summary, "\r%s\r", std::string(previousProgressLength, ' ').c_str());
+        std::fflush(summary);
+    }
+
+    for (CompletedFileFormat& completedFormat : completed) {
+        const std::string& file = completedFormat.pending.file;
+        if (completedFormat.readFailed) {
             std::fprintf(stderr, "Failed to read %s\n", file.c_str());
             failed = true;
             continue;
         }
+        if (!completedFormat.hasPending) {
+            continue;
+        }
         ++processedCount;
-        SourceFormatResult result = FormatSourceText(*text, *config, file);
+        SourceFormatResult& result = completedFormat.pending.result;
         if (!result.ok) {
             std::fprintf(stderr, "%s: %s\n", file.c_str(), result.error.c_str());
             ++parseErrorCount;
@@ -273,11 +356,7 @@ int RunFormat(int argc, char** argv) {
                 failed = true;
             }
         }
-        pendingResults.push_back({file, std::move(result)});
-    }
-    if (showProgress) {
-        std::fprintf(summary, "\r%s\r", std::string(previousProgressLength, ' ').c_str());
-        std::fflush(summary);
+        pendingResults.push_back(std::move(completedFormat.pending));
     }
     if (!failed) {
         for (const PendingFileFormat& pending : pendingResults) {
