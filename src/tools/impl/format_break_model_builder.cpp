@@ -400,10 +400,11 @@ private:
             delimited.delimiterKind == FormatBreakDelimiterKind::Paren &&
             item &&
             item->kind == FormatBreakNodeKind::Chain &&
-            item->chainKind != FormatBreakChainKind::Ternary &&
-            (virtualDelimiter || (IsFlatParenthesizedChain(*item) && (
-                UsesFlatLogicalContinuation(open, *item) || UsesFlatNonCallParenthesisContinuation(open)
-            )))
+            item->chainKind != FormatBreakChainKind::Ternary && (
+                virtualDelimiter || (IsFlatParenthesizedChain(*item) && (
+                    UsesFlatLogicalContinuation(open, *item) || UsesFlatNonCallParenthesisContinuation(open)
+                ))
+            )
         ) {
             item->flatSplitIndent = true;
         }
@@ -459,6 +460,27 @@ private:
             }
         }
         return false;
+    }
+
+    static void MarkBodyHeaderSplitAtParentIndentWhenLineStarts(FormatBreakNode& node) {
+        if (node.kind == FormatBreakNodeKind::BodyHeader) {
+            node.bodyHeaderSplitAtParentIndentWhenLineStarts = true;
+        }
+        for (FormatBreakNode* child : node.children) {
+            if (child) {
+                MarkBodyHeaderSplitAtParentIndentWhenLineStarts(*child);
+            }
+        }
+        for (FormatBreakListItem& item : node.items) {
+            if (item.node) {
+                MarkBodyHeaderSplitAtParentIndentWhenLineStarts(*item.node);
+            }
+        }
+        for (FormatBreakNode* operand : node.operands) {
+            if (operand) {
+                MarkBodyHeaderSplitAtParentIndentWhenLineStarts(*operand);
+            }
+        }
     }
 
     static bool ContainsForceSplitAdjacentStrings(const FormatBreakNode& node) {
@@ -633,8 +655,32 @@ private:
         }
 
         auto result = MakeNode(FormatBreakNodeKind::BodyHeader, depth);
+        result->bodyHeaderSingleStatementBody = IsSingleStatementLambdaBody(*node.children[*bodyIndex]);
+        const SyntaxNode* parent = node.parent;
+        result->bodyHeaderSplitAtParentIndentWhenLineStarts = parent != nullptr &&
+            (parent->kind == SyntaxNodeKind::AssignmentExpression || parent->kind == SyntaxNodeKind::InitDeclarator);
         result->children = StoreNodePointers({header, body});
         return result;
+    }
+
+    static bool IsSingleStatementLambdaBody(const SyntaxNode& node) {
+        size_t statementCount = 0;
+        for (const SyntaxNode* child : node.children) {
+            if (
+                child == nullptr ||
+                child->kind == SyntaxNodeKind::BlankLine ||
+                child->kind == SyntaxNodeKind::Comment ||
+                child->kind == SyntaxNodeKind::TrailingComment ||
+                SyntaxNodeKindHasClass(child->kind, TokenClass::Known)
+            ) {
+                continue;
+            }
+            ++statementCount;
+            if (statementCount > 1) {
+                return false;
+            }
+        }
+        return statementCount == 1;
     }
 
     FormatBreakNode* BuildFunctionSignature(const SyntaxNode& node, int depth) {
@@ -802,6 +848,9 @@ private:
         chain->operands = StoreNodePointers({left, right});
         chain->operators = StoreTokens({*op});
         chain->splitTrailingBodyHeaderAtParentIndent = right != nullptr && ContainsBodyHeader(*right);
+        if (right != nullptr && chain->splitTrailingBodyHeaderAtParentIndent) {
+            MarkBodyHeaderSplitAtParentIndentWhenLineStarts(*right);
+        }
         if (right != nullptr && IsDirectForceSplitAdjacentStringsInitializer(*right)) {
             MarkForceSplitAdjacentStringsFlat(*right);
         }
@@ -1013,6 +1062,9 @@ private:
         chain->operators = StoreTokens({*token});
         chain->splitTrailingBodyHeaderAtParentIndent =
             IsAssignmentOperatorForNode(*token) && right != nullptr && ContainsBodyHeader(*right);
+        if (right != nullptr && chain->splitTrailingBodyHeaderAtParentIndent) {
+            MarkBodyHeaderSplitAtParentIndentWhenLineStarts(*right);
+        }
         if (IsAssignmentOperatorForNode(*token) && right != nullptr && IsDirectForceSplitAdjacentStringsInitializer(
             *right
         )) {

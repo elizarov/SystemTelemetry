@@ -8,7 +8,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 
 - Never use vertical alignment.
 - When a wrapped construct closes, the matching closing delimiter begins a line at the owning indent.
-- Keep formatter-owned chains and lists compact or split item-by-item; a compact chain or list may contain delimiter or body-brace breaks inside its final item.
+- Keep formatter-owned chains and lists compact or split item-by-item.
 - Use no heuristics or weights; use only the general line-break optimization rule.
 - Use indentation changes as visual group borders.
 - Use one indentation size for every indentation change.
@@ -57,7 +57,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 Mandatory line breaks are structural boundaries. The break is always taken before optional wrapping is considered.
 
 - Break between complete statements and declarations, including after each statement-terminating semicolon.
-- The single-statement lambda is an exception: its braces and statement may remain one segment while the lambda header and any declaration or assignment prefix split independently.
+- The single-statement lambda is an exception only when the whole lambda stays on one physical line.
 - Put block-opening braces at the end of the introducing line, then break.
 - Break after a code-block closing brace unless the following token is `else`, `catch`, `finally`, or the `while` that closes a do-while statement.
 - Treat a standalone braced statement block as a block. Its closing brace does not attach to the following statement.
@@ -99,8 +99,6 @@ Line break opportunities are optional boundaries that the optimizer may take whe
 - After semicolons inside `for` and control headers.
 - Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
 
-A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no top-level optional breaks in a structure, but compact chains and lists may keep delimiter or body-brace breaks inside their final item. Split form takes the structure's coupled opportunities; delimiter groups split after the opener and before the closer together.
-
 ## Lists
 
 Lists use compact or split form.
@@ -117,7 +115,7 @@ call(
 
 The rule applies to function arguments, template arguments, braced initializer lists, subscript lists, declaration parameter lists, base-class lists, enum bodies, and similar comma-separated syntax.
 
-Compact comma-separated lists may keep leading items on the opener line while the final item splits internally through a delimiter or body brace. The final item may be any expression, such as a trailing lambda body, braced initializer, or call. If any earlier item splits, or if the final item only splits at an operator, the whole list uses split form.
+Compact comma-separated lists may keep leading items on the opener line while the final item splits internally through a delimiter. The final item may be any expression, such as a braced initializer or call. If any earlier item splits, if the final item only splits at an operator, or if the final item would start a physical line with a delimiter and continue content after that opener, the whole list uses split form.
 
 ```cpp
 call(first, second, [](int value) {
@@ -174,7 +172,7 @@ struct Context {
 - Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, and comparisons.
 - Chain classification is independent of operand count. A chain with two operands is still a chain.
 - Chains use compact or split form.
-- Compact chains may keep leading operands on one line while the final operand splits internally through a delimiter or body brace.
+- Compact chains may keep leading operands on one line while the final operand splits internally through a delimiter that does not start the physical line.
 - A final operand that only splits at another operator does not qualify for compact chain form.
 - Split chains take every top-level chain opportunity.
 - Chain parts use the chain item indentation, not an additional continuation indentation.
@@ -253,7 +251,7 @@ Each node exposes its legal compact and split layouts. The optimizer chooses whi
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
 
-Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`. A delimiter split emits its opening delimiter sequence as the last content on a physical line and its matching closing delimiter sequence as the first content on a physical line. Delimiter sequences stay run-symmetric: when N matching closers are emitted together, their N openers are emitted together as the corresponding opener sequence. This is a universal rule with no exceptions.
+Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`. A delimiter split emits its opening delimiter sequence as the last content on a physical line and its matching closing delimiter sequence as the first content on a physical line. When a physical line starts with an opening delimiter or sequence of opening delimiters whose matching closer is on a later line, the formatter breaks immediately after that opener sequence. Delimiter sequences stay run-symmetric: when N matching closers are emitted together, their N openers are emitted together as the corresponding opener sequence. This is a universal rule with no exceptions.
 When compact content ends in a split delimiter group and no intervening separator or item content follows it, wrapper delimiter groups may stay compact so any number of adjacent openers and closers combine across delimiter kinds.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack can keep the opening sequence together and the closing sequence together regardless of nesting depth.
 
@@ -464,13 +462,13 @@ Nested switches restore the enclosing switch case indentation after the inner sw
 
 Lambdas intentionally format like functions. A lambda is a callable for all header/body placement decisions: the capture list, parameter list, and optional trailing return type form the callable header, and an assignment prefix such as `const auto name =` behaves like a function return-type prefix.
 
-Single-statement lambda bodies may keep their braces and statement compact while lambda captures, parameters, trailing return types, and assignment prefixes split independently. Multi-statement lambda bodies split after `{`, format each statement with normal mandatory statement breaks, and close on their own line. Any delimited list containing a multi-statement lambda body splits like any other list containing a multi-line item.
+Single-statement lambda bodies may keep their braces and statement compact only when the complete lambda capture, parameter list, optional trailing return type, and body fit on one physical line. If a lambda breaks anywhere, its body breaks after `{`, formats the body one indentation step deeper than the declaration, and closes on its own line. Multi-statement lambda bodies always use that broken-body form. Any delimited list containing a broken lambda body splits like any other list containing a multi-line item.
 
 When an assigned lambda keeps the assignment prefix and lambda header together, a split parameter list must keep the body opener attached as `) {`, matching function definitions whose only header continuation is a split parameter list.
 
 Lambda captures and lambda parameters are separate break opportunities. Captures and parameters use the same compact-or-split optimization as other delimiter groups.
 
-When an assigned lambda splits the assignment prefix away from the lambda header, the body-header placement remains an optimizer choice. It may stay attached when that is the best fitting layout, or split to declaration indentation when the body itself needs that structure.
+When an assigned lambda splits the assignment prefix away from the lambda header and the lambda body is broken, the body opener starts on its own line at declaration indentation so body statements are one indentation step deeper than the declaration.
 
 ```cpp
 const auto updateKey = [&](

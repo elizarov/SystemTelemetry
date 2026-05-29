@@ -71,6 +71,8 @@ struct FormatBreakNode {
     bool forceSplit = false;
     bool flatSplitIndent = false;
     bool functionSignatureHasBody = false;
+    bool bodyHeaderSingleStatementBody = false;
+    bool bodyHeaderSplitAtParentIndentWhenLineStarts = false;
     bool splitTrailingBodyHeaderAtParentIndent = false;
     std::span<FormatBreakNode*> children;
     std::vector<FormatBreakListItem> items;
