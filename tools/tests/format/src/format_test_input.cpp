@@ -1028,6 +1028,7 @@ void SplitOperatorChainPartsLineByLine() {
 
 void UniversalBreakSelectionCases() {
     const int singleBinaryValue=firstValue+BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
+    const int tailCallChainValue=firstValue+secondValue+BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
     const int sameOperatorChainValue = firstValue +
         BuildValue(
             firstArgumentWithLongName,
@@ -1051,6 +1052,7 @@ void UniversalBreakSelectionCases() {
             thirdArgumentWithLongName
         ) :
         fallbackValueWithLongName;
+    const int tailTernaryChainValue = firstConditionWithLongName ? firstValueWithLongName : BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName);
     const int ternaryTrueBranchChainValue = firstConditionWithLongName ? secondConditionWithLongName ? firstValueWithLongName : secondValueWithLongName : fallbackValueWithLongName;
     UseTemplate<
         FirstTemplateArgumentWithLongName,
@@ -1062,6 +1064,14 @@ void UniversalBreakSelectionCases() {
         !options.defaultConfig,
         context
     ) : LoadConfigWithExtraTemplate(GetRuntimeConfigPath(), !options.defaultConfig, context, extraTemplate);
+}
+
+void TrailingListExpansionCases() {
+    UseTrailingListExpansion(firstValue,secondValue,BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName));
+    UseTrailingListExpansion(firstValue,secondValue,FormatTableRow{"tail.list.row.with.extra.detail",100,200,firstInitializerFlagWithVeryLongName | secondInitializerFlagWithVeryLongName | thirdInitializerFlagWithVeryLongName | fourthInitializerFlagWithVeryLongName});
+    UseTrailingListExpansion(firstValue,secondValue,conditionWithLongName ? firstValueWithLongName : BuildValue(firstArgumentWithLongName,secondArgumentWithLongName,thirdArgumentWithLongName,fourthArgumentWithLongName));
+    UseTrailingListExpansion(firstValue,secondValue,firstReallyLongEqualityOperandForTrailingListExpansion == secondReallyLongEqualityOperandForTrailingListExpansion);
+    const int compactMaxTailExpansion = std::max(0, ComputeTrailingMaximumCandidate(firstArgumentWithLongName, secondArgumentWithLongName, thirdArgumentWithLongName, fourthArgumentWithLongName));
 }
 
 ColorMixParseResult ParseColorMixParts(const std::vector<std::string>& parts) {

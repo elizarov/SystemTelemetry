@@ -360,11 +360,9 @@ struct IncludeGroup {
 };
 
 void SortIncludeGroups(std::vector<IncludeGroup>& groups) {
-    std::sort(
-        groups.begin(),
-        groups.end(),
-        [](const IncludeGroup& left, const IncludeGroup& right) { return left.priority < right.priority; }
-    );
+    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {
+        return left.priority < right.priority;
+    });
 }
 
 std::set<std::string> RequireSuffixGroup(
@@ -536,11 +534,9 @@ void StartLenovoSnapshot(void* contextPtr) {
 }
 
 HRESULT CreateWriteFactory(ComPtr<IDWriteFactory>& dwriteFactory_) {
-    return DWriteCreateFactory(
-        DWRITE_FACTORY_TYPE_SHARED,
-        __uuidof(IDWriteFactory),
-        reinterpret_cast<IUnknown**>(dwriteFactory_.ReleaseAndGetAddressOf())
-    );
+    return DWriteCreateFactory(DWRITE_FACTORY_TYPE_SHARED, __uuidof(IDWriteFactory), reinterpret_cast<IUnknown**>(
+        dwriteFactory_.ReleaseAndGetAddressOf()
+    ));
 }
 
 void GatewayAddress(const Gateway* gateway) {
@@ -1136,6 +1132,12 @@ void UniversalBreakSelectionCases() {
         thirdArgumentWithLongName,
         fourthArgumentWithLongName
     );
+    const int tailCallChainValue = firstValue + secondValue + BuildValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    );
     const int sameOperatorChainValue = firstValue +
         BuildValue(
             firstArgumentWithLongName,
@@ -1159,6 +1161,12 @@ void UniversalBreakSelectionCases() {
             thirdArgumentWithLongName
         ) :
         fallbackValueWithLongName;
+    const int tailTernaryChainValue = firstConditionWithLongName ? firstValueWithLongName : BuildValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    );
     const int ternaryTrueBranchChainValue =
         firstConditionWithLongName ? secondConditionWithLongName ? firstValueWithLongName :
             secondValueWithLongName :
@@ -1170,6 +1178,42 @@ void UniversalBreakSelectionCases() {
     >();
     AppConfig config = extraTemplate.empty() ? LoadConfig(GetRuntimeConfigPath(), !options.defaultConfig, context) :
         LoadConfigWithExtraTemplate(GetRuntimeConfigPath(), !options.defaultConfig, context, extraTemplate);
+}
+
+void TrailingListExpansionCases() {
+    UseTrailingListExpansion(firstValue, secondValue, BuildValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    ));
+    UseTrailingListExpansion(firstValue, secondValue, FormatTableRow{
+        "tail.list.row.with.extra.detail",
+        100,
+        200,
+        firstInitializerFlagWithVeryLongName |
+            secondInitializerFlagWithVeryLongName |
+            thirdInitializerFlagWithVeryLongName |
+            fourthInitializerFlagWithVeryLongName
+    });
+    UseTrailingListExpansion(firstValue, secondValue, conditionWithLongName ? firstValueWithLongName : BuildValue(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    ));
+    UseTrailingListExpansion(
+        firstValue,
+        secondValue,
+        firstReallyLongEqualityOperandForTrailingListExpansion ==
+            secondReallyLongEqualityOperandForTrailingListExpansion
+    );
+    const int compactMaxTailExpansion = std::max(0, ComputeTrailingMaximumCandidate(
+        firstArgumentWithLongName,
+        secondArgumentWithLongName,
+        thirdArgumentWithLongName,
+        fourthArgumentWithLongName
+    ));
 }
 
 ColorMixParseResult ParseColorMixParts(const std::vector<std::string>& parts) {
@@ -1203,15 +1247,12 @@ void FormatterSelfBreakCases() {
     ) {
         return;
     }
-    if (
-        next < tokens.size() &&
-        tokens[next].kind == TokenKind::Word && (
-            tokens[next].text == "else" ||
-            tokens[next].text == "catch" ||
-            tokens[next].text == "finally" ||
-            (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
-        )
-    ) {
+    if (next < tokens.size() && tokens[next].kind == TokenKind::Word && (
+        tokens[next].text == "else" ||
+        tokens[next].text == "catch" ||
+        tokens[next].text == "finally" ||
+        (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+    )) {
         return;
     }
     if (
@@ -1264,27 +1305,23 @@ void GenericNestedCallDelimiterCombining() {
 }
 
 int MeasureHexLabelWidth(HWND hwnd) {
-    const int hexLabelWidth = MeasureTextWidthForControl(
+    const int hexLabelWidth = MeasureTextWidthForControl(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL, ReadDialogControlText(
         hwnd,
-        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,
-        ReadDialogControlText(hwnd, IDC_LAYOUT_EDIT_COLOR_HEX_LABEL)
-    ) + 8;
+        IDC_LAYOUT_EDIT_COLOR_HEX_LABEL
+    )) + 8;
     return hexLabelWidth;
 }
 
 int MeasureTextBlockRight(const RenderRect& measureRect, const std::wstring& wideText, const TextStyle& style) {
-    const int width = std::max(
-        0,
-        static_cast<int>(
-            MeasureTextBlockD2D(
-                measureRect,
-                wideText,
-                style,
-                TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
-                nullptr
-            ).textRect.right
-        )
-    );
+    const int width = std::max(0, static_cast<int>(
+        MeasureTextBlockD2D(
+            measureRect,
+            wideText,
+            style,
+            TextLayoutOptions::SingleLine(TextHorizontalAlign::Leading, TextVerticalAlign::Center),
+            nullptr
+        ).textRect.right
+    ));
     return width;
 }
 
@@ -1474,7 +1511,9 @@ int CountPlusAnchors(RenderHost& renderer) {
     return static_cast<int>(std::count_if(
         renderer.editArtifacts.staticAnchors.begin(),
         renderer.editArtifacts.staticAnchors.end(),
-        [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }
+        [](const LayoutEditAnchorRegion& region) {
+            return region.shape == AnchorShape::Plus;
+        }
     ));
 }
 

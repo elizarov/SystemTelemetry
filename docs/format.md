@@ -8,7 +8,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 
 - Never use vertical alignment.
 - When a wrapped construct closes, the matching closing delimiter begins a line at the owning indent.
-- Keep lists and formatter-owned chains either fully compact or split item-by-item.
+- Keep formatter-owned chains and lists compact or split item-by-item; a compact chain or list may contain delimiter or body-brace breaks inside its final item.
 - Use no heuristics or weights; use only the general line-break optimization rule.
 - Use indentation changes as visual group borders.
 - Use one indentation size for every indentation change.
@@ -98,7 +98,7 @@ Line break opportunities are optional boundaries that the optimizer may take whe
 - After semicolons inside `for` and control headers.
 - Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
 
-A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no optional breaks in a structure. Split form takes the structure's coupled opportunities; delimiter groups split after the opener and before the closer together.
+A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no top-level optional breaks in a structure, but compact chains and lists may keep delimiter or body-brace breaks inside their final item. Split form takes the structure's coupled opportunities; delimiter groups split after the opener and before the closer together.
 
 ## Lists
 
@@ -115,6 +115,14 @@ call(
 ```
 
 The rule applies to function arguments, template arguments, braced initializer lists, subscript lists, declaration parameter lists, enum bodies, and similar comma-separated syntax.
+
+Compact comma-separated lists may keep leading items on the opener line while the final item splits internally through a delimiter or body brace. The final item may be any expression, such as a trailing lambda body, braced initializer, or call. If any earlier item splits, or if the final item only splits at an operator, the whole list uses split form.
+
+```cpp
+call(first, second, [](int value) {
+    return value + 1;
+});
+```
 
 When a template list wraps, `<` stays with the owner, each top-level argument occupies one line, and the closing `>` starts the continuation line.
 
@@ -165,6 +173,8 @@ struct Context {
 - Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, and comparisons.
 - Chain classification is independent of operand count. A chain with two operands is still a chain.
 - Chains use compact or split form.
+- Compact chains may keep leading operands on one line while the final operand splits internally through a delimiter or body brace.
+- A final operand that only splits at another operator does not qualify for compact chain form.
 - Split chains take every top-level chain opportunity.
 - Chain parts use the chain item indentation, not an additional continuation indentation.
 - If an outer context applies continuation indentation, that context defines the chain's base indentation.
@@ -178,6 +188,11 @@ int total = (
 bool ready = (
     firstCondition &&
     secondCondition
+);
+
+int total = first + second + BuildValue(
+    firstLongArgument,
+    secondLongArgument
 );
 ```
 
