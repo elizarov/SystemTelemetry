@@ -355,6 +355,7 @@ using RuntimeConfigForEachDynamicItem =
 using ZesDriver = void*;
 using ZesInitFn = ZeResult(__cdecl*)(std::uint32_t);
 using SlowPathCompilerCallModifierSpacingReproducer = VeryLongLevelZeroResultTypeName(__cdecl*)(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
+typedef PDH_STATUS (WINAPI*PdhAddEnglishCounterAFn)(PDH_HQUERY,LPCSTR,DWORD_PTR,PDH_HCOUNTER*);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 using LayoutEditParameter = ::LayoutEditParameter;
 using TextLayoutResult = ::TextLayoutResult;
@@ -1031,6 +1032,7 @@ bool EqualStringVectors(const void* address, const void* compareAddress) {
     return *reinterpret_cast<const std::vector<std::string>*>(address)==*reinterpret_cast<const std::vector<std::string>*>(compareAddress);
 }
 
+[[noreturn]] void FailWithAttribute(const char* message){throw Error(message);}
 
 void FormatterSelfBreakCases(){
 if(tokens[statementStart].text=="for"||tokens[statementStart].text=="while"||tokens[statementStart].text=="switch"){return;}
@@ -1145,6 +1147,10 @@ int NestedSwitchIndent(int message,int wParam){
 switch(message){case WM_WTSSESSION_CHANGE:switch(wParam){case WTS_SESSION_LOCK:return 1;default:return 0;}case WM_ERASEBKGND:return 1;default:return 0;}
 }
 
+int CharacterCaseSpacing(char value){
+switch(value){case '\n':return 1;case '\\':return 2;default:return 0;}
+}
+
 void LongForCondition(){
 for(int rowIndex=0;rowIndex<layoutState_.visibleRows&&rowIndex<static_cast<int>(layoutState_.rowBarRects.size())&&rowIndex<static_cast<int>(layoutState_.rowBarAnchorRects.size());++rowIndex){Use(rowIndex);}
 }
@@ -1190,6 +1196,10 @@ if(count==0)values[0]=0;else if(count==1)values[0]=1;else{if(count==2){values[0]
     } while (index > 0);
 }
 
+void EmptyElseIfSpacing(bool first,bool second,bool third){
+if(first){}else if(second){}else if(third){Use(third);}
+}
+
 void TryFinallyCleanup(){
 const auto originalDirectory=Environment::CurrentDirectory;
 try{
@@ -1219,6 +1229,10 @@ int SplitRemainderOperator() {
 
 int SplitSubtractionOperator() {
     return firstReallyLongMinuendValueForOrdinarySubtractionOperatorSplit - secondReallyLongSubtrahendValueForOrdinarySubtractionOperatorSplit;
+}
+
+void AllocateBitmapPixels(){
+std::vector<DisplayPlacementMenuBitmapPixel> pixels(kBitmapSize * kBitmapSize);
 }
 
 class BaseClassSpacingRoot {};

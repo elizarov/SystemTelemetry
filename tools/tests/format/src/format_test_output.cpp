@@ -26,7 +26,7 @@
     X(Gamma, "gamma")
 #define ENUM_STRING_DECLARE(EnumType, ItemsMacro) \
     enum class EnumType { \
-        ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR), \
+        ItemsMacro(ENUM_STRING_DECLARE_ENUMERATOR) \
     }; \
     template <> \
     struct EnumStringTraits<EnumType> { \
@@ -422,6 +422,7 @@ using ZesDriver = void*;
 using ZesInitFn = ZeResult (__cdecl*)(std::uint32_t);
 using SlowPathCompilerCallModifierSpacingReproducer =
     VeryLongLevelZeroResultTypeName (__cdecl*)(std::uint32_t, std::uint32_t, std::uint32_t, std::uint32_t);
+typedef PDH_STATUS (WINAPI* PdhAddEnglishCounterAFn)(PDH_HQUERY, LPCSTR, DWORD_PTR, PDH_HCOUNTER*);
 using DumpValues = std::vector<std::pair<std::string, std::string>>;
 using LayoutEditParameter = ::LayoutEditParameter;
 using TextLayoutResult = ::TextLayoutResult;
@@ -1111,6 +1112,10 @@ bool EqualStringVectors(const void* address, const void* compareAddress) {
         *reinterpret_cast<const std::vector<std::string>*>(compareAddress);
 }
 
+[[noreturn]] void FailWithAttribute(const char* message) {
+    throw Error(message);
+}
+
 void FormatterSelfBreakCases() {
     if (
         tokens[statementStart].text == "for" ||
@@ -1456,6 +1461,17 @@ int NestedSwitchIndent(int message, int wParam) {
     }
 }
 
+int CharacterCaseSpacing(char value) {
+    switch (value) {
+        case '\n':
+            return 1;
+        case '\\':
+            return 2;
+        default:
+            return 0;
+    }
+}
+
 void LongForCondition() {
     for (
         int rowIndex = 0;
@@ -1519,6 +1535,14 @@ void ControlFlowVariety(int* values, int count) {
     } while (index > 0);
 }
 
+void EmptyElseIfSpacing(bool first, bool second, bool third) {
+    if (first) {}
+    else if (second) {}
+    else if (third) {
+        Use(third);
+    }
+}
+
 void TryFinallyCleanup() {
     const auto originalDirectory = Environment::CurrentDirectory;
     try {
@@ -1551,6 +1575,10 @@ int SplitRemainderOperator() {
 int SplitSubtractionOperator() {
     return firstReallyLongMinuendValueForOrdinarySubtractionOperatorSplit -
         secondReallyLongSubtrahendValueForOrdinarySubtractionOperatorSplit;
+}
+
+void AllocateBitmapPixels() {
+    std::vector<DisplayPlacementMenuBitmapPixel> pixels(kBitmapSize * kBitmapSize);
 }
 
 class BaseClassSpacingRoot {};

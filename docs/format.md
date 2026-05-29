@@ -2,7 +2,7 @@
 
 This document specifies the source layout produced by `format.cmd`.
 
-The formatter owns whitespace, line breaks, indentation, wrapping, include ordering, trailing-comma normalization, and required control-statement braces. Source line breaks are not style input. Comments and allowed blank-line separators are grouping input.
+The formatter owns whitespace, line breaks, indentation, wrapping, include ordering, trailing-comma normalization, and control-brace normalization. Source line breaks are not style input. Comments and allowed blank-line separators are grouping input.
 
 ## Main Tenets
 
@@ -385,7 +385,7 @@ DashboardApp::DashboardApp(
 }
 ```
 
-Every `if`, `else`, `for`, `while`, `do`, and `switch` body is a braced block. `else if` remains a direct chain.
+Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain.
 
 ```cpp
 if (ready) {
@@ -544,7 +544,7 @@ The formatter preserves source token order except for:
 
 - include sorting
 - trailing-comma normalization
-- required control-statement brace insertion
+- control-brace normalization
 - safe adjacent ordinary string-literal concatenation
 
 String literals ending with escaped `\n` or `\r\n` are line-fragment boundaries and are not joined with the following literal. A trailing escape such as `\xB0` that would consume the next fragment's first character after textual joining also prevents joining.
