@@ -85,8 +85,8 @@ struct FormatBreakNode {
     bool functionSignatureHasBody = false;
     std::span<FormatBreakNode*> children;
     std::vector<FormatBreakListItem> items;
-    std::vector<FormatBreakNode*> operands;
-    std::vector<FormatBreakToken> operators;
+    std::span<FormatBreakNode*> operands;
+    std::span<FormatBreakToken> operators;
 };
 
 template <typename T>
@@ -128,6 +128,7 @@ private:
 struct FormatBreakModel {
     std::unique_ptr<std::deque<FormatBreakNode>> nodes;
     FormatBreakArena<FormatBreakNode*> nodePointers;
+    FormatBreakArena<FormatBreakToken> tokens;
     FormatBreakNode* root = nullptr;
 };
 

@@ -1,12 +1,12 @@
 #pragma once
 
-#include <map>
+#include <vector>
 
 #include "tools/impl/format_break_model.h"
 #include "tools/impl/format_config.h"
 
 struct FormatBreakSolution {
-    std::map<int, FormatBreakChoice> choices;
+    std::vector<FormatBreakChoice> choices;
 };
 
 FormatBreakSolution SolveFormatBreaks(

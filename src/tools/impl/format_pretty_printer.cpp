@@ -22,6 +22,13 @@ enum class BraceRole {
     CaseBlock,
 };
 
+struct BraceFrame {
+    BraceRole role = BraceRole::Compact;
+    int parenDepth = 0;
+    int indentRestore = 0;
+    int closeIndent = 0;
+};
+
 bool IsPreprocessorNode(SyntaxNodeKind kind) {
     return SyntaxNodeKindHasClass(kind, TokenClass::AtomicPreprocessor);
 }
@@ -542,6 +549,7 @@ private:
     int indentLevel_ = 0;
     bool atLineStart_ = true;
     bool lineHasText_ = false;
+    int currentColumn_ = 0;
     bool macroContinuationLine_ = false;
     bool forceColumnZeroLine_ = false;
     bool emittingMacroValue_ = false;
@@ -552,10 +560,7 @@ private:
     int switchDepth_ = 0;
     int parenDepth_ = 0;
     int bracketDepth_ = 0;
-    std::vector<BraceRole> braceStack_;
-    std::vector<int> braceParenDepthStack_;
-    std::vector<int> braceIndentRestoreStack_;
-    std::vector<int> braceCloseIndentStack_;
+    std::vector<BraceFrame> braceStack_;
     std::vector<int> activeCaseBodySwitchDepths_;
     std::vector<DeferredSplitCallContext> deferredSplitCallContexts_;
     std::optional<int> pendingIndentRestoreAfterFlush_;
@@ -654,6 +659,7 @@ private:
     void TrimTrailingSpaces() {
         while (!output_.empty() && output_.back() == ' ') {
             output_.pop_back();
+            currentColumn_ = std::max(0, currentColumn_ - 1);
         }
     }
 
@@ -671,6 +677,7 @@ private:
         }
         atLineStart_ = true;
         lineHasText_ = false;
+        currentColumn_ = 0;
         macroContinuationLine_ = macroContinuation;
         forceColumnZeroLine_ = false;
         pendingIndentLevel_.reset();
@@ -701,6 +708,7 @@ private:
         }
         atLineStart_ = true;
         lineHasText_ = false;
+        currentColumn_ = 0;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
         pendingIndentLevel_.reset();
@@ -712,7 +720,8 @@ private:
         }
         const int macroOffset = macroContinuationLine_ ? 1 : 0;
         const int indentLevel = pendingIndentLevel_.value_or(forceColumnZeroLine_ ? 0 : indentLevel_ + macroOffset);
-        output_.append(static_cast<size_t>(std::max(0, indentLevel) * indentWidth_), ' ');
+        currentColumn_ = std::max(0, indentLevel) * indentWidth_;
+        output_.append(static_cast<size_t>(currentColumn_), ' ');
         atLineStart_ = false;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
@@ -722,22 +731,26 @@ private:
     void WriteWithIndentOffset(std::string_view text, int indentOffset) {
         if (!atLineStart_) {
             output_.append(text);
+            AdvanceCurrentColumn(text);
             lineHasText_ = lineHasText_ || !text.empty();
             return;
         }
         const int adjustedIndent = std::max(0, indentLevel_ + indentOffset);
-        output_.append(static_cast<size_t>(adjustedIndent * indentWidth_), ' ');
+        currentColumn_ = adjustedIndent * indentWidth_;
+        output_.append(static_cast<size_t>(currentColumn_), ' ');
         atLineStart_ = false;
         macroContinuationLine_ = false;
         forceColumnZeroLine_ = false;
         pendingIndentLevel_.reset();
         output_.append(text);
+        AdvanceCurrentColumn(text);
         lineHasText_ = lineHasText_ || !text.empty();
     }
 
     void Write(std::string_view text) {
         WriteIndentIfNeeded();
         output_.append(text);
+        AdvanceCurrentColumn(text);
         lineHasText_ = lineHasText_ || !text.empty();
     }
 
@@ -751,6 +764,7 @@ private:
     void Space() {
         if (!atLineStart_ && !output_.empty() && output_.back() != ' ' && output_.back() != '\n') {
             output_.push_back(' ');
+            ++currentColumn_;
         }
     }
 
@@ -760,11 +774,16 @@ private:
             const int indentLevel = pendingIndentLevel_.value_or(forceColumnZeroLine_ ? 0 : indentLevel_ + macroOffset);
             return std::max(0, indentLevel) * indentWidth_;
         }
-        const size_t lineStart = output_.find_last_of('\n');
-        if (lineStart == std::string::npos) {
-            return static_cast<int>(output_.size());
+        return currentColumn_;
+    }
+
+    void AdvanceCurrentColumn(std::string_view text) {
+        const size_t newline = text.find_last_of('\n');
+        if (newline == std::string_view::npos) {
+            currentColumn_ += static_cast<int>(text.size());
+            return;
         }
-        return static_cast<int>(output_.size() - lineStart - 1);
+        currentColumn_ = static_cast<int>(text.size() - newline - 1);
     }
 
     int CurrentLineIndentLevel() const {
@@ -849,8 +868,10 @@ private:
     }
 
     FormatBreakChoice ChoiceFor(const FormatBreakSolution& solution, int nodeId) const {
-        const auto found = solution.choices.find(nodeId);
-        return found == solution.choices.end() ? FormatBreakChoice::Compact : found->second;
+        if (nodeId < 0 || static_cast<size_t>(nodeId) >= solution.choices.size()) {
+            return FormatBreakChoice::Compact;
+        }
+        return solution.choices[static_cast<size_t>(nodeId)];
     }
 
     static bool IsSplitChoice(FormatBreakChoice choice) {
@@ -1436,14 +1457,14 @@ private:
     }
 
     bool InEnumBody() const {
-        return !braceStack_.empty() && braceStack_.back() == BraceRole::Enum;
+        return !braceStack_.empty() && braceStack_.back().role == BraceRole::Enum;
     }
 
     bool ShouldBreakAfterSemicolon() const {
-        if (braceParenDepthStack_.empty()) {
+        if (braceStack_.empty()) {
             return parenDepth_ == 0;
         }
-        return parenDepth_ <= braceParenDepthStack_.back();
+        return parenDepth_ <= braceStack_.back().parenDepth;
     }
 
     bool ShouldContinueMacroLine(const PrintToken& token, const PrintToken* next) const {
@@ -1603,6 +1624,7 @@ private:
         if (lineHasText_) {
             Space();
             output_.push_back(' ');
+            ++currentColumn_;
             Write(token.text);
             NewLine();
             return;
@@ -1620,6 +1642,7 @@ private:
         }
         const std::string text = FormatIncludeRunText(config_, *token.node, sourcePath_);
         output_.append(text);
+        currentColumn_ = 0;
         atLineStart_ = true;
         lineHasText_ = false;
         if (!text.empty() && next != nullptr) {
@@ -1638,6 +1661,7 @@ private:
             NewLine();
         }
         output_.append(line);
+        AdvanceCurrentColumn(line);
         lineHasText_ = true;
         atLineStart_ = false;
         NewLine();
@@ -1841,12 +1865,12 @@ private:
             token.inMacroValue || functionBlock ?
                 indentLevel_ : (lineHasText_ ? CurrentLineIndentLevel() : indentLevel_)
         );
-        braceStack_.push_back(role);
-        braceParenDepthStack_.push_back(parenDepth_);
-        braceIndentRestoreStack_.push_back(indentLevel_);
-        braceCloseIndentStack_.push_back(
-            role == BraceRole::Block || role == BraceRole::Enum ? openLineIndent : indentLevel_
-        );
+        braceStack_.push_back({
+            .role = role,
+            .parenDepth = parenDepth_,
+            .indentRestore = indentLevel_,
+            .closeIndent = role == BraceRole::Block || role == BraceRole::Enum ? openLineIndent : indentLevel_
+        });
         if (
             token.parentKind == SyntaxNodeKind::CompoundStatement &&
             token.grandParentKind == SyntaxNodeKind::SwitchStatement
@@ -1874,21 +1898,14 @@ private:
             BufferToken(token);
             return;
         }
-        const BraceRole role = braceStack_.empty() ? tokenRole : braceStack_.back();
+        const BraceRole role = braceStack_.empty() ? tokenRole : braceStack_.back().role;
         FlushPendingTokens();
+        std::optional<int> restoreIndent;
+        std::optional<int> closeIndent;
         if (!braceStack_.empty()) {
+            restoreIndent = braceStack_.back().indentRestore;
+            closeIndent = braceStack_.back().closeIndent;
             braceStack_.pop_back();
-            braceParenDepthStack_.pop_back();
-        }
-        const std::optional<int> restoreIndent =
-            !braceIndentRestoreStack_.empty() ? std::optional<int>(braceIndentRestoreStack_.back()) : std::nullopt;
-        if (!braceIndentRestoreStack_.empty()) {
-            braceIndentRestoreStack_.pop_back();
-        }
-        const std::optional<int> closeIndent =
-            !braceCloseIndentStack_.empty() ? std::optional<int>(braceCloseIndentStack_.back()) : std::nullopt;
-        if (!braceCloseIndentStack_.empty()) {
-            braceCloseIndentStack_.pop_back();
         }
         if (role == BraceRole::Namespace) {
             if (lineHasText_) {

@@ -2,8 +2,14 @@
 setlocal EnableExtensions EnableDelayedExpansion
 for %%I in ("%~dp0.") do set "REPO_ROOT=%%~fI"
 
-call "%REPO_ROOT%\devenv.cmd"
-if errorlevel 1 exit /b %errorlevel%
+set "SKIP_DEVENV=0"
+if /i "%~1"=="/run-request" set "SKIP_DEVENV=1"
+if /i "%~4"=="/run-request" set "SKIP_DEVENV=1"
+
+if "%SKIP_DEVENV%"=="0" if not defined VSCMD_VER (
+    call "%REPO_ROOT%\devenv.cmd"
+    if errorlevel 1 exit /b %errorlevel%
+)
 
 set "ITERATIONS="
 set "RENDER_SCALE="
@@ -569,6 +575,7 @@ exit /b 0
 :validate_benchmark_name
 if /i "%BENCHMARK_NAME%"=="animation" exit /b 0
 if /i "%BENCHMARK_NAME%"=="edit-layout" exit /b 0
+if /i "%BENCHMARK_NAME%"=="format-golden" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-guide-sheet" exit /b 0
 if /i "%BENCHMARK_NAME%"=="layout-switch" exit /b 0
 if /i "%BENCHMARK_NAME%"=="mouse-hover" exit /b 0

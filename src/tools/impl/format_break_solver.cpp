@@ -1,8 +1,11 @@
 #include "tools/impl/format_break_solver.h"
 
 #include <algorithm>
+#include <cstddef>
 #include <deque>
 #include <limits>
+#include <memory>
+#include <new>
 #include <optional>
 #include <span>
 #include <tuple>
@@ -46,6 +49,164 @@ struct NodeResult {
     int deepestBreakDepth = -1;
     int bestOperatorBreakPriority = std::numeric_limits<int>::max();
     const struct ChoiceTree* choices = nullptr;
+};
+
+class NodeResults {
+public:
+    using iterator = NodeResult*;
+    using const_iterator = const NodeResult*;
+
+    NodeResults() = default;
+
+    NodeResults(std::initializer_list<NodeResult> values) {
+        for (NodeResult value : values) {
+            push_back(std::move(value));
+        }
+    }
+
+    NodeResults(const NodeResults& other) {
+        for (const NodeResult& value : other) {
+            push_back(value);
+        }
+    }
+
+    NodeResults(NodeResults&& other) noexcept {
+        MoveFrom(std::move(other));
+    }
+
+    ~NodeResults() {
+        clear();
+    }
+
+    NodeResults& operator=(const NodeResults& other) {
+        if (this != &other) {
+            clear();
+            usingHeap_ = false;
+            for (const NodeResult& value : other) {
+                push_back(value);
+            }
+        }
+        return *this;
+    }
+
+    NodeResults& operator=(NodeResults&& other) noexcept {
+        if (this != &other) {
+            clear();
+            usingHeap_ = false;
+            MoveFrom(std::move(other));
+        }
+        return *this;
+    }
+
+    iterator begin() {
+        return usingHeap_ ? heap_.data() : InlineData();
+    }
+
+    iterator end() {
+        return begin() + size();
+    }
+
+    const_iterator begin() const {
+        return usingHeap_ ? heap_.data() : InlineData();
+    }
+
+    const_iterator end() const {
+        return begin() + size();
+    }
+
+    bool empty() const {
+        return size() == 0;
+    }
+
+    size_t size() const {
+        return usingHeap_ ? heap_.size() : inlineSize_;
+    }
+
+    NodeResult& operator[](size_t index) {
+        return begin()[index];
+    }
+
+    const NodeResult& operator[](size_t index) const {
+        return begin()[index];
+    }
+
+    void push_back(NodeResult value) {
+        if (usingHeap_) {
+            heap_.push_back(std::move(value));
+            return;
+        }
+        if (inlineSize_ < kInlineCapacity) {
+            std::construct_at(InlineData() + inlineSize_, std::move(value));
+            ++inlineSize_;
+            return;
+        }
+        MoveInlineToHeap();
+        heap_.push_back(std::move(value));
+    }
+
+    iterator erase(iterator it) {
+        const size_t index = static_cast<size_t>(it - begin());
+        if (usingHeap_) {
+            heap_.erase(heap_.begin() + static_cast<std::ptrdiff_t>(index));
+            return heap_.data() + index;
+        }
+        for (size_t cursor = index + 1; cursor < inlineSize_; ++cursor) {
+            InlineData()[cursor - 1] = std::move(InlineData()[cursor]);
+        }
+        --inlineSize_;
+        std::destroy_at(InlineData() + inlineSize_);
+        return InlineData() + index;
+    }
+
+    void clear() {
+        if (usingHeap_) {
+            heap_.clear();
+            return;
+        }
+        for (size_t index = 0; index < inlineSize_; ++index) {
+            std::destroy_at(InlineData() + index);
+        }
+        inlineSize_ = 0;
+    }
+
+private:
+    static constexpr size_t kInlineCapacity = 8;
+
+    NodeResult* InlineData() {
+        return std::launder(reinterpret_cast<NodeResult*>(inlineStorage_));
+    }
+
+    const NodeResult* InlineData() const {
+        return std::launder(reinterpret_cast<const NodeResult*>(inlineStorage_));
+    }
+
+    void MoveFrom(NodeResults&& other) {
+        if (other.usingHeap_) {
+            heap_ = std::move(other.heap_);
+            usingHeap_ = true;
+            other.usingHeap_ = false;
+            return;
+        }
+        for (NodeResult& value : other) {
+            push_back(std::move(value));
+        }
+        other.clear();
+    }
+
+    void MoveInlineToHeap() {
+        heap_.reserve(kInlineCapacity * 2);
+        for (size_t index = 0; index < inlineSize_; ++index) {
+            heap_.push_back(std::move(InlineData()[index]));
+            std::destroy_at(InlineData() + index);
+        }
+        inlineSize_ = 0;
+        usingHeap_ = true;
+    }
+
+    alignas(NodeResult) std::byte inlineStorage_[sizeof(NodeResult) * kInlineCapacity];
+    size_t inlineSize_ = 0;
+    bool usingHeap_ = false;
+    std::vector<NodeResult> heap_;
 };
 
 struct ChoiceTree {
@@ -182,16 +343,14 @@ private:
         left.choices = ConcatChoices(left.choices, right.choices);
     }
 
-    std::vector<NodeResult>
-        SolveAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText)
-    {
+    NodeResults SolveAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
         switch (node.kind) {
             case FormatBreakNodeKind::Token:
                 return {SolveToken(node.token, column, indentLevel, lineHasText)};
             case FormatBreakNodeKind::Sequence:
                 return SolveChildrenAlternatives(node.children, column, indentLevel, lineHasText);
             case FormatBreakNodeKind::Delimited: {
-                std::vector<NodeResult> alternatives;
+                NodeResults alternatives;
                 for (NodeResult compact : SolveDelimitedCompactAlternatives(node, column, indentLevel, lineHasText)) {
                     if (!node.forceSplit && !(
                         compact.valid && compact.extraLines > 0 && !CanKeepDelimitedCompactWithExtraLines(node, compact)
@@ -206,7 +365,7 @@ private:
                 return alternatives;
             }
             case FormatBreakNodeKind::PrefixList: {
-                std::vector<NodeResult> alternatives;
+                NodeResults alternatives;
                 NodeResult compact = SolvePrefixListCompact(node, column, indentLevel, lineHasText);
                 if (!node.forceSplit && !(compact.valid && compact.extraLines > 0)) {
                     alternatives.push_back(compact);
@@ -222,7 +381,7 @@ private:
             case FormatBreakNodeKind::BodyHeader:
                 return {SolveBodyHeader(node, column, indentLevel, lineHasText)};
             case FormatBreakNodeKind::Chain: {
-                std::vector<NodeResult> alternatives;
+                NodeResults alternatives;
                 for (NodeResult compact : SolveChainCompactAlternatives(node, column, indentLevel, lineHasText)) {
                     const bool compactKeepsSplitChild = compact.valid &&
                         compact.extraLines > 0 && (
@@ -267,7 +426,7 @@ private:
                 return alternatives;
             }
             case FormatBreakNodeKind::AdjacentStrings: {
-                std::vector<NodeResult> alternatives;
+                NodeResults alternatives;
                 if (!node.forceSplit) {
                     alternatives.push_back(SolveAdjacentStringsCompact(node, column, indentLevel, lineHasText));
                 }
@@ -296,7 +455,7 @@ private:
         return best;
     }
 
-    std::vector<NodeResult> SolveChildrenAlternatives(
+    NodeResults SolveChildrenAlternatives(
         std::span<FormatBreakNode* const> children,
         int column,
         int indentLevel,
@@ -304,10 +463,10 @@ private:
     ) {
         std::vector<const FormatBreakNode*> sequenceChildren;
         AppendSequenceChildren(children, sequenceChildren);
-        std::vector<NodeResult>
+        NodeResults
             current{{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText}};
         for (const FormatBreakNode* child : sequenceChildren) {
-            std::vector<NodeResult> next;
+            NodeResults next;
             for (const NodeResult& prefix : current) {
                 for (const NodeResult& childResult : SolveAlternatives(
                     *child,
@@ -490,7 +649,7 @@ private:
         return left.endLineHasText < right.endLineHasText;
     }
 
-    void AddPrunedResult(std::vector<NodeResult>& results, NodeResult candidate) const {
+    void AddPrunedResult(NodeResults& results, NodeResult candidate) const {
         if (!candidate.valid) {
             return;
         }
@@ -513,7 +672,7 @@ private:
         results.push_back(std::move(candidate));
     }
 
-    static void SortPrunedResults(std::vector<NodeResult>& results) {
+    static void SortPrunedResults(NodeResults& results) {
         std::sort(results.begin(), results.end(), ResultStateLess);
     }
 
@@ -673,7 +832,7 @@ private:
             result.endColumn + TokenColumnAdvance(token, result.endLineHasText) > config_.columnLimit;
     }
 
-    std::vector<NodeResult> SolveDelimitedCompactItemAlternatives(
+    NodeResults SolveDelimitedCompactItemAlternatives(
         const FormatBreakNode& item,
         int column,
         int indentLevel,
@@ -685,17 +844,20 @@ private:
         return SolveAlternatives(item, column, indentLevel, lineHasText);
     }
 
-    std::vector<NodeResult>
-        SolveDelimitedCompactAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText)
-    {
+    NodeResults SolveDelimitedCompactAlternatives(
+        const FormatBreakNode& node,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
         NodeResult
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         AddChoice(result, node.id, FormatBreakChoice::Compact);
         result = AddToken(result, node.children[0]->token);
-        std::vector<NodeResult> current{result};
+        NodeResults current{result};
         for (size_t index = 0; index < node.items.size(); ++index) {
             const FormatBreakListItem& listItem = node.items[index];
-            std::vector<NodeResult> nextByState;
+            NodeResults nextByState;
             const bool canKeepMultilineItem = node.items.size() == 1 || index + 1 == node.items.size();
             for (const NodeResult& prefix : current) {
                 for (const NodeResult& item : SolveDelimitedCompactItemAlternatives(
@@ -725,7 +887,7 @@ private:
             current = std::move(nextByState);
         }
 
-        std::vector<NodeResult> alternatives;
+        NodeResults alternatives;
         for (const NodeResult& candidate : current) {
             AddPrunedResult(alternatives, AddToken(candidate, node.children[1]->token));
         }
@@ -1175,10 +1337,13 @@ private:
         return result;
     }
 
-    std::vector<NodeResult>
-        SolveFunctionSignatureAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText)
-    {
-        std::vector<NodeResult> alternatives;
+    NodeResults SolveFunctionSignatureAlternatives(
+        const FormatBreakNode& node,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
+        NodeResults alternatives;
         NodeResult compact = SolveFunctionSignatureCompact(node, column, indentLevel, lineHasText);
         if (compact.valid) {
             alternatives.push_back(compact);
@@ -1257,15 +1422,18 @@ private:
         return best;
     }
 
-    std::vector<NodeResult>
-        SolveChainCompactAlternatives(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText)
-    {
+    NodeResults SolveChainCompactAlternatives(
+        const FormatBreakNode& node,
+        int column,
+        int indentLevel,
+        bool lineHasText
+    ) {
         NodeResult
             result{.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
         AddChoice(result, node.id, FormatBreakChoice::Compact);
-        std::vector<NodeResult> current{result};
+        NodeResults current{result};
         for (size_t index = 0; index < node.operands.size(); ++index) {
-            std::vector<NodeResult> nextByState;
+            NodeResults nextByState;
             for (const NodeResult& prefix : current) {
                 for (const NodeResult& operand : SolveAlternatives(
                     *node.operands[index],
@@ -1476,7 +1644,7 @@ private:
         }
         if (node.chainKind == FormatBreakChainKind::Ternary && node.operators.size() == 2) {
             NodeResult best = compact;
-            std::vector<NodeResult>
+            NodeResults
                 alternatives{
                     SolveSingleTernary(
                         node,
@@ -1555,16 +1723,20 @@ private:
     }
 };
 
-void AppendChoices(const ChoiceTree* tree, std::map<int, FormatBreakChoice>& output) {
+void AppendChoices(const ChoiceTree* tree, std::vector<FormatBreakChoice>& output, std::vector<bool>& assigned) {
     if (tree == nullptr) {
         return;
     }
     if (tree->leaf) {
-        output.emplace(tree->nodeId, tree->choice);
+        const size_t index = static_cast<size_t>(tree->nodeId);
+        if (index < output.size() && !assigned[index]) {
+            output[index] = tree->choice;
+            assigned[index] = true;
+        }
         return;
     }
-    AppendChoices(tree->left, output);
-    AppendChoices(tree->right, output);
+    AppendChoices(tree->left, output, assigned);
+    AppendChoices(tree->right, output, assigned);
 }
 
 }  // namespace
@@ -1582,6 +1754,12 @@ FormatBreakSolution SolveFormatBreaks(
     }
     Solver solver(config, indentWidth);
     NodeResult result = solver.Solve(*model.root, startColumn, indentLevel, startColumn > indentLevel * indentWidth);
-    AppendChoices(result.choices, solution.choices);
+    if (!result.valid) {
+        return solution;
+    }
+    const size_t choiceCount = model.nodes == nullptr ? 0 : model.nodes->size() + 1;
+    solution.choices.assign(choiceCount, FormatBreakChoice::Compact);
+    std::vector<bool> assigned(choiceCount, false);
+    AppendChoices(result.choices, solution.choices, assigned);
     return solution;
 }

@@ -363,6 +363,14 @@ private:
         return StoreNodePointers(std::span<FormatBreakNode* const>{nodes.begin(), nodes.size()});
     }
 
+    std::span<FormatBreakToken> StoreTokens(std::span<const FormatBreakToken> tokens) {
+        return model_.tokens.Append(tokens);
+    }
+
+    std::span<FormatBreakToken> StoreTokens(std::initializer_list<FormatBreakToken> tokens) {
+        return StoreTokens(std::span<const FormatBreakToken>{tokens.begin(), tokens.size()});
+    }
+
     FormatBreakNode* MakeNode(FormatBreakNodeKind kind, int depth) {
         model_.nodes->emplace_back();
         FormatBreakNode& node = model_.nodes->back();
@@ -404,11 +412,6 @@ private:
 
     void AppendListItem(FormatBreakNode& list, FormatBreakNode* item, bool blankLineBefore) {
         list.items.push_back(FormatBreakListItem{.node = item, .blankLineBefore = blankLineBefore});
-    }
-
-    static void ReserveChain(FormatBreakNode& chain, size_t operandCapacity, size_t operatorCapacity) {
-        chain.operands.reserve(operandCapacity);
-        chain.operators.reserve(operatorCapacity);
     }
 
     void AppendDelimitedItem(
@@ -485,13 +488,15 @@ private:
             }
 
             auto strings = MakeNode(FormatBreakNodeKind::AdjacentStrings, depth + 1);
-            strings->operands.reserve(index - begin);
+            std::vector<FormatBreakNode*> operands;
+            operands.reserve(index - begin);
             for (size_t cursor = begin; cursor < index; ++cursor) {
                 if (cursor + 1 < index && ForcesStringBoundarySplit(*TokenChild(sequence.children[cursor]))) {
                     strings->forceSplit = true;
                 }
-                strings->operands.push_back(sequence.children[cursor]);
+                operands.push_back(sequence.children[cursor]);
             }
+            strings->operands = StoreNodePointers(operands);
             grouped.push_back(strings);
         }
         sequence.children = StoreNodePointers(grouped);
@@ -657,12 +662,11 @@ private:
         }
 
         auto chain = MakeNode(FormatBreakNodeKind::Chain, depth);
-        ReserveChain(*chain, 2, 1);
-        chain->operands.push_back(BuildSequenceFromChildren(node.children, 0, *declaratorIndex, depth + 1));
-        chain->operators.push_back({});
-        chain->operands.push_back(
-            BuildSequenceFromChildren(node.children, *declaratorIndex, node.children.size(), depth + 1)
-        );
+        FormatBreakNode* left = BuildSequenceFromChildren(node.children, 0, *declaratorIndex, depth + 1);
+        FormatBreakNode* right =
+            BuildSequenceFromChildren(node.children, *declaratorIndex, node.children.size(), depth + 1);
+        chain->operands = StoreNodePointers({left, right});
+        chain->operators = StoreTokens({{}});
         return chain;
     }
 
@@ -703,12 +707,11 @@ private:
         }
 
         auto chain = MakeNode(FormatBreakNodeKind::Chain, depth);
-        ReserveChain(*chain, 2, 1);
-        chain->operands.push_back(BuildSequenceFromPointers(leftChildren, depth + 1));
-        chain->operators.push_back(*op);
-        chain->operands.push_back(
-            BuildSequenceFromChildren(declarator.children, *operatorIndex + 1, declarator.children.size(), depth + 1)
-        );
+        FormatBreakNode* left = BuildSequenceFromPointers(leftChildren, depth + 1);
+        FormatBreakNode* right =
+            BuildSequenceFromChildren(declarator.children, *operatorIndex + 1, declarator.children.size(), depth + 1);
+        chain->operands = StoreNodePointers({left, right});
+        chain->operators = StoreTokens({*op});
 
         std::vector<FormatBreakNode*> tailChildren;
         tailChildren.reserve(node.children.size() - *declaratorIndex - 1);
@@ -846,7 +849,8 @@ private:
     }
 
     void AppendBinaryChainOperand(
-        FormatBreakNode& chain,
+        std::vector<FormatBreakNode*>& operands,
+        std::vector<FormatBreakToken>& operators,
         const std::vector<SyntaxNode*>& children,
         size_t begin,
         size_t end,
@@ -859,24 +863,30 @@ private:
             IsFlattenableBinaryOperator(op) &&
             HasSameDirectBinaryOperator(*children[begin], op)
         ) {
-            AppendBinaryChain(*children[begin], op, chain, depth);
+            AppendBinaryChain(*children[begin], op, operands, operators, depth);
             return;
         }
-        chain.operands.push_back(BuildSequenceFromChildren(children, begin, end, depth + 1));
+        operands.push_back(BuildSequenceFromChildren(children, begin, end, depth + 1));
     }
 
-    void AppendBinaryChain(const SyntaxNode& node, SyntaxNodeKind op, FormatBreakNode& chain, int depth) {
+    void AppendBinaryChain(
+        const SyntaxNode& node,
+        SyntaxNodeKind op,
+        std::vector<FormatBreakNode*>& operands,
+        std::vector<FormatBreakToken>& operators,
+        int depth
+    ) {
         const std::optional<size_t> opIndex = DirectOperatorIndex(node);
         if (!opIndex || !node.children[*opIndex]) {
-            chain.operands.push_back(BuildSyntaxNode(node, depth + 1));
+            operands.push_back(BuildSyntaxNode(node, depth + 1));
             return;
         }
 
-        AppendBinaryChainOperand(chain, node.children, 0, *opIndex, op, depth);
+        AppendBinaryChainOperand(operands, operators, node.children, 0, *opIndex, op, depth);
         if (std::optional<FormatBreakToken> token = TokenForNode(*node.children[*opIndex])) {
-            chain.operators.push_back(*token);
+            operators.push_back(*token);
         }
-        AppendBinaryChainOperand(chain, node.children, *opIndex + 1, node.children.size(), op, depth);
+        AppendBinaryChainOperand(operands, operators, node.children, *opIndex + 1, node.children.size(), op, depth);
     }
 
     FormatBreakNode* BuildBinaryOrAssignmentExpression(const SyntaxNode& node, int depth) {
@@ -890,50 +900,58 @@ private:
         }
 
         auto chain = MakeNode(FormatBreakNodeKind::Chain, depth);
-        ReserveChain(*chain, 2, 1);
         const SyntaxNodeKind operatorKind = FormatBreakTokenSyntaxKind(*token);
         chain->chainKind = (
             operatorKind == SyntaxNodeKind::LessLess || operatorKind == SyntaxNodeKind::GreaterGreater
         ) ? FormatBreakChainKind::StreamBeforeOperator : FormatBreakChainKind::AfterOperator;
         if (node.kind == SyntaxNodeKind::BinaryExpression && IsFlattenableBinaryOperator(operatorKind)) {
-            AppendBinaryChain(node, operatorKind, *chain, depth);
+            std::vector<FormatBreakNode*> operands;
+            std::vector<FormatBreakToken> operators;
+            operands.reserve(2);
+            operators.reserve(1);
+            AppendBinaryChain(node, operatorKind, operands, operators, depth);
+            chain->operands = StoreNodePointers(operands);
+            chain->operators = StoreTokens(operators);
             return chain;
         }
 
-        chain->operands.push_back(BuildSequenceFromChildren(node.children, 0, *opIndex, depth + 1));
-        chain->operators.push_back(*token);
-        chain->operands.push_back(
-            BuildSequenceFromChildren(node.children, *opIndex + 1, node.children.size(), depth + 1)
-        );
+        FormatBreakNode* left = BuildSequenceFromChildren(node.children, 0, *opIndex, depth + 1);
+        FormatBreakNode* right =
+            BuildSequenceFromChildren(node.children, *opIndex + 1, node.children.size(), depth + 1);
+        chain->operands = StoreNodePointers({left, right});
+        chain->operators = StoreTokens({*token});
         return chain;
     }
 
-    void AppendConditionalChain(const SyntaxNode& node, FormatBreakNode& chain, int depth) {
-        const std::optional<std::pair<size_t, size_t>> operators = DirectConditionalOperatorIndices(node);
-        if (!operators) {
-            chain.operands.push_back(BuildSyntaxNode(node, depth + 1));
+    void AppendConditionalChain(
+        const SyntaxNode& node,
+        std::vector<FormatBreakNode*>& operands,
+        std::vector<FormatBreakToken>& operators,
+        int depth
+    ) {
+        const std::optional<std::pair<size_t, size_t>> operatorIndices = DirectConditionalOperatorIndices(node);
+        if (!operatorIndices) {
+            operands.push_back(BuildSyntaxNode(node, depth + 1));
             return;
         }
-        const size_t question = operators->first;
-        const size_t colon = operators->second;
-        chain.operands.push_back(BuildSequenceFromChildren(node.children, 0, question, depth + 1));
+        const size_t question = operatorIndices->first;
+        const size_t colon = operatorIndices->second;
+        operands.push_back(BuildSequenceFromChildren(node.children, 0, question, depth + 1));
         if (std::optional<FormatBreakToken> token = TokenForNode(*node.children[question])) {
-            chain.operators.push_back(*token);
+            operators.push_back(*token);
         }
-        chain.operands.push_back(BuildSequenceFromChildren(node.children, question + 1, colon, depth + 1));
+        operands.push_back(BuildSequenceFromChildren(node.children, question + 1, colon, depth + 1));
         if (std::optional<FormatBreakToken> token = TokenForNode(*node.children[colon])) {
-            chain.operators.push_back(*token);
+            operators.push_back(*token);
         }
         if (
             node.children.size() == colon + 2 &&
             node.children[colon + 1] &&
             node.children[colon + 1]->kind == SyntaxNodeKind::ConditionalExpression
         ) {
-            AppendConditionalChain(*node.children[colon + 1], chain, depth);
+            AppendConditionalChain(*node.children[colon + 1], operands, operators, depth);
         } else {
-            chain.operands.push_back(
-                BuildSequenceFromChildren(node.children, colon + 1, node.children.size(), depth + 1)
-            );
+            operands.push_back(BuildSequenceFromChildren(node.children, colon + 1, node.children.size(), depth + 1));
         }
     }
 
@@ -943,8 +961,13 @@ private:
         }
         auto chain = MakeNode(FormatBreakNodeKind::Chain, depth);
         chain->chainKind = FormatBreakChainKind::Ternary;
-        ReserveChain(*chain, 3, 2);
-        AppendConditionalChain(node, *chain, depth);
+        std::vector<FormatBreakNode*> operands;
+        std::vector<FormatBreakToken> operators;
+        operands.reserve(3);
+        operators.reserve(2);
+        AppendConditionalChain(node, operands, operators, depth);
+        chain->operands = StoreNodePointers(operands);
+        chain->operators = StoreTokens(operators);
         return chain;
     }
 
