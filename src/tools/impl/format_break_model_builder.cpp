@@ -106,7 +106,7 @@ bool IsCommaOperatorForNode(const FormatBreakToken& token) {
     const PrintToken& printToken = FormatBreakTokenValue(token);
     return printToken.kind == PrintTokenKind::Known &&
         printToken.parentKind == SyntaxNodeKind::CommaExpression &&
-        printToken.syntaxKind == SyntaxNodeKind::Comma;
+        SyntaxNodeKindHasClass(printToken.syntaxKind, TokenClass::ChainOperator);
 }
 
 bool IsControlHeaderKind(SyntaxNodeKind kind) {
@@ -123,14 +123,13 @@ bool IsFlatLogicalHeaderKind(SyntaxNodeKind kind) {
     return SyntaxNodeKindHasClass(kind, TokenClass::FlatLogicalHeader);
 }
 
-bool IsFlattenableBinaryOperator(SyntaxNodeKind token) {
-    return token == SyntaxNodeKind::Plus ||
-        token == SyntaxNodeKind::Star ||
-        token == SyntaxNodeKind::Pipe ||
-        token == SyntaxNodeKind::AmpersandAmpersand ||
-        token == SyntaxNodeKind::PipePipe ||
-        token == SyntaxNodeKind::LessLess ||
-        token == SyntaxNodeKind::GreaterGreater;
+bool IsChainOperatorKind(SyntaxNodeKind token) {
+    return SyntaxNodeKindHasClass(token, TokenClass::ChainOperator);
+}
+
+bool IsChainOperatorToken(const FormatBreakToken& token) {
+    return FormatBreakTokenKind(token) == PrintTokenKind::Known &&
+        IsChainOperatorKind(FormatBreakTokenSyntaxKind(token));
 }
 
 bool EndsWithEscapedLineFragment(std::string_view text) {
@@ -183,7 +182,7 @@ bool IsConstructorParameterListWithInitializerList(const FormatBreakToken& open)
 }
 
 bool IsLogicalOperatorToken(const FormatBreakToken& token) {
-    return FormatBreakTokenKind(token) == PrintTokenKind::Known && (
+    return IsChainOperatorToken(token) && (
         FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::AmpersandAmpersand ||
         FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::PipePipe
     );
@@ -197,20 +196,7 @@ bool IsLogicalChain(const FormatBreakNode& node) {
 }
 
 bool IsFlatChainOperator(const FormatBreakToken& token) {
-    if (FormatBreakTokenKind(token) != PrintTokenKind::Known) {
-        return false;
-    }
-    switch (FormatBreakTokenSyntaxKind(token)) {
-        case SyntaxNodeKind::Plus:
-        case SyntaxNodeKind::Star:
-        case SyntaxNodeKind::Pipe:
-        case SyntaxNodeKind::AmpersandAmpersand:
-        case SyntaxNodeKind::PipePipe:
-        case SyntaxNodeKind::Comma:
-            return true;
-        default:
-            return false;
-    }
+    return IsChainOperatorToken(token);
 }
 
 bool IsFlatParenthesizedChain(const FormatBreakNode& node) {
@@ -978,7 +964,7 @@ private:
         if (
             end == begin + 1 &&
             children[begin] &&
-            IsFlattenableBinaryOperator(op) &&
+            IsChainOperatorKind(op) &&
             HasSameDirectBinaryOperator(*children[begin], op)
         ) {
             AppendBinaryChain(*children[begin], op, operands, operators, depth);
@@ -1022,7 +1008,7 @@ private:
         chain->chainKind = (
             operatorKind == SyntaxNodeKind::LessLess || operatorKind == SyntaxNodeKind::GreaterGreater
         ) ? FormatBreakChainKind::StreamBeforeOperator : FormatBreakChainKind::AfterOperator;
-        if (node.kind == SyntaxNodeKind::BinaryExpression && IsFlattenableBinaryOperator(operatorKind)) {
+        if (node.kind == SyntaxNodeKind::BinaryExpression && IsChainOperatorKind(operatorKind)) {
             std::vector<FormatBreakNode*> operands;
             std::vector<FormatBreakToken> operators;
             operands.reserve(2);

@@ -42,6 +42,7 @@ constexpr std::uint64_t kStringLikeClasses =
 constexpr std::uint64_t kNumberLiteralClasses = Bit(TokenClass::Literal) | Bit(TokenClass::WholeNodeAsFreeToken);
 constexpr std::uint64_t kAtomicPreprocessorClasses =
     Bit(TokenClass::AtomicPreprocessor) | Bit(TokenClass::WholeNodeAsFreeToken);
+constexpr std::uint64_t kChainBinaryClasses = Bit(TokenClass::BinaryOperator) | Bit(TokenClass::ChainOperator);
 
 constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
@@ -193,12 +194,12 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Token(SyntaxNodeKind::EqualEqual, "==", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::BangEqual, "!=", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::Spaceship, "<=>", Bit(TokenClass::BinaryOperator)),
-    Token(SyntaxNodeKind::Plus, "+", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::UnaryOperator)),
+    Token(SyntaxNodeKind::Plus, "+", kChainBinaryClasses | Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Minus, "-", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::UnaryOperator)),
     Token(
         SyntaxNodeKind::Star,
         "*",
-        Bit(TokenClass::BinaryOperator) | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
+        kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
     ),
     Token(SyntaxNodeKind::Slash, "/", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::Percent, "%", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)),
@@ -206,9 +207,9 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Token(
         SyntaxNodeKind::Ampersand,
         "&",
-        Bit(TokenClass::BinaryOperator) | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
+        kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
     ),
-    Token(SyntaxNodeKind::Pipe, "|", Bit(TokenClass::BinaryOperator)),
+    Token(SyntaxNodeKind::Pipe, "|", kChainBinaryClasses),
     Token(SyntaxNodeKind::Bang, "!", Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Tilde, "~", Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Equal, "=", Bit(TokenClass::AssignmentOperator)),
@@ -220,16 +221,12 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Token(SyntaxNodeKind::CaretEqual, "^=", Bit(TokenClass::AssignmentOperator)),
     Token(SyntaxNodeKind::AmpersandEqual, "&=", Bit(TokenClass::AssignmentOperator)),
     Token(SyntaxNodeKind::PipeEqual, "|=", Bit(TokenClass::AssignmentOperator)),
-    Token(SyntaxNodeKind::LessLess, "<<", Bit(TokenClass::BinaryOperator)),
-    Token(SyntaxNodeKind::GreaterGreater, ">>", Bit(TokenClass::BinaryOperator)),
+    Token(SyntaxNodeKind::LessLess, "<<", kChainBinaryClasses),
+    Token(SyntaxNodeKind::GreaterGreater, ">>", kChainBinaryClasses),
     Token(SyntaxNodeKind::LessLessEqual, "<<=", Bit(TokenClass::AssignmentOperator)),
     Token(SyntaxNodeKind::GreaterGreaterEqual, ">>=", Bit(TokenClass::AssignmentOperator)),
-    Token(
-        SyntaxNodeKind::AmpersandAmpersand,
-        "&&",
-        Bit(TokenClass::BinaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
-    ),
-    Token(SyntaxNodeKind::PipePipe, "||", Bit(TokenClass::BinaryOperator)),
+    Token(SyntaxNodeKind::AmpersandAmpersand, "&&", kChainBinaryClasses | Bit(TokenClass::DeclaratorReferenceToken)),
+    Token(SyntaxNodeKind::PipePipe, "||", kChainBinaryClasses),
     Token(SyntaxNodeKind::PlusPlus, "++", Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::MinusMinus, "--", Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Arrow, "->", Bit(TokenClass::MemberOperator)),
@@ -240,7 +237,7 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Token(SyntaxNodeKind::Question, "?"),
     Token(SyntaxNodeKind::Colon, ":"),
     Token(SyntaxNodeKind::Semicolon, ";"),
-    Token(SyntaxNodeKind::Comma, ","),
+    Token(SyntaxNodeKind::Comma, ",", Bit(TokenClass::ChainOperator)),
     Token(SyntaxNodeKind::Ellipsis, "..."),
     Keyword(SyntaxNodeKind::KeywordAlignas, "alignas"),
     Keyword(SyntaxNodeKind::KeywordAlignof, "alignof"),

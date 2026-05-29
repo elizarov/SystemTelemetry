@@ -272,6 +272,7 @@ enum class TokenClass : std::uint64_t {
     CompoundBlock = 1ull << 19,
     ControlHeader = 1ull << 20,
     FlatLogicalHeader = 1ull << 21,
+    ChainOperator = 1ull << 22,
 };
 
 SyntaxNodeKind SyntaxNodeKindFromTreeType(std::string_view type);

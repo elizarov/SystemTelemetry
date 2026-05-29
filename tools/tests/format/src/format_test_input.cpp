@@ -1223,6 +1223,10 @@ bool ParenthesizedEqualityOperator() {
 return (firstReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit == secondReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit);
 }
 
+unsigned int ParenthesizedBitwiseAndChain() {
+return (firstReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit & secondReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit);
+}
+
 int ParenthesizedDivisionOperator() {
 return (firstReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit / secondReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit);
 }

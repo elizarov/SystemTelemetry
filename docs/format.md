@@ -8,7 +8,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 
 - Never use vertical alignment.
 - When a wrapped construct closes, the matching closing delimiter begins a line at the owning indent.
-- Keep lists and same-operator chains either fully compact or split item-by-item.
+- Keep lists and formatter-owned chains either fully compact or split item-by-item.
 - Use no heuristics or weights; use only the general line-break optimization rule.
 - Use indentation changes as visual group borders.
 - Use one indentation size for every indentation change.
@@ -64,7 +64,7 @@ Mandatory line breaks are structural boundaries. The break is always taken befor
 - Break between enum enumerators; enum bodies keep one enumerator per line.
 - Break between declaration groups where declaration-scope separation rules require a blank line.
 - Break multi-statement lambda bodies after `{`, format each body statement with normal mandatory statement breaks, and put the closing `}` on its own line.
-- Preserve a standalone line comment on its own line. An end-of-line comment attached to one list or chain element forces the owning structure into split form.
+- Preserve a standalone line comment on its own line.
 
 ```cpp
 if (ready) {
@@ -92,14 +92,13 @@ if (value != next) {
 Line break opportunities are optional boundaries that the optimizer may take when formatting one segment between mandatory breaks.
 
 - After assignment operators and after binary or ternary operators.
-- Before stream-shift operators `<<` and `>>`.
 - After delimiter openers and before matching closers for `()`, `[]`, `{}`, and template `<>`.
 - After commas in lists, including call arguments, declaration parameters, template arguments, braced initializer elements, subscript lists, and enum bodies.
 - Between a declaration type and its direct-initialized declarator value.
 - After semicolons inside `for` and control headers.
 - Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
 
-A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no optional breaks in a structure. Split form takes the structure's coupled opportunities: lists and same-operator chains split all items or none, and delimiter groups split after the opener and before the closer together.
+A forced break is a mandatory line break. A taken break is an optional opportunity selected by the optimizer. Compact form takes no optional breaks in a structure. Split form takes the structure's coupled opportunities; delimiter groups split after the opener and before the closer together.
 
 ## Lists
 
@@ -159,51 +158,16 @@ struct Context {
 
 ## Operator Chains
 
-Formatter-owned chain operators use compact or split form. Chain-ness is determined by the operator kind, not by operand count: `+`, `*`, `|`, `&&`, `||`, and comma expressions are chains even with two operands. Ordinary binary operators such as `==`, `-`, `/`, and `%` are not chains.
-
-```cpp
-int value = a + b + c;
-
-int value = first +
-    second +
-    third;
-```
-
-Ternary chains are one flat chain.
-
-```cpp
-const char* key = firstCondition ? firstKey :
-    secondCondition ? secondKey :
-    fallbackKey;
-```
-
-Logical chains split by `&&` or `||`. Inside `if` and `while`, split logical chain parts stay at condition indentation. Inside a split `for` header, a wrapped logical chain inside one semicolon part uses continuation indentation.
-
-Stream-shift chains split before `<<` or `>>`. Shift chains have one extra compact-tail form: the receiver may occupy one line and the shifted tail may stay compact on the next line. If the compact shifted tail does not fit, each continued shift segment starts a continuation line.
-
-```cpp
-std::cout
-    << "name=" << name << " value=" << value << "\n";
-```
-
-Stream configuration methods listed in `.cpp-format` bind to the following shifted value. A split stream chain does not take the `<<` or `>>` opportunity between a configured stream manipulator run and that following value.
-
-Adjacent string literals are an implicit concatenation chain. When a call argument string sequence stays split, the first literal uses expression indentation and later fragments use one additional indent. When a forced multi-line string-fragment sequence is the direct initializer in an assignment or declaration, the assignment breaks first and all fragments align at the assignment continuation indentation.
-
-```cpp
-std::string trace = FormatText(
-    "layout=\"%s\" editing=%s moving=%s "
-        "tooltip_visible=%s capture=\"%s\"",
-    layoutName,
-    editingText,
-    tooltipText,
-    captureText
-);
-```
-
-Line-fragment strings ending with escaped `\n` or `\r\n` stay physically split so each source line remains a trace-text fragment. A boundary such as `"\xB0" "C"` stays token-separated to preserve escape parsing, but it may remain on one physical line when the adjacent-literal chain fits.
-
-`+`, `*`, and `|` are formatter-owned arithmetic or bitwise chains even with two operands. `-`, `/`, `%`, and comparison operators are ordinary binary operators. A split ordinary binary operator uses continuation indentation for its right operand, including when the expression is inside `(...)`.
+- Chain operators are token-class defined.
+- Binary chain operators are `+`, `*`, `&`, `|`, `&&`, and `||`.
+- Comma is a chain operator only in comma expressions.
+- Stream-shift chain operators are `<<` and `>>`.
+- Operators outside the chain-operator token class are ordinary operators. Examples include `==`, `-`, `/`, `%`, `^`, and comparisons.
+- Chain classification is independent of operand count. A chain with two operands is still a chain.
+- Chains use compact or split form.
+- Split chains take every top-level chain opportunity.
+- Chain parts use the chain item indentation, not an additional continuation indentation.
+- If an outer context applies continuation indentation, that context defines the chain's base indentation.
 
 ```cpp
 int total = (
@@ -215,7 +179,33 @@ bool ready = (
     firstCondition &&
     secondCondition
 );
+```
 
+- Logical chains split by `&&` or `||`.
+- Inside `if` and `while`, split logical chain parts stay at condition indentation.
+- Inside a split `for` header, a wrapped logical chain inside one semicolon part uses continuation indentation.
+- Stream-shift chains split before `<<` or `>>`.
+- A stream-shift chain may split once between the receiver and a compact shifted tail.
+- If the compact shifted tail does not fit, each continued shift segment starts a continuation line.
+- Stream configuration methods listed in `.cpp-format` bind to the following shifted value; no `<<` or `>>` break is taken between a configured manipulator run and that value.
+- Adjacent string literals are an implicit concatenation chain.
+- When a call argument string sequence stays split, the first literal uses expression indentation and later fragments use one additional indent.
+- When a forced multi-line string-fragment sequence is the direct initializer in an assignment or declaration, the assignment breaks first and all fragments align at the assignment continuation indentation.
+- Line-fragment strings ending with escaped `\n` or `\r\n` stay physically split.
+- A boundary such as `"\xB0" "C"` stays token-separated to preserve escape parsing, but it may remain on one physical line when the adjacent-literal chain fits.
+- Ternary chains are flat chains.
+- A nested ternary chain either breaks after every `:` or stays compact.
+- A single ternary may break after `?`, after `:`, after both, or inside either branch while keeping the selected branch attached to its `?` or `:` marker.
+
+```cpp
+const char* key = firstCondition ? firstKey :
+    secondCondition ? secondKey :
+    fallbackKey;
+```
+
+- Ordinary binary operators use continuation indentation for the right operand when they split, including inside `(...)`.
+
+```cpp
 bool installed = (
     RegEnumKeyExA(key, index, name, &nameLength, nullptr, nullptr, nullptr, nullptr) ==
         ERROR_SUCCESS
@@ -227,11 +217,16 @@ int ratio = (
 );
 ```
 
-Plain non-call parentheses contain one expression group, so the delimiter group itself adds only the body indentation. Sibling structures inside that group keep their elements at the same body level: list items and formatter-owned chain parts. Nested ordinary binary operators still introduce their own continuation indentation.
+- Plain non-call parentheses contain one expression group.
+- A plain non-call parenthesis group adds only body indentation.
+- Lists and formatter-owned chain parts inside that group keep their elements at that body level.
+- Nested ordinary binary operators still introduce continuation indentation.
+- Unary operators and declarator `*` or `&` are token facts, not chain break points.
+- An end-of-line comment attached to one chain part forces the chain into split form.
 
 ## Break Selection Algorithm
 
-For each parsed segment between mandatory line breaks, the formatter uses a tree-sitter-derived layout model built directly from the parsed syntax tree. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator chains, ternary expressions, stream-shift chains, adjacent string literal sequences, lambda headers and bodies, and comments. The formatter rejects inputs whose tree-sitter parse contains errors or missing nodes; formatter-supported syntax is added to the grammar instead of falling back to token-span recovery.
+For each parsed segment between mandatory line breaks, the formatter uses a tree-sitter-derived layout model built directly from the parsed syntax tree. Tree nodes represent text leaves, sequences, delimiter groups, lists, operator structures, adjacent string literal sequences, lambda headers and bodies, and comments. The formatter rejects inputs whose tree-sitter parse contains errors or missing nodes; formatter-supported syntax is added to the grammar instead of falling back to token-span recovery.
 
 Each node exposes its legal compact and split layouts. The optimizer chooses which optional breaks to take with dynamic programming:
 
@@ -241,31 +236,6 @@ Each node exposes its legal compact and split layouts. The optimizer chooses whi
 - On equal line count, prefer the layout whose deepest taken break renders at the shallower indentation level; if still tied, prefer the structurally shallower deepest taken break, then source-order-stable compact behavior.
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
-
-Lists and formatter-owned chains are all-or-nothing. Either every top-level comma or chain opportunity in the structure is taken, or none are taken. A split braced comma-list may still combine adjacent braced element boundaries as `}, {` when both element interiors are split. Stream-shift chains are the exception: they may split once between the receiver and the compact shifted tail before splitting every shifted segment.
-
-```cpp
-selected = Matches(region) || (
-    special != nullptr &&
-    IsActive(*special)
-);
-
-loaded = LoadFirst() ||
-    LoadSecond(
-        source,
-        target
-    ) ||
-    LoadThird();
-```
-
-Ordinary binary expressions are not formatter-owned chains, so an ordinary operator may stay attached while a child delimiter group splits.
-
-```cpp
-value = first == BuildValue(
-    left,
-    right
-);
-```
 
 Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
@@ -308,13 +278,11 @@ Widget rows[] = {{
 }};
 ```
 
-Ternary chains use special all-or-nothing handling: a chain either breaks after every `:` or stays compact. A single ternary is more flexible and may break after `?`, after `:`, after both, or inside either branch while keeping the selected branch attached to its `?` or `:` marker.
-
-Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, compiler declaration prefix groups, `__declspec` groups, operator function names, or template-angle tokens that are not template argument lists. Unary operators and declarator `*` or `&` are token facts, not operator-chain break points.
+Do not split inside empty delimiter pairs, function-pointer declarator groups, parenthesized callees, compiler declaration prefix groups, `__declspec` groups, operator function names, or template-angle tokens that are not template argument lists.
 
 Defaulted, deleted, and pure-virtual method markers stay with the declaration tail.
 
-An end-of-line comment attached to one element forces the owning list or chain into split form. A source blank line or standalone comment between list elements also forces the owning list into split form. Lists still split all top-level comma opportunities together, and a single empty line directly before or after a standalone list comment is preserved.
+An end-of-line comment attached to one list element forces the owning list into split form. A source blank line or standalone comment between list elements also forces the owning list into split form. Lists still split all top-level comma opportunities together, and a single empty line directly before or after a standalone list comment is preserved.
 
 ```cpp
 update(

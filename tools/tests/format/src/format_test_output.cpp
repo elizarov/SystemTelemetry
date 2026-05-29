@@ -1567,6 +1567,13 @@ bool ParenthesizedEqualityOperator() {
     );
 }
 
+unsigned int ParenthesizedBitwiseAndChain() {
+    return (
+        firstReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit &
+        secondReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit
+    );
+}
+
 int ParenthesizedDivisionOperator() {
     return (
         firstReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit /
