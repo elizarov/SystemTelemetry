@@ -1511,9 +1511,7 @@ int CountPlusAnchors(RenderHost& renderer) {
     return static_cast<int>(std::count_if(
         renderer.editArtifacts.staticAnchors.begin(),
         renderer.editArtifacts.staticAnchors.end(),
-        [](const LayoutEditAnchorRegion& region) {
-            return region.shape == AnchorShape::Plus;
-        }
+        [](const LayoutEditAnchorRegion& region) { return region.shape == AnchorShape::Plus; }
     ));
 }
 

@@ -1031,6 +1031,17 @@ private:
             }
             return CanKeepCompactPrefixEndingInTailExpansion(*node.operands.back(), compact);
         }
+        if (node.kind == FormatBreakNodeKind::BodyHeader) {
+            if (node.children.empty() || ChoiceFor(compact, node) != FormatBreakChoice::Compact) {
+                return false;
+            }
+            for (size_t index = 0; index + 1 < node.children.size(); ++index) {
+                if (node.children[index] != nullptr && HasSelectedBreak(*node.children[index], compact)) {
+                    return false;
+                }
+            }
+            return CanKeepCompactPrefixEndingInTailExpansion(*node.children.back(), compact);
+        }
         if (node.kind != FormatBreakNodeKind::Sequence || node.children.empty()) {
             return false;
         }
@@ -1385,9 +1396,17 @@ private:
         if (choice == FormatBreakChoice::BodyHeaderSplitAtParentIndent) {
             result = AddBreak(result, bodyIndentLevel, node.structuralDepth);
         }
-        NodeResult body = Solve(*node.children[1], result.endColumn, result.endIndentLevel, result.endLineHasText);
+        NodeResult body =
+            SolveBodyHeaderSplitBody(*node.children[1], result.endColumn, result.endIndentLevel, result.endLineHasText);
         Merge(result, body);
         return result;
+    }
+
+    NodeResult SolveBodyHeaderSplitBody(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {
+        if (node.kind == FormatBreakNodeKind::Delimited) {
+            return SolveDelimitedSplit(node, column, indentLevel, lineHasText);
+        }
+        return Solve(node, column, indentLevel, lineHasText);
     }
 
     NodeResult SolveBodyHeaderSplit(const FormatBreakNode& node, int column, int indentLevel, bool lineHasText) {

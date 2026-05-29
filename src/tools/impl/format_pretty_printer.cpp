@@ -171,19 +171,10 @@ bool IsDeclarationLikeNode(SyntaxNodeKind kind) {
     return kind == SyntaxNodeKind::Declaration || kind == SyntaxNodeKind::FieldDeclaration;
 }
 
-bool IsLambdaListCompactContext(SyntaxNodeKind kind) {
-    return kind == SyntaxNodeKind::ArgumentList ||
-        kind == SyntaxNodeKind::SubscriptArgumentList ||
-        kind == SyntaxNodeKind::InitializerList;
-}
-
 const SyntaxNode* LambdaCompactContext(const SyntaxNode& lambda) {
     const SyntaxNode* parent = lambda.parent;
     if (parent == nullptr) {
         return &lambda;
-    }
-    if (IsLambdaListCompactContext(parent->kind)) {
-        return parent;
     }
     if (parent->kind == SyntaxNodeKind::AssignmentExpression) {
         return parent;
