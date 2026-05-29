@@ -196,6 +196,30 @@ bool IsLogicalChain(const FormatBreakNode& node) {
         std::all_of(node.operators.begin(), node.operators.end(), IsLogicalOperatorToken);
 }
 
+bool IsFlatChainOperator(const FormatBreakToken& token) {
+    if (FormatBreakTokenKind(token) != PrintTokenKind::Known) {
+        return false;
+    }
+    switch (FormatBreakTokenSyntaxKind(token)) {
+        case SyntaxNodeKind::Plus:
+        case SyntaxNodeKind::Star:
+        case SyntaxNodeKind::Pipe:
+        case SyntaxNodeKind::AmpersandAmpersand:
+        case SyntaxNodeKind::PipePipe:
+        case SyntaxNodeKind::Comma:
+            return true;
+        default:
+            return false;
+    }
+}
+
+bool IsFlatParenthesizedChain(const FormatBreakNode& node) {
+    return node.kind == FormatBreakNodeKind::Chain &&
+        node.chainKind == FormatBreakChainKind::AfterOperator &&
+        !node.operators.empty() &&
+        std::all_of(node.operators.begin(), node.operators.end(), IsFlatChainOperator);
+}
+
 bool UsesFlatLogicalContinuation(const FormatBreakToken& open, const FormatBreakNode& item) {
     if (!IsLogicalChain(item)) {
         return false;
@@ -422,14 +446,15 @@ private:
             return;
         }
         FormatBreakNode* item = BuildSequenceFromPointers(itemChildren, depth + 1);
+        const bool virtualDelimiter = FormatBreakTokenValue(open).parentKind == SyntaxNodeKind::Unknown;
         if (
             delimited.delimiterKind == FormatBreakDelimiterKind::Paren &&
             item &&
             item->kind == FormatBreakNodeKind::Chain &&
             item->chainKind != FormatBreakChainKind::Ternary && (
-                FormatBreakTokenValue(open).parentKind == SyntaxNodeKind::Unknown ||
-                UsesFlatLogicalContinuation(open, *item) ||
-                UsesFlatNonCallParenthesisContinuation(open)
+                virtualDelimiter || (IsFlatParenthesizedChain(*item) && (
+                    UsesFlatLogicalContinuation(open, *item) || UsesFlatNonCallParenthesisContinuation(open)
+                ))
             )
         ) {
             item->flatSplitIndent = true;

@@ -975,7 +975,7 @@ bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_vi
 void EnumerateUninstallChildren(HKEY uninstallKey) {
     while (
         RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
-        ERROR_SUCCESS
+            ERROR_SUCCESS
     ) {
         ++index;
     }
@@ -1558,6 +1558,34 @@ void UseNamespaceTrailingComment() {}
 
 void LongComment() {
     // This deliberately long comment should remain as one physical line because ReflowComments is false even though it is beyond the configured column limit for the fixture.
+}
+
+bool ParenthesizedEqualityOperator() {
+    return (
+        firstReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit ==
+            secondReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit
+    );
+}
+
+int ParenthesizedDivisionOperator() {
+    return (
+        firstReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit /
+            secondReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit
+    );
+}
+
+int ParenthesizedSubtractionOperator() {
+    return (
+        firstReallyLongParenthesizedSubtractionOperandForOrdinaryBinaryOperatorSplit -
+            secondReallyLongParenthesizedSubtractionOperandForOrdinaryBinaryOperatorSplit
+    );
+}
+
+int ParenthesizedRemainderOperator() {
+    return (
+        firstReallyLongParenthesizedRemainderOperandForOrdinaryBinaryOperatorSplit %
+            secondReallyLongParenthesizedRemainderOperandForOrdinaryBinaryOperatorSplit
+    );
 }
 
 int SplitDivisionOperator() {

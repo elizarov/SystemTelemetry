@@ -159,7 +159,7 @@ struct Context {
 
 ## Operator Chains
 
-Formatter-owned same-operator chains use compact or split form. A single binary operator is not a chain: it may stay compact while a nested structural part splits, or it may take the operator break when that is the selected shortest fitting layout.
+Formatter-owned chain operators use compact or split form. Chain-ness is determined by the operator kind, not by operand count: `+`, `*`, `|`, `&&`, `||`, and comma expressions are chains even with two operands. Ordinary binary operators such as `==`, `-`, `/`, and `%` are not chains.
 
 ```cpp
 int value = a + b + c;
@@ -177,7 +177,7 @@ const char* key = firstCondition ? firstKey :
     fallbackKey;
 ```
 
-Logical chains split by `&&` or `||`. Inside `if` and `while`, split logical parts stay at condition indentation. Inside a split `for` header, a wrapped logical chain inside one semicolon part uses continuation indentation.
+Logical chains split by `&&` or `||`. Inside `if` and `while`, split logical chain parts stay at condition indentation. Inside a split `for` header, a wrapped logical chain inside one semicolon part uses continuation indentation.
 
 Stream-shift chains split before `<<` or `>>`. Shift chains have one extra compact-tail form: the receiver may occupy one line and the shifted tail may stay compact on the next line. If the compact shifted tail does not fit, each continued shift segment starts a continuation line.
 
@@ -203,9 +203,31 @@ std::string trace = FormatText(
 
 Line-fragment strings ending with escaped `\n` or `\r\n` stay physically split so each source line remains a trace-text fragment. A boundary such as `"\xB0" "C"` stays token-separated to preserve escape parsing, but it may remain on one physical line when the adjacent-literal chain fits.
 
-Repeated `+` and repeated `*` are formatter-owned arithmetic chains. `-`, `/`, and `%` are ordinary binary operators.
+`+`, `*`, and `|` are formatter-owned arithmetic or bitwise chains even with two operands. `-`, `/`, `%`, and comparison operators are ordinary binary operators. A split ordinary binary operator uses continuation indentation for its right operand, including when the expression is inside `(...)`.
 
-Continuation indentation is only for sibling structures that need visual separation: list items and chain parts. Plain non-call parentheses contain one expression group, so `(...)` adds only the delimiter body indentation; a wrapped expression inside the group does not add another continuation level. Nested lists and nested chains still introduce their own sibling boundaries.
+```cpp
+int total = (
+    firstLongValue +
+    secondLongValue
+);
+
+bool ready = (
+    firstCondition &&
+    secondCondition
+);
+
+bool installed = (
+    RegEnumKeyExA(key, index, name, &nameLength, nullptr, nullptr, nullptr, nullptr) ==
+        ERROR_SUCCESS
+);
+
+int ratio = (
+    firstLongValue /
+        secondLongValue
+);
+```
+
+Plain non-call parentheses contain one expression group, so the delimiter group itself adds only the body indentation. Sibling structures inside that group keep their elements at the same body level: list items and formatter-owned chain parts. Nested ordinary binary operators still introduce their own continuation indentation.
 
 ## Break Selection Algorithm
 
@@ -220,7 +242,7 @@ Each node exposes its legal compact and split layouts. The optimizer chooses whi
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
 
-Lists and same-operator chains are all-or-nothing. Either every top-level comma or same-operator opportunity in the structure is taken, or none are taken. A split braced comma-list may still combine adjacent braced element boundaries as `}, {` when both element interiors are split. Stream-shift chains are the exception: they may split once between the receiver and the compact shifted tail before splitting every shifted segment.
+Lists and formatter-owned chains are all-or-nothing. Either every top-level comma or chain opportunity in the structure is taken, or none are taken. A split braced comma-list may still combine adjacent braced element boundaries as `}, {` when both element interiors are split. Stream-shift chains are the exception: they may split once between the receiver and the compact shifted tail before splitting every shifted segment.
 
 ```cpp
 selected = Matches(region) || (
@@ -236,10 +258,10 @@ loaded = LoadFirst() ||
     LoadThird();
 ```
 
-Binary expressions are not same-operator chains by themselves, so a single binary operator may stay attached while a child delimiter group splits.
+Ordinary binary expressions are not formatter-owned chains, so an ordinary operator may stay attached while a child delimiter group splits.
 
 ```cpp
-value = first + BuildValue(
+value = first == BuildValue(
     left,
     right
 );

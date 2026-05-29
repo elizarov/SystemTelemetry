@@ -1219,6 +1219,22 @@ void LongComment() {
     // This deliberately long comment should remain as one physical line because ReflowComments is false even though it is beyond the configured column limit for the fixture.
 }
 
+bool ParenthesizedEqualityOperator() {
+return (firstReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit == secondReallyLongParenthesizedEqualityOperandForOrdinaryBinaryOperatorSplit);
+}
+
+int ParenthesizedDivisionOperator() {
+return (firstReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit / secondReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit);
+}
+
+int ParenthesizedSubtractionOperator() {
+return (firstReallyLongParenthesizedSubtractionOperandForOrdinaryBinaryOperatorSplit - secondReallyLongParenthesizedSubtractionOperandForOrdinaryBinaryOperatorSplit);
+}
+
+int ParenthesizedRemainderOperator() {
+return (firstReallyLongParenthesizedRemainderOperandForOrdinaryBinaryOperatorSplit % secondReallyLongParenthesizedRemainderOperandForOrdinaryBinaryOperatorSplit);
+}
+
 int SplitDivisionOperator() {
     return firstReallyLongNumeratorValueForOrdinaryDivisionOperatorSplit / secondReallyLongDivisorValueForOrdinaryDivisionOperatorSplit;
 }
