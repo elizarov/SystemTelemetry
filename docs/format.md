@@ -188,7 +188,7 @@ std::cout
 
 Stream configuration methods listed in `.cpp-format` bind to the following shifted value. A split stream chain does not take the `<<` or `>>` opportunity between a configured stream manipulator run and that following value.
 
-Adjacent string literals are an implicit concatenation chain. When the sequence stays split, the first literal uses expression indentation and later fragments use one additional indent.
+Adjacent string literals are an implicit concatenation chain. When a call argument string sequence stays split, the first literal uses expression indentation and later fragments use one additional indent. When a forced multi-line string-fragment sequence is the direct initializer in an assignment or declaration, the assignment breaks first and all fragments align at the assignment continuation indentation.
 
 ```cpp
 std::string trace = FormatText(
@@ -201,9 +201,11 @@ std::string trace = FormatText(
 );
 ```
 
-Line-fragment strings ending with escaped `\n` or `\r\n` stay separate. A boundary such as `"\xB0" "C"` stays split when textual joining would change escape parsing.
+Line-fragment strings ending with escaped `\n` or `\r\n` stay physically split so each source line remains a trace-text fragment. A boundary such as `"\xB0" "C"` stays token-separated to preserve escape parsing, but it may remain on one physical line when the adjacent-literal chain fits.
 
 Repeated `+` and repeated `*` are formatter-owned arithmetic chains. `-`, `/`, and `%` are ordinary binary operators.
+
+Continuation indentation is only for sibling structures that need visual separation: list items and chain parts. Plain non-call parentheses contain one expression group, so `(...)` adds only the delimiter body indentation; a wrapped expression inside the group does not add another continuation level. Nested lists and nested chains still introduce their own sibling boundaries.
 
 ## Break Selection Algorithm
 
@@ -246,7 +248,7 @@ value = first + BuildValue(
 Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
 When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
 
-Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. When the return type is split away from a function definition, the body `{` starts on its own line at the declaration indentation. A definition whose only continuation is a split parameter list may keep `) {` together.
+Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. Functions and lambdas deliberately share one callable-header model. When the declaration or assignment prefix is split away from the callable header, the body `{` starts on its own line at the declaration indentation. A callable whose only header continuation is a split parameter list must keep `) {` together.
 
 ```cpp
 std::vector<std::string>
@@ -385,7 +387,7 @@ DashboardApp::DashboardApp(
 }
 ```
 
-Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain.
+Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain. Compact empty control bodies stay `{}` but still finish their own control-body line before a following `else` chain.
 
 ```cpp
 if (ready) {
@@ -467,22 +469,29 @@ Nested switches restore the enclosing switch case indentation after the inner sw
 
 ## Lambdas
 
-Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement on its own line, and close on their own line. A lambda argument with a compact header may keep the containing call arguments compact even though the lambda body itself spans lines.
+Lambdas intentionally format like functions. A lambda is a callable for all header/body placement decisions: the capture list, parameter list, and optional trailing return type form the callable header, and an assignment prefix such as `const auto name =` behaves like a function return-type prefix.
 
-When a wrapped lambda is assigned to a variable, the assignment prefix is part of the lambda header context, so the optimizer may keep the prefix and lambda opener on the same line.
+Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement with normal mandatory statement breaks, and close on their own line. A lambda argument with a compact header may keep the containing call arguments compact even though the lambda body itself spans lines.
+
+When an assigned lambda keeps the assignment prefix and lambda header together, a split parameter list must keep the body opener attached as `) {`, matching function definitions whose only header continuation is a split parameter list.
 
 Lambda captures and lambda parameters are separate break opportunities. Captures and parameters use the same compact-or-split optimization as other delimiter groups.
 
-When the lambda parameter list splits, put the body `{` on the next line at the lambda header indentation.
+When an assigned lambda splits the assignment prefix away from the lambda header, the body `{` starts on its own line at the declaration indentation, matching function definitions whose return-type prefix is split away from the function name.
 
 ```cpp
 const auto updateKey = [&](
     const std::string& sectionName,
     const std::string& key,
     const std::string& value
-)
-{
+) {
     Update(sectionName, key, value);
+};
+
+const auto findValue =
+    [&config](std::string_view name) -> std::optional<Value>
+{
+    return LookupValue(config, name);
 };
 ```
 

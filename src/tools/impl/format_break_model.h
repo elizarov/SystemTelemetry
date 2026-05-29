@@ -38,6 +38,7 @@ enum class FormatBreakChainKind {
 enum class FormatBreakChoice {
     Compact,
     Split,
+    BodyHeaderSplitAtParentIndent,
     SplitAttachedOpen,
     SplitDelimiterStack,
     StreamCompactTail,
@@ -70,6 +71,7 @@ struct FormatBreakNode {
     bool forceSplit = false;
     bool flatSplitIndent = false;
     bool functionSignatureHasBody = false;
+    bool splitTrailingBodyHeaderAtParentIndent = false;
     std::span<FormatBreakNode*> children;
     std::vector<FormatBreakListItem> items;
     std::span<FormatBreakNode*> operands;

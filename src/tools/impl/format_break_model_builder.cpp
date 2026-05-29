@@ -73,7 +73,7 @@ FormatBreakDelimiterKind ClosingDelimiter(const FormatBreakToken& token) {
 bool IsSelectedSeparator(const FormatBreakToken& token) {
     return FormatBreakTokenKind(token) == PrintTokenKind::Known && (
         FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::Comma ||
-            FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::Semicolon
+        FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::Semicolon
     );
 }
 
@@ -89,9 +89,9 @@ bool IsAssignmentOperatorForNode(const FormatBreakToken& token) {
     return printToken.kind == PrintTokenKind::Known &&
         SyntaxNodeKindHasClass(printToken.syntaxKind, TokenClass::AssignmentOperator) && (
             printToken.parentKind == SyntaxNodeKind::AssignmentExpression ||
-                printToken.parentKind == SyntaxNodeKind::InitDeclarator ||
-                printToken.parentKind == SyntaxNodeKind::FieldDeclaration ||
-                printToken.parentKind == SyntaxNodeKind::AliasDeclaration
+            printToken.parentKind == SyntaxNodeKind::InitDeclarator ||
+            printToken.parentKind == SyntaxNodeKind::FieldDeclaration ||
+            printToken.parentKind == SyntaxNodeKind::AliasDeclaration
         );
 }
 
@@ -133,10 +133,6 @@ bool IsFlattenableBinaryOperator(SyntaxNodeKind token) {
         token == SyntaxNodeKind::GreaterGreater;
 }
 
-bool IsHexDigit(char ch) {
-    return (ch >= '0' && ch <= '9') || (ch >= 'A' && ch <= 'F') || (ch >= 'a' && ch <= 'f');
-}
-
 bool EndsWithEscapedLineFragment(std::string_view text) {
     const size_t quote = text.rfind('"');
     if (quote == std::string_view::npos || quote == 0) {
@@ -148,21 +144,9 @@ bool EndsWithEscapedLineFragment(std::string_view text) {
     return quote >= 4 && text.substr(quote - 4, 4) == "\\r\\n";
 }
 
-bool EndsWithOpenHexEscape(std::string_view text) {
-    const size_t quote = text.rfind('"');
-    if (quote == std::string_view::npos || quote == 0) {
-        return false;
-    }
-    size_t cursor = quote;
-    while (cursor > 0 && IsHexDigit(text[cursor - 1])) {
-        --cursor;
-    }
-    return cursor < quote && cursor >= 2 && text[cursor - 2] == '\\' && text[cursor - 1] == 'x';
-}
-
 bool ForcesStringBoundarySplit(const FormatBreakToken& token) {
     const std::string_view text = FormatTokenText(FormatBreakTokenValue(token));
-    return EndsWithEscapedLineFragment(text) || EndsWithOpenHexEscape(text);
+    return EndsWithEscapedLineFragment(text);
 }
 
 size_t CountFieldInitializers(const SyntaxNode& node) {
@@ -201,7 +185,7 @@ bool IsConstructorParameterListWithInitializerList(const FormatBreakToken& open)
 bool IsLogicalOperatorToken(const FormatBreakToken& token) {
     return FormatBreakTokenKind(token) == PrintTokenKind::Known && (
         FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::AmpersandAmpersand ||
-            FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::PipePipe
+        FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::PipePipe
     );
 }
 
@@ -227,6 +211,17 @@ bool UsesFlatLogicalContinuation(const FormatBreakToken& open, const FormatBreak
         return false;
     }
     return IsFlatLogicalHeaderKind(printToken.parentKind) || IsFlatLogicalHeaderKind(printToken.grandParentKind);
+}
+
+bool UsesFlatNonCallParenthesisContinuation(const FormatBreakToken& open) {
+    const PrintToken& printToken = FormatBreakTokenValue(open);
+    if (printToken.kind != PrintTokenKind::Known || printToken.syntaxKind != SyntaxNodeKind::LeftParen) {
+        return false;
+    }
+    return printToken.parentKind != SyntaxNodeKind::ArgumentList &&
+        printToken.parentKind != SyntaxNodeKind::ParameterList &&
+        printToken.parentKind != SyntaxNodeKind::ForStatement &&
+        printToken.grandParentKind != SyntaxNodeKind::ForStatement;
 }
 
 bool IsListForceSplitMarker(SyntaxNodeKind kind) {
@@ -433,7 +428,8 @@ private:
             item->kind == FormatBreakNodeKind::Chain &&
             item->chainKind != FormatBreakChainKind::Ternary && (
                 FormatBreakTokenValue(open).parentKind == SyntaxNodeKind::Unknown ||
-                    UsesFlatLogicalContinuation(open, *item)
+                UsesFlatLogicalContinuation(open, *item) ||
+                UsesFlatNonCallParenthesisContinuation(open)
             )
         ) {
             item->flatSplitIndent = true;
@@ -468,6 +464,97 @@ private:
         }
         list.items.back().separator = separator;
         return true;
+    }
+
+    static bool ContainsBodyHeader(const FormatBreakNode& node) {
+        if (node.kind == FormatBreakNodeKind::BodyHeader) {
+            return true;
+        }
+        for (const FormatBreakNode* child : node.children) {
+            if (child && ContainsBodyHeader(*child)) {
+                return true;
+            }
+        }
+        for (const FormatBreakListItem& item : node.items) {
+            if (item.node && ContainsBodyHeader(*item.node)) {
+                return true;
+            }
+        }
+        for (const FormatBreakNode* operand : node.operands) {
+            if (operand && ContainsBodyHeader(*operand)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool ContainsForceSplitAdjacentStrings(const FormatBreakNode& node) {
+        if (node.kind == FormatBreakNodeKind::AdjacentStrings && node.forceSplit) {
+            return true;
+        }
+        for (const FormatBreakNode* child : node.children) {
+            if (child && ContainsForceSplitAdjacentStrings(*child)) {
+                return true;
+            }
+        }
+        for (const FormatBreakListItem& item : node.items) {
+            if (item.node && ContainsForceSplitAdjacentStrings(*item.node)) {
+                return true;
+            }
+        }
+        for (const FormatBreakNode* operand : node.operands) {
+            if (operand && ContainsForceSplitAdjacentStrings(*operand)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool ContainsDelimitedNode(const FormatBreakNode& node) {
+        if (node.kind == FormatBreakNodeKind::Delimited) {
+            return true;
+        }
+        for (const FormatBreakNode* child : node.children) {
+            if (child && ContainsDelimitedNode(*child)) {
+                return true;
+            }
+        }
+        for (const FormatBreakListItem& item : node.items) {
+            if (item.node && ContainsDelimitedNode(*item.node)) {
+                return true;
+            }
+        }
+        for (const FormatBreakNode* operand : node.operands) {
+            if (operand && ContainsDelimitedNode(*operand)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    static bool IsDirectForceSplitAdjacentStringsInitializer(const FormatBreakNode& node) {
+        return ContainsForceSplitAdjacentStrings(node) && !ContainsDelimitedNode(node);
+    }
+
+    static void MarkForceSplitAdjacentStringsFlat(FormatBreakNode& node) {
+        if (node.kind == FormatBreakNodeKind::AdjacentStrings && node.forceSplit) {
+            node.flatSplitIndent = true;
+        }
+        for (FormatBreakNode* child : node.children) {
+            if (child) {
+                MarkForceSplitAdjacentStringsFlat(*child);
+            }
+        }
+        for (FormatBreakListItem& item : node.items) {
+            if (item.node) {
+                MarkForceSplitAdjacentStringsFlat(*item.node);
+            }
+        }
+        for (FormatBreakNode* operand : node.operands) {
+            if (operand) {
+                MarkForceSplitAdjacentStringsFlat(*operand);
+            }
+        }
     }
 
     void GroupAdjacentStrings(FormatBreakNode& sequence, int depth) {
@@ -714,6 +801,10 @@ private:
             BuildSequenceFromChildren(declarator.children, *operatorIndex + 1, declarator.children.size(), depth + 1);
         chain->operands = StoreNodePointers({left, right});
         chain->operators = StoreTokens({*op});
+        chain->splitTrailingBodyHeaderAtParentIndent = right != nullptr && ContainsBodyHeader(*right);
+        if (right != nullptr && IsDirectForceSplitAdjacentStringsInitializer(*right)) {
+            MarkForceSplitAdjacentStringsFlat(*right);
+        }
 
         std::vector<FormatBreakNode*> tailChildren;
         tailChildren.reserve(node.children.size() - *declaratorIndex - 1);
@@ -803,9 +894,9 @@ private:
                 (node.kind == SyntaxNodeKind::CommaExpression && IsCommaOperatorForNode(*token)) || (
                     (
                         node.kind == SyntaxNodeKind::AssignmentExpression ||
-                            node.kind == SyntaxNodeKind::InitDeclarator ||
-                            node.kind == SyntaxNodeKind::FieldDeclaration ||
-                            node.kind == SyntaxNodeKind::AliasDeclaration
+                        node.kind == SyntaxNodeKind::InitDeclarator ||
+                        node.kind == SyntaxNodeKind::FieldDeclaration ||
+                        node.kind == SyntaxNodeKind::AliasDeclaration
                     ) && IsAssignmentOperatorForNode(*token)
                 )
             ) {
@@ -922,6 +1013,15 @@ private:
             BuildSequenceFromChildren(node.children, *opIndex + 1, node.children.size(), depth + 1);
         chain->operands = StoreNodePointers({left, right});
         chain->operators = StoreTokens({*token});
+        chain->splitTrailingBodyHeaderAtParentIndent =
+            IsAssignmentOperatorForNode(*token) && right != nullptr && ContainsBodyHeader(*right);
+        if (
+            IsAssignmentOperatorForNode(*token) &&
+            right != nullptr &&
+            IsDirectForceSplitAdjacentStringsInitializer(*right)
+        ) {
+            MarkForceSplitAdjacentStringsFlat(*right);
+        }
         return chain;
     }
 
@@ -1194,7 +1294,7 @@ private:
             if (
                 (
                     IsControlHeaderKind(FormatBreakTokenValue(*open).parentKind) ||
-                        IsControlHeaderKind(FormatBreakTokenValue(*open).grandParentKind)
+                    IsControlHeaderKind(FormatBreakTokenValue(*open).grandParentKind)
                 ) &&
                 itemChildren.size() == 1 &&
                 (child->kind == SyntaxNodeKind::Declaration || child->kind == SyntaxNodeKind::InitStatement)

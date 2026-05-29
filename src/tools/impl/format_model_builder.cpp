@@ -115,8 +115,8 @@ SyntaxNode* MakeTokenNode(FormatModel& model, SyntaxNodeKind token) {
 bool IsTriviaNode(const SyntaxNode* node) {
     return node != nullptr && (
         node->kind == SyntaxNodeKind::BlankLine ||
-            node->kind == SyntaxNodeKind::Comment ||
-            node->kind == SyntaxNodeKind::TrailingComment
+        node->kind == SyntaxNodeKind::Comment ||
+        node->kind == SyntaxNodeKind::TrailingComment
     );
 }
 
@@ -130,6 +130,14 @@ bool IsTokenNode(const SyntaxNode* node, SyntaxNodeKind token) {
 
 bool IsTreeNode(const SyntaxNode* node, SyntaxNodeKind kind) {
     return node != nullptr && node->kind == kind;
+}
+
+bool IsMacroLikeInvocationNode(const SyntaxNode* node) {
+    return node != nullptr &&
+        node->kind == SyntaxNodeKind::Tree &&
+        node->children.size() == 2 &&
+        IsTreeNode(node->children[0], SyntaxNodeKind::Identifier) &&
+        IsTreeNode(node->children[1], SyntaxNodeKind::ArgumentList);
 }
 
 std::optional<size_t> PreviousNonTriviaChildIndex(const std::vector<SyntaxNode*>& children, size_t before) {
@@ -169,7 +177,8 @@ void NormalizeTrailingCommas(FormatModel& model, SyntaxNode& node) {
         if (node.kind == SyntaxNodeKind::EnumeratorList) {
             if (
                 !IsTokenNode(children[*previous], SyntaxNodeKind::Comma) &&
-                !IsTokenNode(children[*previous], SyntaxNodeKind::LeftBrace)
+                !IsTokenNode(children[*previous], SyntaxNodeKind::LeftBrace) &&
+                !IsMacroLikeInvocationNode(children[*previous])
             ) {
                 SyntaxNode* comma = MakeTokenNode(model, SyntaxNodeKind::Comma);
                 SetParentRecursive(*comma, &node);

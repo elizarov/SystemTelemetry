@@ -877,8 +877,13 @@ private:
 
     static bool IsSplitChoice(FormatBreakChoice choice) {
         return choice == FormatBreakChoice::Split ||
+            choice == FormatBreakChoice::BodyHeaderSplitAtParentIndent ||
             choice == FormatBreakChoice::SplitAttachedOpen ||
             choice == FormatBreakChoice::SplitDelimiterStack;
+    }
+
+    static bool IsBodyHeaderSplitChoice(FormatBreakChoice choice) {
+        return choice == FormatBreakChoice::Split || choice == FormatBreakChoice::BodyHeaderSplitAtParentIndent;
     }
 
     void WriteBreakToken(const FormatBreakToken& token) {
@@ -1191,15 +1196,17 @@ private:
 
     void EmitBodyHeaderNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
         const FormatBreakChoice choice = ChoiceFor(solution, node.id);
-        if (choice != FormatBreakChoice::Split || node.children.size() < 2) {
+        if (!IsBodyHeaderSplitChoice(choice) || node.children.size() < 2) {
             for (const FormatBreakNode* child : node.children) {
                 EmitBreakNode(*child, solution, baseIndent);
             }
             return;
         }
         EmitBreakNode(*node.children[0], solution, baseIndent);
-        NewLineWithIndent(baseIndent);
-        EmitBreakNode(*node.children[1], solution, baseIndent);
+        const int bodyIndent =
+            choice == FormatBreakChoice::BodyHeaderSplitAtParentIndent ? std::max(0, baseIndent - 1) : baseIndent;
+        NewLineWithIndent(bodyIndent);
+        EmitBreakNode(*node.children[1], solution, bodyIndent);
     }
 
     void EmitChainNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
@@ -1298,11 +1305,12 @@ private:
 
     void EmitAdjacentStringsNode(const FormatBreakNode& node, const FormatBreakSolution& solution, int baseIndent) {
         const FormatBreakChoice choice = ChoiceFor(solution, node.id);
+        const int continuationIndent = node.flatSplitIndent ? baseIndent : baseIndent + 1;
         for (size_t index = 0; index < node.operands.size(); ++index) {
             if (choice == FormatBreakChoice::Split && index > 0) {
-                NewLineWithIndent(baseIndent + 1);
+                NewLineWithIndent(continuationIndent);
             }
-            EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : baseIndent + 1);
+            EmitBreakNode(*node.operands[index], solution, index == 0 ? baseIndent : continuationIndent);
         }
     }
 
@@ -1472,6 +1480,24 @@ private:
         return token.inMacroValue && next != nullptr && next->macroDefinition == token.macroDefinition;
     }
 
+    const PrintToken* RawTokenAfterCurrent(size_t offset) const {
+        if (activeTokens_ == nullptr || currentTokenIndex_ + offset >= activeTokens_->size()) {
+            return nullptr;
+        }
+        return &(*activeTokens_)[currentTokenIndex_ + offset];
+    }
+
+    bool ShouldBreakAfterCompactEmptyBlock(const PrintToken& token) const {
+        if (RoleForBrace(token) != BraceRole::Block) {
+            return false;
+        }
+        const PrintToken* afterClose = RawTokenAfterCurrent(2);
+        return afterClose != nullptr &&
+            afterClose->kind == PrintTokenKind::Known &&
+            afterClose->syntaxKind != SyntaxNodeKind::KeywordWhile &&
+            SyntaxNodeKindHasClass(afterClose->syntaxKind, TokenClass::AttachAfterBlockKeyword);
+    }
+
     DeferredSplitCallContext* ActiveDeferredSplitCallContext() {
         return deferredSplitCallContexts_.empty() ? nullptr : &deferredSplitCallContexts_.back();
     }
@@ -1575,7 +1601,7 @@ private:
         if (
             (
                 (startsMacroValue && (current.breakBeforeMacroValue || macroValueWouldOverflow)) ||
-                    StartsMacroValueElement(previous, current)
+                StartsMacroValueElement(previous, current)
             ) && HasBufferedLineText()
         ) {
             FlushPendingTokens();
@@ -1723,8 +1749,8 @@ private:
                     token.inTemplateDeclaration &&
                     !(
                         next != nullptr &&
-                            next->kind == PrintTokenKind::Known &&
-                            next->syntaxKind == SyntaxNodeKind::KeywordRequires
+                        next->kind == PrintTokenKind::Known &&
+                        next->syntaxKind == SyntaxNodeKind::KeywordRequires
                     )
                 ) {
                     FlushPendingTokens();
@@ -1783,7 +1809,7 @@ private:
                     previous != nullptr &&
                     previous->kind == PrintTokenKind::Known && (
                         previous->syntaxKind == SyntaxNodeKind::KeywordDefault ||
-                            SyntaxNodeKindHasClass(previous->syntaxKind, TokenClass::AccessKeyword)
+                        SyntaxNodeKindHasClass(previous->syntaxKind, TokenClass::AccessKeyword)
                     )
                 ) {
                     FlushPendingTokens();
@@ -1832,7 +1858,7 @@ private:
         const BraceRole role = isCaseBlock ? BraceRole::CaseBlock : RoleForBrace(token);
         const bool followsConstructorInitializer = previous != nullptr && (
             previous->parentKind == SyntaxNodeKind::FieldInitializerList ||
-                previous->grandParentKind == SyntaxNodeKind::FieldInitializer
+            previous->grandParentKind == SyntaxNodeKind::FieldInitializer
         );
         if (!isEmptyBracePair && role == BraceRole::Block && followsConstructorInitializer && HasBufferedLineText()) {
             FlushPendingTokens();
@@ -1848,6 +1874,11 @@ private:
             compact.text = "{}";
             BufferToken(compact);
             ++compactRightBraceSkips_;
+            if (ShouldBreakAfterCompactEmptyBlock(token)) {
+                const PrintToken* afterClose = RawTokenAfterCurrent(2);
+                FlushPendingTokens();
+                NewLine(ShouldContinueMacroLine(token, afterClose));
+            }
             return;
         }
         const std::optional<LambdaSplitCallPlan> splitCallPlan = BuildLambdaSplitCallPlan(token);
@@ -1970,7 +2001,7 @@ private:
                 next != nullptr &&
                 token.parentKind == SyntaxNodeKind::FieldDeclarationList && (
                     token.grandParentKind == SyntaxNodeKind::StructSpecifier ||
-                        token.grandParentKind == SyntaxNodeKind::ClassSpecifier
+                    token.grandParentKind == SyntaxNodeKind::ClassSpecifier
                 )
             ) {
                 return;

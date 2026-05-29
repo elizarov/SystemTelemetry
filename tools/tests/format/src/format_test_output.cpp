@@ -166,8 +166,7 @@ void WriteTraceStringFragments(TraceLog& trace) {
 }
 
 void ExpectJoinedHexEscapeFragment() {
-    EXPECT_THAT(output, testing::HasSubstr("gpu.temp = 100,\xC2\xB0"
-                "C,Core Temp\r\n"));
+    EXPECT_THAT(output, testing::HasSubstr("gpu.temp = 100,\xC2\xB0" "C,Core Temp\r\n"));
 }
 
 void WriteLongTraceStringFragments(TraceLog& trace, const char* adapterName) {
@@ -238,7 +237,7 @@ void ReserveGroupedRegionCount(LayoutEditActiveRegions& regions) {
             layoutResolver_->widgetEditGuides_.size() +
             (
                 layoutResolver_->staticEditableAnchorRegions_.size() +
-                    layoutResolver_->dynamicEditableAnchorRegions_.size()
+                layoutResolver_->dynamicEditableAnchorRegions_.size()
             ) * 2 +
             layoutResolver_->staticColorEditRegions_.size() +
             layoutResolver_->dynamicColorEditRegions_.size()
@@ -630,7 +629,7 @@ void AttachCalloutBubble(Callout& callout, LayoutGuideSheetExitSide side) {
 double MaxSegmentGap(double totalSweep, double minSegmentSweep, int segmentCount) {
     const double maxSegmentGap = (std::max)(
         0.0,
-            (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1)
+        (totalSweep - (minSegmentSweep * static_cast<double>(segmentCount))) / static_cast<double>(segmentCount - 1)
     );
     return maxSegmentGap;
 }
@@ -722,8 +721,7 @@ const auto appendTrialLeaders = [&](
     LayoutGuideSheetExitSide side,
     const LayoutGuideSheetCardPlacement& placement,
     const BlockLayout& block
-)
-{
+) {
     Use(leaders, plannedIndexes, side, placement, block);
 };
 
@@ -731,8 +729,7 @@ const auto appendEmbeddedRect = [&](
     const RenderRect& rect,
     const std::vector<LayoutEditOverlayOwner>* owners,
     LayoutEditOverlayAffordanceLayer artifactLayer
-)
-{
+) {
     if (rect.IsEmpty()) {
         return;
     }
@@ -766,29 +763,30 @@ const auto updateKey = [&lines, &ensureSection, &ensureSectionAfter, &findSectio
     const std::string& sectionName,
     const std::string& key,
     const std::string& value
-)
-{
+) {
     Use(sectionName, key, value);
 };
 
 const auto ensureSectionAfter =
-    [&lines, &findSectionIndex, shape](const std::string& sectionName, const std::string& afterSectionName) -> size_t {
-        const size_t existingIndex = findSectionIndex(sectionName);
-        if (existingIndex < lines.size()) {
-            return existingIndex;
-        }
+    [&lines, &findSectionIndex, shape](const std::string& sectionName, const std::string& afterSectionName) -> size_t
+{
+    const size_t existingIndex = findSectionIndex(sectionName);
+    if (existingIndex < lines.size()) {
+        return existingIndex;
+    }
 
-        const size_t afterIndex = findSectionIndex(afterSectionName);
-        return afterIndex;
-    };
+    const size_t afterIndex = findSectionIndex(afterSectionName);
+    return afterIndex;
+};
 
 const auto guideSheetLookup =
-    [&config, activeTheme, &colorsSection](std::string_view name) -> std::optional<ColorConfig> {
-        if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
-            return themeColor;
-        }
-        return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
-    };
+    [&config, activeTheme, &colorsSection](std::string_view name) -> std::optional<ColorConfig>
+{
+    if (std::optional<ColorConfig> themeColor = FindThemeToken(*activeTheme, name); themeColor.has_value()) {
+        return themeColor;
+    }
+    return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
+};
 
 constexpr int kPrimaryFlag = 1;
 constexpr int kSecondaryFlag = 2;
@@ -977,7 +975,7 @@ bool IsNamedColorField(const RuntimeConfigFieldDescriptor& field, std::string_vi
 void EnumerateUninstallChildren(HKEY uninstallKey) {
     while (
         RegEnumKeyExA(uninstallKey, index, childName, &childNameLength, nullptr, nullptr, nullptr, nullptr) ==
-            ERROR_SUCCESS
+        ERROR_SUCCESS
     ) {
         ++index;
     }
@@ -999,9 +997,9 @@ void CollectLayoutEditHighlights(const DashboardOverlayState& overlayState, cons
     const auto* special = std::get_if<LayoutEditSelectionHighlightSpecial>(&*overlayState.selectedTreeHighlight);
     if (MatchesLayoutEditSelectionHighlight(*overlayState.selectedTreeHighlight, region.key) || (
         special != nullptr &&
-            *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
-            LayoutEditAnchorParameter(region.key).has_value() &&
-            IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
+        *special == LayoutEditSelectionHighlightSpecial::AllTexts &&
+        LayoutEditAnchorParameter(region.key).has_value() &&
+        IsFontEditParameter(*LayoutEditAnchorParameter(region.key))
     )) {
         appendHighlight(region, true);
     }
@@ -1128,9 +1126,9 @@ void FormatterSelfBreakCases() {
         next < tokens.size() &&
         tokens[next].kind == TokenKind::Word && (
             tokens[next].text == "else" ||
-                tokens[next].text == "catch" ||
-                tokens[next].text == "finally" ||
-                (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
+            tokens[next].text == "catch" ||
+            tokens[next].text == "finally" ||
+            (tokens[next].text == "while" && closedBlock.kind == BlockKind::DoStatement)
         )
     ) {
         return;
@@ -1229,7 +1227,7 @@ RenderRect BuildGuideSheetTargetRect(
 double ComputeBackgroundWeight(const Geometry& geometry, double sampleX, double sampleY, double denom) {
     const double backgroundWeight = (
         (geometry.topY - geometry.bottomY) * (sampleX - geometry.bottomX) +
-            (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
+        (geometry.bottomX - geometry.rightX) * (sampleY - geometry.bottomY)
     ) / denom;
     return backgroundWeight;
 }
@@ -1593,9 +1591,9 @@ bool AttachedOpenChainKeepsFollowingOperator(const PrintToken* previous, KnownTo
     if (
         previous->kind == PrintTokenKind::Known && (
             prev == KnownToken::RightParen ||
-                prev == KnownToken::RightBracket ||
-                prev == KnownToken::RightBrace ||
-                prev == KnownToken::Greater
+            prev == KnownToken::RightBracket ||
+            prev == KnownToken::RightBrace ||
+            prev == KnownToken::Greater
         ) &&
         IsWordLike(current)
     ) {
