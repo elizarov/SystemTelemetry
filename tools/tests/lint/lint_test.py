@@ -64,7 +64,7 @@ class LintCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
-        self.assertIn("Scanned 1 LOC across 1 lint input file(s).", result.stdout)
+        self.assertIn("Lint succeeded after scanning 1 lint input file(s), 1 LOC in", result.stdout)
         self.assertIn("  1. 1 LOC: maintained -> (none)", result.stdout)
         self.assertNotIn("ignored", result.stdout)
 
@@ -108,7 +108,7 @@ class LintCheckTests(unittest.TestCase):
         )
 
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
-        self.assertIn("Scanned 8 LOC across 2 lint input file(s).", result.stdout)
+        self.assertIn("Lint succeeded after scanning 2 lint input file(s), 8 LOC in", result.stdout)
 
     def test_lint_check_reports_all_known_violation_shapes(self) -> None:
         shutil.rmtree(TEST_ROOT / "build", ignore_errors=True)

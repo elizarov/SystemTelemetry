@@ -386,13 +386,28 @@ std::string ScannedFileCountText(size_t scannedFiles, size_t totalFiles) {
     return std::to_string(scannedFiles) + "/" + std::to_string(totalFiles);
 }
 
-void PrintScannedLocSummary(const std::vector<FileRecord>& records, size_t totalFiles) {
+int TotalLoc(const std::vector<FileRecord>& records) {
     int loc = 0;
     for (const FileRecord& record : records) {
         loc += record.LineCount();
     }
+    return loc;
+}
+
+void PrintLintSummary(
+    const char* result,
+    const std::vector<FileRecord>& records,
+    size_t totalFiles,
+    std::chrono::steady_clock::time_point started
+) {
     const std::string scannedFiles = ScannedFileCountText(records.size(), totalFiles);
-    std::printf("Scanned %s LOC across %s lint input file(s).\n", FormatCount(loc).c_str(), scannedFiles.c_str());
+    std::printf(
+        "Lint %s after scanning %s lint input file(s), %s LOC in %s.\n",
+        result,
+        scannedFiles.c_str(),
+        FormatCount(TotalLoc(records)).c_str(),
+        FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
+    );
 }
 
 void PrintFailureResult(const CheckResult& result) {
@@ -483,12 +498,7 @@ int RunLintCheck(int argc, char** argv) {
         }
     } catch (const std::exception& error) {
         std::fprintf(stderr, "lint error: %s\n", error.what());
-        const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
-        std::printf(
-            "Lint failed after scanning %s file(s) in %s.\n",
-            scannedFiles.c_str(),
-            FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
-        );
+        PrintLintSummary("failed", records, entries.size(), started);
         return 2;
     }
 
@@ -500,12 +510,7 @@ int RunLintCheck(int argc, char** argv) {
         const std::string reportPath = ResolveProjectPath(projectRoot, *args.reportJson);
         if (!WriteReportJson(reportPath, failed, diagnostics)) {
             std::fprintf(stderr, "lint report error: could not write %s\n", reportPath.c_str());
-            const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
-            std::printf(
-                "Lint failed after scanning %s file(s) in %s.\n",
-                scannedFiles.c_str(),
-                FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
-            );
+            PrintLintSummary("failed", records, entries.size(), started);
             return 2;
         }
     }
@@ -526,16 +531,10 @@ int RunLintCheck(int argc, char** argv) {
         if (printedReport) {
             std::printf("\n");
         }
-        const std::string scannedFiles = ScannedFileCountText(records.size(), entries.size());
-        std::printf(
-            "Lint failed after scanning %s file(s) in %s.\n",
-            scannedFiles.c_str(),
-            FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
-        );
+        PrintLintSummary("failed", records, entries.size(), started);
         return 1;
     }
 
-    PrintScannedLocSummary(records, entries.size());
     if (args.verbose) {
         std::vector<std::string> verboseLines;
         for (const CheckResult& result : results) {
@@ -548,10 +547,6 @@ int RunLintCheck(int argc, char** argv) {
             }
         }
     }
-    std::printf(
-        "Lint succeeded after scanning %s file(s) in %s.\n",
-        ScannedFileCountText(records.size(), entries.size()).c_str(),
-        FormatToolElapsed(std::chrono::steady_clock::now() - started).c_str()
-    );
+    PrintLintSummary("succeeded", records, entries.size(), started);
     return 0;
 }

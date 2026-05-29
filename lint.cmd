@@ -98,7 +98,6 @@ if "%failed%"=="0" (
     exit /b 0
 )
 
-if "!lint_check_result!"=="0" echo Lint failed.
 popd >nul
 exit /b 1
 
