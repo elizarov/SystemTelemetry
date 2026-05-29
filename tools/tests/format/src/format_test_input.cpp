@@ -287,6 +287,10 @@ std::vector<std::string> ParseIndentedStringList(const std::vector<ConfigLine>& 
 
 std::vector<std::string> ParseIndentedStringListDeclaration(const std::vector<ConfigLine>& lines, size_t& index, int parentIndent);
 
+VeryLongNamespace::VeryLongReturnTypeNameWithNoTemplateArgumentsAndExtraSuffixBeyondLimit ParseLongNonTemplateReturnTypeWithExtremelyLongFunctionName(const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture, size_t& indexWithLongNameForFormatterFixture);
+
+std::vector<VeryLongReturnTypeNameWithTemplateArgumentsAndExtraSuffixBeyondLimit> ParseLongTemplateReturnTypeWithExtremelyLongFunctionName(const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture, size_t& indexWithLongNameForFormatterFixture);
+
 std::vector<std::string> ParseIndentedStringListWithSplitParameters(const std::vector<ConfigLine>& linesWithLongNameForFormatterFixture, size_t& indexWithLongNameForFormatterFixture, int parentIndentWithLongNameForFormatterFixture) {
     return {};
 }
@@ -340,6 +344,24 @@ private:
     void* context_ = nullptr;
     Result (*invoke_)(void*, Args...) = nullptr;
 };
+
+struct InitializerGeneralityWidget {
+    InitializerGeneralityWidget(int value, int other);
+    InitializerGeneralityWidget(int value, int other, int third);
+    void Touch();
+
+    int first_ = 0;
+    int second_ = 0;
+    int third_ = 0;
+};
+
+InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other) {
+    Touch();
+}
+
+InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other, int third) : first_(value), second_(other), third_(third) {
+    Touch();
+}
 
 template <typename T>
 requires(HasValue<T>) void UseShortRequires(T& value) {
@@ -506,7 +528,9 @@ void TrackFeatureLevels() {
     };
     const std::array<D3D_FEATURE_LEVEL, 3>
         fallbackFeatureLevels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
-    Use(preferredFeatureLevels, fallbackFeatureLevels);
+    const std::array<VeryLongTemplateArgumentNameForDirectInitialization, 3>
+        parenthesizedFeatureLevels(D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0);
+    Use(preferredFeatureLevels, fallbackFeatureLevels, parenthesizedFeatureLevels);
 }
 
 DashboardApp::DashboardApp(
@@ -719,6 +743,14 @@ const auto guideSheetLookup = [&config, activeTheme, &colorsSection]
     return FindColorFieldByKey(RuntimeConfigFields(colorsSection), &config.layout.colors, name);
 };
 
+void LambdaGeneralityCases(int left, int right) {
+    auto twoParameterLambda = [](int left, int right) { return left + right; };
+    auto twoCaptureLambda = [left, right](int value) { return left + right + value; };
+    Call(firstVeryLongArgumentName, [](int value) { Prepare(value); return value + 1; }, secondVeryLongArgumentName);
+    std::array callbacks{firstVeryLongArgumentName, [](int value) { Prepare(value); return value + 1; }, secondVeryLongArgumentName};
+    Use(twoParameterLambda, twoCaptureLambda, callbacks);
+}
+
 constexpr int kPrimaryFlag = 1;
 constexpr int kSecondaryFlag = 2;
 constexpr int kTertiaryFlag = 4;
@@ -806,6 +838,7 @@ int ShortNonEmpty() {
 }
 
 void EmptyFunction() {}
+void EmptyFunctionPairA() {} void EmptyFunctionPairB() {}
 
 std::string FormatNamedMenuLabel(std::string_view name, std::string_view description) {
     return description.empty() ? std::string(name) : FormatText(
@@ -1049,6 +1082,10 @@ if(!::ConfigureDisplay(updatedConfig,state.telemetryUpdate.dump,option.fittedSca
 return false;
 }
 
+void GenericNestedCallDelimiterCombining(){
+CallA(CallB(firstNestedCallArgumentWithLongName,secondNestedCallArgumentWithLongName,thirdNestedCallArgumentWithLongName,fourthNestedCallArgumentWithLongName,fifthNestedCallArgumentWithLongName));
+}
+
 int MeasureHexLabelWidth(HWND hwnd){
 const int hexLabelWidth=MeasureTextWidthForControl(hwnd,IDC_LAYOUT_EDIT_COLOR_HEX_LABEL,ReadDialogControlText(hwnd,IDC_LAYOUT_EDIT_COLOR_HEX_LABEL))+8;
 return hexLabelWidth;
@@ -1227,6 +1264,14 @@ unsigned int ParenthesizedBitwiseAndChain() {
 return (firstReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit & secondReallyLongParenthesizedBitwiseAndOperandForFormatterOwnedChainSplit);
 }
 
+unsigned int ParenthesizedXorOperator() {
+return (firstReallyLongParenthesizedXorOperandForOrdinaryBinaryOperatorSplit ^ secondReallyLongParenthesizedXorOperandForOrdinaryBinaryOperatorSplit);
+}
+
+unsigned int SplitXorOperator() {
+    return firstReallyLongXorLeftOperandForOrdinaryBinaryOperatorSplit ^ secondReallyLongXorRightOperandForOrdinaryBinaryOperatorSplit;
+}
+
 int ParenthesizedDivisionOperator() {
 return (firstReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit / secondReallyLongParenthesizedDivisionOperandForOrdinaryBinaryOperatorSplit);
 }
@@ -1304,6 +1349,17 @@ constexpr BracedMacroInitializerStressEntry BracedMacroInitializerStressValues[]
     BRACED_MACRO_INITIALIZER_STRESS("field17", BracedMacroInitializerStressKind::Value, source.path17),
     BRACED_MACRO_INITIALIZER_STRESS("field18", BracedMacroInitializerStressKind::Value, source.path18)
 };
+
+int DelimiterStackThresholdGenerality(
+    int firstReallyLongOperandName,
+    int secondReallyLongOperandName,
+    int thirdReallyLongOperandName,
+    int fourthReallyLongOperandName
+) {
+    int seven = (((((((firstReallyLongOperandName + secondReallyLongOperandName + thirdReallyLongOperandName + fourthReallyLongOperandName)))))));
+    int eight = ((((((((firstReallyLongOperandName + secondReallyLongOperandName + thirdReallyLongOperandName + fourthReallyLongOperandName))))))));
+    return seven + eight;
+}
 
 int DeepDelimiterStressCase(int y) {
     int x = ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((y))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));

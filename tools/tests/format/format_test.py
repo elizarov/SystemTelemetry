@@ -223,7 +223,7 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
-    def test_multiline_lambda_argument_and_split_function_parameters_are_allowed(self) -> None:
+    def test_lambda_argument_and_split_function_parameters_are_allowed(self) -> None:
         input_text = (
             "struct IncludeGroup { int priority; };\n"
             "void SortIncludeGroups(std::vector<IncludeGroup>& groups) {\n"
@@ -248,9 +248,11 @@ class FormatCommandTests(unittest.TestCase):
             "    int priority;\n"
             "};\n"
             "void SortIncludeGroups(std::vector<IncludeGroup>& groups) {\n"
-            "    std::sort(groups.begin(), groups.end(), [](const IncludeGroup& left, const IncludeGroup& right) {\n"
-            "        return left.priority < right.priority;\n"
-            "    });\n"
+            "    std::sort(\n"
+            "        groups.begin(),\n"
+            "        groups.end(),\n"
+            "        [](const IncludeGroup& left, const IncludeGroup& right) { return left.priority < right.priority; }\n"
+            "    );\n"
             "}\n"
             "\n"
             "std::set<std::string> RequireSuffixGroup(\n"

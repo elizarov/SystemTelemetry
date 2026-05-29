@@ -148,39 +148,6 @@ bool ForcesStringBoundarySplit(const FormatBreakToken& token) {
     return EndsWithEscapedLineFragment(text);
 }
 
-size_t CountFieldInitializers(const SyntaxNode& node) {
-    if (node.kind == SyntaxNodeKind::FieldInitializerList) {
-        return static_cast<size_t>(std::count_if(
-            node.children.begin(),
-            node.children.end(),
-            [](const SyntaxNode* child) { return child && child->kind == SyntaxNodeKind::FieldInitializer; }
-        ));
-    }
-    size_t count = 0;
-    for (const SyntaxNode* child : node.children) {
-        if (child) {
-            count += CountFieldInitializers(*child);
-        }
-    }
-    return count;
-}
-
-bool IsConstructorParameterListWithInitializerList(const FormatBreakToken& open) {
-    const PrintToken& printToken = FormatBreakTokenValue(open);
-    if (
-        printToken.parentKind != SyntaxNodeKind::ParameterList ||
-        printToken.grandParentKind != SyntaxNodeKind::FunctionDeclarator
-    ) {
-        return false;
-    }
-    for (const SyntaxNode* ancestor = printToken.node; ancestor != nullptr; ancestor = ancestor->parent) {
-        if (ancestor != nullptr && ancestor->kind == SyntaxNodeKind::FunctionDefinition) {
-            return CountFieldInitializers(*ancestor) > 2;
-        }
-    }
-    return false;
-}
-
 bool IsLogicalOperatorToken(const FormatBreakToken& token) {
     return IsChainOperatorToken(token) && (
         FormatBreakTokenSyntaxKind(token) == SyntaxNodeKind::AmpersandAmpersand ||
@@ -238,17 +205,6 @@ bool IsListForceSplitMarker(SyntaxNodeKind kind) {
     return kind == SyntaxNodeKind::BlankLine ||
         kind == SyntaxNodeKind::Comment ||
         kind == SyntaxNodeKind::TrailingComment;
-}
-
-bool ContainsSyntaxKind(const SyntaxNode& node, SyntaxNodeKind kind) {
-    if (node.kind == kind) {
-        return true;
-    }
-    return std::any_of(
-        node.children.begin(),
-        node.children.end(),
-        [kind](const SyntaxNode* child) { return child != nullptr && ContainsSyntaxKind(*child, kind); }
-    );
 }
 
 class BreakModelBuilder {
@@ -437,11 +393,10 @@ private:
             delimited.delimiterKind == FormatBreakDelimiterKind::Paren &&
             item &&
             item->kind == FormatBreakNodeKind::Chain &&
-            item->chainKind != FormatBreakChainKind::Ternary && (
-                virtualDelimiter || (IsFlatParenthesizedChain(*item) && (
-                    UsesFlatLogicalContinuation(open, *item) || UsesFlatNonCallParenthesisContinuation(open)
-                ))
-            )
+            item->chainKind != FormatBreakChainKind::Ternary &&
+            (virtualDelimiter || (IsFlatParenthesizedChain(*item) && (
+                UsesFlatLogicalContinuation(open, *item) || UsesFlatNonCallParenthesisContinuation(open)
+            )))
         ) {
             item->flatSplitIndent = true;
         }
@@ -690,18 +645,6 @@ private:
         if (!ContainsSelected(*node.children[*declaratorIndex])) {
             return nullptr;
         }
-        bool hasTemplateReturnType = false;
-        for (size_t index = 0; index < *declaratorIndex; ++index) {
-            if (
-                node.children[index] && ContainsSyntaxKind(*node.children[index], SyntaxNodeKind::TemplateArgumentList)
-            ) {
-                hasTemplateReturnType = true;
-                break;
-            }
-        }
-        if (!hasTemplateReturnType) {
-            return nullptr;
-        }
 
         FormatBreakNode* returnType = BuildSequenceFromChildren(node.children, 0, *declaratorIndex, depth + 1);
         FormatBreakNode* declarator =
@@ -745,14 +688,29 @@ private:
             if (child->kind == SyntaxNodeKind::InitializerList) {
                 hasInitializer = true;
             }
+            if (child->kind == SyntaxNodeKind::ArgumentList) {
+                hasInitializer = true;
+            }
         }
         return hasInitializer && !hasAssignment;
+    }
+
+    static bool IsParenthesizedDirectInitializedDeclarator(const SyntaxNode& node) {
+        if (node.kind != SyntaxNodeKind::FunctionDeclarator) {
+            return false;
+        }
+        return std::any_of(node.children.begin(), node.children.end(), [](const SyntaxNode* child) {
+            return child != nullptr && child->kind == SyntaxNodeKind::ParameterList && child->children.size() > 2;
+        });
     }
 
     FormatBreakNode* BuildDirectInitializedDeclaration(const SyntaxNode& node, int depth) {
         std::optional<size_t> declaratorIndex;
         for (size_t index = 0; index < node.children.size(); ++index) {
-            if (node.children[index] && IsDirectInitializedDeclarator(*node.children[index])) {
+            if (node.children[index] && (IsDirectInitializedDeclarator(*node.children[index]) || (
+                ParentKind(node) == SyntaxNodeKind::CompoundStatement &&
+                IsParenthesizedDirectInitializedDeclarator(*node.children[index])
+            ))) {
                 declaratorIndex = index;
                 break;
             }
@@ -1325,9 +1283,7 @@ private:
         ) {
             AppendEmptyDelimitedItem(*delimited, depth);
         }
-        delimited->forceSplit = delimited->forceSplit ||
-            (IsConstructorParameterListWithInitializerList(*open) && delimited->items.size() > 1) ||
-            (hasVirtualClose && context_.forceSplitVirtualDelimiter);
+        delimited->forceSplit = delimited->forceSplit || (hasVirtualClose && context_.forceSplitVirtualDelimiter);
         afterDelimited = hasVirtualClose ? end : closeIndex + 1;
         return delimited;
     }

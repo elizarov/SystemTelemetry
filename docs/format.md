@@ -56,7 +56,7 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 Mandatory line breaks are structural boundaries. The break is always taken before optional wrapping is considered.
 
 - Break between complete statements and declarations, including after each statement-terminating semicolon.
-- The single-statement lambda is an exception: a complete single-statement lambda body may remain one segment when the lambda fits.
+- The single-statement lambda is an exception: its braces and statement may remain one segment when the complete lambda fits.
 - Put block-opening braces at the end of the introducing line, then break.
 - Break after a code-block closing brace unless the following token is `else`, `catch`, `finally`, or the `while` that closes a do-while statement.
 - Treat a standalone braced statement block as a block. Its closing brace does not attach to the following statement.
@@ -94,7 +94,7 @@ Line break opportunities are optional boundaries that the optimizer may take whe
 - After assignment operators and after binary or ternary operators.
 - After delimiter openers and before matching closers for `()`, `[]`, `{}`, and template `<>`.
 - After commas in lists, including call arguments, declaration parameters, template arguments, braced initializer elements, subscript lists, and enum bodies.
-- Between a declaration type and its direct-initialized declarator value.
+- Between a declaration type and its direct-initialized declarator value, whether the initializer is braced or parenthesized.
 - After semicolons inside `for` and control headers.
 - Around lambda captures, lambda parameter lists, lambda bodies, constructor initializer lists, and adjacent string literal sequences.
 
@@ -237,10 +237,11 @@ Each node exposes its legal compact and split layouts. The optimizer chooses whi
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.
 
-Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`.
-When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack may keep the opening sequence together and the closing sequence together.
+Delimiter groups split after the opener and before the closer as one coupled decision for `()`, `[]`, `{}`, and template `<>`. A delimiter split emits its opening delimiter sequence as the last content on a physical line and its matching closing delimiter sequence as the first content on a physical line. Delimiter sequences stay run-symmetric: when N matching closers are emitted together, their N openers are emitted together as the corresponding opener sequence. This is a universal rule with no exceptions.
+When compact content ends in a split delimiter group and no intervening separator or item content follows it, wrapper delimiter groups may stay compact so any number of adjacent openers and closers combine across delimiter kinds.
+When a delimiter group contains a nested delimiter group and only closing delimiters after that nested group, the delimiter stack can keep the opening sequence together and the closing sequence together regardless of nesting depth.
 
-Function signatures with a template-id return type may break after the complete return type before breaking the return type's template arguments. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. Functions and lambdas deliberately share one callable-header model. When the declaration or assignment prefix is split away from the callable header, the body `{` starts on its own line at the declaration indentation. A callable whose only header continuation is a split parameter list must keep `) {` together.
+Function signatures may break after the complete return type before breaking inside the return type. The function name is indented one continuation level. Split parameters may keep the return type and function name together when that line fits. Functions and lambdas deliberately share one callable-header model. When the declaration or assignment prefix is split away from the callable header, the body `{` starts on its own line at the declaration indentation. A callable whose only header continuation is a split parameter list must keep `) {` together.
 
 ```cpp
 std::vector<std::string>
@@ -360,7 +361,7 @@ template <typename Callable>
 FunctionRef(Callable&& callable);
 ```
 
-Constructor initializer lists use compact or split form. A long initializer list keeps `) :` on the header line, or `) noexcept :` when a trailing qualifier is present. Non-empty bodies put the opening body brace on its own line after the initializer list. Empty bodies keep `{}` compact.
+Constructor initializer lists use compact or split form. A long initializer list keeps `) :` on the header line, or `) noexcept :` when a trailing qualifier is present. Initializer count alone does not force the constructor parameter list to split. Non-empty bodies put the opening body brace on its own line after the initializer list. Empty bodies keep `{}` compact.
 
 ```cpp
 Widget::Widget(int value) : value_(value) {}
@@ -377,7 +378,7 @@ DashboardApp::DashboardApp(
 }
 ```
 
-Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain. Compact empty control bodies stay `{}` but still finish their own control-body line before a following `else` chain.
+Control-brace normalization makes every `if`, `else`, `for`, `while`, `do`, and `switch` body a braced block. It also emits an `else` block whose only statement is an `if` statement as a direct `else if` chain. Compact empty control bodies stay `{}` and use the same following-token attachment rules as non-empty control bodies.
 
 ```cpp
 if (ready) {
@@ -405,20 +406,6 @@ if (
     current.has_value() && *current != nullptr
 ) {
     Use(*current);
-}
-```
-
-A control condition whose selected split is a nested call keeps the control opener and nested call opener on the same line when that chosen layout fits. Nested call arguments use one indent. The call close and control close combine on the body-opening line.
-
-```cpp
-if (!::ConfigureDisplay(
-    updatedConfig,
-    telemetryDump,
-    fittedScale,
-    traceLog,
-    hwnd
-)) {
-    return false;
 }
 ```
 
@@ -461,7 +448,7 @@ Nested switches restore the enclosing switch case indentation after the inner sw
 
 Lambdas intentionally format like functions. A lambda is a callable for all header/body placement decisions: the capture list, parameter list, and optional trailing return type form the callable header, and an assignment prefix such as `const auto name =` behaves like a function return-type prefix.
 
-Single-statement lambda bodies may stay on one line when the complete lambda fits. Multi-statement lambda bodies split after `{`, format each statement with normal mandatory statement breaks, and close on their own line. A lambda argument with a compact header may keep the containing call arguments compact even though the lambda body itself spans lines.
+Single-statement lambda bodies may keep their braces and statement compact when the complete lambda fits. Lambda captures, parameters, trailing return types, and assignment prefixes still split independently. Multi-statement lambda bodies split after `{`, format each statement with normal mandatory statement breaks, and close on their own line. Any delimited list containing a multi-statement lambda body splits like any other list containing a multi-line item.
 
 When an assigned lambda keeps the assignment prefix and lambda header together, a split parameter list must keep the body opener attached as `) {`, matching function definitions whose only header continuation is a split parameter list.
 
