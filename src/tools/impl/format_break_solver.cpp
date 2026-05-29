@@ -8,9 +8,10 @@
 #include <new>
 #include <optional>
 #include <span>
-#include <tuple>
 #include <unordered_map>
 #include <vector>
+
+#include "tools/impl/format_break_model_inline_helpers.h"
 
 namespace {
 

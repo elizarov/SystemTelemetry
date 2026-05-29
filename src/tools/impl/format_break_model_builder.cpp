@@ -8,6 +8,8 @@
 #include <span>
 #include <utility>
 
+#include "tools/impl/format_break_model_inline_helpers.h"
+
 namespace {
 
 using SyntaxChildList = std::vector<const SyntaxNode*>;

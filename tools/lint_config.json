@@ -15,6 +15,7 @@
     "roots": ["src"],
     "header_suffix_group": "headers",
     "implementation_suffix_group": "implementations",
+    "header_body_allowlist": ["src/tools/impl/format_break_model_inline_helpers.h"],
     "cpp_without_header_allowlist": ["src/main/main.cpp", "src/headless/headless_main.cpp"],
     "control_keywords": ["catch", "for", "if", "switch", "while"]
   },

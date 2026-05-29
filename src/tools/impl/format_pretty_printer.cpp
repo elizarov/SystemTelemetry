@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "tools/impl/format_break_model_builder.h"
+#include "tools/impl/format_break_model_inline_helpers.h"
 #include "tools/impl/format_break_solver.h"
 #include "tools/impl/format_include_sort.h"
 #include "tools/impl/format_spacing.h"

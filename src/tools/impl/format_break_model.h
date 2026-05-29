@@ -60,19 +60,6 @@ struct FormatBreakListItem {
     bool blankLineBefore = false;
 };
 
-inline const PrintToken& FormatBreakTokenValue(const FormatBreakToken& token) {
-    static const PrintToken kEmptyToken;
-    return token.token == nullptr ? kEmptyToken : *token.token;
-}
-
-inline PrintTokenKind FormatBreakTokenKind(const FormatBreakToken& token) {
-    return token.token == nullptr ? PrintTokenKind::Free : token.token->kind;
-}
-
-inline SyntaxNodeKind FormatBreakTokenSyntaxKind(const FormatBreakToken& token) {
-    return token.token == nullptr ? SyntaxNodeKind::Unknown : token.token->syntaxKind;
-}
-
 struct FormatBreakNode {
     int id = 0;
     int structuralDepth = 0;
@@ -92,38 +79,46 @@ struct FormatBreakNode {
 template <typename T>
 class FormatBreakArena {
 public:
-    std::span<T> Append(std::span<const T> values) {
-        std::span<T> result = Allocate(values.size());
-        std::copy(values.begin(), values.end(), result.begin());
-        return result;
-    }
+    std::span<T> Append(std::span<const T> values);
 
 private:
     static constexpr size_t kBlockSize = 256;
 
-    std::span<T> Allocate(size_t count) {
-        if (count == 0) {
-            return {};
-        }
-        if (remaining_ < count) {
-            AllocateBlock(std::max(count, kBlockSize));
-        }
-        T* result = cursor_;
-        cursor_ += count;
-        remaining_ -= count;
-        return {result, count};
-    }
-
-    void AllocateBlock(size_t capacity) {
-        blocks_.push_back(std::make_unique<T[]>(capacity));
-        cursor_ = blocks_.back().get();
-        remaining_ = capacity;
-    }
+    std::span<T> Allocate(size_t count);
+    void AllocateBlock(size_t capacity);
 
     std::vector<std::unique_ptr<T[]>> blocks_;
     T* cursor_ = nullptr;
     size_t remaining_ = 0;
 };
+
+template <typename T>
+std::span<T> FormatBreakArena<T>::Append(std::span<const T> values) {
+    std::span<T> result = Allocate(values.size());
+    std::copy(values.begin(), values.end(), result.begin());
+    return result;
+}
+
+template <typename T>
+std::span<T> FormatBreakArena<T>::Allocate(size_t count) {
+    if (count == 0) {
+        return {};
+    }
+    if (remaining_ < count) {
+        AllocateBlock(std::max(count, kBlockSize));
+    }
+    T* result = cursor_;
+    cursor_ += count;
+    remaining_ -= count;
+    return {result, count};
+}
+
+template <typename T>
+void FormatBreakArena<T>::AllocateBlock(size_t capacity) {
+    blocks_.push_back(std::make_unique<T[]>(capacity));
+    cursor_ = blocks_.back().get();
+    remaining_ = capacity;
+}
 
 struct FormatBreakModel {
     std::unique_ptr<std::deque<FormatBreakNode>> nodes;
