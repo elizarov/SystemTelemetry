@@ -272,6 +272,35 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_compact_initializer_braces_stay_tight_in_split_context(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "const auto matchesDrag = [&](const LayoutEditOverlayOwner& owner) {\n"
+                "return owner.childIndex==drag.currentIndex&&\n"
+                "MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId,owner.key.nodePath},\n"
+                "LayoutContainerEditKey{drag.key.editCardId,drag.key.nodePath});\n"
+                "};\n"
+                "bool hits(){return MatchesRegionHit(regions,region,RenderPoint{x,y})&&\n"
+                "MatchesRegionHit(regions,region,RenderPoint{x+3,y});}\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "const auto matchesDrag = [&](const LayoutEditOverlayOwner& owner) {\n"
+            "    return owner.childIndex == drag.currentIndex && MatchesLayoutContainerEditKey(\n"
+            "        LayoutContainerEditKey{owner.key.editCardId, owner.key.nodePath},\n"
+            "        LayoutContainerEditKey{drag.key.editCardId, drag.key.nodePath}\n"
+            "    );\n"
+            "};\n"
+            "bool hits() {\n"
+            "    return MatchesRegionHit(regions, region, RenderPoint{x, y}) &&\n"
+            "        MatchesRegionHit(regions, region, RenderPoint{x + 3, y});\n"
+            "}\n",
+            result.stdout,
+        )
+
     def test_control_body_brace_normalization(self) -> None:
         result = native_format(
             "--style=file",

@@ -1247,6 +1247,8 @@ private:
 
         auto delimited = MakeNode(FormatBreakNodeKind::Delimited, depth);
         delimited->delimiterKind = delimiter;
+        delimited->suppressCompactDelimiterPadding = delimiter == FormatBreakDelimiterKind::Brace &&
+            FormatBreakTokenValue(*open).parentKind == SyntaxNodeKind::InitializerList;
         delimited->children = StoreNodePointers({BuildToken(*open, depth + 1), BuildToken(*close, depth + 1)});
 
         ConstSyntaxChildList itemChildren;

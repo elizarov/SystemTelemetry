@@ -708,6 +708,8 @@ void PreserveWin32BooleanMacros(){int falseValue=FALSE;int trueValue=TRUE;bool s
 
 auto CompactEmptyBraceTernary(bool empty, std::string value){return empty?std::string{}:value;}
 
+bool InitializerPaddingInSplitContext(const LayoutEditOverlayOwner& owner,const DragState& drag){return owner.childIndex==drag.currentIndex&&MatchesLayoutContainerEditKey(LayoutContainerEditKey{owner.key.editCardId,owner.key.nodePath},LayoutContainerEditKey{drag.key.editCardId,drag.key.nodePath});}
+
 const auto noLookup = [](std::string_view) -> std::optional<ColorConfig> { return std::nullopt; };
 
 const auto handled = [&result](INT_PTR value) {

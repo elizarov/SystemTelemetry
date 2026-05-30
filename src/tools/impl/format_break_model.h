@@ -70,6 +70,7 @@ struct FormatBreakNode {
     FormatBreakChainKind chainKind = FormatBreakChainKind::AfterOperator;
     bool forceSplit = false;
     bool flatSplitIndent = false;
+    bool suppressCompactDelimiterPadding = false;
     bool functionSignatureHasBody = false;
     bool bodyHeaderSingleStatementBody = false;
     bool bodyHeaderSplitAtParentIndentWhenLineStarts = false;

@@ -418,6 +418,7 @@ private:
     int indentLevel_ = 0;
     bool atLineStart_ = true;
     bool lineHasText_ = false;
+    bool suppressNextBreakTokenSpace_ = false;
     int currentColumn_ = 0;
     bool macroContinuationLine_ = false;
     bool forceColumnZeroLine_ = false;
@@ -918,6 +919,8 @@ private:
     }
 
     void WriteBreakToken(const FormatBreakToken& token) {
+        const bool suppressSpace = suppressNextBreakTokenSpace_;
+        suppressNextBreakTokenSpace_ = false;
         if (token.contextOnly) {
             return;
         }
@@ -934,7 +937,7 @@ private:
             Write(FormatTokenText(printToken));
             return;
         }
-        if (token.spaceBefore && !atLineStart_) {
+        if (token.spaceBefore && !suppressSpace && !atLineStart_) {
             Space();
         }
         Write(FormatTokenText(printToken));
@@ -1105,6 +1108,9 @@ private:
             EmitBreakNode(*node.children[0], solution, baseIndent);
             for (size_t index = 0; index < node.items.size(); ++index) {
                 const FormatBreakListItem& item = node.items[index];
+                if (node.suppressCompactDelimiterPadding && index == 0) {
+                    suppressNextBreakTokenSpace_ = true;
+                }
                 EmitBreakNode(*item.node, solution, baseIndent);
                 if (FormatBreakTokenKind(item.separator) == PrintTokenKind::Known) {
                     WriteBreakToken(item.separator);
@@ -1112,6 +1118,9 @@ private:
                 if (HasTrailingComment(node, index)) {
                     WriteBreakToken(item.trailingComment);
                 }
+            }
+            if (node.suppressCompactDelimiterPadding) {
+                suppressNextBreakTokenSpace_ = true;
             }
             EmitBreakNode(*node.children[1], solution, baseIndent);
             return;
