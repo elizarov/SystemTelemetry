@@ -12,7 +12,7 @@
 
 namespace {
 
-using SyntaxChildList = std::vector<const SyntaxNode*>;
+using ConstSyntaxChildList = std::vector<const SyntaxNode*>;
 
 bool IsTemplateAngleToken(const FormatBreakToken& token) {
     const PrintToken& printToken = FormatBreakTokenValue(token);
@@ -386,7 +386,7 @@ private:
 
     void AppendDelimitedItem(
         FormatBreakNode& delimited,
-        SyntaxChildList& itemChildren,
+        ConstSyntaxChildList& itemChildren,
         const FormatBreakToken& open,
         int depth,
         bool blankLineBefore = false
@@ -813,7 +813,7 @@ private:
             return nullptr;
         }
 
-        SyntaxChildList leftChildren;
+        ConstSyntaxChildList leftChildren;
         leftChildren.reserve(*declaratorIndex + *operatorIndex);
         for (size_t index = 0; index < *declaratorIndex; ++index) {
             leftChildren.push_back(node.children[index]);
@@ -857,7 +857,7 @@ private:
         return sequence;
     }
 
-    FormatBreakNode* BuildSequenceFromPointers(const SyntaxChildList& children, int depth) {
+    FormatBreakNode* BuildSequenceFromPointers(const ConstSyntaxChildList& children, int depth) {
         std::vector<FormatBreakNode*> builtChildren;
         builtChildren.reserve(children.size());
         for (const SyntaxNode* child : children) {
@@ -877,12 +877,7 @@ private:
         return sequence;
     }
 
-    FormatBreakNode* BuildSequenceFromChildren(
-        const std::vector<SyntaxNode*>& children,
-        size_t begin,
-        size_t end,
-        int depth
-    ) {
+    FormatBreakNode* BuildSequenceFromChildren(const ::SyntaxChildList& children, size_t begin, size_t end, int depth) {
         std::vector<FormatBreakNode*> builtChildren;
         builtChildren.reserve(end - begin);
         for (size_t index = begin; index < end;) {
@@ -974,7 +969,7 @@ private:
     void AppendBinaryChainOperand(
         std::vector<FormatBreakNode*>& operands,
         std::vector<FormatBreakToken>& operators,
-        const std::vector<SyntaxNode*>& children,
+        const ::SyntaxChildList& children,
         size_t begin,
         size_t end,
         SyntaxNodeKind op,
@@ -1079,7 +1074,7 @@ private:
     }
 
     void AppendConditionalBranch(
-        const std::vector<SyntaxNode*>& children,
+        const ::SyntaxChildList& children,
         size_t begin,
         size_t end,
         std::vector<FormatBreakNode*>& operands,
@@ -1148,7 +1143,7 @@ private:
         auto list = MakeNode(FormatBreakNodeKind::PrefixList, depth);
         list->children = StoreNodePointers({BuildToken(*prefix, depth + 1)});
 
-        SyntaxChildList itemChildren;
+        ConstSyntaxChildList itemChildren;
         bool pendingBlankLine = false;
         for (size_t index = *prefixIndex + 1; index < node.children.size(); ++index) {
             const SyntaxNode* child = node.children[index];
@@ -1213,7 +1208,7 @@ private:
     }
 
     std::optional<std::pair<size_t, FormatBreakDelimiterKind>> FindDirectClose(
-        const std::vector<SyntaxNode*>& children,
+        const ::SyntaxChildList& children,
         size_t openIndex,
         size_t end,
         FormatBreakDelimiterKind delimiter
@@ -1231,7 +1226,7 @@ private:
     }
 
     FormatBreakNode* BuildDirectDelimited(
-        const std::vector<SyntaxNode*>& children,
+        const ::SyntaxChildList& children,
         size_t openIndex,
         size_t end,
         int depth,
@@ -1273,7 +1268,7 @@ private:
         delimited->delimiterKind = delimiter;
         delimited->children = StoreNodePointers({BuildToken(*open, depth + 1), BuildToken(*close, depth + 1)});
 
-        SyntaxChildList itemChildren;
+        ConstSyntaxChildList itemChildren;
         bool pendingBlankLine = false;
         for (size_t index = openIndex + 1; index < closeIndex; ++index) {
             const SyntaxNode* child = children[index];

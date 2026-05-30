@@ -1,6 +1,7 @@
 #include "tools/impl/format_model.h"
 
 #include <array>
+#include <tree_sitter_cpp.h>
 #include <unordered_map>
 
 namespace {
@@ -40,12 +41,16 @@ constexpr SyntaxKindMapping Keyword(SyntaxNodeKind kind, std::string_view tokenT
 constexpr std::uint64_t kStringLikeClasses =
     Bit(TokenClass::Literal) | Bit(TokenClass::StringLike) | Bit(TokenClass::WholeNodeAsFreeToken);
 constexpr std::uint64_t kNumberLiteralClasses = Bit(TokenClass::Literal) | Bit(TokenClass::WholeNodeAsFreeToken);
+constexpr std::uint64_t kCommentClasses = Bit(TokenClass::Comment) | Bit(TokenClass::Trivia);
 constexpr std::uint64_t kAtomicPreprocessorClasses =
     Bit(TokenClass::AtomicPreprocessor) | Bit(TokenClass::WholeNodeAsFreeToken);
 constexpr std::uint64_t kChainBinaryClasses = Bit(TokenClass::BinaryOperator) | Bit(TokenClass::ChainOperator);
 
 constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
+    Kind(SyntaxNodeKind::Comment, kCommentClasses),
+    Kind(SyntaxNodeKind::TrailingComment, kCommentClasses),
+    Kind(SyntaxNodeKind::BlankLine, Bit(TokenClass::Trivia)),
     Tree(SyntaxNodeKind::TranslationUnit, "translation_unit"),
     Tree(SyntaxNodeKind::IncludeRun, "include_run"),
     Tree(SyntaxNodeKind::MacroReplacementList, "macro_replacement_list"),
@@ -66,35 +71,29 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Tree(SyntaxNodeKind::StructSpecifier, "struct_specifier", Bit(TokenClass::MacroDeclarationFragment)),
     Tree(SyntaxNodeKind::BaseClassClause, "base_class_clause"),
     Tree(SyntaxNodeKind::AccessSpecifier, "access_specifier"),
-    Tree(
-        SyntaxNodeKind::IfStatement,
-        "if_statement",
-        Bit(TokenClass::ControlHeader) | Bit(TokenClass::FlatLogicalHeader)
-    ),
+    Tree(SyntaxNodeKind::IfStatement, "if_statement", Bit(TokenClass::ControlHeader) | Bit(
+        TokenClass::FlatLogicalHeader
+    )),
     Tree(SyntaxNodeKind::ElseClause, "else_clause"),
     Tree(SyntaxNodeKind::ForStatement, "for_statement", Bit(TokenClass::ControlHeader)),
-    Tree(
-        SyntaxNodeKind::WhileStatement,
-        "while_statement",
-        Bit(TokenClass::ControlHeader) | Bit(TokenClass::FlatLogicalHeader)
-    ),
+    Tree(SyntaxNodeKind::WhileStatement, "while_statement", Bit(TokenClass::ControlHeader) | Bit(
+        TokenClass::FlatLogicalHeader
+    )),
     Tree(SyntaxNodeKind::DoStatement, "do_statement"),
-    Tree(
-        SyntaxNodeKind::SwitchStatement,
-        "switch_statement",
-        Bit(TokenClass::ControlHeader) | Bit(TokenClass::FlatLogicalHeader)
-    ),
+    Tree(SyntaxNodeKind::SwitchStatement, "switch_statement", Bit(TokenClass::ControlHeader) | Bit(
+        TokenClass::FlatLogicalHeader
+    )),
     Tree(SyntaxNodeKind::CaseStatement, "case_statement"),
-    Tree(
-        SyntaxNodeKind::ConditionClause,
-        "condition_clause",
-        Bit(TokenClass::ControlHeader) | Bit(TokenClass::FlatLogicalHeader)
-    ),
+    Tree(SyntaxNodeKind::ConditionClause, "condition_clause", Bit(TokenClass::ControlHeader) | Bit(
+        TokenClass::FlatLogicalHeader
+    )),
     Tree(SyntaxNodeKind::InitStatement, "init_statement"),
     Tree(SyntaxNodeKind::PreprocCall, "preproc_call", kAtomicPreprocessorClasses),
     Tree(SyntaxNodeKind::PreprocDef, "preproc_def", Bit(TokenClass::MacroDefinition)),
     Tree(SyntaxNodeKind::PreprocFunctionDef, "preproc_function_def", Bit(TokenClass::MacroDefinition)),
-    Tree(SyntaxNodeKind::PreprocInclude, "preproc_include", kAtomicPreprocessorClasses),
+    Tree(SyntaxNodeKind::PreprocInclude, "preproc_include", kAtomicPreprocessorClasses | Bit(
+        TokenClass::IncludeDirective
+    )),
     Tree(SyntaxNodeKind::PreprocIf, "preproc_if"),
     Tree(SyntaxNodeKind::PreprocIfdef, "preproc_ifdef"),
     Tree(SyntaxNodeKind::PreprocElse, "preproc_else"),
@@ -119,36 +118,26 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Tree(SyntaxNodeKind::InitDeclarator, "init_declarator"),
     Tree(SyntaxNodeKind::CastExpression, "cast_expression"),
     Tree(SyntaxNodeKind::PointerDeclarator, "pointer_declarator", Bit(TokenClass::DeclaratorReferenceParent)),
-    Tree(
-        SyntaxNodeKind::AbstractPointerDeclarator,
-        "abstract_pointer_declarator",
-        Bit(TokenClass::DeclaratorReferenceParent)
-    ),
+    Tree(SyntaxNodeKind::AbstractPointerDeclarator, "abstract_pointer_declarator", Bit(
+        TokenClass::DeclaratorReferenceParent
+    )),
     Tree(SyntaxNodeKind::ReferenceDeclarator, "reference_declarator", Bit(TokenClass::DeclaratorReferenceParent)),
-    Tree(
-        SyntaxNodeKind::AbstractReferenceDeclarator,
-        "abstract_reference_declarator",
-        Bit(TokenClass::DeclaratorReferenceParent)
-    ),
+    Tree(SyntaxNodeKind::AbstractReferenceDeclarator, "abstract_reference_declarator", Bit(
+        TokenClass::DeclaratorReferenceParent
+    )),
     Tree(SyntaxNodeKind::HandleDeclarator, "handle_declarator", Bit(TokenClass::DeclaratorReferenceParent)),
-    Tree(
-        SyntaxNodeKind::AbstractHandleDeclarator,
-        "abstract_handle_declarator",
-        Bit(TokenClass::DeclaratorReferenceParent)
-    ),
-    Tree(
-        SyntaxNodeKind::MemberPointerDeclarator,
-        "member_pointer_declarator",
-        Bit(TokenClass::DeclaratorReferenceParent)
-    ),
+    Tree(SyntaxNodeKind::AbstractHandleDeclarator, "abstract_handle_declarator", Bit(
+        TokenClass::DeclaratorReferenceParent
+    )),
+    Tree(SyntaxNodeKind::MemberPointerDeclarator, "member_pointer_declarator", Bit(
+        TokenClass::DeclaratorReferenceParent
+    )),
     Tree(SyntaxNodeKind::FunctionDeclarator, "function_declarator"),
     Tree(SyntaxNodeKind::AbstractFunctionDeclarator, "abstract_function_declarator"),
     Tree(SyntaxNodeKind::ParenthesizedDeclarator, "parenthesized_declarator", Bit(TokenClass::ParenthesizedDeclarator)),
-    Tree(
-        SyntaxNodeKind::AbstractParenthesizedDeclarator,
-        "abstract_parenthesized_declarator",
-        Bit(TokenClass::ParenthesizedDeclarator)
-    ),
+    Tree(SyntaxNodeKind::AbstractParenthesizedDeclarator, "abstract_parenthesized_declarator", Bit(
+        TokenClass::ParenthesizedDeclarator
+    )),
     Tree(SyntaxNodeKind::ParameterList, "parameter_list"),
     Tree(SyntaxNodeKind::ArgumentList, "argument_list"),
     Tree(SyntaxNodeKind::SubscriptArgumentList, "subscript_argument_list"),
@@ -197,19 +186,15 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Token(SyntaxNodeKind::Spaceship, "<=>", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::Plus, "+", kChainBinaryClasses | Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Minus, "-", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::UnaryOperator)),
-    Token(
-        SyntaxNodeKind::Star,
-        "*",
-        kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
-    ),
+    Token(SyntaxNodeKind::Star, "*", kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(
+        TokenClass::DeclaratorReferenceToken
+    )),
     Token(SyntaxNodeKind::Slash, "/", Bit(TokenClass::BinaryOperator)),
     Token(SyntaxNodeKind::Percent, "%", Bit(TokenClass::BinaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)),
     Token(SyntaxNodeKind::Caret, "^", kChainBinaryClasses | Bit(TokenClass::DeclaratorReferenceToken)),
-    Token(
-        SyntaxNodeKind::Ampersand,
-        "&",
-        kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(TokenClass::DeclaratorReferenceToken)
-    ),
+    Token(SyntaxNodeKind::Ampersand, "&", kChainBinaryClasses | Bit(TokenClass::UnaryOperator) | Bit(
+        TokenClass::DeclaratorReferenceToken
+    )),
     Token(SyntaxNodeKind::Pipe, "|", kChainBinaryClasses),
     Token(SyntaxNodeKind::Bang, "!", Bit(TokenClass::UnaryOperator)),
     Token(SyntaxNodeKind::Tilde, "~", Bit(TokenClass::UnaryOperator)),
@@ -247,11 +232,9 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Keyword(SyntaxNodeKind::KeywordBool, "bool"),
     Keyword(SyntaxNodeKind::KeywordBreak, "break"),
     Keyword(SyntaxNodeKind::KeywordCase, "case"),
-    Keyword(
-        SyntaxNodeKind::KeywordCatch,
-        "catch",
-        Bit(TokenClass::ControlKeyword) | Bit(TokenClass::AttachAfterBlockKeyword)
-    ),
+    Keyword(SyntaxNodeKind::KeywordCatch, "catch", Bit(TokenClass::ControlKeyword) | Bit(
+        TokenClass::AttachAfterBlockKeyword
+    )),
     Keyword(SyntaxNodeKind::KeywordChar, "char"),
     Keyword(SyntaxNodeKind::KeywordChar16T, "char16_t"),
     Keyword(SyntaxNodeKind::KeywordChar32T, "char32_t"),
@@ -323,11 +306,9 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Keyword(SyntaxNodeKind::KeywordVoid, "void"),
     Keyword(SyntaxNodeKind::KeywordVolatile, "volatile"),
     Keyword(SyntaxNodeKind::KeywordWcharT, "wchar_t"),
-    Keyword(
-        SyntaxNodeKind::KeywordWhile,
-        "while",
-        Bit(TokenClass::ControlKeyword) | Bit(TokenClass::AttachAfterBlockKeyword)
-    ),
+    Keyword(SyntaxNodeKind::KeywordWhile, "while", Bit(TokenClass::ControlKeyword) | Bit(
+        TokenClass::AttachAfterBlockKeyword
+    )),
     Keyword(SyntaxNodeKind::KeywordCdecl, "__cdecl"),
     Keyword(SyntaxNodeKind::KeywordDeclspec, "__declspec"),
     Keyword(SyntaxNodeKind::KeywordCoAwait, "co_await"),
@@ -396,7 +377,119 @@ const std::unordered_map<std::string_view, SyntaxNodeKind>& SyntaxKindByTokenTex
     return tokens;
 }
 
+using SymbolInfoTable = std::vector<SyntaxSymbolInfo>;
+
+SymbolInfoTable MakeSymbolInfoTable() {
+    return SymbolInfoTable(ts_language_symbol_count(tree_sitter_cpp()));
+}
+
+void StoreTreeSymbolInfo(SymbolInfoTable& table, std::string_view name, SyntaxNodeKind kind) {
+    const TSSymbol symbol =
+        ts_language_symbol_for_name(tree_sitter_cpp(), name.data(), static_cast<uint32_t>(name.size()), true);
+    if (static_cast<size_t>(symbol) < table.size()) {
+        table[symbol].treeKind = kind;
+    }
+}
+
+void StoreTokenSymbolInfo(SymbolInfoTable& table, std::string_view name, bool isNamed, SyntaxNodeKind kind) {
+    const TSSymbol symbol =
+        ts_language_symbol_for_name(tree_sitter_cpp(), name.data(), static_cast<uint32_t>(name.size()), isNamed);
+    if (static_cast<size_t>(symbol) < table.size()) {
+        table[symbol].tokenKind = kind;
+    }
+}
+
+void StoreSymbolInfoRole(SymbolInfoTable& table, std::string_view name, SyntaxWrapperRole role) {
+    const TSSymbol symbol =
+        ts_language_symbol_for_name(tree_sitter_cpp(), name.data(), static_cast<uint32_t>(name.size()), true);
+    if (static_cast<size_t>(symbol) < table.size()) {
+        table[symbol].wrapperRole = role;
+    }
+}
+
+const SymbolInfoTable& SyntaxInfoBySymbol() {
+    static const SymbolInfoTable symbols = [] {
+        SymbolInfoTable result = MakeSymbolInfoTable();
+        for (const SyntaxKindMapping& mapping : kSyntaxKindMappings) {
+            if (!mapping.treeType.empty()) {
+                StoreTreeSymbolInfo(result, mapping.treeType, mapping.kind);
+            }
+            if (!mapping.tokenText.empty()) {
+                StoreTokenSymbolInfo(result, mapping.tokenText, false, mapping.kind);
+                StoreTokenSymbolInfo(result, mapping.tokenText, true, mapping.kind);
+            }
+        }
+        StoreTreeSymbolInfo(result, "comment", SyntaxNodeKind::Comment);
+
+        constexpr std::string_view flattenNames[] = {
+            "call_expression",
+            "compound_literal_expression",
+            "initializer_pair",
+            "parameter_declaration",
+            "qualified_operator_cast_identifier",
+            "sized_type_specifier",
+            "subscript_expression",
+            "template_function",
+            "template_method",
+            "template_type",
+            "type_descriptor"
+        };
+        constexpr std::string_view wholeTokenNames[] = {
+            "null",
+            "placeholder_type_specifier",
+            "primitive_type",
+            "storage_class_specifier",
+            "type_qualifier",
+            "virtual_specifier"
+        };
+        constexpr std::string_view wholeAtomNames[] = {
+            "dependent_field_identifier",
+            "dependent_identifier",
+            "dependent_type_identifier",
+            "field_designator",
+            "field_identifier",
+            "identifier",
+            "namespace_identifier",
+            "pointer_expression",
+            "qualified_field_identifier",
+            "qualified_identifier",
+            "qualified_type_identifier",
+            "type_identifier",
+            "unary_expression",
+            "update_expression"
+        };
+        constexpr std::string_view compactEmptyDelimitedNames[] = {
+            "argument_list",
+            "field_initializer_list",
+            "initializer_list",
+            "lambda_capture_specifier",
+            "subscript_argument_list",
+            "template_argument_list"
+        };
+        for (const std::string_view name : flattenNames) {
+            StoreSymbolInfoRole(result, name, SyntaxWrapperRole::Flatten);
+        }
+        for (const std::string_view name : wholeTokenNames) {
+            StoreSymbolInfoRole(result, name, SyntaxWrapperRole::WholeToken);
+        }
+        for (const std::string_view name : wholeAtomNames) {
+            StoreSymbolInfoRole(result, name, SyntaxWrapperRole::WholeAtom);
+        }
+        for (const std::string_view name : compactEmptyDelimitedNames) {
+            StoreSymbolInfoRole(result, name, SyntaxWrapperRole::CompactEmptyDelimited);
+        }
+        StoreSymbolInfoRole(result, "field_expression", SyntaxWrapperRole::WholeFieldAtom);
+        return result;
+    }
+    ();
+    return symbols;
+}
+
 }  // namespace
+
+SyntaxNode::SyntaxNode(std::pmr::memory_resource* childResource) : children(childResource) {}
+
+FormatModel::FormatModel() : childStorage(std::make_unique<std::pmr::monotonic_buffer_resource>()) {}
 
 SyntaxNodeKind SyntaxNodeKindFromTreeType(std::string_view type) {
     const auto& kindsByTreeType = SyntaxKindByTreeType();
@@ -411,6 +504,11 @@ SyntaxNodeKind SyntaxNodeKindFromTokenText(std::string_view text) {
     const auto& tokens = SyntaxKindByTokenText();
     const auto found = tokens.find(text);
     return found == tokens.end() ? SyntaxNodeKind::Unknown : found->second;
+}
+
+SyntaxSymbolInfo SyntaxSymbolInfoForSymbol(TSSymbol symbol) {
+    const auto& symbols = SyntaxInfoBySymbol();
+    return static_cast<size_t>(symbol) < symbols.size() ? symbols[symbol] : SyntaxSymbolInfo{};
 }
 
 std::string_view SyntaxNodeKindTokenText(SyntaxNodeKind kind) {

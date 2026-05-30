@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <deque>
 #include <memory>
+#include <memory_resource>
 #include <string>
 #include <string_view>
+#include <tree_sitter/api.h>
 #include <vector>
 
 struct ParseResult {
@@ -13,6 +14,9 @@ struct ParseResult {
 };
 
 struct PrintToken;
+struct SyntaxNode;
+
+using SyntaxChildList = std::pmr::vector<SyntaxNode*>;
 
 enum class SyntaxNodeKind : std::uint16_t {
     // Structural nodes.
@@ -274,21 +278,42 @@ enum class TokenClass : std::uint64_t {
     ControlHeader = 1ull << 20,
     FlatLogicalHeader = 1ull << 21,
     ChainOperator = 1ull << 22,
+    IncludeDirective = 1ull << 23,
+    Comment = 1ull << 24,
+    Trivia = 1ull << 25,
+};
+
+enum class SyntaxWrapperRole : std::uint8_t {
+    None,
+    Flatten,
+    WholeToken,
+    WholeAtom,
+    WholeFieldAtom,
+    CompactEmptyDelimited,
+};
+
+struct SyntaxSymbolInfo {
+    SyntaxNodeKind treeKind = SyntaxNodeKind::Unknown;
+    SyntaxNodeKind tokenKind = SyntaxNodeKind::Unknown;
+    SyntaxWrapperRole wrapperRole = SyntaxWrapperRole::None;
 };
 
 SyntaxNodeKind SyntaxNodeKindFromTreeType(std::string_view type);
 SyntaxNodeKind SyntaxNodeKindFromTokenText(std::string_view text);
+SyntaxSymbolInfo SyntaxSymbolInfoForSymbol(TSSymbol symbol);
 std::string_view SyntaxNodeKindName(SyntaxNodeKind kind);
 std::string_view SyntaxNodeKindTokenText(SyntaxNodeKind kind);
 bool SyntaxNodeKindHasClass(SyntaxNodeKind kind, TokenClass tokenClass);
 
 struct SyntaxNode {
+    explicit SyntaxNode(std::pmr::memory_resource* childResource = std::pmr::get_default_resource());
+
     // Keep nodes maximally generic and space-efficient; avoid fields that only apply to one node kind.
     SyntaxNodeKind kind = SyntaxNodeKind::Unknown;
     std::string_view text;
     const SyntaxNode* parent = nullptr;
     size_t depth = 0;
-    std::vector<SyntaxNode*> children;
+    SyntaxChildList children;
 
     // Break model scratch storage. These fields are valid only for the active formatting pass mark.
     mutable const PrintToken* formatPrintToken = nullptr;
@@ -298,7 +323,7 @@ struct SyntaxNode {
 };
 
 struct FormatModel {
-    FormatModel() = default;
+    FormatModel();
     FormatModel(const FormatModel&) = delete;
     FormatModel& operator=(const FormatModel&) = delete;
     FormatModel(FormatModel&&) noexcept = default;
@@ -306,6 +331,7 @@ struct FormatModel {
 
     ParseResult parse;
     std::unique_ptr<std::string> sourceText;
-    std::deque<SyntaxNode> nodes;
+    std::unique_ptr<std::pmr::monotonic_buffer_resource> childStorage;
+    std::vector<SyntaxNode> nodes;
     SyntaxNode* root = nullptr;
 };

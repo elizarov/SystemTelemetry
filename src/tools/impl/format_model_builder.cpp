@@ -7,10 +7,6 @@
 
 namespace {
 
-TSPoint StartPoint(TSNode node) {
-    return ts_node_start_point(node);
-}
-
 std::string_view NodeText(TSNode node, std::string_view source) {
     const uint32_t start = ts_node_start_byte(node);
     const uint32_t end = ts_node_end_byte(node);
@@ -45,18 +41,6 @@ bool ContainsBlankLine(std::string_view source, uint32_t firstEnd, uint32_t seco
     return lineBreaks >= 2 && !sawNonWhitespace;
 }
 
-bool IsLiteralKind(SyntaxNodeKind kind) {
-    return SyntaxNodeKindHasClass(kind, TokenClass::Literal);
-}
-
-bool KeepWholeNodeAsFreeToken(SyntaxNodeKind kind) {
-    return SyntaxNodeKindHasClass(kind, TokenClass::WholeNodeAsFreeToken);
-}
-
-bool IsAtomicPreprocessorNode(SyntaxNodeKind kind) {
-    return SyntaxNodeKindHasClass(kind, TokenClass::AtomicPreprocessor);
-}
-
 std::string_view TrimLeadingWhitespace(std::string_view value) {
     while (!value.empty() && (value.front() == ' ' || value.front() == '\t')) {
         value.remove_prefix(1);
@@ -64,12 +48,8 @@ std::string_view TrimLeadingWhitespace(std::string_view value) {
     return value;
 }
 
-bool IsPragmaOnceNode(const SyntaxNode& node) {
-    return node.kind == SyntaxNodeKind::PreprocCall && StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
-}
-
 SyntaxNode* MakeNode(FormatModel& model) {
-    return &model.nodes.emplace_back();
+    return &model.nodes.emplace_back(model.childStorage.get());
 }
 
 void SetParentRecursive(SyntaxNode& node, const SyntaxNode* parent) {
@@ -89,16 +69,6 @@ void AppendChild(SyntaxNode& parent, SyntaxNode* child) {
     parent.children.push_back(child);
 }
 
-bool IsIncludeNode(const SyntaxNode* node) {
-    return node != nullptr && node->kind == SyntaxNodeKind::PreprocInclude;
-}
-
-bool IsOpeningIncludeSpacer(const SyntaxNode& node) {
-    return node.kind == SyntaxNodeKind::BlankLine ||
-        node.kind == SyntaxNodeKind::Comment ||
-        node.kind == SyntaxNodeKind::TrailingComment;
-}
-
 SyntaxNode* MakeBlankLine(FormatModel& model) {
     SyntaxNode* node = MakeNode(model);
     node->kind = SyntaxNodeKind::BlankLine;
@@ -111,47 +81,108 @@ SyntaxNode* MakeTokenNode(FormatModel& model, SyntaxNodeKind token) {
     return node;
 }
 
-bool IsTriviaNode(const SyntaxNode* node) {
-    return node != nullptr && (
-        node->kind == SyntaxNodeKind::BlankLine ||
-        node->kind == SyntaxNodeKind::Comment ||
-        node->kind == SyntaxNodeKind::TrailingComment
-    );
-}
-
-bool IsCommentNode(const SyntaxNode* node) {
-    return node != nullptr && (node->kind == SyntaxNodeKind::Comment || node->kind == SyntaxNodeKind::TrailingComment);
-}
-
-bool IsTokenNode(const SyntaxNode* node, SyntaxNodeKind token) {
-    return node != nullptr && node->kind == token;
-}
-
-bool IsTreeNode(const SyntaxNode* node, SyntaxNodeKind kind) {
-    return node != nullptr && node->kind == kind;
-}
-
-bool IsMacroLikeInvocationNode(const SyntaxNode* node) {
+bool MacroLikeInvocationNode(const SyntaxNode* node) {
     return node != nullptr &&
         node->kind == SyntaxNodeKind::Tree &&
         node->children.size() == 2 &&
-        IsTreeNode(node->children[0], SyntaxNodeKind::Identifier) &&
-        IsTreeNode(node->children[1], SyntaxNodeKind::ArgumentList);
+        node->children[0] != nullptr &&
+        node->children[0]->kind == SyntaxNodeKind::Identifier &&
+        node->children[1] != nullptr &&
+        node->children[1]->kind == SyntaxNodeKind::ArgumentList;
 }
 
-std::optional<size_t> PreviousNonTriviaChildIndex(const std::vector<SyntaxNode*>& children, size_t before) {
+bool MacroLikeInvocationEnding(const SyntaxChildList& children, size_t index) {
+    if (MacroLikeInvocationNode(children[index])) {
+        return true;
+    }
+    return index > 0 &&
+        children[index] != nullptr &&
+        children[index]->kind == SyntaxNodeKind::ArgumentList &&
+        children[index - 1] != nullptr &&
+        children[index - 1]->kind == SyntaxNodeKind::Identifier;
+}
+
+bool ContainsWholeAtomDelimiter(std::string_view text) {
+    // Whole-atom wrappers are safe to keep as one text node only when the text has no structural separators.
+    // Examples that take the shortcut: `name`, `ns::Type`, `*ptr`, `++index`.
+    // Examples that must still expose children: `call(arg)`, `array[i]`, `T<U>`, `x + y`.
+    for (const char ch : text) {
+        switch (ch) {
+            case '\t':
+            case '\n':
+            case '\r':
+            case ' ':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '<':
+            case '>':
+            case ',':
+            case ';':
+            case '"':
+            case '\'':
+                return true;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
+bool ContainsWholeFieldAtomDelimiter(std::string_view text) {
+    // Field expressions get the same shortcut, but `object->field` is still atom-like; the `>` in `->` is allowed.
+    for (size_t index = 0; index < text.size(); ++index) {
+        switch (text[index]) {
+            case '\t':
+            case '\n':
+            case '\r':
+            case ' ':
+            case '(':
+            case ')':
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '<':
+            case ',':
+            case ';':
+            case '"':
+            case '\'':
+                return true;
+            case '>':
+                if (index == 0 || text[index - 1] != '-') {
+                    return true;
+                }
+                break;
+            default:
+                break;
+        }
+    }
+    return false;
+}
+
+bool CompactEmptyDelimitedText(std::string_view text) {
+    return text == "()" || text == "[]" || text == "<>" || text == "{}";
+}
+
+std::optional<size_t> PreviousNonTriviaChildIndex(const SyntaxChildList& children, size_t before) {
     while (before > 0) {
         --before;
-        if (!IsTriviaNode(children[before])) {
+        const SyntaxNode* child = children[before];
+        if (child == nullptr || !SyntaxNodeKindHasClass(child->kind, TokenClass::Trivia)) {
             return before;
         }
     }
     return std::nullopt;
 }
 
-std::optional<size_t> NextNonTriviaChildIndex(const std::vector<SyntaxNode*>& children, size_t after) {
+std::optional<size_t> NextNonTriviaChildIndex(const SyntaxChildList& children, size_t after) {
     for (size_t index = after; index < children.size(); ++index) {
-        if (!IsTriviaNode(children[index])) {
+        const SyntaxNode* child = children[index];
+        if (child == nullptr || !SyntaxNodeKindHasClass(child->kind, TokenClass::Trivia)) {
             return index;
         }
     }
@@ -159,13 +190,16 @@ std::optional<size_t> NextNonTriviaChildIndex(const std::vector<SyntaxNode*>& ch
 }
 
 void NormalizeTrailingCommas(FormatModel& model, SyntaxNode& node) {
-    std::vector<SyntaxNode*>& children = node.children;
+    SyntaxChildList& children = node.children;
     for (size_t index = 0; index < children.size(); ++index) {
+        if (children[index] == nullptr) {
+            continue;
+        }
         if (
-            !IsTokenNode(children[index], SyntaxNodeKind::RightBrace) &&
-            !IsTokenNode(children[index], SyntaxNodeKind::RightParen) &&
-            !IsTokenNode(children[index], SyntaxNodeKind::RightBracket) &&
-            !IsTokenNode(children[index], SyntaxNodeKind::Greater)
+            children[index]->kind != SyntaxNodeKind::RightBrace &&
+            children[index]->kind != SyntaxNodeKind::RightParen &&
+            children[index]->kind != SyntaxNodeKind::RightBracket &&
+            children[index]->kind != SyntaxNodeKind::Greater
         ) {
             continue;
         }
@@ -175,18 +209,19 @@ void NormalizeTrailingCommas(FormatModel& model, SyntaxNode& node) {
         }
         if (node.kind == SyntaxNodeKind::EnumeratorList) {
             if (
-                !IsTokenNode(children[*previous], SyntaxNodeKind::Comma) &&
-                !IsTokenNode(children[*previous], SyntaxNodeKind::LeftBrace) &&
-                !IsMacroLikeInvocationNode(children[*previous])
+                children[*previous]->kind != SyntaxNodeKind::Comma &&
+                children[*previous]->kind != SyntaxNodeKind::LeftBrace &&
+                !MacroLikeInvocationEnding(children, *previous)
             ) {
                 SyntaxNode* comma = MakeTokenNode(model, SyntaxNodeKind::Comma);
-                SetParentRecursive(*comma, &node);
+                comma->parent = &node;
+                comma->depth = node.depth + 1;
                 children.insert(children.begin() + static_cast<std::ptrdiff_t>(*previous + 1), comma);
                 ++index;
             }
             continue;
         }
-        if (IsTokenNode(children[*previous], SyntaxNodeKind::Comma)) {
+        if (children[*previous]->kind == SyntaxNodeKind::Comma) {
             children.erase(children.begin() + static_cast<std::ptrdiff_t>(*previous));
             --index;
         }
@@ -194,18 +229,23 @@ void NormalizeTrailingCommas(FormatModel& model, SyntaxNode& node) {
 }
 
 void WrapControlBody(FormatModel& model, SyntaxNode& node, size_t childIndex) {
-    if (
-        childIndex >= node.children.size() || IsTreeNode(node.children[childIndex], SyntaxNodeKind::CompoundStatement)
-    ) {
+    if (childIndex >= node.children.size() || (
+        node.children[childIndex] != nullptr && node.children[childIndex]->kind == SyntaxNodeKind::CompoundStatement
+    )) {
         return;
     }
     size_t firstBodyIndex = childIndex;
-    while (firstBodyIndex > 0 && IsCommentNode(node.children[firstBodyIndex - 1])) {
+    while (firstBodyIndex > 0 && node.children[firstBodyIndex - 1] != nullptr && SyntaxNodeKindHasClass(
+        node.children[firstBodyIndex - 1]->kind,
+        TokenClass::Comment
+    )) {
         --firstBodyIndex;
     }
 
     SyntaxNode* compound = MakeNode(model);
     compound->kind = SyntaxNodeKind::CompoundStatement;
+    compound->parent = &node;
+    compound->depth = node.depth + 1;
     compound->children.reserve(childIndex - firstBodyIndex + 3);
     AppendChild(*compound, MakeTokenNode(model, SyntaxNodeKind::LeftBrace));
     for (size_t index = firstBodyIndex; index <= childIndex; ++index) {
@@ -217,7 +257,6 @@ void WrapControlBody(FormatModel& model, SyntaxNode& node, size_t childIndex) {
         node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex),
         node.children.begin() + static_cast<std::ptrdiff_t>(childIndex + 1)
     );
-    SetParentRecursive(*compound, &node);
     node.children.insert(node.children.begin() + static_cast<std::ptrdiff_t>(firstBodyIndex), compound);
 }
 
@@ -227,13 +266,14 @@ std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
     }
     std::optional<size_t> ifIndex;
     for (size_t index = 0; index < node.children.size(); ++index) {
-        if (
-            IsTokenNode(node.children[index], SyntaxNodeKind::LeftBrace) ||
-            IsTokenNode(node.children[index], SyntaxNodeKind::RightBrace)
-        ) {
+        const SyntaxNode* child = node.children[index];
+        if (child == nullptr) {
+            return std::nullopt;
+        }
+        if (child->kind == SyntaxNodeKind::LeftBrace || child->kind == SyntaxNodeKind::RightBrace) {
             continue;
         }
-        if (IsTreeNode(node.children[index], SyntaxNodeKind::IfStatement) && !ifIndex) {
+        if (child->kind == SyntaxNodeKind::IfStatement && !ifIndex) {
             ifIndex = index;
             continue;
         }
@@ -244,17 +284,19 @@ std::optional<size_t> FindOnlyIfInBraceBlock(const SyntaxNode& node) {
 
 void NormalizeElseClauseBody(FormatModel& model, SyntaxNode& node) {
     for (size_t index = 0; index < node.children.size(); ++index) {
-        if (!IsTokenNode(node.children[index], SyntaxNodeKind::KeywordElse)) {
+        if (node.children[index] == nullptr || node.children[index]->kind != SyntaxNodeKind::KeywordElse) {
             continue;
         }
         const std::optional<size_t> bodyIndex = NextNonTriviaChildIndex(node.children, index + 1);
         if (!bodyIndex) {
             return;
         }
-        if (IsTreeNode(node.children[*bodyIndex], SyntaxNodeKind::IfStatement)) {
+        if (node.children[*bodyIndex] != nullptr && node.children[*bodyIndex]->kind == SyntaxNodeKind::IfStatement) {
             return;
         }
-        if (IsTreeNode(node.children[*bodyIndex], SyntaxNodeKind::CompoundStatement)) {
+        if (
+            node.children[*bodyIndex] != nullptr && node.children[*bodyIndex]->kind == SyntaxNodeKind::CompoundStatement
+        ) {
             std::optional<size_t> ifIndex = FindOnlyIfInBraceBlock(*node.children[*bodyIndex]);
             if (ifIndex) {
                 node.children[*bodyIndex] = node.children[*bodyIndex]->children[*ifIndex];
@@ -271,7 +313,7 @@ void NormalizeElseClauseBody(FormatModel& model, SyntaxNode& node) {
 void NormalizeIfStatementBody(FormatModel& model, SyntaxNode& node) {
     size_t before = node.children.size();
     for (size_t index = 0; index < node.children.size(); ++index) {
-        if (IsTreeNode(node.children[index], SyntaxNodeKind::ElseClause)) {
+        if (node.children[index] != nullptr && node.children[index]->kind == SyntaxNodeKind::ElseClause) {
             before = index;
             break;
         }
@@ -284,7 +326,7 @@ void NormalizeIfStatementBody(FormatModel& model, SyntaxNode& node) {
 
 void NormalizeDoStatementBody(FormatModel& model, SyntaxNode& node) {
     for (size_t index = 0; index < node.children.size(); ++index) {
-        if (!IsTokenNode(node.children[index], SyntaxNodeKind::KeywordWhile)) {
+        if (node.children[index] == nullptr || node.children[index]->kind != SyntaxNodeKind::KeywordWhile) {
             continue;
         }
         const std::optional<size_t> bodyIndex = PreviousNonTriviaChildIndex(node.children, index);
@@ -328,17 +370,41 @@ void NormalizeSyntaxNode(FormatModel& model, SyntaxNode& node) {
     NormalizeControlBodies(model, node);
 }
 
-SyntaxNode* BuildNode(FormatModel& model, TSNode tsNode, std::string_view source, const SyntaxNode* parent) {
+struct TsNodeSyntax {
+    TSSymbol symbol = 0;
+    SyntaxNodeKind kind = SyntaxNodeKind::Unknown;
+    SyntaxNodeKind tokenKind = SyntaxNodeKind::Unknown;
+    SyntaxWrapperRole wrapperRole = SyntaxWrapperRole::None;
+};
+
+inline TsNodeSyntax GetTsNodeSyntax(TSNode tsNode) {
+    const TSSymbol symbol = ts_node_symbol(tsNode);
+    const SyntaxSymbolInfo info = SyntaxSymbolInfoForSymbol(symbol);
+    return {.symbol = symbol, .kind = info.treeKind, .tokenKind = info.tokenKind, .wrapperRole = info.wrapperRole};
+}
+
+void AppendTsChildren(
+    FormatModel& model,
+    TSNode tsNode,
+    std::string_view source,
+    SyntaxNode& parent,
+    uint32_t childCount
+);
+
+SyntaxNode* BuildNode(
+    FormatModel& model,
+    TSNode tsNode,
+    std::string_view source,
+    const SyntaxNode* parent,
+    TsNodeSyntax syntax
+) {
     SyntaxNode* node = MakeNode(model);
     node->parent = parent;
     node->depth = parent == nullptr ? 0 : parent->depth + 1;
-    const std::string_view type = ts_node_type(tsNode);
-    const std::string_view text = NodeText(tsNode, source);
-    const SyntaxNodeKind syntaxKind = SyntaxNodeKindFromTreeType(type);
 
-    if (type == "comment") {
+    if (syntax.kind == SyntaxNodeKind::Comment) {
         node->kind = SyntaxNodeKind::Comment;
-        std::string_view commentText = text;
+        std::string_view commentText = NodeText(tsNode, source);
         while (!commentText.empty() && (commentText.back() == '\r' || commentText.back() == '\n')) {
             commentText.remove_suffix(1);
         }
@@ -346,47 +412,138 @@ SyntaxNode* BuildNode(FormatModel& model, TSNode tsNode, std::string_view source
         return node;
     }
 
+    if (syntax.wrapperRole == SyntaxWrapperRole::CompactEmptyDelimited) {
+        const std::string_view text = NodeText(tsNode, source);
+        if (CompactEmptyDelimitedText(text)) {
+            node->kind = syntax.kind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::FreeToken : syntax.kind;
+            node->text = text;
+            return node;
+        }
+    }
+    if (syntax.wrapperRole == SyntaxWrapperRole::WholeToken) {
+        const std::string_view text = NodeText(tsNode, source);
+        const SyntaxNodeKind known = SyntaxNodeKindFromTokenText(text);
+        if (known != SyntaxNodeKind::Unknown) {
+            node->kind = known;
+            return node;
+        }
+    } else if (
+        syntax.wrapperRole == SyntaxWrapperRole::WholeAtom || syntax.wrapperRole == SyntaxWrapperRole::WholeFieldAtom
+    ) {
+        const std::string_view text = NodeText(tsNode, source);
+        if ((syntax.wrapperRole == SyntaxWrapperRole::WholeAtom && !ContainsWholeAtomDelimiter(text)) || (
+            syntax.wrapperRole == SyntaxWrapperRole::WholeFieldAtom && !ContainsWholeFieldAtomDelimiter(text)
+        )) {
+            node->kind = syntax.kind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::FreeToken : syntax.kind;
+            node->text = text;
+            return node;
+        }
+    }
+    if (
+        SyntaxNodeKindHasClass(syntax.kind, TokenClass::WholeNodeAsFreeToken) ||
+        SyntaxNodeKindHasClass(syntax.kind, TokenClass::AtomicPreprocessor)
+    ) {
+        node->kind = syntax.kind;
+        node->text = NodeText(tsNode, source);
+        return node;
+    }
+    if (syntax.tokenKind != SyntaxNodeKind::Unknown) {
+        node->kind = syntax.tokenKind;
+        return node;
+    }
+
     const uint32_t childCount = ts_node_child_count(tsNode);
-    const SyntaxNodeKind known = SyntaxNodeKindFromTokenText(text);
-    if (SyntaxNodeKindHasClass(known, TokenClass::Known)) {
-        node->kind = known;
-        return node;
-    }
-
-    if (childCount == 0 || KeepWholeNodeAsFreeToken(syntaxKind)) {
-        node->kind = syntaxKind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::FreeToken : syntaxKind;
+    if (childCount == 0) {
+        const std::string_view text = NodeText(tsNode, source);
+        const SyntaxNodeKind knownFromText = SyntaxNodeKindFromTokenText(text);
+        if (knownFromText != SyntaxNodeKind::Unknown) {
+            node->kind = knownFromText;
+            return node;
+        }
+        node->kind = syntax.kind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::FreeToken : syntax.kind;
         node->text = text;
         return node;
     }
 
-    if (IsAtomicPreprocessorNode(syntaxKind)) {
-        node->kind = syntaxKind;
-        node->text = text;
-        return node;
-    }
-
-    node->kind = syntaxKind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::Tree : syntaxKind;
+    node->kind = syntax.kind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::Tree : syntax.kind;
     node->children.reserve(childCount);
-    uint32_t previousEnd = ts_node_start_byte(tsNode);
-    uint32_t previousEndRow = StartPoint(tsNode).row;
-    for (uint32_t index = 0; index < childCount; ++index) {
-        TSNode child = ts_node_child(tsNode, index);
-        const uint32_t childStart = ts_node_start_byte(child);
-        if (!node->children.empty() && ContainsBlankLine(source, previousEnd, childStart)) {
-            AppendChild(*node, MakeBlankLine(model));
-        }
-        SyntaxNode* childNode = BuildNode(model, child, source, node);
-        if (childNode->kind == SyntaxNodeKind::Comment) {
-            if (!node->children.empty() && previousEndRow == StartPoint(child).row) {
-                childNode->kind = SyntaxNodeKind::TrailingComment;
-            }
-        }
-        node->children.push_back(childNode);
-        previousEnd = ts_node_end_byte(child);
-        previousEndRow = ts_node_end_point(child).row;
-    }
+    AppendTsChildren(model, tsNode, source, *node, childCount);
     NormalizeSyntaxNode(model, *node);
     return node;
+}
+
+inline void AppendTsNode(
+    FormatModel& model,
+    TSNode tsNode,
+    std::string_view source,
+    SyntaxNode& parent,
+    TsNodeSyntax syntax,
+    bool isTrailingComment
+) {
+    if (syntax.wrapperRole == SyntaxWrapperRole::Flatten) {
+        AppendTsChildren(model, tsNode, source, parent, ts_node_child_count(tsNode));
+        return;
+    }
+    SyntaxNode* childNode = BuildNode(model, tsNode, source, &parent, syntax);
+    if (isTrailingComment && childNode->kind == SyntaxNodeKind::Comment) {
+        childNode->kind = SyntaxNodeKind::TrailingComment;
+    }
+    parent.children.push_back(childNode);
+}
+
+inline void AppendTsChild(
+    FormatModel& model,
+    TSNode child,
+    uint32_t childEnd,
+    uint32_t childEndRow,
+    std::string_view source,
+    SyntaxNode& parent,
+    uint32_t& previousEnd,
+    uint32_t& previousEndRow,
+    bool& hasPreviousSibling
+) {
+    const TsNodeSyntax childSyntax = GetTsNodeSyntax(child);
+    const uint32_t childStart = ts_node_start_byte(child);
+    if (hasPreviousSibling && ContainsBlankLine(source, previousEnd, childStart)) {
+        AppendChild(parent, MakeBlankLine(model));
+    }
+    const bool isTrailingComment = childSyntax.kind == SyntaxNodeKind::Comment &&
+        hasPreviousSibling &&
+        previousEndRow == ts_node_start_point(child).row;
+    AppendTsNode(model, child, source, parent, childSyntax, isTrailingComment);
+    previousEnd = childEnd;
+    previousEndRow = childEndRow;
+    hasPreviousSibling = true;
+}
+
+void AppendTsChildren(
+    FormatModel& model,
+    TSNode tsNode,
+    std::string_view source,
+    SyntaxNode& parent,
+    uint32_t childCount
+) {
+    if (childCount == 0) {
+        return;
+    }
+
+    uint32_t previousEnd = ts_node_start_byte(tsNode);
+    uint32_t previousEndRow = ts_node_start_point(tsNode).row;
+    bool hasPreviousSibling = !parent.children.empty();
+    for (uint32_t index = 0; index < childCount; ++index) {
+        TSNode child = ts_node_child(tsNode, index);
+        AppendTsChild(
+            model,
+            child,
+            ts_node_end_byte(child),
+            ts_node_end_point(child).row,
+            source,
+            parent,
+            previousEnd,
+            previousEndRow,
+            hasPreviousSibling
+        );
+    }
 }
 
 struct ProblemNode {
@@ -418,16 +575,22 @@ ProblemNode FindFirstProblem(TSNode node) {
 }
 
 void AppendIncludeRun(
-    std::vector<SyntaxNode*>& sourceChildren,
+    SyntaxChildList& sourceChildren,
     size_t& index,
-    std::vector<SyntaxNode*>& groupedChildren,
-    FormatModel& model
+    SyntaxChildList& groupedChildren,
+    FormatModel& model,
+    SyntaxNode& root
 ) {
     SyntaxNode* includeRun = MakeNode(model);
     includeRun->kind = SyntaxNodeKind::IncludeRun;
+    includeRun->parent = &root;
+    includeRun->depth = root.depth + 1;
 
     for (; index < sourceChildren.size(); ++index) {
-        if (IsIncludeNode(sourceChildren[index])) {
+        if (
+            sourceChildren[index] != nullptr &&
+            SyntaxNodeKindHasClass(sourceChildren[index]->kind, TokenClass::IncludeDirective)
+        ) {
             AppendChild(*includeRun, sourceChildren[index]);
             continue;
         }
@@ -445,19 +608,25 @@ void GroupOpeningIncludeRuns(FormatModel& model, SyntaxNode& root) {
         return;
     }
 
-    std::vector<SyntaxNode*> groupedChildren;
+    SyntaxChildList groupedChildren(root.children.get_allocator());
     groupedChildren.reserve(root.children.size());
     bool sawInclude = false;
     bool inOpeningArea = true;
     for (size_t index = 0; index < root.children.size();) {
-        if (inOpeningArea && IsIncludeNode(root.children[index])) {
-            AppendIncludeRun(root.children, index, groupedChildren, model);
+        if (inOpeningArea && root.children[index] != nullptr && SyntaxNodeKindHasClass(
+            root.children[index]->kind,
+            TokenClass::IncludeDirective
+        )) {
+            AppendIncludeRun(root.children, index, groupedChildren, model, root);
             sawInclude = true;
             continue;
         }
+        const bool isPragmaOnce = root.children[index] != nullptr &&
+            root.children[index]->kind == SyntaxNodeKind::PreprocCall &&
+            StartsWith(TrimLeadingWhitespace(root.children[index]->text), "#pragma once");
         const bool canRemainInOpeningArea = inOpeningArea &&
             root.children[index] != nullptr &&
-            (IsOpeningIncludeSpacer(*root.children[index]) || (!sawInclude && IsPragmaOnceNode(*root.children[index])));
+            (SyntaxNodeKindHasClass(root.children[index]->kind, TokenClass::Trivia) || (!sawInclude && isPragmaOnce));
         if (canRemainInOpeningArea) {
             groupedChildren.push_back(root.children[index]);
             ++index;
@@ -470,11 +639,6 @@ void GroupOpeningIncludeRuns(FormatModel& model, SyntaxNode& root) {
     }
 
     root.children = std::move(groupedChildren);
-    for (SyntaxNode* child : root.children) {
-        if (child != nullptr && child->parent != &root) {
-            SetParentRecursive(*child, &root);
-        }
-    }
 }
 
 ParseResult ParseFailure(TSNode root) {
@@ -482,7 +646,7 @@ ParseResult ParseFailure(TSNode root) {
     if (!problem.found) {
         problem = {.found = true, .missing = false, .node = root};
     }
-    const TSPoint point = StartPoint(problem.node);
+    const TSPoint point = ts_node_start_point(problem.node);
     const std::string nodeType = problem.missing ? "missing " + std::string(ts_node_type(problem.node)) :
         std::string(ts_node_type(problem.node));
     ParseResult parse;
@@ -507,12 +671,13 @@ FormatModel BuildFormatModel(TSNode root, std::unique_ptr<std::string> sourceTex
     }
 
     const std::string_view source(*model.sourceText);
+    model.nodes.reserve(source.size() * 2 + 64);
     if (ts_node_has_error(root) || ts_node_is_missing(root)) {
         model.parse = ParseFailure(root);
         return model;
     }
 
-    model.root = BuildNode(model, root, source, nullptr);
+    model.root = BuildNode(model, root, source, nullptr, GetTsNodeSyntax(root));
     GroupOpeningIncludeRuns(model, *model.root);
     model.parse.ok = true;
     return model;
