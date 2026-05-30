@@ -617,7 +617,7 @@ String literals ending with escaped `\n` or `\r\n` are line-fragment boundaries 
 
 Outside the listed changes, the formatter changes only spaces and line breaks.
 
-Token spelling is preserved even when the parser grammar treats multiple spellings as the same syntax node. For example, Win32 `TRUE` and `FALSE` remain uppercase.
+Token spelling is preserved even when the parser grammar treats multiple spellings as the same syntax node. For example, Win32 `TRUE` and `FALSE` remain uppercase. Parser nodes that share a name with a keyword token still keep their child tokens; for example, `decltype(function)` remains a full `decltype` expression instead of being reduced to the `decltype` keyword.
 
 ## Tooling Ownership
 

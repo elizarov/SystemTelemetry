@@ -240,6 +240,22 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_macro_decltype_argument_is_preserved(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "#define CASEDASH_LOAD_OPTIONAL(function, name) \\\n"
+                "function=reinterpret_cast<decltype(function)>(GetProcAddress(module_,name))\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "#define CASEDASH_LOAD_OPTIONAL(function, name) \\\n"
+            "    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name))\n",
+            result.stdout,
+        )
+
     def test_control_body_brace_normalization(self) -> None:
         result = native_format(
             "--style=file",

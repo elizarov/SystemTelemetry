@@ -454,12 +454,13 @@ SyntaxNode* BuildNode(
         node->text = NodeText(tsNode, source);
         return node;
     }
-    if (syntax.tokenKind != SyntaxNodeKind::Unknown) {
+
+    const uint32_t childCount = ts_node_child_count(tsNode);
+    if (syntax.tokenKind != SyntaxNodeKind::Unknown && childCount == 0) {
         SetKnownTokenNode(*node, syntax.tokenKind, NodeText(tsNode, source));
         return node;
     }
 
-    const uint32_t childCount = ts_node_child_count(tsNode);
     if (childCount == 0) {
         const std::string_view text = NodeText(tsNode, source);
         const SyntaxNodeKind knownFromText = SyntaxNodeKindFromTokenText(text);

@@ -20,6 +20,8 @@
     ((firstValue) + (secondValue) + (thirdValue) + (firstValue) + (secondValue) + (thirdValue))
 #define FORMAT_FIXTURE_SHORT_MACRO(value) (value)
 #define FORMAT_FIXTURE_MUCH_LONGER_MACRO(value) (value)
+#define FORMAT_FIXTURE_LOAD_OPTIONAL(function, name) \
+    function = reinterpret_cast<decltype(function)>(GetProcAddress(module_, name))
 #define FORMAT_FIXTURE_ITEMS(X) \
     X(Alpha, "alpha") \
     X(Beta, "beta") \
