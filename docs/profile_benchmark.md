@@ -255,6 +255,21 @@ These shared decisions produced useful wins or preserve important benchmark sema
 - Conclusion:
   - On WDDM laptop dGPUs, the idle power state can make NVML utilization and current-clock polling unreliable at the app cadence. Keep NVIDIA load on PDH and current clock on NVAPI so a powered-off dGPU reports clock unavailable quickly instead of blocking the telemetry worker.
 
+### Hypothesis: The overflow-line objective caused the current formatter golden cost
+
+- Change:
+  - The formatter golden input now includes local direct-initializer ambiguity coverage and delimiter-stack overflow-isolation coverage.
+  - The break solver objective now minimizes largest overflow first, then overflowing physical lines, then total lines, then deepest break point.
+- Result:
+  - Rejected.
+- Evidence:
+  - Direct `format-golden 100 2` runs on the Gigabyte desktop with the updated golden input land around `54-57 ms` per iteration, with `format_solve` around `34-36 ms`.
+  - The immediate parent before the overflow-line objective lands around `61 ms` per iteration on the same machine, with `format_solve` around `41 ms`; nearby earlier formatter commits are in the same range.
+  - `profile_benchmark.cmd format-golden 100 2` attributes the current cost to the formatter DP path, led by `Solver::SolveAlternatives`, `Solver::Solve`, `Solver::SolveDelimitedCompactAlternatives`, and `Solver::SolveListItemWithSuffix`.
+  - Direct `format-all 3 2` remains parse-heavy at about `910-918 ms` per iteration, with parse about `623-628 ms` and solve about `117-118 ms`.
+- Conclusion:
+  - Treat the updated golden as a solver stress workload. Compare future formatter objective changes against the current machine-file range and the same golden fixture, not against older `format-golden` baselines that predate the current delimiter-stack and ambiguity cases.
+
 ## Practical Guidance For Future Experiments
 
 - Keep benchmark comparisons on the same command shape, same iteration count, same warmup count, and same machine file.
