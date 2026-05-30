@@ -262,7 +262,7 @@ bool ready = (
 );
 
 int total = first + second + BuildValue(
-    firstLongArgument,
+    firstLongArgument, 
     secondLongArgument
 );
 ```
