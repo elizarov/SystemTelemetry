@@ -316,9 +316,9 @@ For each parsed segment between mandatory line breaks, the formatter uses a tree
 
 Each node exposes its legal compact and split layouts. The optimizer chooses which optional breaks to take with dynamic programming:
 
-- Prefer layouts with no physical line over the configured column limit.
-- If no legal layout fits, choose the layout with the smallest maximum overflow.
-- Among fitting layouts, minimize the physical line count.
+- Minimize the largest overflow beyond the configured column limit; layouts with no overflowing physical line have zero overflow.
+- On equal maximum overflow, minimize the number of physical lines that overflow.
+- On equal overflow cost, minimize the physical line count.
 - On equal line count, prefer the layout whose deepest taken break renders at the shallower indentation level; if still tied, prefer the structurally shallower deepest taken break, then source-order-stable compact behavior.
 
 The optimizer treats the column limit as bounded input and caches each subproblem by node and normalized layout context, including indentation, prefix, suffix, and continuation mode.

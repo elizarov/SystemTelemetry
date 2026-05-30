@@ -1875,6 +1875,16 @@ int DelimiterStackThresholdGenerality(
     return seven + eight;
 }
 
+int DelimiterStackOverflowLineIsolation(int y) {
+    // Anti-heuristic: one overflowing leaf line must not license delimiter overflow elsewhere.
+    int value =
+        ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
+            VeryLongUnbreakableIdentifierXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX +
+            y
+        ))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))))));
+    return value;
+}
+
 int DeepDelimiterStressCase(int y) {
     int x = ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((
         ((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((((

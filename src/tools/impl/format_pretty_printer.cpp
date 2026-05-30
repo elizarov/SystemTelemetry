@@ -1062,6 +1062,7 @@ private:
             const int space = open.spaceBefore && !atLineStart_ ? 1 : 0;
             if (
                 !atLineStart_ &&
+                CurrentColumn() <= config_.columnLimit &&
                 CurrentColumn() + space + FormatTokenWidth(FormatBreakTokenValue(open)) > config_.columnLimit
             ) {
                 currentLineIndent = nextOpenIndent;

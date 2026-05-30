@@ -45,6 +45,7 @@ struct NodeResult {
     bool endLineHasText = false;
     int extraLines = 0;
     int maxOverflow = 0;
+    int overflowLines = 0;
     int deepestBreakIndent = -1;
     int deepestBreakDepth = -1;
     const struct ChoiceTree* choices = nullptr;
@@ -303,15 +304,22 @@ private:
     }
 
     NodeResult SolveToken(const FormatBreakToken& token, int column, int indentLevel, bool lineHasText) const {
+        if (token.contextOnly) {
+            return {.valid = true, .endColumn = column, .endIndentLevel = indentLevel, .endLineHasText = lineHasText};
+        }
         const int space = SpaceBeforeToken(token, lineHasText);
         const int width = FormatTokenWidth(FormatBreakTokenValue(token));
         const int endColumn = column + space + width;
+        const bool endLineHasText = lineHasText || width > 0;
+        const bool lineWasOverLimit = lineHasText && column > config_.columnLimit;
+        const bool lineIsOverLimit = endLineHasText && endColumn > config_.columnLimit;
         return {
             .valid = true,
             .endColumn = endColumn,
             .endIndentLevel = indentLevel,
-            .endLineHasText = lineHasText || width > 0,
-            .maxOverflow = std::max(0, endColumn - config_.columnLimit)
+            .endLineHasText = endLineHasText,
+            .maxOverflow = std::max(0, endColumn - config_.columnLimit),
+            .overflowLines = !lineWasOverLimit && lineIsOverLimit ? 1 : 0
         };
     }
 
@@ -342,6 +350,7 @@ private:
         left.endLineHasText = right.endLineHasText;
         left.extraLines += right.extraLines;
         left.maxOverflow = std::max(left.maxOverflow, right.maxOverflow);
+        left.overflowLines += right.overflowLines;
         left.deepestBreakIndent = std::max(left.deepestBreakIndent, right.deepestBreakIndent);
         left.deepestBreakDepth = std::max(left.deepestBreakDepth, right.deepestBreakDepth);
         left.choices = ConcatChoices(left.choices, right.choices);
@@ -560,11 +569,11 @@ private:
         if (!incumbent.valid) {
             return true;
         }
-        if ((candidate.maxOverflow == 0) != (incumbent.maxOverflow == 0)) {
-            return candidate.maxOverflow == 0;
-        }
         if (candidate.maxOverflow != incumbent.maxOverflow) {
             return candidate.maxOverflow < incumbent.maxOverflow;
+        }
+        if (candidate.overflowLines != incumbent.overflowLines) {
+            return candidate.overflowLines < incumbent.overflowLines;
         }
         if (candidate.extraLines != incumbent.extraLines) {
             return candidate.extraLines < incumbent.extraLines;
@@ -593,6 +602,7 @@ private:
         }
         if (
             left.maxOverflow > right.maxOverflow ||
+            left.overflowLines > right.overflowLines ||
             left.extraLines > right.extraLines ||
             left.deepestBreakIndent > right.deepestBreakIndent ||
             left.deepestBreakDepth > right.deepestBreakDepth
@@ -600,6 +610,7 @@ private:
             return false;
         }
         return left.maxOverflow < right.maxOverflow ||
+            left.overflowLines < right.overflowLines ||
             left.extraLines < right.extraLines ||
             left.deepestBreakIndent < right.deepestBreakIndent ||
             left.deepestBreakDepth < right.deepestBreakDepth;
@@ -792,6 +803,7 @@ private:
 
     bool TokenWouldOverflow(const NodeResult& result, const FormatBreakToken& token) const {
         return result.endLineHasText &&
+            result.endColumn <= config_.columnLimit &&
             result.endColumn + TokenColumnAdvance(token, result.endLineHasText) > config_.columnLimit;
     }
 
@@ -936,6 +948,8 @@ private:
         for (size_t index = 0; index < stack.delimiters.size(); ++index) {
             const FormatBreakNode* delimiter = stack.delimiters[index];
             const FormatBreakToken& open = delimiter->children.front()->token;
+            // Avoid starting a new overflow line for an opener. If this line is
+            // already over the limit, keeping the opener avoids another overflow line.
             if (TokenWouldOverflow(result, open)) {
                 currentLineIndent = nextOpenIndent;
                 result = AddBreak(result, currentLineIndent, node.structuralDepth);
@@ -955,6 +969,9 @@ private:
             NodeResult broken = AddBreak(result, nextOpenIndent, node.structuralDepth);
             leaf = Solve(*stack.leaf, broken.endColumn, broken.endIndentLevel, broken.endLineHasText);
             result = broken;
+        }
+        if (!leaf.valid) {
+            return {};
         }
         const bool leafHasBreaks = leaf.valid && leaf.extraLines > 0;
         Merge(result, leaf);
