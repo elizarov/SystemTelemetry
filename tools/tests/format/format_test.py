@@ -200,6 +200,26 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_final_undef_does_not_emit_trailing_empty_line(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "#define VALUE 1\n"
+                "int value;\n"
+                "#undef VALUE\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "#define VALUE 1\n"
+            "\n"
+            "int value;\n"
+            "\n"
+            "#undef VALUE\n",
+            result.stdout,
+        )
+
     def test_control_body_brace_normalization(self) -> None:
         result = native_format(
             "--style=file",

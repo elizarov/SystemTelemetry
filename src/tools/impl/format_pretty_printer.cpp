@@ -401,6 +401,7 @@ public:
         activeTokens_ = nullptr;
         FlushPendingTokens();
         FinishLine();
+        TrimTrailingBlankLines();
         if (!output_.empty() && output_.back() != '\n') {
             output_.push_back('\n');
         }
@@ -649,8 +650,23 @@ private:
         }
     }
 
+    bool HasOutputContent() const {
+        for (char ch : output_) {
+            if (ch != '\n') {
+                return true;
+            }
+        }
+        return false;
+    }
+
     void FinishLine() {
         TrimTrailingSpaces();
+    }
+
+    void TrimTrailingBlankLines() {
+        while (output_.size() >= 2 && output_.back() == '\n' && output_[output_.size() - 2] == '\n') {
+            output_.pop_back();
+        }
     }
 
     void NewLine(bool macroContinuation = false) {
@@ -688,6 +704,14 @@ private:
     }
 
     void BlankLine() {
+        if (!HasOutputContent() && !lineHasText_) {
+            atLineStart_ = true;
+            currentColumn_ = 0;
+            macroContinuationLine_ = false;
+            forceColumnZeroLine_ = false;
+            pendingIndentLevel_.reset();
+            return;
+        }
         NewLine(false);
         if (output_.size() < 2 || output_[output_.size() - 2] != '\n') {
             output_.push_back('\n');

@@ -68,8 +68,9 @@ int product((a * b), (c & d));
 - Use 4 spaces per indent level. Do not emit tabs.
 - Preserve comments in source order. A trailing comment stays trailing only when it was trailing in source. A standalone comment stays standalone.
 - Preserve one source blank line when it separates already closed declarations or statements at the same structural level. Collapse multiple blank lines to one.
+- Treat empty lines only as separators between neighboring source items. Do not emit empty lines at the beginning or end of a file.
 - Drop blank lines at the beginning of a block and immediately before a closing brace.
-- Insert required structural blank lines even when source omits them.
+- Insert required structural blank lines only when they separate neighboring source items.
 - Remove trailing commas except in enum bodies.
 
 ## Mandatory Line Breaks
@@ -557,7 +558,7 @@ Multi-parameter lambda parameter lists and capture lists split all-or-nothing.
 
 Preprocessor directives stay at column zero.
 
-Put one empty line after `#pragma once`. Put one empty line before and after each `#undef`.
+Put one empty line after `#pragma once` when another source item follows. Put one empty line before and after each `#undef` when it separates `#undef` from a neighboring source item.
 
 Macro continuation backslashes, spaces before continuation backslashes, and continuation newlines are formatter-owned. A multi-line macro definition is parsed as one replacement list, then emitted with continuation backslashes on all continued macro lines.
 
