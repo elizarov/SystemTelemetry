@@ -185,7 +185,7 @@ void AppendTokens(
         tokens.push_back({
             .kind = PrintTokenKind::Known,
             .syntaxKind = nodeKind,
-            .text = SyntaxNodeKindTokenText(nodeKind),
+            .text = node.text.empty() ? SyntaxNodeKindTokenText(nodeKind) : node.text,
             .parentKind = parentKind,
             .grandParentKind = grandParentKind,
             .inTemplateDeclaration = childInTemplateDeclaration,
@@ -1854,7 +1854,7 @@ private:
                 }
                 if (IsAccessLabel(token, next)) {
                     FlushPendingTokens();
-                    WriteWithIndentOffset(SyntaxNodeKindTokenText(token.syntaxKind), -1);
+                    WriteWithIndentOffset(FormatTokenText(token), -1);
                     return;
                 }
                 if (

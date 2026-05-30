@@ -81,6 +81,13 @@ SyntaxNode* MakeTokenNode(FormatModel& model, SyntaxNodeKind token) {
     return node;
 }
 
+void SetKnownTokenNode(SyntaxNode& node, SyntaxNodeKind token, std::string_view text) {
+    node.kind = token;
+    if (text != SyntaxNodeKindTokenText(token)) {
+        node.text = text;
+    }
+}
+
 bool MacroLikeInvocationNode(const SyntaxNode* node) {
     return node != nullptr &&
         node->kind == SyntaxNodeKind::Tree &&
@@ -424,7 +431,7 @@ SyntaxNode* BuildNode(
         const std::string_view text = NodeText(tsNode, source);
         const SyntaxNodeKind known = SyntaxNodeKindFromTokenText(text);
         if (known != SyntaxNodeKind::Unknown) {
-            node->kind = known;
+            SetKnownTokenNode(*node, known, text);
             return node;
         }
     } else if (
@@ -448,7 +455,7 @@ SyntaxNode* BuildNode(
         return node;
     }
     if (syntax.tokenKind != SyntaxNodeKind::Unknown) {
-        node->kind = syntax.tokenKind;
+        SetKnownTokenNode(*node, syntax.tokenKind, NodeText(tsNode, source));
         return node;
     }
 
@@ -457,7 +464,7 @@ SyntaxNode* BuildNode(
         const std::string_view text = NodeText(tsNode, source);
         const SyntaxNodeKind knownFromText = SyntaxNodeKindFromTokenText(text);
         if (knownFromText != SyntaxNodeKind::Unknown) {
-            node->kind = knownFromText;
+            SetKnownTokenNode(*node, knownFromText, text);
             return node;
         }
         node->kind = syntax.kind == SyntaxNodeKind::Unknown ? SyntaxNodeKind::FreeToken : syntax.kind;

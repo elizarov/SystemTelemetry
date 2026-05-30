@@ -617,6 +617,8 @@ String literals ending with escaped `\n` or `\r\n` are line-fragment boundaries 
 
 Outside the listed changes, the formatter changes only spaces and line breaks.
 
+Token spelling is preserved even when the parser grammar treats multiple spellings as the same syntax node. For example, Win32 `TRUE` and `FALSE` remain uppercase.
+
 ## Tooling Ownership
 
 - `format.cmd` owns repository source discovery for all, changed, and staged formatting runs, then delegates the discovered newline-separated file list to `CaseDashTools.exe format --files`. It forwards `--concurrency <n>` when a caller overrides native formatter worker count.

@@ -395,7 +395,8 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
 }
 
 std::string_view FormatTokenText(const PrintToken& token) {
-    return token.kind == PrintTokenKind::Known ? SyntaxNodeKindTokenText(token.syntaxKind) : token.text;
+    return token.kind == PrintTokenKind::Known && token.text.empty() ? SyntaxNodeKindTokenText(token.syntaxKind) :
+        token.text;
 }
 
 int FormatTokenWidth(const PrintToken& token) {

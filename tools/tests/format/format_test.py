@@ -220,6 +220,26 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_win32_boolean_macros_preserve_spelling(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "int false_value=FALSE;\n"
+                "int true_value=TRUE;\n"
+                "bool standard_false=false;\n"
+                "bool standard_true=true;\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "int false_value = FALSE;\n"
+            "int true_value = TRUE;\n"
+            "bool standard_false = false;\n"
+            "bool standard_true = true;\n",
+            result.stdout,
+        )
+
     def test_control_body_brace_normalization(self) -> None:
         result = native_format(
             "--style=file",

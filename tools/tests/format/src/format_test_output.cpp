@@ -784,6 +784,13 @@ double NormalizeAngleCandidate(double angleDegrees) {
     return angleDegrees;
 }
 
+void PreserveWin32BooleanMacros() {
+    int falseValue = FALSE;
+    int trueValue = TRUE;
+    bool standardFalse = false;
+    bool standardTrue = true;
+}
+
 const auto noLookup = [](std::string_view) -> std::optional<ColorConfig> { return std::nullopt; };
 
 const auto handled = [&result](INT_PTR value) {
