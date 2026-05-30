@@ -146,7 +146,7 @@ POINT points[] = {
 };
 ```
 
-The `}, {` boundary is allowed because the line starts with the combined closers for the previous element and then opens the next element. The next body break is still immediately after that opener.
+Delimiter item boundaries may coalesce generically only for direct close-comma-open boundaries where both neighboring items use split delimiter expansions, such as `}, {` or `), (`. The boundary line starts with the combined closers for the previous item, then keeps the comma and the next item's opener before the next body break.
 
 ## Lists
 

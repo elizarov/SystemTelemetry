@@ -1897,4 +1897,42 @@ int DeepDelimiterStressCase(int y) {
     return x;
 }
 
+// Delimiter-boundary coalescing generalizes only direct close-comma-open boundaries:
+// bare-brace items coalesce at `}, {`, bare-paren items coalesce at `), (`, and
+// prefixed template-id items keep separate item lines.
+void DelimiterBoundaryCoalescingGenerality() {
+    Widget braceBoundaryRows[] = {
+        {
+            firstBraceElementValueForCoalescingGenerality,
+            secondBraceElementValueForCoalescingGenerality,
+            thirdBraceElementValueForCoalescing
+        }, {
+            fourthBraceElementValueForCoalescingGenerality,
+            fifthBraceElementValueForCoalescingGenerality,
+            sixthBraceElementValueForCoalescing
+        }
+    };
+    int parenBoundaryValues[] = {
+        (
+            firstParenElementValueForCoalescingGenerality +
+            secondParenElementValueForCoalescingGenerality +
+            thirdParenElementValueForCoalescing
+        ), (
+            fourthParenElementValueForCoalescingGenerality +
+            fifthParenElementValueForCoalescingGenerality +
+            sixthParenElementValueForCoalescing
+        )
+    };
+    OuterAngleContainerForCoalescingGenerality<
+        FirstAngleElementTemplateForCoalescingGenerality<
+            firstAngleArgumentValueNameForCoalescing,
+            secondAngleArgumentValueNameForCoalescing
+        >,
+        SecondAngleElementTemplateForCoalescingGenerality<
+            thirdAngleArgumentValueNameForCoalescing,
+            fourthAngleArgumentValueNameForCoalescing
+        >
+    > angleBoundaryValue;
+}
+
 }

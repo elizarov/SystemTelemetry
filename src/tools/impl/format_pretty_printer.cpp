@@ -970,12 +970,16 @@ private:
         }
     }
 
-    bool ShouldCombineSplitBracedItemBoundary(
+    bool IsDirectSplitDelimitedItem(const FormatBreakNode& node, const FormatBreakSolution& solution) const {
+        return node.kind == FormatBreakNodeKind::Delimited && IsSplitChoice(ChoiceFor(solution, node.id));
+    }
+
+    bool ShouldCombineSplitDelimitedItemBoundary(
         const FormatBreakNode& node,
         const FormatBreakSolution& solution,
         size_t index
     ) const {
-        if (node.delimiterKind != FormatBreakDelimiterKind::Brace || index + 1 >= node.items.size()) {
+        if (index + 1 >= node.items.size()) {
             return false;
         }
         const FormatBreakListItem& item = node.items[index];
@@ -984,12 +988,8 @@ private:
             nextItem.node != nullptr &&
             FormatBreakTokenKind(item.separator) == PrintTokenKind::Known &&
             FormatBreakTokenSyntaxKind(item.separator) == SyntaxNodeKind::Comma &&
-            item.node->kind == FormatBreakNodeKind::Delimited &&
-            item.node->delimiterKind == FormatBreakDelimiterKind::Brace &&
-            IsSplitChoice(ChoiceFor(solution, item.node->id)) &&
-            nextItem.node->kind == FormatBreakNodeKind::Delimited &&
-            nextItem.node->delimiterKind == FormatBreakDelimiterKind::Brace &&
-            IsSplitChoice(ChoiceFor(solution, nextItem.node->id)) &&
+            IsDirectSplitDelimitedItem(*item.node, solution) &&
+            IsDirectSplitDelimitedItem(*nextItem.node, solution) &&
             !HasTrailingComment(node, index) &&
             !HasBlankLineBeforeItem(node, index + 1);
     }
@@ -1129,7 +1129,7 @@ private:
             if (HasTrailingComment(node, index)) {
                 WriteBreakToken(item.trailingComment);
             }
-            if (ShouldCombineSplitBracedItemBoundary(node, solution, index)) {
+            if (ShouldCombineSplitDelimitedItemBoundary(node, solution, index)) {
                 Space();
             } else if (closesInContext && index + 1 == node.items.size()) {
                 continue;
@@ -1197,7 +1197,7 @@ private:
             if (HasTrailingComment(node, index)) {
                 WriteBreakToken(item.trailingComment);
             }
-            if (ShouldCombineSplitBracedItemBoundary(node, solution, index)) {
+            if (ShouldCombineSplitDelimitedItemBoundary(node, solution, index)) {
                 Space();
             } else if (closesInContext && index + 1 == node.items.size()) {
                 continue;
