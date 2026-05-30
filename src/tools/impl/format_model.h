@@ -304,6 +304,7 @@ SyntaxSymbolInfo SyntaxSymbolInfoForSymbol(TSSymbol symbol);
 std::string_view SyntaxNodeKindName(SyntaxNodeKind kind);
 std::string_view SyntaxNodeKindTokenText(SyntaxNodeKind kind);
 bool SyntaxNodeKindHasClass(SyntaxNodeKind kind, TokenClass tokenClass);
+bool LambdaBodyAllowsCompactSingleStatementForm(const SyntaxNode& node, SyntaxNodeKind parentKind);
 
 struct SyntaxNode {
     explicit SyntaxNode(std::pmr::memory_resource* childResource = std::pmr::get_default_resource());

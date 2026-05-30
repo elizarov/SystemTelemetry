@@ -384,6 +384,13 @@ void SaveBoardSectionDifferences(
 ) {
     DynamicSectionSaveContext<UpdateKeyFn> context{&board, compareBoard, &updateKey};
     updateKey(board, compareBoard, sectionName);
+    const auto saveBoardKey =
+        [&](const std::string& key, const std::string& currentValue, const std::string& compareValue)
+    {
+        if (compareBoard == nullptr || currentValue != compareValue) {
+            updateKey(sectionName, key, currentValue);
+        }
+    };
 }
 
 template <

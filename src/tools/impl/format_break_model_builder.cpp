@@ -655,32 +655,13 @@ private:
         }
 
         auto result = MakeNode(FormatBreakNodeKind::BodyHeader, depth);
-        result->bodyHeaderSingleStatementBody = IsSingleStatementLambdaBody(*node.children[*bodyIndex]);
+        result->bodyHeaderSingleStatementBody =
+            LambdaBodyAllowsCompactSingleStatementForm(*node.children[*bodyIndex], node.kind);
         const SyntaxNode* parent = node.parent;
         result->bodyHeaderSplitAtParentIndentWhenLineStarts = parent != nullptr &&
             (parent->kind == SyntaxNodeKind::AssignmentExpression || parent->kind == SyntaxNodeKind::InitDeclarator);
         result->children = StoreNodePointers({header, body});
         return result;
-    }
-
-    static bool IsSingleStatementLambdaBody(const SyntaxNode& node) {
-        size_t statementCount = 0;
-        for (const SyntaxNode* child : node.children) {
-            if (
-                child == nullptr ||
-                child->kind == SyntaxNodeKind::BlankLine ||
-                child->kind == SyntaxNodeKind::Comment ||
-                child->kind == SyntaxNodeKind::TrailingComment ||
-                SyntaxNodeKindHasClass(child->kind, TokenClass::Known)
-            ) {
-                continue;
-            }
-            ++statementCount;
-            if (statementCount > 1) {
-                return false;
-            }
-        }
-        return statementCount == 1;
     }
 
     FormatBreakNode* BuildFunctionSignature(const SyntaxNode& node, int depth) {

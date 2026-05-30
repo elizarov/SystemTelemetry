@@ -485,6 +485,35 @@ const SymbolInfoTable& SyntaxInfoBySymbol() {
     return symbols;
 }
 
+bool NodeOrDescendantHasClass(const SyntaxNode& node, TokenClass tokenClass) {
+    if (SyntaxNodeKindHasClass(node.kind, tokenClass)) {
+        return true;
+    }
+    for (const SyntaxNode* child : node.children) {
+        if (child != nullptr && NodeOrDescendantHasClass(*child, tokenClass)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+const SyntaxNode* OnlyContentChild(const SyntaxNode& node) {
+    const SyntaxNode* contentChild = nullptr;
+    for (const SyntaxNode* child : node.children) {
+        if (child == nullptr || SyntaxNodeKindHasClass(child->kind, TokenClass::Trivia) || SyntaxNodeKindHasClass(
+            child->kind,
+            TokenClass::Known
+        )) {
+            continue;
+        }
+        if (contentChild != nullptr) {
+            return nullptr;
+        }
+        contentChild = child;
+    }
+    return contentChild;
+}
+
 }  // namespace
 
 SyntaxNode::SyntaxNode(std::pmr::memory_resource* childResource) : children(childResource) {}
@@ -987,4 +1016,14 @@ bool SyntaxNodeKindHasClass(SyntaxNodeKind kind, TokenClass tokenClass) {
         return false;
     }
     return (kSyntaxKindInfoByKind[index].classes & Bit(tokenClass)) != 0;
+}
+
+bool LambdaBodyAllowsCompactSingleStatementForm(const SyntaxNode& node, SyntaxNodeKind parentKind) {
+    if (node.kind != SyntaxNodeKind::CompoundStatement || parentKind != SyntaxNodeKind::LambdaExpression) {
+        return false;
+    }
+    const SyntaxNode* statement = OnlyContentChild(node);
+    // Compact lambda spacing and body-header choices must agree. A lone statement that owns a
+    // compound block, such as if/switch/compound, needs normal block indentation for that subtree.
+    return statement != nullptr && !NodeOrDescendantHasClass(*statement, TokenClass::CompoundBlock);
 }

@@ -119,29 +119,6 @@ bool KeepsListCommentInBreakModel(const PrintToken& token) {
     }
 }
 
-bool IsSingleStatementLambdaBody(const SyntaxNode& node, SyntaxNodeKind parentKind) {
-    if (node.kind != SyntaxNodeKind::CompoundStatement || parentKind != SyntaxNodeKind::LambdaExpression) {
-        return false;
-    }
-    size_t statementCount = 0;
-    for (const SyntaxNode* child : node.children) {
-        if (
-            !child ||
-            child->kind == SyntaxNodeKind::BlankLine ||
-            child->kind == SyntaxNodeKind::Comment ||
-            child->kind == SyntaxNodeKind::TrailingComment ||
-            SyntaxNodeKindHasClass(child->kind, TokenClass::Known)
-        ) {
-            continue;
-        }
-        ++statementCount;
-        if (statementCount > 1) {
-            return false;
-        }
-    }
-    return statementCount == 1;
-}
-
 void AppendTokens(
     const SyntaxNode& node,
     SyntaxNodeKind parentKind,
@@ -163,7 +140,7 @@ void AppendTokens(
         nodeKind == SyntaxNodeKind::MsCallModifier ||
         nodeKind == SyntaxNodeKind::MsDeclspecModifier;
     const bool childInSingleStatementLambdaBody =
-        inSingleStatementLambdaBody || IsSingleStatementLambdaBody(node, parentKind);
+        inSingleStatementLambdaBody || LambdaBodyAllowsCompactSingleStatementForm(node, parentKind);
     const SyntaxNode* childMacroDefinition =
         macroDefinition != nullptr ? macroDefinition : (IsMacroDefinitionNode(nodeKind) ? &node : nullptr);
     const bool childInMacroValue = inMacroValue || nodeKind == SyntaxNodeKind::MacroReplacementList;
