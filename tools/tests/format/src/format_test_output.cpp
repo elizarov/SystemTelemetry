@@ -793,6 +793,10 @@ void PreserveWin32BooleanMacros() {
     bool standardTrue = true;
 }
 
+auto CompactEmptyBraceTernary(bool empty, std::string value) {
+    return empty ? std::string{} : value;
+}
+
 const auto noLookup = [](std::string_view) -> std::optional<ColorConfig> { return std::nullopt; };
 
 const auto handled = [&result](INT_PTR value) {

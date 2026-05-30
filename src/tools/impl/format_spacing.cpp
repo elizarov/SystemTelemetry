@@ -155,6 +155,11 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return true;
     }
     if (IsCompactEmptyBraceToken(*previous) && current.kind == PrintTokenKind::Known) {
+        if (current.parentKind == SyntaxNodeKind::ConditionalExpression && (
+            current.syntaxKind == SyntaxNodeKind::Question || current.syntaxKind == SyntaxNodeKind::Colon
+        )) {
+            return true;
+        }
         return SyntaxNodeKindHasClass(current.syntaxKind, TokenClass::AttachAfterBlockKeyword);
     }
     if (previous->kind != PrintTokenKind::Known && current.kind != PrintTokenKind::Known) {

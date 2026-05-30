@@ -256,6 +256,22 @@ class FormatCommandTests(unittest.TestCase):
             result.stdout,
         )
 
+    def test_compact_empty_brace_ternary_colon_keeps_space(self) -> None:
+        result = native_format(
+            "--style=file",
+            input_text=(
+                "auto snapshot=preferred?TreeViewportSnapshot{}:CaptureTreeViewportSnapshot();\n"
+                "auto text=empty?std::string{}:value;\n"
+            ),
+        )
+
+        self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+        self.assertEqual(
+            "auto snapshot = preferred ? TreeViewportSnapshot{} : CaptureTreeViewportSnapshot();\n"
+            "auto text = empty ? std::string{} : value;\n",
+            result.stdout,
+        )
+
     def test_control_body_brace_normalization(self) -> None:
         result = native_format(
             "--style=file",
