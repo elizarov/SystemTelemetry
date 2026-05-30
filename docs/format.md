@@ -31,7 +31,6 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 - Put spaces around binary and ternary operators, e.g. `a + b`.
 - Put no spaces around unary operators, e.g. `!ok`.
 - Bind type declarator symbols to the type, e.g. `int* value`.
-- In block-scope parenthesized direct-initializer shapes whose parser form is a function declarator, space declarator-shaped `*` and `&` tokens as expression operators because the formatter has no type information.
 - Treat `operator` plus a following symbolic operator as one function name, e.g. `operator==(`.
 - Treat destructor `~` plus the following type name as one function name, e.g. `~Widget(`.
 - Put no space between a C-style cast and the expression it prefixes, e.g. `(void)value`.
@@ -40,6 +39,28 @@ The formatter owns whitespace, line breaks, indentation, wrapping, include order
 - Put no spaces around namespace, member-access, or pointer-member-access operators, e.g. `std::string`.
 - Put two spaces before a trailing `//` comment after code, e.g. `value;  // note`.
 - Put one space after a preprocessor directive keyword before its operand, e.g. `#pragma once`.
+
+## Parenthesized Initializer Ambiguity
+
+C++ block-scope declarations can use a token shape that is both a parenthesized direct initializer and a function declaration without type information.
+
+```cpp
+int product(a * b, c & d);
+ResultType local(FirstType* first, SecondType& second);
+```
+
+The formatter has no symbol table and follows the parser's declaration interpretation for that ambiguous shape. Parenthesized initialization is rare in project code, so the formatter keeps the generic declaration rule and leaves source disambiguation to the author. Prefer braced initialization by default. Use parenthesized initialization only when braces have different C++ semantics, such as vector length construction:
+
+```cpp
+std::vector<int> values(count);
+std::vector<int> oneValue{count};
+```
+
+When a parenthesized direct initializer needs expression operands that could parse as declarators, add extra parentheses around those operands. This is the preferred fix:
+
+```cpp
+int product((a * b), (c & d));
+```
 
 ## Line Hygiene
 

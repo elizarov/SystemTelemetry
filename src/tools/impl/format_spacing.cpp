@@ -79,33 +79,6 @@ bool HasCallModifierBeforeDeclaratorBinding(const PrintToken& token) {
     return false;
 }
 
-bool IsBlockScopeDirectInitializerExpressionToken(const PrintToken& token) {
-    if (
-        token.kind != PrintTokenKind::Known ||
-        !SyntaxNodeKindHasClass(token.syntaxKind, TokenClass::DeclaratorReferenceToken) ||
-        token.node == nullptr
-    ) {
-        return false;
-    }
-    const SyntaxNode* declarator = ParentNode(token);
-    const SyntaxNode* parameterItem = GrandParentNode(token);
-    const SyntaxNode* parameterList = parameterItem != nullptr ? parameterItem->parent : nullptr;
-    const SyntaxNode* functionDeclarator = parameterList != nullptr ? parameterList->parent : nullptr;
-    const SyntaxNode* declaration = functionDeclarator != nullptr ? functionDeclarator->parent : nullptr;
-    const SyntaxNode* declarationParent = declaration != nullptr ? declaration->parent : nullptr;
-    return declarator != nullptr &&
-        IsDeclaratorReferenceParent(declarator->kind) &&
-        parameterItem != nullptr &&
-        parameterList != nullptr &&
-        parameterList->kind == SyntaxNodeKind::ParameterList &&
-        functionDeclarator != nullptr &&
-        functionDeclarator->kind == SyntaxNodeKind::FunctionDeclarator &&
-        declaration != nullptr &&
-        declaration->kind == SyntaxNodeKind::Declaration &&
-        declarationParent != nullptr &&
-        declarationParent->kind == SyntaxNodeKind::CompoundStatement;
-}
-
 }  // namespace
 
 bool IsPreprocessorPrintToken(PrintTokenKind kind) {
@@ -350,11 +323,6 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
             return false;
         }
         return current.parentKind != SyntaxNodeKind::CaseStatement;
-    }
-    if (
-        IsBlockScopeDirectInitializerExpressionToken(current) || IsBlockScopeDirectInitializerExpressionToken(*previous)
-    ) {
-        return true;
     }
     if (IsDeclaratorBindingToken(current)) {
         return false;

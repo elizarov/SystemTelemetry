@@ -357,12 +357,12 @@ struct InitializerGeneralityWidget {
 
 struct DirectInitializedDeclarationGenerality {
 ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage fieldWithBracedDirectInitializerName{value};
-ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage fieldWithParenDirectInitializerName(value);
+ResultType memberFunctionWithParenthesizedDeclarator(value);
 };
 
 void DirectInitializedDeclarationGeneralityLocals(){
 ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage localWithBracedDirectInitializerName{value};
-ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage localWithParenDirectInitializerName(value);
+ExtremelyLongDirectInitializerTypeNameForFormatterGeneralityAndMemberCoverage localWithExtraParenDirectInitializerName((value));
 }
 
 InitializerGeneralityWidget::InitializerGeneralityWidget(int value, int other) : first_(value), second_(other) {
@@ -458,6 +458,9 @@ ColorConfig& MutableColorField(void* owner, const RuntimeConfigFieldDescriptor& 
 }
 
 void StartLenovoSnapshot(void* contextPtr) {
+    // Parenthesized initializer ambiguity: this parser shape formats as a function declaration.
+    ResultType functionDeclaration(FirstType* first, SecondType& second);
+    // Use extra parentheses around expression operands when parenthesized initialization is intended.
     std::unique_ptr<LenovoServiceSnapshotThreadContext> context(
         static_cast<LenovoServiceSnapshotThreadContext*>(contextPtr)
     );
@@ -507,7 +510,7 @@ void ManagedReferenceSpacing(
 ResultType NamespaceDeclaratorReferenceSpacing(FirstType* first, SecondType& second);
 
 void LocalDeclaratorReferenceSpacing() {
-    int directProduct(a*b, c&d);
+    int directProduct((a*b), (c&d));
     ResultType local(FirstType* first, SecondType& second);
 }
 
@@ -556,8 +559,9 @@ void TrackFeatureLevels() {
     const std::array<D3D_FEATURE_LEVEL, 3>
         fallbackFeatureLevels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
     const std::array<VeryLongTemplateArgumentNameForDirectInitialization, 3>
-        parenthesizedFeatureLevels(D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0);
-    Use(preferredFeatureLevels, fallbackFeatureLevels, parenthesizedFeatureLevels);
+        bracedFeatureLevels{D3D_FEATURE_LEVEL_11_0, D3D_FEATURE_LEVEL_10_1, D3D_FEATURE_LEVEL_10_0};
+    std::vector<int> lengthInitializedValues((featureLevelCount));
+    Use(preferredFeatureLevels, fallbackFeatureLevels, bracedFeatureLevels, lengthInitializedValues);
 }
 
 DashboardApp::DashboardApp(
@@ -1349,7 +1353,7 @@ int SplitSubtractionOperator() {
 }
 
 void AllocateBitmapPixels(){
-std::vector<DisplayPlacementMenuBitmapPixel> pixels(kBitmapSize * kBitmapSize);
+std::vector<DisplayPlacementMenuBitmapPixel> pixels((kBitmapSize * kBitmapSize));
 }
 
 class BaseClassSpacingRoot {};

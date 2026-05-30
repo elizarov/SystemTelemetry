@@ -684,9 +684,6 @@ private:
     }
 
     FormatBreakNode* BuildFunctionSignature(const SyntaxNode& node, int depth) {
-        if (node.kind == SyntaxNodeKind::Declaration && ParentKind(node) == SyntaxNodeKind::CompoundStatement) {
-            return nullptr;
-        }
         std::optional<size_t> declaratorIndex;
         for (size_t index = 0; index < node.children.size(); ++index) {
             if (node.children[index] && node.children[index]->kind == SyntaxNodeKind::FunctionDeclarator) {
@@ -755,19 +752,6 @@ private:
             SyntaxNodeKindHasClass(node.kind, TokenClass::AssignmentOperator);
     }
 
-    static bool IsParenthesizedDirectInitializedDeclarator(const SyntaxNode& node) {
-        if (node.kind != SyntaxNodeKind::FunctionDeclarator) {
-            return false;
-        }
-        return std::any_of(node.children.begin(), node.children.end(), [](const SyntaxNode* child) {
-            return child != nullptr && child->kind == SyntaxNodeKind::ParameterList && child->children.size() > 2;
-        });
-    }
-
-    bool AllowsParenthesizedDirectInitializerShape(const SyntaxNode& node) const {
-        return node.kind == SyntaxNodeKind::FieldDeclaration || ParentKind(node) == SyntaxNodeKind::CompoundStatement;
-    }
-
     std::optional<size_t> DirectInitializedDeclaratorIndex(const SyntaxNode& node) const {
         bool hasAssignment = false;
         for (size_t index = 0; index < node.children.size(); ++index) {
@@ -777,9 +761,6 @@ private:
             }
             hasAssignment = hasAssignment || IsAssignmentOperatorNode(*child);
             if (IsDirectInitializedDeclarator(*child)) {
-                return index;
-            }
-            if (AllowsParenthesizedDirectInitializerShape(node) && IsParenthesizedDirectInitializedDeclarator(*child)) {
                 return index;
             }
             // Some direct initializer forms attach the initializer list as a declaration child after the declarator.
