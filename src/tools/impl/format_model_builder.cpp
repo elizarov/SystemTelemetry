@@ -381,13 +381,24 @@ struct TsNodeSyntax {
     TSSymbol symbol = 0;
     SyntaxNodeKind kind = SyntaxNodeKind::Unknown;
     SyntaxNodeKind tokenKind = SyntaxNodeKind::Unknown;
+    std::uint64_t classes = 0;
     SyntaxWrapperRole wrapperRole = SyntaxWrapperRole::None;
 };
 
 inline TsNodeSyntax GetTsNodeSyntax(TSNode tsNode) {
     const TSSymbol symbol = ts_node_symbol(tsNode);
     const SyntaxSymbolInfo info = SyntaxSymbolInfoForSymbol(symbol);
-    return {.symbol = symbol, .kind = info.treeKind, .tokenKind = info.tokenKind, .wrapperRole = info.wrapperRole};
+    return {
+        .symbol = symbol,
+        .kind = info.treeKind,
+        .tokenKind = info.tokenKind,
+        .classes = info.classes,
+        .wrapperRole = info.wrapperRole
+    };
+}
+
+bool TsNodeSyntaxHasClass(TsNodeSyntax syntax, TokenClass tokenClass) {
+    return (syntax.classes & static_cast<std::uint64_t>(tokenClass)) != 0;
 }
 
 void AppendTsChildren(
@@ -408,6 +419,7 @@ SyntaxNode* BuildNode(
     SyntaxNode* node = MakeNode(model);
     node->parent = parent;
     node->depth = parent == nullptr ? 0 : parent->depth + 1;
+    node->classes = syntax.classes;
 
     if (syntax.kind == SyntaxNodeKind::Comment) {
         node->kind = SyntaxNodeKind::Comment;
@@ -447,8 +459,8 @@ SyntaxNode* BuildNode(
         }
     }
     if (
-        SyntaxNodeKindHasClass(syntax.kind, TokenClass::WholeNodeAsFreeToken) ||
-        SyntaxNodeKindHasClass(syntax.kind, TokenClass::AtomicPreprocessor)
+        TsNodeSyntaxHasClass(syntax, TokenClass::WholeNodeAsFreeToken) ||
+        TsNodeSyntaxHasClass(syntax, TokenClass::AtomicPreprocessor)
     ) {
         node->kind = syntax.kind;
         node->text = NodeText(tsNode, source);

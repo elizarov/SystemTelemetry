@@ -91,7 +91,6 @@ extern"C" {
 #ifndef FORMAT_USERVER_CLANG
 [[gnu::visibility("default")]] [[gnu::externally_visible]]
 #endif
-
     int FormatUserverExternAttribute();
 }
 
@@ -119,7 +118,6 @@ constexpr utils::StringLiteral kFormatUserverPrefixes[] = {
 #ifdef FORMAT_USERVER_SOURCE_PREFIX
     FORMAT_USERVER_STRINGIZE(FORMAT_USERVER_SOURCE_PREFIX),
 #endif
-
 };
 
 template <typename T>
@@ -197,15 +195,18 @@ void MacroConcatenatedString() {
 }
 
 #if defined(FORMAT_USERVER_PLATFORM) && __has_include(<format_userver/header.hpp>)
-void HasIncludeGuardedFunction() { UsePlatformHeader(); }
+void HasIncludeGuardedFunction() {
+    UsePlatformHeader();
+}
 #else
-void HasIncludeGuardedFallback() { UseFallbackHeader(); }
+void HasIncludeGuardedFallback() {
+    UseFallbackHeader();
+}
 #endif
 
 void QualifiedTemplateCompoundLiteral(Token token, Writer& writer) {
     WriteToStream(
-        fixture::chaotic::Primitive<std::string, fixture::chaotic::MinLength<128>,
-fixture::chaotic::MaxLength<128>>{
+        fixture::chaotic::Primitive<std::string, fixture::chaotic::MinLength<128>, fixture::chaotic::MaxLength<128>>{
             *token
         },
         writer
@@ -213,7 +214,7 @@ fixture::chaotic::MaxLength<128>>{
 }
 
 auto BracedLambdaCapture(std::vector<int> inputs, CaptureSettings settings) {
-    return [inputs{std::move(inputs)}, settings{std::move(settings)}]()mutable {
+    return [inputs{std::move(inputs)}, settings{std::move(settings)}]() mutable {
         return inputs.size() + settings.count;
     };
 }
@@ -225,7 +226,7 @@ FORMAT_USERVER_NODEBUG_FUNC inline decltype(auto) PrefixedInlineFunction(Functio
 class PrefixedAttributeMethodFixture {
 public:
     template <typename T>
-    FORMAT_USERVER_PROTECTED_ATTR bool Compare(T& value)noexcept {
+    FORMAT_USERVER_PROTECTED_ATTR bool Compare(T& value) noexcept {
         return value.Compare();
     }
 };
@@ -245,14 +246,12 @@ extern int* ConditionalDeclarationSuffix(void)
 #ifdef FORMAT_USERVER_THROW
     FORMAT_USERVER_THROW
 #endif
-
 ;
 
 void ConditionalLocalConstQualifier() {
 #if FORMAT_USERVER_OPENSSL_HAS_CONST_SIGNATURE
 const
 #endif
-
     ASN1_BIT_STRING* signature = nullptr;
     UseSignature(signature);
 }
@@ -298,7 +297,6 @@ if (conn->pipelineStatus == kPipelineOff)
 #else
 if (Flush(conn) < 0)
 #endif
-
     goto sendFailed;
     sendFailed :;
 }
@@ -313,7 +311,6 @@ status.append("Secondary AVAILABLE");
 } else {
 status.append("Secondary UNAVAILABLE");
 }
-
 }
 
 bool ConditionalWholeCondition(int error_code) {
@@ -394,7 +391,6 @@ GTEST_SKIP()
 FAIL()
 #endif
     << "failed to trigger failures";
-
 }
 
 void PreprocessorSelectedInitializer(DescriptorPool* descriptor_pool, std::string_view file_name) {
@@ -404,7 +400,6 @@ descriptor_pool->FindFileByName(file_name);
 #else
 descriptor_pool->FindFileByName(std::string{file_name});
 #endif
-
     Use(file_desc);
 }
 
@@ -418,7 +413,6 @@ false
 #else
 true
 #endif
-
     };
 }
 
@@ -461,7 +455,6 @@ HandlePipelineSync();
 } else if (status != Status::kAborted)
 #endif
 handle = std::move(next_handle);
-
 }
 
 void MacroCompoundArgument() {
@@ -499,7 +492,7 @@ PostgresChaosProxy::PostgresChaosProxy(engine::TaskProcessor& task_processor) :
 
 PostgresChaosProxy::~PostgresChaosProxy() {}
 
-ATTRIBUTE_NO_SANITIZE_UNDEFINED std::size_t AttributePrefixedFunction(const BoundsBlock& block, float value)noexcept {
+ATTRIBUTE_NO_SANITIZE_UNDEFINED std::size_t AttributePrefixedFunction(const BoundsBlock& block, float value) noexcept {
     return block.Find(value);
 }
 
@@ -516,7 +509,7 @@ struct Overloaded : Ts... {
     using Ts::operator()...;
 };
 
-FORMAT_USERVER_ALWAYS_INLINE_SIMD std::size_t PrefixMacroFunction(const BoundsBlock& block, float value)noexcept {
+FORMAT_USERVER_ALWAYS_INLINE_SIMD std::size_t PrefixMacroFunction(const BoundsBlock& block, float value) noexcept {
     return block.Find(value);
 }
 
@@ -527,7 +520,6 @@ const char* ConditionalStringLiteral() {
 #else
 "GMT "
 #endif
-
     "suffix";
 }
 
@@ -545,17 +537,15 @@ auto DecltypeValueInitialization(Func& func) {
 
 using MemberFunctionPointerArray = std::array<void (FieldSubparser::*)(), Count>;
 
-using GenericPrepareUnaryCall = std::unique_ptr<grpc::ClientAsyncResponseReader<
-    grpc::ByteBuffer>>(
+using GenericPrepareUnaryCall = std::unique_ptr<grpc::ClientAsyncResponseReader<grpc::ByteBuffer>>(
     grpc::GenericStub::*
 )(grpc::ClientContext*, const grpc::string&);
 using AuthCheckerFactoryFactory = utils::UniqueRef<AuthCheckerFactoryBase>(*)(const components::ComponentContext&);
 
-PrepareUnaryCallProxy(GenericPrepareUnaryCall, const grpc::string&) -> PrepareUnaryCallProxy<
-    grpc::GenericStub,
-    grpc::ByteBuffer,
-    grpc::ByteBuffer
->;
+PrepareUnaryCallProxy(
+    GenericPrepareUnaryCall,
+    const grpc::string&
+) -> PrepareUnaryCallProxy<grpc::GenericStub, grpc::ByteBuffer, grpc::ByteBuffer>;
 
 Data& operator*() & FORMAT_USERVER_LIFETIME_BOUND {
     return data_;
@@ -580,8 +570,7 @@ public:
 #else
     consteval
 #endif
-
-    PreprocessorSpecifierFixture(const char* value)noexcept : value{value} {}
+    PreprocessorSpecifierFixture(const char* value) noexcept : value{value} {}
 
 private:
     const char* value;

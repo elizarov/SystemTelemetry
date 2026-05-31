@@ -45,6 +45,8 @@ constexpr std::uint64_t kCommentClasses = Bit(TokenClass::Comment) | Bit(TokenCl
 constexpr std::uint64_t kAtomicPreprocessorClasses =
     Bit(TokenClass::AtomicPreprocessor) | Bit(TokenClass::WholeNodeAsFreeToken);
 constexpr std::uint64_t kChainBinaryClasses = Bit(TokenClass::BinaryOperator) | Bit(TokenClass::ChainOperator);
+constexpr std::uint64_t kSymbolLocalClasses =
+    Bit(TokenClass::WholeNodeAsFreeToken) | Bit(TokenClass::AtomicPreprocessor);
 
 constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Kind(SyntaxNodeKind::Tree, Bit(TokenClass::Tree)),
@@ -399,7 +401,7 @@ constexpr auto BuildSyntaxKindInfoByKind() {
     std::array<SyntaxKindInfo, kSyntaxNodeKindCount> result{};
     for (const SyntaxKindMapping& mapping : kSyntaxKindMappings) {
         SyntaxKindInfo& info = result[KindIndex(mapping.kind)];
-        info.classes |= mapping.classes;
+        info.classes |= mapping.classes & ~kSymbolLocalClasses;
         if (!mapping.tokenText.empty()) {
             info.tokenText = mapping.tokenText;
         }
@@ -456,19 +458,32 @@ SymbolInfoTable MakeSymbolInfoTable() {
     return SymbolInfoTable(ts_language_symbol_count(tree_sitter_cpp()));
 }
 
-void StoreTreeSymbolInfo(SymbolInfoTable& table, std::string_view name, SyntaxNodeKind kind) {
+void StoreTreeSymbolInfo(
+    SymbolInfoTable& table,
+    std::string_view name,
+    SyntaxNodeKind kind,
+    std::uint64_t classes = 0
+) {
     const TSSymbol symbol =
         ts_language_symbol_for_name(tree_sitter_cpp(), name.data(), static_cast<uint32_t>(name.size()), true);
     if (static_cast<size_t>(symbol) < table.size()) {
         table[symbol].treeKind = kind;
+        table[symbol].classes |= classes;
     }
 }
 
-void StoreTokenSymbolInfo(SymbolInfoTable& table, std::string_view name, bool isNamed, SyntaxNodeKind kind) {
+void StoreTokenSymbolInfo(
+    SymbolInfoTable& table,
+    std::string_view name,
+    bool isNamed,
+    SyntaxNodeKind kind,
+    std::uint64_t classes = 0
+) {
     const TSSymbol symbol =
         ts_language_symbol_for_name(tree_sitter_cpp(), name.data(), static_cast<uint32_t>(name.size()), isNamed);
     if (static_cast<size_t>(symbol) < table.size()) {
         table[symbol].tokenKind = kind;
+        table[symbol].classes |= classes;
     }
 }
 
@@ -485,14 +500,14 @@ const SymbolInfoTable& SyntaxInfoBySymbol() {
         SymbolInfoTable result = MakeSymbolInfoTable();
         for (const SyntaxKindMapping& mapping : kSyntaxKindMappings) {
             if (!mapping.treeType.empty()) {
-                StoreTreeSymbolInfo(result, mapping.treeType, mapping.kind);
+                StoreTreeSymbolInfo(result, mapping.treeType, mapping.kind, mapping.classes);
             }
             if (!mapping.tokenText.empty()) {
-                StoreTokenSymbolInfo(result, mapping.tokenText, false, mapping.kind);
-                StoreTokenSymbolInfo(result, mapping.tokenText, true, mapping.kind);
+                StoreTokenSymbolInfo(result, mapping.tokenText, false, mapping.kind, mapping.classes);
+                StoreTokenSymbolInfo(result, mapping.tokenText, true, mapping.kind, mapping.classes);
             }
         }
-        StoreTreeSymbolInfo(result, "comment", SyntaxNodeKind::Comment);
+        StoreTreeSymbolInfo(result, "comment", SyntaxNodeKind::Comment, kCommentClasses);
 
         constexpr std::string_view flattenNames[] = {
             "call_expression",

@@ -30,8 +30,13 @@ struct BraceFrame {
     int closeIndent = 0;
 };
 
-bool IsPreprocessorNode(SyntaxNodeKind kind) {
-    return SyntaxNodeKindHasClass(kind, TokenClass::AtomicPreprocessor);
+bool SyntaxNodeHasClass(const SyntaxNode& node, TokenClass tokenClass) {
+    return (node.classes & static_cast<std::uint64_t>(tokenClass)) != 0 ||
+        SyntaxNodeKindHasClass(node.kind, tokenClass);
+}
+
+bool IsPreprocessorNode(const SyntaxNode& node) {
+    return SyntaxNodeHasClass(node, TokenClass::AtomicPreprocessor);
 }
 
 std::string_view TrimSourceLine(std::string_view line) {
@@ -157,6 +162,19 @@ bool IsConditionalMacroFunctionHeader(const PrintToken& token) {
     return token.syntaxKind == SyntaxNodeKind::PreprocIf && token.parentKind == SyntaxNodeKind::FunctionDefinition;
 }
 
+bool IsStandalonePreprocessorBranchToken(const SyntaxNode& node, SyntaxNodeKind parentKind) {
+    return parentKind == SyntaxNodeKind::PreprocElse &&
+        node.kind == SyntaxNodeKind::FreeToken &&
+        node.text == "#else";
+}
+
+bool IsConditionalPreprocessorDirective(std::string_view line) {
+    return StartsWith(line, "#if") ||
+        StartsWith(line, "#elif") ||
+        StartsWith(line, "#else") ||
+        StartsWith(line, "#endif");
+}
+
 bool RequiresMacroValueBreak(const SyntaxNode& node) {
     size_t topLevelElementCount = 0;
     for (const SyntaxNode* child : node.children) {
@@ -266,6 +284,25 @@ void AppendTokens(
         });
         return;
     }
+    if (IsStandalonePreprocessorBranchToken(node, parentKind)) {
+        tokens.push_back({
+            .kind = PrintTokenKind::Preprocessor,
+            .syntaxKind = nodeKind,
+            .text = node.text,
+            .parentKind = parentKind,
+            .grandParentKind = grandParentKind,
+            .inTemplateDeclaration = childInTemplateDeclaration,
+            .inRequiresClause = childInRequiresClause,
+            .inCompilerCallModifier = childInCompilerCallModifier,
+            .inSingleStatementLambdaBody = childInSingleStatementLambdaBody,
+            .inMacroValue = childInMacroValue,
+            .breakBeforeMacroValue = childBreakBeforeMacroValue,
+            .node = &node,
+            .macroDefinition = childMacroDefinition,
+            .macroValueElement = macroValueElement
+        });
+        return;
+    }
     if (SyntaxNodeKindHasClass(nodeKind, TokenClass::Known)) {
         tokens.push_back({
             .kind = PrintTokenKind::Known,
@@ -303,7 +340,7 @@ void AppendTokens(
         });
         return;
     }
-    if (IsPreprocessorNode(nodeKind)) {
+    if (IsPreprocessorNode(node)) {
         tokens.push_back({
             .kind = PrintTokenKind::Preprocessor,
             .syntaxKind = nodeKind,
@@ -1844,6 +1881,7 @@ private:
             token.grandParentKind == SyntaxNodeKind::ArgumentList;
         const bool isInclude = StartsWith(line, "#include");
         const bool isUndef = StartsWith(line, "#undef");
+        const bool isConditionalDirective = IsConditionalPreprocessorDirective(line);
         if (isUndef) {
             BlankLine();
         }
@@ -1861,7 +1899,7 @@ private:
             return;
         }
         if (StartsWith(line, "#pragma once") || isUndef || (
-            !inlineFragment && !isInclude && next != nullptr && !IsPreprocessorLikeToken(*next)
+            !inlineFragment && !isInclude && !isConditionalDirective && next != nullptr && !IsPreprocessorLikeToken(*next)
         )) {
             BlankLine();
         }
