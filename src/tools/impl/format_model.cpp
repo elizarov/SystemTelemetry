@@ -213,6 +213,7 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Tree(SyntaxNodeKind::TemplateArgumentList, "template_argument_list"),
     Tree(SyntaxNodeKind::TemplateDeclaration, "template_declaration", Bit(TokenClass::MacroDeclarationFragment)),
     Tree(SyntaxNodeKind::RequiresClause, "requires_clause"),
+    Tree(SyntaxNodeKind::RequiresExpression, "requires_expression"),
     Tree(SyntaxNodeKind::RequiresClause, "nested_requirement"),
     Tree(SyntaxNodeKind::RefQualifier, "ref_qualifier"),
     Tree(SyntaxNodeKind::LambdaExpression, "lambda_expression"),
@@ -223,6 +224,7 @@ constexpr auto kSyntaxKindMappings = std::to_array<SyntaxKindMapping>({
     Tree(SyntaxNodeKind::TrailingReturnType, "trailing_return_type"),
     Tree(SyntaxNodeKind::OperatorName, "operator_name"),
     Tree(SyntaxNodeKind::OperatorCast, "operator_cast"),
+    Tree(SyntaxNodeKind::LabeledStatement, "labeled_statement"),
     Tree(SyntaxNodeKind::FreeToken, "deleted_operator_cast_declaration", Bit(TokenClass::WholeNodeAsFreeToken)),
     Tree(SyntaxNodeKind::AttributeSpecifier, "attribute_specifier"),
     Tree(SyntaxNodeKind::AttributeDeclaration, "attribute_declaration"),
@@ -780,6 +782,8 @@ std::string_view SyntaxNodeKindName(SyntaxNodeKind kind) {
             return "TemplateDeclaration";
         case SyntaxNodeKind::RequiresClause:
             return "RequiresClause";
+        case SyntaxNodeKind::RequiresExpression:
+            return "RequiresExpression";
         case SyntaxNodeKind::RefQualifier:
             return "RefQualifier";
         case SyntaxNodeKind::LambdaExpression:
@@ -798,6 +802,8 @@ std::string_view SyntaxNodeKindName(SyntaxNodeKind kind) {
             return "OperatorName";
         case SyntaxNodeKind::OperatorCast:
             return "OperatorCast";
+        case SyntaxNodeKind::LabeledStatement:
+            return "LabeledStatement";
         case SyntaxNodeKind::AttributeSpecifier:
             return "AttributeSpecifier";
         case SyntaxNodeKind::AttributeDeclaration:

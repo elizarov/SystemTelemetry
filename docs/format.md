@@ -581,6 +581,8 @@ Include sorting is enabled when the active `.cpp-format` contains `IncludeCatego
 
 When `IncludeCategories` is absent, include sorting is disabled. Include directives are normalized and emitted in source order, and blank-separated include blocks are preserved.
 
+Opening include blocks follow the same include-run formatting path for `#pragma once` headers and `#ifndef`/`#define` guarded headers, so `IncludeCategories` controls sorting or preservation for both forms.
+
 Comments inside an include area bound the sortable include run around them.
 
 Include blocks are regrouped, sorted case-insensitively inside each group, and separated by one empty line between groups. Group definitions live in `.cpp-format`. Group order:
@@ -643,6 +645,6 @@ Regenerate parser outputs only after editing vendored grammar source or parser m
 python tools\regenerate_tree_sitter_grammar.py
 ```
 
-The regeneration tool writes `case_dash_macro_config.js` from `.cpp-format`, runs the pinned tree-sitter CLI, and updates generated files under `src\tools\vendor\tree-sitter\tree-sitter-cpp\src\`. Pass `--tree-sitter-cli <path>` to use an existing CLI. Otherwise it downloads the pinned Windows CLI under `build\`.
+The regeneration tool writes `macro_config.js` from `.cpp-format` and `tools/tests/format/.cpp-format-userver`, runs the pinned tree-sitter CLI, and updates generated files under `src\tools\vendor\tree-sitter\tree-sitter-cpp\src\`. Pass `--tree-sitter-cli <path>` to use an existing CLI. Otherwise it downloads the pinned Windows CLI under `build\`.
 
 Configuration is intentionally narrow and does not expose style policy knobs. Brace behavior, wrapping behavior, spacing, alignment behavior, and other layout ideology are fixed in formatter source.

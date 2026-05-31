@@ -49,99 +49,6 @@ std::string_view TrimSourceLine(std::string_view line) {
     return line;
 }
 
-bool IsBlankSourceLine(std::string_view line) {
-    return TrimSourceLine(line).empty();
-}
-
-bool IsCommentSourceLine(std::string_view line) {
-    const std::string_view trimmed = TrimSourceLine(line);
-    return StartsWith(trimmed, "//") || StartsWith(trimmed, "/*");
-}
-
-bool IsIncludeSourceLine(std::string_view line) {
-    return StartsWith(TrimSourceLine(line), "#include");
-}
-
-bool IsIncludeGuardOpening(const std::vector<std::string>& lines) {
-    if (lines.size() < 3) {
-        return false;
-    }
-    return StartsWith(TrimSourceLine(lines[0]), "#ifndef") && StartsWith(TrimSourceLine(lines[1]), "#define");
-}
-
-void AppendSourceLines(std::string& output, const std::vector<std::string>& lines, size_t first, size_t last) {
-    for (size_t index = first; index < last; ++index) {
-        output.append(lines[index]);
-        output.push_back('\n');
-    }
-}
-
-size_t SkipBlankSourceLines(const std::vector<std::string>& lines, size_t index) {
-    while (index < lines.size() && IsBlankSourceLine(lines[index])) {
-        ++index;
-    }
-    return index;
-}
-
-bool IsIncludeSeparatorBlank(const std::vector<std::string>& lines, size_t index, size_t& nextLine) {
-    if (index >= lines.size() || !IsBlankSourceLine(lines[index])) {
-        return false;
-    }
-    nextLine = SkipBlankSourceLines(lines, index + 1);
-    return nextLine < lines.size() && IsIncludeSourceLine(lines[nextLine]);
-}
-
-std::string FormatOpeningIncludeGuardIncludes(
-    const FormatterConfig& config,
-    std::string_view text,
-    std::string_view sourcePath
-) {
-    const std::vector<std::string> lines = SplitLines(text);
-    if (!IsIncludeGuardOpening(lines)) {
-        return std::string(text);
-    }
-
-    size_t runStart = 2;
-    while (runStart < lines.size() && (
-        IsBlankSourceLine(lines[runStart]) ||
-        IsCommentSourceLine(lines[runStart])
-    )) {
-        ++runStart;
-    }
-    if (runStart >= lines.size() || !IsIncludeSourceLine(lines[runStart])) {
-        return std::string(text);
-    }
-
-    std::vector<std::string> includeLines;
-    size_t runEnd = runStart;
-    for (; runEnd < lines.size(); ++runEnd) {
-        if (IsIncludeSourceLine(lines[runEnd])) {
-            includeLines.push_back(lines[runEnd]);
-            continue;
-        }
-        if (IsBlankSourceLine(lines[runEnd])) {
-            size_t nextLine = runEnd;
-            if (IsIncludeSeparatorBlank(lines, runEnd, nextLine)) {
-                includeLines.emplace_back();
-                runEnd = nextLine - 1;
-                continue;
-            }
-            runEnd = nextLine;
-            break;
-        }
-        break;
-    }
-
-    std::string result;
-    AppendSourceLines(result, lines, 0, runStart);
-    result.append(FormatIncludeLinesText(config, includeLines, sourcePath));
-    if (runEnd < lines.size()) {
-        result.push_back('\n');
-    }
-    AppendSourceLines(result, lines, runEnd, lines.size());
-    return result;
-}
-
 BraceRole RoleForBraceParent(SyntaxNodeKind parentKind) {
     switch (parentKind) {
         case SyntaxNodeKind::CompoundStatement:
@@ -195,6 +102,18 @@ bool IsConditionalPreprocessorDirective(std::string_view line) {
         StartsWith(line, "#elif") ||
         StartsWith(line, "#else") ||
         StartsWith(line, "#endif");
+}
+
+bool IsRawStatementToken(const PrintToken& token) {
+    if (token.kind != PrintTokenKind::Free || token.text.find_first_of("\r\n") != std::string_view::npos) {
+        return false;
+    }
+    const SyntaxNodeKind parent = token.parentKind;
+    return (
+        parent == SyntaxNodeKind::TranslationUnit ||
+        parent == SyntaxNodeKind::DeclarationList ||
+        parent == SyntaxNodeKind::CompoundStatement
+    ) && EndsWith(TrimSourceLine(token.text), ";");
 }
 
 bool RequiresMacroValueBreak(const SyntaxNode& node) {
@@ -1859,6 +1778,15 @@ private:
             PrintKnown(token, previous, next, rawNext);
             return;
         }
+        if (IsRawStatementToken(token)) {
+            FlushPendingTokens();
+            if (lineHasText_) {
+                NewLine();
+            }
+            Write(CollapseSourceWhitespace(token.text));
+            NewLine();
+            return;
+        }
         BufferToken(token);
     }
 
@@ -1895,7 +1823,7 @@ private:
     void PrintPreprocessor(const PrintToken& token, const PrintToken* next) {
         const bool hasLineBreak = token.text.find_first_of("\r\n") != std::string_view::npos;
         const std::string line = hasLineBreak ?
-            FormatOpeningIncludeGuardIncludes(config_, PreserveSourceLines(token.text), sourcePath_) :
+            FormatOpeningIncludeBlocksText(config_, PreserveSourceLines(token.text), sourcePath_) :
             CollapseSourceWhitespace(token.text);
         const bool conditionalMacroFunctionHeader = IsConditionalMacroFunctionHeader(token);
         const bool inlineFragment =

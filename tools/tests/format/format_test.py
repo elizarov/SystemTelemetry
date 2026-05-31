@@ -149,30 +149,48 @@ class FormatCommandTests(unittest.TestCase):
                 "    Priority: 2\n",
                 encoding="utf-8",
             )
-            input_text = (
-                "#ifndef SORT_FIXTURE_HPP\n"
-                "#define SORT_FIXTURE_HPP\n\n"
-                "#include \"b.h\"\n"
-                "#include <zeta>\n\n"
-                "#include \"a.h\"\n"
-                "#include <alpha>\n\n"
-                "int value;\n\n"
-                "#endif\n"
-            )
-            result = native_format(f"--style={config}", input_text=input_text)
+            cases = [
+                (
+                    "#pragma once",
+                    "#pragma once\n\n"
+                    "#include \"b.h\"\n"
+                    "#include <zeta>\n\n"
+                    "#include \"a.h\"\n"
+                    "#include <alpha>\n\n"
+                    "int value;\n",
+                    "#pragma once\n\n"
+                    "#include <alpha>\n"
+                    "#include <zeta>\n\n"
+                    "#include \"a.h\"\n"
+                    "#include \"b.h\"\n\n"
+                    "int value;\n",
+                ),
+                (
+                    "#ifndef",
+                    "#ifndef SORT_FIXTURE_HPP\n"
+                    "#define SORT_FIXTURE_HPP\n\n"
+                    "#include \"b.h\"\n"
+                    "#include <zeta>\n\n"
+                    "#include \"a.h\"\n"
+                    "#include <alpha>\n\n"
+                    "int value;\n\n"
+                    "#endif\n",
+                    "#ifndef SORT_FIXTURE_HPP\n"
+                    "#define SORT_FIXTURE_HPP\n\n"
+                    "#include <alpha>\n"
+                    "#include <zeta>\n\n"
+                    "#include \"a.h\"\n"
+                    "#include \"b.h\"\n\n"
+                    "int value;\n\n"
+                    "#endif\n",
+                ),
+            ]
+            for name, input_text, expected in cases:
+                with self.subTest(name=name):
+                    result = native_format(f"--style={config}", input_text=input_text)
 
-            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
-            self.assertEqual(
-                "#ifndef SORT_FIXTURE_HPP\n"
-                "#define SORT_FIXTURE_HPP\n\n"
-                "#include <alpha>\n"
-                "#include <zeta>\n\n"
-                "#include \"a.h\"\n"
-                "#include \"b.h\"\n\n"
-                "int value;\n\n"
-                "#endif\n",
-                result.stdout,
-            )
+                    self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+                    self.assertEqual(expected, result.stdout)
 
     def test_file_argument_formats_to_stdout(self) -> None:
         with copied_fixtures(OUTPUT_FIXTURE) as fixtures:

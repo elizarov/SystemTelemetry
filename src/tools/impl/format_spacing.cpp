@@ -168,6 +168,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
     if (IsAttributeOpenToken(current) && IsWordLike(*previous)) {
         return true;
     }
+    if ((IsStringLike(*previous) && IsWordLike(current)) || (IsWordLike(*previous) && IsStringLike(current))) {
+        return true;
+    }
     if (current.parentKind == SyntaxNodeKind::RefQualifier) {
         return true;
     }
@@ -294,6 +297,9 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return false;
     }
     if (cur == SyntaxNodeKind::LeftBrace) {
+        if (current.parentKind == SyntaxNodeKind::RequiresExpression) {
+            return true;
+        }
         if (current.parentKind == SyntaxNodeKind::InitializerList) {
             return previous->kind == PrintTokenKind::Known && (
                 SyntaxNodeKindHasClass(prev, TokenClass::AssignmentOperator) ||
@@ -343,7 +349,8 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
     if (cur == SyntaxNodeKind::Colon) {
         if (
             previous->syntaxKind == SyntaxNodeKind::KeywordDefault ||
-            SyntaxNodeKindHasClass(previous->syntaxKind, TokenClass::AccessKeyword)
+            SyntaxNodeKindHasClass(previous->syntaxKind, TokenClass::AccessKeyword) ||
+            current.parentKind == SyntaxNodeKind::LabeledStatement
         ) {
             return false;
         }

@@ -1,7 +1,8 @@
 #ifndef FORMAT_USERVER_FIXTURE_HPP
 #define FORMAT_USERVER_FIXTURE_HPP
 
-// Golden fixture for userver formatting; keep these examples representative of userver parser and include-preservation cases.
+// Golden fixture for userver formatting.
+// Keep these examples representative of userver parser and include-preservation cases.
 // Mirrors userver .clang-format include setting: IncludeBlocks: Preserve.
 // The guarded header shape exercises include preservation away from the common userver #pragma once path.
 

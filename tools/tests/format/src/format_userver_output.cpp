@@ -1,7 +1,8 @@
 #ifndef FORMAT_USERVER_FIXTURE_HPP
 #define FORMAT_USERVER_FIXTURE_HPP
 
-// Golden fixture for userver formatting; keep these examples representative of userver parser and include-preservation cases.
+// Golden fixture for userver formatting.
+// Keep these examples representative of userver parser and include-preservation cases.
 // Mirrors userver .clang-format include setting: IncludeBlocks: Preserve.
 // The guarded header shape exercises include preservation away from the common userver #pragma once path.
 
@@ -88,17 +89,16 @@ public: \
         name>();                         \
     struct FormatUserverForceSemicolon
 
-extern"C" {
+extern "C" {
 #ifndef FORMAT_USERVER_CLANG
 [[gnu::visibility("default")]] [[gnu::externally_visible]]
 #endif
     int FormatUserverExternAttribute();
 }
 
-BENCHMARK_CAPTURE(FormatterBenchmark, Mode, kValue) FORMAT_USERVER_BENCHMARK_ARGS; BENCHMARK_INSTANTIATE_TEMPLATE_F(FormatterBenchmark, Value, int); BENCHMARK_DEFINE_TEMPLATE_F(
-    FormatterBenchmark,
-    Value
-)(benchmark::State& state) {
+BENCHMARK_CAPTURE(FormatterBenchmark, Mode, kValue) FORMAT_USERVER_BENCHMARK_ARGS;
+BENCHMARK_INSTANTIATE_TEMPLATE_F(FormatterBenchmark, Value, int);
+BENCHMARK_DEFINE_TEMPLATE_F(FormatterBenchmark, Value)(benchmark::State& state) {
     UseBenchmarkState(state);
 }
 BENCHMARK_DEFINE_F(FormatterBenchmark, Inline)(benchmark::State& state) {
@@ -192,7 +192,7 @@ void DecltypeBracedSentinel(Iterator it) {
 }
 
 void MacroConcatenatedString() {
-    throw Error("prefix "FORMAT_USERVER_VERSION" suffix");
+    throw Error("prefix " FORMAT_USERVER_VERSION " suffix");
 }
 
 #if defined(FORMAT_USERVER_PLATFORM) && __has_include(<format_userver/header.hpp>)
@@ -299,7 +299,7 @@ if (conn->pipelineStatus == kPipelineOff)
 if (Flush(conn) < 0)
 #endif
     goto sendFailed;
-    sendFailed :;
+    sendFailed:;
 }
 
 void PreprocessorSelectedBracedIf(Connection* conn, std::string& status) {

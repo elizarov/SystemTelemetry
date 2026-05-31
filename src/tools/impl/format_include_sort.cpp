@@ -50,6 +50,48 @@ std::string_view TrimView(std::string_view value) {
     return value;
 }
 
+bool IsBlankSourceLine(std::string_view line) {
+    return TrimView(line).empty();
+}
+
+bool IsCommentSourceLine(std::string_view line) {
+    const std::string_view trimmed = TrimView(line);
+    return StartsWith(trimmed, "//") || StartsWith(trimmed, "/*");
+}
+
+bool IsIncludeSourceLine(std::string_view line) {
+    return StartsWith(TrimView(line), "#include");
+}
+
+bool IsIncludeGuardOpening(const std::vector<std::string>& lines) {
+    if (lines.size() < 3) {
+        return false;
+    }
+    return StartsWith(TrimView(lines[0]), "#ifndef") && StartsWith(TrimView(lines[1]), "#define");
+}
+
+void AppendSourceLines(std::string& output, const std::vector<std::string>& lines, size_t first, size_t last) {
+    for (size_t index = first; index < last; ++index) {
+        output.append(lines[index]);
+        output.push_back('\n');
+    }
+}
+
+size_t SkipBlankSourceLines(const std::vector<std::string>& lines, size_t index) {
+    while (index < lines.size() && IsBlankSourceLine(lines[index])) {
+        ++index;
+    }
+    return index;
+}
+
+bool IsIncludeSeparatorBlank(const std::vector<std::string>& lines, size_t index, size_t& nextLine) {
+    if (index >= lines.size() || !IsBlankSourceLine(lines[index])) {
+        return false;
+    }
+    nextLine = SkipBlankSourceLines(lines, index + 1);
+    return nextLine < lines.size() && IsIncludeSourceLine(lines[nextLine]);
+}
+
 std::string_view ConsumeIncludeDirective(std::string_view text) {
     text = TrimView(text);
     if (text.empty() || text.front() != '#') {
@@ -267,6 +309,57 @@ std::string FormatIncludeEntriesText(
     return result;
 }
 
+std::string FormatOpeningIncludeBlocks(
+    const FormatterConfig& config,
+    std::string_view text,
+    std::string_view sourcePath
+) {
+    const std::vector<std::string> lines = SplitLines(text);
+    if (!IsIncludeGuardOpening(lines)) {
+        return std::string(text);
+    }
+
+    size_t runStart = 2;
+    while (runStart < lines.size() && (
+        IsBlankSourceLine(lines[runStart]) ||
+        IsCommentSourceLine(lines[runStart])
+    )) {
+        ++runStart;
+    }
+    if (runStart >= lines.size() || !IsIncludeSourceLine(lines[runStart])) {
+        return std::string(text);
+    }
+
+    std::vector<std::string> includeLines;
+    size_t runEnd = runStart;
+    for (; runEnd < lines.size(); ++runEnd) {
+        if (IsIncludeSourceLine(lines[runEnd])) {
+            includeLines.push_back(lines[runEnd]);
+            continue;
+        }
+        if (IsBlankSourceLine(lines[runEnd])) {
+            size_t nextLine = runEnd;
+            if (IsIncludeSeparatorBlank(lines, runEnd, nextLine)) {
+                includeLines.emplace_back();
+                runEnd = nextLine - 1;
+                continue;
+            }
+            runEnd = nextLine;
+            break;
+        }
+        break;
+    }
+
+    std::string result;
+    AppendSourceLines(result, lines, 0, runStart);
+    result.append(FormatIncludeEntriesText(config, includeLines, sourcePath));
+    if (runEnd < lines.size()) {
+        result.push_back('\n');
+    }
+    AppendSourceLines(result, lines, runEnd, lines.size());
+    return result;
+}
+
 }  // namespace
 
 std::string
@@ -293,4 +386,12 @@ std::string FormatIncludeLinesText(
     std::string_view sourcePath
 ) {
     return FormatIncludeEntriesText(config, includeLines, sourcePath);
+}
+
+std::string FormatOpeningIncludeBlocksText(
+    const FormatterConfig& config,
+    std::string_view text,
+    std::string_view sourcePath
+) {
+    return FormatOpeningIncludeBlocks(config, text, sourcePath);
 }

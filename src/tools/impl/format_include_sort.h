@@ -18,3 +18,9 @@ std::string FormatIncludeLinesText(
     const std::vector<std::string>& includeLines,
     std::string_view sourcePath
 );
+
+std::string FormatOpeningIncludeBlocksText(
+    const FormatterConfig& config,
+    std::string_view text,
+    std::string_view sourcePath
+);
