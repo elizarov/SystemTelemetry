@@ -1,0 +1,101 @@
+# Mirrors ../../../../userver/.cpp-format style for userver golden fixtures.
+# Keep style fields in sync with the formatter config used by the adjacent userver checkout.
+# Userver-specific MacroCategories entries below are parser grammar inputs.
+# userver .clang-format include config currently sets IncludeBlocks: Preserve.
+---
+ColumnLimit: 120
+IndentWidth: 4
+TabWidth: 4
+
+IncludeCategories:
+  - Regex: '^<(winsock2|ws2tcpip)\.h>$'
+    Priority: 1
+  - Regex: '^<windows\.h>$'
+    Priority: 2
+  - Regex: '^<.*>$'
+    Priority: 3
+  - Regex: '^"vendor/.*"$'
+    Priority: 4
+  - Regex: '^".*"$'
+    Priority: 5
+MainIncludeChar: Quote
+IncludeIsMainRegex: '(Test)?$'
+
+MacroCategories:
+  CallingConvention:
+    - CALLBACK
+    - WINAPI
+  StatementLikeParameters:
+    - X
+  RawMacroFunctionPrefixes:
+    - IMPL_UTEST
+    - TYPED_UTEST
+    - INSTANTIATE_UTEST
+    - UTEST
+    - UPROTO
+    - LOG
+    - RET
+    - UASSERT
+    - UEXPECT
+    - UINVARIANT
+    - USERVER
+    - UTILS
+  FunctionPrefixes:
+    - USERVER_IMPL_NODEBUG
+    - USERVER_IMPL_FORCE_INLINE
+    - USERVER_IMPL_DISABLE_ASAN
+  MacroFunctionDefinitions:
+    - TYPED_UTEST_P_MT
+    - TYPED_UTEST_MT
+    - TYPED_UTEST_P
+    - UTEST_F_MT
+    - UTEST_P_MT
+    - UTEST_MT
+    - UTEST_DEATH
+    - UTEST_F
+    - UTEST_P
+    - UTEST
+  NoThrowMacros:
+    - UEXPECT_NO_THROW
+    - UASSERT_NO_THROW
+  NameMacroCalls:
+    - RET_NAME
+  NamespaceAliasMacros:
+    - CURL_FORMAT_USERVER_NAMESPACE
+    - CURL_8_13_NAMESPACE
+    - CURL_SSLVERSION_NAMESPACE
+
+StreamShift:
+  ConfigurationMethods:
+    - std::boolalpha
+    - std::noboolalpha
+    - std::showbase
+    - std::noshowbase
+    - std::showpoint
+    - std::noshowpoint
+    - std::showpos
+    - std::noshowpos
+    - std::skipws
+    - std::noskipws
+    - std::uppercase
+    - std::nouppercase
+    - std::unitbuf
+    - std::nounitbuf
+    - std::internal
+    - std::left
+    - std::right
+    - std::dec
+    - std::hex
+    - std::oct
+    - std::fixed
+    - std::scientific
+    - std::hexfloat
+    - std::defaultfloat
+    - std::setbase
+    - std::setfill
+    - std::setprecision
+    - std::setw
+    - std::resetiosflags
+    - std::setiosflags
+    - std::emit_on_flush
+    - std::noemit_on_flush

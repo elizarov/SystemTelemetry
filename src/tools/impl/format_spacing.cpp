@@ -57,6 +57,17 @@ bool IsAttributeCloseToken(const PrintToken& token) {
     );
 }
 
+bool IsAttributeOpenToken(const PrintToken& token) {
+    return token.kind == PrintTokenKind::Free && token.text == "[[" && (
+        token.parentKind == SyntaxNodeKind::AttributeSpecifier ||
+        token.parentKind == SyntaxNodeKind::AttributeDeclaration
+    );
+}
+
+bool IsFunctionSuffixMacro(const PrintToken& token) {
+    return token.syntaxKind == SyntaxNodeKind::FunctionSuffixMacro;
+}
+
 bool HasCallModifierBeforeDeclaratorBinding(const PrintToken& token) {
     const SyntaxNode* declarator = ParentNode(token);
     const SyntaxNode* parenthesized = GrandParentNode(token);
@@ -152,6 +163,15 @@ bool FormatTokenNeedsSpace(const PrintToken* previous, const PrintToken& current
         return true;
     }
     if (IsAttributeCloseToken(*previous)) {
+        return true;
+    }
+    if (IsAttributeOpenToken(current) && IsWordLike(*previous)) {
+        return true;
+    }
+    if (current.parentKind == SyntaxNodeKind::RefQualifier) {
+        return true;
+    }
+    if (IsFunctionSuffixMacro(current)) {
         return true;
     }
     if (IsCompactEmptyBraceToken(*previous) && current.kind == PrintTokenKind::Known) {

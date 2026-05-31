@@ -25,9 +25,24 @@ TREE_SITTER_CLI_SHA512 = (
     "4CEFF1C79CF8491B1099CBC401AC4F2B85BAC45716C8C4B24C3EDA35A38C01E4996000CAF86979323E3F6352B2BF61CE2904C971"
     "627AFC4B0BCDEFD4E40C8A36"
 )
+MACRO_CATEGORY_ORDER = (
+    "calling_convention",
+    "raw_macro_function_prefix",
+    "function_prefix",
+    "macro_function_definition",
+    "no_throw_macro",
+    "name_macro_call",
+    "namespace_alias_macro",
+)
 REQUIRED_MACRO_CATEGORIES = ("calling_convention",)
 FORMAT_CATEGORY_KEYS = {
     "calling_convention": "CallingConvention",
+    "raw_macro_function_prefix": "RawMacroFunctionPrefixes",
+    "function_prefix": "FunctionPrefixes",
+    "macro_function_definition": "MacroFunctionDefinitions",
+    "no_throw_macro": "NoThrowMacros",
+    "name_macro_call": "NameMacroCalls",
+    "namespace_alias_macro": "NamespaceAliasMacros",
 }
 MACRO_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
@@ -85,40 +100,61 @@ def load_macro_category_section(config_path: Path) -> dict[str, list[str]]:
     return macro_categories
 
 
+def clean_macro_category_names(config_path: Path, config_key: str, names: list[str]) -> list[str]:
+    seen = set()
+    clean_names: list[str] = []
+    for name in names:
+        if not MACRO_NAME_PATTERN.match(name):
+            fail(f"{config_path} MacroCategories.{config_key} entry is not a C/C++ macro name: {name!r}")
+        if name in seen:
+            fail(f"{config_path} MacroCategories.{config_key} entry is duplicated: {name}")
+        seen.add(name)
+        clean_names.append(name)
+    return clean_names
+
+
 def load_macro_categories(config_path: Path) -> dict[str, list[str]]:
     macro_categories = load_macro_category_section(config_path)
     if not macro_categories:
-        fail(".cpp-format MacroCategories must be present")
+        fail(f"{config_path} MacroCategories must be present")
 
     categories: dict[str, list[str]] = {}
-    for category in REQUIRED_MACRO_CATEGORIES:
+    for category in MACRO_CATEGORY_ORDER:
         config_key = FORMAT_CATEGORY_KEYS[category]
-        names = macro_categories.get(config_key)
-        if not names:
-            fail(f".cpp-format MacroCategories.{config_key} must be a non-empty array")
-        seen = set()
-        clean_names: list[str] = []
-        for name in names:
-            if not MACRO_NAME_PATTERN.match(name):
-                fail(f".cpp-format macro {config_key} entry is not a C/C++ macro name: {name!r}")
-            if name in seen:
-                fail(f".cpp-format macro {config_key} entry is duplicated: {name}")
-            seen.add(name)
-            clean_names.append(name)
+        names = macro_categories.get(config_key, [])
+        if category in REQUIRED_MACRO_CATEGORIES and not names:
+            fail(f"{config_path} MacroCategories.{config_key} must be a non-empty array")
+        clean_names = clean_macro_category_names(config_path, config_key, names)
         categories[category] = clean_names
     return categories
 
 
-def write_case_dash_macro_config(output_path: Path, categories: dict[str, list[str]]) -> None:
+def load_macro_category_sources(config_paths: list[Path], repo_root: Path) -> list[tuple[str, dict[str, list[str]]]]:
+    sources: list[tuple[str, dict[str, list[str]]]] = []
+    for config_path in config_paths:
+        categories = load_macro_categories(config_path)
+        source_name = config_path.relative_to(repo_root).as_posix()
+        sources.append((source_name, categories))
+    return sources
+
+
+def write_macro_config(output_path: Path, sources: list[tuple[str, dict[str, list[str]]]]) -> None:
     lines = [
-        "// Generated from .cpp-format by tools/regenerate_tree_sitter_grammar.py.",
+        "// Generated from .cpp-format and tools/tests/format/.cpp-format-userver by",
+        "// tools/regenerate_tree_sitter_grammar.py.",
         "module.exports = {",
         "  macro_categories: {",
     ]
-    for category in REQUIRED_MACRO_CATEGORIES:
+    for category in MACRO_CATEGORY_ORDER:
         lines.append(f"    {category}: [")
-        for name in categories[category]:
-            lines.append(f"      {json.dumps(name)},")
+        seen_names: set[str] = set()
+        for source_name, categories in sources:
+            lines.append(f"      // {source_name}")
+            for name in categories[category]:
+                if name in seen_names:
+                    continue
+                seen_names.add(name)
+                lines.append(f"      {json.dumps(name)},")
         lines.append("    ],")
     lines.extend([
         "  },",
@@ -182,15 +218,18 @@ def main() -> int:
     vendor_root = repo_root / "src" / "tools" / "vendor" / "tree-sitter"
     cpp_grammar_dir = vendor_root / "tree-sitter-cpp"
     c_grammar_dir = vendor_root / "tree-sitter-c"
-    config_path = repo_root / ".cpp-format"
-    macro_config_path = cpp_grammar_dir / "case_dash_macro_config.js"
+    config_paths = [
+        repo_root / ".cpp-format",
+        repo_root / "tools" / "tests" / "format" / ".cpp-format-userver",
+    ]
+    macro_config_path = cpp_grammar_dir / "macro_config.js"
 
-    for required_path in (cpp_grammar_dir / "grammar.js", c_grammar_dir / "grammar.js", config_path):
+    for required_path in (cpp_grammar_dir / "grammar.js", c_grammar_dir / "grammar.js", *config_paths):
         if not required_path.exists():
             fail(f"Missing required grammar regeneration input: {required_path}")
 
-    categories = load_macro_categories(config_path)
-    write_case_dash_macro_config(macro_config_path, categories)
+    sources = load_macro_category_sources(config_paths, repo_root)
+    write_macro_config(macro_config_path, sources)
     tree_sitter_cli = ensure_tree_sitter_cli(repo_root, args.tree_sitter_cli)
     run_tree_sitter_generate(cpp_grammar_dir, vendor_root, tree_sitter_cli)
     print(f"Regenerated tree-sitter C++ grammar outputs under {cpp_grammar_dir}")

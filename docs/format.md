@@ -566,6 +566,8 @@ Macro replacement lists that form declaration fragments are recursively formatte
 
 Function-like macro parameters listed in `.cpp-format` `MacroCategories.StatementLikeParameters` are emitted one invocation per continuation line.
 
+Tree-sitter macro recognition is generated from `.cpp-format` and `tools/tests/format/.cpp-format-userver`. `MacroCategories.CallingConvention` feeds calling-convention tokens. `RawMacroFunctionPrefixes`, `FunctionPrefixes`, `MacroFunctionDefinitions`, `NoThrowMacros`, `NameMacroCalls`, and `NamespaceAliasMacros` feed parser-only macro name categories for project-specific source shapes.
+
 ```cpp
 #define CASEDASH_METRIC_DISPLAY_STYLE_ITEMS(X) \
     X(Scalar, "scalar") \
@@ -626,6 +628,7 @@ Token spelling is preserved even when the parser grammar treats multiple spellin
 - `src\tools\format.cpp` owns formatter command orchestration; the internal `src\tools\impl\format_*` formatter modules own the parser setup, model definitions, tree-sitter model builder helpers, preprocessor model helpers, and pretty printer.
 - `CaseDashTools.exe format_model_dump` owns ad hoc formatter model debugging. It takes one source file path and writes YAML to stdout with each `SyntaxNode` represented by `kind`, plus `text` only when node text is non-empty and `children` only when child nodes exist; text values up to 60 bytes are YAML-quoted, and longer text values are emitted as their byte length.
 - `.cpp-format` owns only the formatter inputs that are intentionally configurable: `ColumnLimit`, `IndentWidth`, `TabWidth`, `IncludeCategories`, `MainIncludeChar`, `IncludeIsMainRegex`, `MacroCategories`, and `StreamShift`.
+- `tools/tests/format/.cpp-format-userver` mirrors the userver formatter fixture style inputs and owns userver-specific parser macro names used by grammar regeneration.
 - `.cpp-format-ignore` owns simple literal formatter exclusions. Entries are directory names, file names, or slash-separated relative paths. Glob patterns and negation are not supported.
 - `src\tools\vendor\tree-sitter\` owns vendored tree-sitter grammar inputs and generated parser sources.
 - `tools\regenerate_tree_sitter_grammar.py` owns parser regeneration.

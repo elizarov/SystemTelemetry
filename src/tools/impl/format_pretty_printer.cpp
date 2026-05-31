@@ -34,6 +34,87 @@ bool IsPreprocessorNode(SyntaxNodeKind kind) {
     return SyntaxNodeKindHasClass(kind, TokenClass::AtomicPreprocessor);
 }
 
+std::string_view TrimSourceLine(std::string_view line) {
+    while (!line.empty() && (line.front() == ' ' || line.front() == '\t')) {
+        line.remove_prefix(1);
+    }
+    while (!line.empty() && (line.back() == ' ' || line.back() == '\t')) {
+        line.remove_suffix(1);
+    }
+    return line;
+}
+
+bool IsBlankSourceLine(std::string_view line) {
+    return TrimSourceLine(line).empty();
+}
+
+bool IsCommentSourceLine(std::string_view line) {
+    const std::string_view trimmed = TrimSourceLine(line);
+    return StartsWith(trimmed, "//") || StartsWith(trimmed, "/*");
+}
+
+bool IsIncludeSourceLine(std::string_view line) {
+    return StartsWith(TrimSourceLine(line), "#include");
+}
+
+bool IsIncludeGuardOpening(const std::vector<std::string>& lines) {
+    if (lines.size() < 3) {
+        return false;
+    }
+    return StartsWith(TrimSourceLine(lines[0]), "#ifndef") && StartsWith(TrimSourceLine(lines[1]), "#define");
+}
+
+void AppendSourceLines(std::string& output, const std::vector<std::string>& lines, size_t first, size_t last) {
+    for (size_t index = first; index < last; ++index) {
+        output.append(lines[index]);
+        output.push_back('\n');
+    }
+}
+
+std::string FormatOpeningIncludeGuardIncludes(
+    const FormatterConfig& config,
+    std::string_view text,
+    std::string_view sourcePath
+) {
+    const std::vector<std::string> lines = SplitLines(text);
+    if (!IsIncludeGuardOpening(lines)) {
+        return std::string(text);
+    }
+
+    size_t runStart = 2;
+    while (runStart < lines.size() && (
+        IsBlankSourceLine(lines[runStart]) ||
+        IsCommentSourceLine(lines[runStart])
+    )) {
+        ++runStart;
+    }
+    if (runStart >= lines.size() || !IsIncludeSourceLine(lines[runStart])) {
+        return std::string(text);
+    }
+
+    std::vector<std::string> includeLines;
+    size_t runEnd = runStart;
+    for (; runEnd < lines.size(); ++runEnd) {
+        if (IsIncludeSourceLine(lines[runEnd])) {
+            includeLines.push_back(lines[runEnd]);
+            continue;
+        }
+        if (IsBlankSourceLine(lines[runEnd])) {
+            continue;
+        }
+        break;
+    }
+
+    std::string result;
+    AppendSourceLines(result, lines, 0, runStart);
+    result.append(FormatIncludeLinesText(config, includeLines, sourcePath));
+    if (runEnd < lines.size()) {
+        result.push_back('\n');
+    }
+    AppendSourceLines(result, lines, runEnd, lines.size());
+    return result;
+}
+
 BraceRole RoleForBraceParent(SyntaxNodeKind parentKind) {
     switch (parentKind) {
         case SyntaxNodeKind::CompoundStatement:
@@ -70,6 +151,10 @@ bool IsMacroDefinitionNode(SyntaxNodeKind kind) {
 
 bool IsMacroDeclarationFragment(SyntaxNodeKind kind) {
     return SyntaxNodeKindHasClass(kind, TokenClass::MacroDeclarationFragment);
+}
+
+bool IsConditionalMacroFunctionHeader(const PrintToken& token) {
+    return token.syntaxKind == SyntaxNodeKind::PreprocIf && token.parentKind == SyntaxNodeKind::FunctionDefinition;
 }
 
 bool RequiresMacroValueBreak(const SyntaxNode& node) {
@@ -344,6 +429,26 @@ std::string CollapseSourceWhitespace(std::string_view text) {
     return result;
 }
 
+std::string PreserveSourceLines(std::string_view text) {
+    std::string result;
+    result.reserve(text.size());
+    for (size_t index = 0; index < text.size(); ++index) {
+        const char ch = text[index];
+        if (ch == '\r') {
+            if (index + 1 < text.size() && text[index + 1] == '\n') {
+                ++index;
+            }
+            result.push_back('\n');
+        } else {
+            result.push_back(ch);
+        }
+    }
+    while (!result.empty() && result.back() == '\n') {
+        result.pop_back();
+    }
+    return result;
+}
+
 void AnnotateMacroValueWidths(std::vector<PrintToken>& tokens) {
     for (size_t index = 0; index < tokens.size(); ++index) {
         if (!tokens[index].inMacroValue || tokens[index].macroValueRemainingWidth != 0) {
@@ -433,6 +538,7 @@ private:
     std::vector<BraceFrame> braceStack_;
     std::vector<int> activeCaseBodySwitchDepths_;
     std::vector<DeferredSplitListContext> deferredSplitListContexts_;
+    std::vector<int> conditionalMacroFunctionIndents_;
     std::optional<int> pendingIndentRestoreAfterFlush_;
 
     static const PrintToken* PreviousToken(const std::vector<PrintToken>& tokens, size_t index) {
@@ -1726,7 +1832,16 @@ private:
     }
 
     void PrintPreprocessor(const PrintToken& token, const PrintToken* next) {
-        const std::string line = CollapseSourceWhitespace(token.text);
+        const bool hasLineBreak = token.text.find_first_of("\r\n") != std::string_view::npos;
+        const std::string line = hasLineBreak ?
+            FormatOpeningIncludeGuardIncludes(config_, PreserveSourceLines(token.text), sourcePath_) :
+            CollapseSourceWhitespace(token.text);
+        const bool conditionalMacroFunctionHeader = IsConditionalMacroFunctionHeader(token);
+        const bool inlineFragment =
+            token.parentKind == SyntaxNodeKind::ArgumentList ||
+            token.parentKind == SyntaxNodeKind::BinaryExpression ||
+            token.parentKind == SyntaxNodeKind::ConditionClause ||
+            token.grandParentKind == SyntaxNodeKind::ArgumentList;
         const bool isInclude = StartsWith(line, "#include");
         const bool isUndef = StartsWith(line, "#undef");
         if (isUndef) {
@@ -1740,8 +1855,13 @@ private:
         lineHasText_ = true;
         atLineStart_ = false;
         NewLine();
+        if (conditionalMacroFunctionHeader) {
+            conditionalMacroFunctionIndents_.push_back(indentLevel_);
+            ++indentLevel_;
+            return;
+        }
         if (StartsWith(line, "#pragma once") || isUndef || (
-            !isInclude && next != nullptr && !IsPreprocessorLikeToken(*next)
+            !inlineFragment && !isInclude && next != nullptr && !IsPreprocessorLikeToken(*next)
         )) {
             BlankLine();
         }
@@ -1968,6 +2088,28 @@ private:
     void PrintRightBrace(const PrintToken& token, const PrintToken* next, const PrintToken* rawNext) {
         if (compactRightBraceSkips_ > 0) {
             --compactRightBraceSkips_;
+            return;
+        }
+        if (
+            token.parentKind == SyntaxNodeKind::CompoundStatement &&
+            token.grandParentKind == SyntaxNodeKind::FunctionDefinition &&
+            token.node != nullptr &&
+            token.node->parent != nullptr &&
+            !HasDirectTokenChild(*token.node->parent, SyntaxNodeKind::LeftBrace) &&
+            !conditionalMacroFunctionIndents_.empty()
+        ) {
+            FlushPendingTokens();
+            if (lineHasText_) {
+                NewLine(token.inMacroValue);
+            }
+            indentLevel_ = conditionalMacroFunctionIndents_.back();
+            conditionalMacroFunctionIndents_.pop_back();
+            BufferToken(token);
+            FlushPendingTokens();
+            if (next != nullptr && next->kind == PrintTokenKind::TrailingComment) {
+                return;
+            }
+            NewLine(ShouldContinueMacroLine(token, next));
             return;
         }
         const BraceRole tokenRole = RoleForBrace(token);
