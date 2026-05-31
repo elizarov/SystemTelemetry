@@ -516,23 +516,30 @@ inline void AppendTsChild(
     TSNode child,
     uint32_t childEnd,
     uint32_t childEndRow,
+    uint32_t childEndColumn,
     std::string_view source,
     SyntaxNode& parent,
     uint32_t& previousEnd,
     uint32_t& previousEndRow,
+    uint32_t& previousEndColumn,
     bool& hasPreviousSibling
 ) {
     const TsNodeSyntax childSyntax = GetTsNodeSyntax(child);
     const uint32_t childStart = ts_node_start_byte(child);
-    if (hasPreviousSibling && ContainsBlankLine(source, previousEnd, childStart)) {
+    const uint32_t childStartRow = ts_node_start_point(child).row;
+    if (
+        hasPreviousSibling &&
+        (ContainsBlankLine(source, previousEnd, childStart) || (previousEndColumn == 0 && childStartRow > previousEndRow))
+    ) {
         AppendChild(parent, MakeBlankLine(model));
     }
     const bool isTrailingComment = childSyntax.kind == SyntaxNodeKind::Comment &&
         hasPreviousSibling &&
-        previousEndRow == ts_node_start_point(child).row;
+        previousEndRow == childStartRow;
     AppendTsNode(model, child, source, parent, childSyntax, isTrailingComment);
     previousEnd = childEnd;
     previousEndRow = childEndRow;
+    previousEndColumn = childEndColumn;
     hasPreviousSibling = true;
 }
 
@@ -549,18 +556,22 @@ void AppendTsChildren(
 
     uint32_t previousEnd = ts_node_start_byte(tsNode);
     uint32_t previousEndRow = ts_node_start_point(tsNode).row;
+    uint32_t previousEndColumn = ts_node_start_point(tsNode).column;
     bool hasPreviousSibling = !parent.children.empty();
     for (uint32_t index = 0; index < childCount; ++index) {
         TSNode child = ts_node_child(tsNode, index);
+        const TSPoint childEndPoint = ts_node_end_point(child);
         AppendTsChild(
             model,
             child,
             ts_node_end_byte(child),
-            ts_node_end_point(child).row,
+            childEndPoint.row,
+            childEndPoint.column,
             source,
             parent,
             previousEnd,
             previousEndRow,
+            previousEndColumn,
             hasPreviousSibling
         );
     }
@@ -615,7 +626,25 @@ void AppendIncludeRun(
             continue;
         }
         if (sourceChildren[index] != nullptr && sourceChildren[index]->kind == SyntaxNodeKind::BlankLine) {
-            continue;
+            size_t nextIndex = index + 1;
+            while (
+                nextIndex < sourceChildren.size() &&
+                sourceChildren[nextIndex] != nullptr &&
+                sourceChildren[nextIndex]->kind == SyntaxNodeKind::BlankLine
+            ) {
+                ++nextIndex;
+            }
+            if (
+                nextIndex < sourceChildren.size() &&
+                sourceChildren[nextIndex] != nullptr &&
+                SyntaxNodeKindHasClass(sourceChildren[nextIndex]->kind, TokenClass::IncludeDirective)
+            ) {
+                AppendChild(*includeRun, sourceChildren[index]);
+                index = nextIndex - 1;
+                continue;
+            }
+            index = nextIndex;
+            break;
         }
         break;
     }
@@ -623,8 +652,42 @@ void AppendIncludeRun(
     groupedChildren.push_back(includeRun);
 }
 
+bool IsPragmaOnceNode(const SyntaxNode& node) {
+    return node.kind == SyntaxNodeKind::PreprocCall && StartsWith(TrimLeadingWhitespace(node.text), "#pragma once");
+}
+
+bool IsPreprocessorConditionHeaderNode(const SyntaxNode& node) {
+    return node.kind == SyntaxNodeKind::FreeToken || node.kind == SyntaxNodeKind::Identifier;
+}
+
+bool IsStructuredIncludeGuardOwner(SyntaxNodeKind kind) {
+    return kind == SyntaxNodeKind::PreprocIfdef || kind == SyntaxNodeKind::PreprocIf;
+}
+
+bool CanRemainInOpeningIncludeArea(const SyntaxNode& owner, const SyntaxNode& child, bool sawInclude) {
+    if (SyntaxNodeKindHasClass(child.kind, TokenClass::Trivia)) {
+        return true;
+    }
+    if (sawInclude) {
+        return false;
+    }
+    if (owner.kind == SyntaxNodeKind::TranslationUnit) {
+        return IsPragmaOnceNode(child);
+    }
+    if (IsStructuredIncludeGuardOwner(owner.kind)) {
+        return child.kind == SyntaxNodeKind::PreprocDef || IsPreprocessorConditionHeaderNode(child);
+    }
+    return false;
+}
+
 void GroupOpeningIncludeRuns(FormatModel& model, SyntaxNode& root) {
-    if (root.kind != SyntaxNodeKind::TranslationUnit) {
+    for (SyntaxNode* child : root.children) {
+        if (child != nullptr) {
+            GroupOpeningIncludeRuns(model, *child);
+        }
+    }
+
+    if (root.kind != SyntaxNodeKind::TranslationUnit && !IsStructuredIncludeGuardOwner(root.kind)) {
         return;
     }
 
@@ -641,12 +704,9 @@ void GroupOpeningIncludeRuns(FormatModel& model, SyntaxNode& root) {
             sawInclude = true;
             continue;
         }
-        const bool isPragmaOnce = root.children[index] != nullptr &&
-            root.children[index]->kind == SyntaxNodeKind::PreprocCall &&
-            StartsWith(TrimLeadingWhitespace(root.children[index]->text), "#pragma once");
         const bool canRemainInOpeningArea = inOpeningArea &&
             root.children[index] != nullptr &&
-            (SyntaxNodeKindHasClass(root.children[index]->kind, TokenClass::Trivia) || (!sawInclude && isPragmaOnce));
+            CanRemainInOpeningIncludeArea(root, *root.children[index], sawInclude);
         if (canRemainInOpeningArea) {
             groupedChildren.push_back(root.children[index]);
             ++index;

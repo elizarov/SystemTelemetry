@@ -1,23 +1,24 @@
 #ifndef FORMAT_USERVER_FIXTURE_HPP
 #define FORMAT_USERVER_FIXTURE_HPP
 
-// Golden fixture for userver formatting; keep these examples representative of userver parser and include-sorting cases.
+// Golden fixture for userver formatting; keep these examples representative of userver parser and include-preservation cases.
 // Mirrors userver .clang-format include setting: IncludeBlocks: Preserve.
-// The guarded header shape exercises include sorting away from the common userver #pragma once path.
+// The guarded header shape exercises include preservation away from the common userver #pragma once path.
 
-#include <algorithm>
-#include <array>
-#include <boost/atomic/atomic.hpp>
-#include <fmt/format.h>
-#include <google/protobuf/descriptor.h>
-#include <grpcpp/grpcpp.h>
-#include <string_view>
-#include <userver/logging/log.hpp>
-#include <userver/utest/utest.hpp>
 #include <userver/utils/assert.hpp>
+#include <algorithm>
+#include <boost/atomic/atomic.hpp>
 
 #include "src/kafka/impl/consumer_impl.hpp"
+#include <userver/utest/utest.hpp>
+#include <fmt/format.h>
+#include <string_view>
 #include "userver/chaotic/io/my/custom_object.hpp"
+
+#include <userver/logging/log.hpp>
+#include <google/protobuf/descriptor.h>
+#include <grpcpp/grpcpp.h>
+#include <array>
 
 #define FORMAT_USERVER_DO_WHILE(flag) \
     do { \

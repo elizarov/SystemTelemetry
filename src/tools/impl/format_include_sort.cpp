@@ -203,15 +203,35 @@ bool IsIncludeNode(const SyntaxNode& node) {
     return node.kind == SyntaxNodeKind::PreprocInclude;
 }
 
+std::string FormatIncludeTextsPreservingOrder(const std::vector<std::string>& includeTexts) {
+    std::string result;
+    for (const std::string& text : includeTexts) {
+        if (TrimView(text).empty()) {
+            result.push_back('\n');
+            continue;
+        }
+        result += ParseIncludeText(text).line;
+        result.push_back('\n');
+    }
+    return result;
+}
+
 std::string FormatIncludeEntriesText(
     const FormatterConfig& config,
     const std::vector<std::string>& includeTexts,
     std::string_view sourcePath
 ) {
+    if (config.includeGroups.empty()) {
+        return FormatIncludeTextsPreservingOrder(includeTexts);
+    }
+
     const IncludeSortContext context{.config = config, .mainIncludeRegex = BuildMainIncludeRegex(config, sourcePath)};
     std::vector<IncludeEntry> includes;
     includes.reserve(includeTexts.size());
     for (const std::string& text : includeTexts) {
+        if (TrimView(text).empty()) {
+            continue;
+        }
         IncludeText include = ParseIncludeText(text);
         includes.push_back({
             .line = std::move(include.line),
@@ -255,10 +275,14 @@ std::string
     std::vector<std::string> includeTexts;
     includeTexts.reserve(includeRun.children.size());
     for (const SyntaxNode* child : includeRun.children) {
-        if (!child || !IsIncludeNode(*child)) {
+        if (child == nullptr) {
             continue;
         }
-        includeTexts.push_back(std::string(child->text));
+        if (IsIncludeNode(*child)) {
+            includeTexts.push_back(std::string(child->text));
+        } else if (child->kind == SyntaxNodeKind::BlankLine) {
+            includeTexts.emplace_back();
+        }
     }
     return FormatIncludeEntriesText(config, includeTexts, sourcePath);
 }

@@ -76,6 +76,21 @@ void AppendSourceLines(std::string& output, const std::vector<std::string>& line
     }
 }
 
+size_t SkipBlankSourceLines(const std::vector<std::string>& lines, size_t index) {
+    while (index < lines.size() && IsBlankSourceLine(lines[index])) {
+        ++index;
+    }
+    return index;
+}
+
+bool IsIncludeSeparatorBlank(const std::vector<std::string>& lines, size_t index, size_t& nextLine) {
+    if (index >= lines.size() || !IsBlankSourceLine(lines[index])) {
+        return false;
+    }
+    nextLine = SkipBlankSourceLines(lines, index + 1);
+    return nextLine < lines.size() && IsIncludeSourceLine(lines[nextLine]);
+}
+
 std::string FormatOpeningIncludeGuardIncludes(
     const FormatterConfig& config,
     std::string_view text,
@@ -105,7 +120,14 @@ std::string FormatOpeningIncludeGuardIncludes(
             continue;
         }
         if (IsBlankSourceLine(lines[runEnd])) {
-            continue;
+            size_t nextLine = runEnd;
+            if (IsIncludeSeparatorBlank(lines, runEnd, nextLine)) {
+                includeLines.emplace_back();
+                runEnd = nextLine - 1;
+                continue;
+            }
+            runEnd = nextLine;
+            break;
         }
         break;
     }
@@ -197,7 +219,9 @@ bool PreservesBlankLineToken(SyntaxNodeKind parentKind) {
         parentKind == SyntaxNodeKind::DeclarationList ||
         parentKind == SyntaxNodeKind::CompoundStatement ||
         parentKind == SyntaxNodeKind::FieldDeclarationList ||
-        parentKind == SyntaxNodeKind::EnumeratorList;
+        parentKind == SyntaxNodeKind::EnumeratorList ||
+        parentKind == SyntaxNodeKind::PreprocIf ||
+        parentKind == SyntaxNodeKind::PreprocIfdef;
 }
 
 bool KeepsListCommentInBreakModel(const PrintToken& token) {

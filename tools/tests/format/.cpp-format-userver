@@ -1,23 +1,12 @@
-# Mirrors ../../../../userver/.cpp-format style for userver golden fixtures.
+# Mirrors $(userver)/.cpp-format style for userver golden fixtures.
 # Keep style fields in sync with the formatter config used by the adjacent userver checkout.
 # Userver-specific MacroCategories entries below are parser grammar inputs.
-# userver .clang-format include config currently sets IncludeBlocks: Preserve.
+# No IncludeCategories entry: mirrors userver .clang-format IncludeBlocks: Preserve behavior.
 ---
 ColumnLimit: 120
 IndentWidth: 4
 TabWidth: 4
 
-IncludeCategories:
-  - Regex: '^<(winsock2|ws2tcpip)\.h>$'
-    Priority: 1
-  - Regex: '^<windows\.h>$'
-    Priority: 2
-  - Regex: '^<.*>$'
-    Priority: 3
-  - Regex: '^"vendor/.*"$'
-    Priority: 4
-  - Regex: '^".*"$'
-    Priority: 5
 MainIncludeChar: Quote
 IncludeIsMainRegex: '(Test)?$'
 

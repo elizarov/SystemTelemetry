@@ -577,7 +577,9 @@ Tree-sitter macro recognition is generated from `.cpp-format` and `tools/tests/f
 
 ## Include Sorting
 
-Include sorting may move `#include` lines within sortable include blocks. It does not add includes, remove includes, rewrite include spelling, or move comments.
+Include sorting is enabled when the active `.cpp-format` contains `IncludeCategories`. Sorting may move `#include` lines within sortable include blocks. It does not add includes, remove includes, rewrite include spelling, or move comments.
+
+When `IncludeCategories` is absent, include sorting is disabled. Include directives are normalized and emitted in source order, and blank-separated include blocks are preserved.
 
 Comments inside an include area bound the sortable include run around them.
 
@@ -610,7 +612,7 @@ Include blocks are regrouped, sorted case-insensitively inside each group, and s
 
 The formatter preserves source token order except for:
 
-- include sorting
+- include sorting when `IncludeCategories` is configured
 - trailing-comma normalization
 - control-brace normalization
 - safe adjacent ordinary string-literal concatenation

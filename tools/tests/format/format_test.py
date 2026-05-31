@@ -95,6 +95,85 @@ class FormatCommandTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
         self.assertNotIn("tree-sitter parse failed", result.stderr)
 
+    def test_missing_include_categories_preserves_opening_include_blocks(self) -> None:
+        build_dir = REPO_ROOT / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="format_preserve_includes_", dir=build_dir) as temp_dir:
+            root = Path(temp_dir)
+            config = root / ".cpp-format"
+            config.write_text("---\nColumnLimit: 120\nIndentWidth: 4\nTabWidth: 4\n", encoding="utf-8")
+            cases = [
+                (
+                    "#pragma once\n\n"
+                    "#include <zeta>\n"
+                    "#include <alpha>\n\n"
+                    "#include \"b.h\"\n"
+                    "#include \"a.h\"\n\n"
+                    "int value;\n"
+                ),
+                (
+                    "#ifndef PRESERVE_FIXTURE_HPP\n"
+                    "#define PRESERVE_FIXTURE_HPP\n\n"
+                    "#include <zeta>\n"
+                    "#include <alpha>\n\n"
+                    "#include \"b.h\"\n"
+                    "#include \"a.h\"\n\n"
+                    "int value;\n\n"
+                    "#endif\n"
+                ),
+            ]
+            for text in cases:
+                with self.subTest(text=text.splitlines()[0]):
+                    result = native_format(f"--style={config}", input_text=text)
+
+                    self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+                    self.assertEqual(text, result.stdout)
+
+    def test_include_categories_sort_opening_include_blocks(self) -> None:
+        build_dir = REPO_ROOT / "build"
+        build_dir.mkdir(exist_ok=True)
+
+        with tempfile.TemporaryDirectory(prefix="format_sort_includes_", dir=build_dir) as temp_dir:
+            root = Path(temp_dir)
+            config = root / ".cpp-format"
+            config.write_text(
+                "---\n"
+                "ColumnLimit: 120\n"
+                "IndentWidth: 4\n"
+                "TabWidth: 4\n"
+                "IncludeCategories:\n"
+                "  - Regex: '^<.*>$'\n"
+                "    Priority: 1\n"
+                "  - Regex: '^\".*\"$'\n"
+                "    Priority: 2\n",
+                encoding="utf-8",
+            )
+            input_text = (
+                "#ifndef SORT_FIXTURE_HPP\n"
+                "#define SORT_FIXTURE_HPP\n\n"
+                "#include \"b.h\"\n"
+                "#include <zeta>\n\n"
+                "#include \"a.h\"\n"
+                "#include <alpha>\n\n"
+                "int value;\n\n"
+                "#endif\n"
+            )
+            result = native_format(f"--style={config}", input_text=input_text)
+
+            self.assertEqual(0, result.returncode, msg=f"stdout:\n{result.stdout}\n\nstderr:\n{result.stderr}")
+            self.assertEqual(
+                "#ifndef SORT_FIXTURE_HPP\n"
+                "#define SORT_FIXTURE_HPP\n\n"
+                "#include <alpha>\n"
+                "#include <zeta>\n\n"
+                "#include \"a.h\"\n"
+                "#include \"b.h\"\n\n"
+                "int value;\n\n"
+                "#endif\n",
+                result.stdout,
+            )
+
     def test_file_argument_formats_to_stdout(self) -> None:
         with copied_fixtures(OUTPUT_FIXTURE) as fixtures:
             result = native_format("--style=file", str(fixtures[OUTPUT_FIXTURE]))
